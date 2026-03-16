@@ -10,8 +10,11 @@ import {
   Clock,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
+import { ErrorCard } from "@/components/ui/error-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
+import { useProcessingState } from "@/hooks/useProcessingState";
+import { uploadImage } from "@/lib/utils/upload";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -59,9 +62,7 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
   const [extendLeft, setExtendLeft] = useState(true);
   const [extendRight, setExtendRight] = useState(true);
   const [bgPrompt, setBgPrompt] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [statusText, setStatusText] = useState("");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { isProcessing, errorMsg, statusText, clearError, run } = useProcessingState();
 
   const handlePresetSelect = useCallback((preset: PlatformPreset) => {
     setSelectedPreset(preset.id);
@@ -71,33 +72,20 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
 
   const handleApply = useCallback(async () => {
     if (!imageFile) return;
-    // Validate dimensions
     const w = Math.max(100, customWidth);
     const h = Math.max(100, customHeight);
-    setIsProcessing(true);
-    setErrorMsg(null);
-    setStatusText("Subiendo imagen...");
 
-    try {
-      // Step 1: Upload the image
-      const formData = new FormData();
-      formData.append("file", imageFile);
-      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      const uploadData = await uploadRes.json();
+    await run(async (setStatus) => {
+      setStatus("Subiendo imagen...");
+      const imageUrl = await uploadImage(imageFile);
 
-      if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen");
+      setStatus("Extendiendo imagen con IA... (30-90 seg)");
 
-      setStatusText("Extendiendo imagen con IA... (30-90 seg)");
-
-      // Determine target aspect ratio from dimensions
       const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
       const d = gcd(w, h);
       const targetAspectRatio = `${w / d}:${h / d}`;
-
-      // Find matching platform ID if a preset is selected
       const platformId = selectedPreset || undefined;
 
-      // Build direction-aware prompt
       const dirs: string[] = [];
       if (extendTop) dirs.push("top");
       if (extendBottom) dirs.push("bottom");
@@ -108,31 +96,23 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
         : "";
       const fullPrompt = directionHint + (bgPrompt || "");
 
-      // Step 2: Call outpaint API
       const res = await fetch("/api/outpaint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: uploadData.data.url,
+          imageUrl,
           platform: platformId,
           targetAspectRatio,
           prompt: fullPrompt || undefined,
         }),
       });
       const data = await res.json();
-
       if (!data.success) throw new Error(data.error || "Error al extender imagen");
-      setStatusText("Listo!");
+
+      setStatus("Listo!");
       onProcess(data.data.url, undefined, data.data.cost ?? 0.05);
-    } catch (error) {
-      console.error("Outpaint error:", error);
-      setStatusText("");
-      setErrorMsg(error instanceof Error ? error.message : "Error al extender imagen");
-    } finally {
-      setIsProcessing(false);
-      setTimeout(() => setStatusText(""), 3000);
-    }
-  }, [imageFile, customWidth, customHeight, selectedPreset, bgPrompt, extendTop, extendBottom, extendLeft, extendRight, onProcess]);
+    });
+  }, [imageFile, customWidth, customHeight, selectedPreset, bgPrompt, extendTop, extendBottom, extendLeft, extendRight, onProcess, run]);
 
   const activeDirections = [extendTop, extendBottom, extendLeft, extendRight].filter(Boolean).length;
   const estimatedCost = activeDirections > 0 ? 0.05 : 0;
@@ -327,13 +307,7 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
       )}
 
       {/* Error card */}
-      {errorMsg && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-          <span className="text-red-400 text-xs shrink-0">Error:</span>
-          <p className="text-xs text-red-300">{errorMsg}</p>
-          <button type="button" onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-300 text-xs shrink-0">x</button>
-        </div>
-      )}
+      <ErrorCard message={errorMsg} onDismiss={clearError} />
 
       {/* Apply button */}
       <Button
