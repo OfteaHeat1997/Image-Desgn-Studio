@@ -93,7 +93,7 @@ const PROJECT_TREE: FileEntry[] = [
       },
       {
         name: "editor/page.tsx",
-        description: "Editor principal — canvas central + sidebar izquierda (modulos) + sidebar derecha (capas/propiedades). Aqui viven TODOS los 17 paneles de modulos",
+        description: "Editor principal — canvas central + sidebar izquierda (modulos) + sidebar derecha (capas/propiedades). Aqui viven TODOS los 19 paneles de modulos",
         editHint: "Agregar nuevos modulos al editor, cambiar layout del canvas, modificar la barra de herramientas",
         path: "src/app/editor/page.tsx",
         type: "file",

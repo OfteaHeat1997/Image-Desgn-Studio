@@ -19,6 +19,9 @@ import {
   Bot,
   ChevronDown,
   ChevronRight,
+  ZoomIn,
+  Layers,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -60,6 +63,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     name: "MEJORA",
     modules: [
       { id: "enhance", label: "Mejorar Calidad", icon: Sparkles, cost: "Gratis", description: "Ajusta brillo, contraste, nitidez y color" },
+      { id: "upscale", label: "Aumentar Resolucion", icon: ZoomIn, cost: "$0.02-$0.05", description: "Agranda tu imagen 2x o 4x sin perder calidad" },
       { id: "shadows", label: "Sombras e Iluminacion", icon: Sun, cost: "Gratis-$0.05", description: "Agrega sombras realistas y cambia iluminacion" },
       { id: "outpaint", label: "Extender Imagen", icon: Expand, cost: "$0.05", description: "Expande los bordes para cualquier formato" },
     ],
@@ -83,15 +87,22 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
   {
     name: "CONTENIDO",
     modules: [
-      { id: "video", label: "Video Studio", icon: Film, cost: "$0-$0.35", description: "Convierte fotos en videos para redes sociales" },
+      { id: "video", label: "Estudio de Video", icon: Film, cost: "$0-$0.35", description: "Convierte fotos en videos para redes sociales" },
       { id: "ad-creator", label: "Crear Anuncios", icon: Megaphone, cost: "$0.04-$0.35", description: "Genera videos publicitarios por plataforma" },
       { id: "ai-prompt", label: "Director Creativo IA", icon: Wand2, cost: "Gratis-$0.003", description: "La IA sugiere conceptos creativos" },
     ],
   },
   {
+    name: "GESTION",
+    modules: [
+      { id: "batch", label: "Procesamiento Masivo", icon: Layers, cost: "Variable", description: "Procesa multiples imagenes con la misma secuencia" },
+      { id: "brand-kit", label: "Kit de Marca", icon: Palette, cost: "Gratis", description: "Colores, fuentes, logo y marca de agua de tu marca" },
+    ],
+  },
+  {
     name: "AUTOMATIZACION",
     modules: [
-      { id: "ai-agent", label: "AI Agent (Auto)", icon: Bot, cost: "Variable", description: "Describe lo que quieres, el agente lo hace" },
+      { id: "ai-agent", label: "Agente IA (Auto)", icon: Bot, cost: "Variable", description: "Describe lo que quieres, el agente lo hace" },
     ],
   },
 ];
@@ -155,6 +166,7 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
                           key={mod.id}
                           type="button"
                           title={mod.description}
+                          aria-label={`${mod.label} — ${mod.description}`}
                           onClick={() => onModuleChange(mod.id)}
                           className={cn(
                             "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-all group",

@@ -171,7 +171,7 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
             tips={[
               "Los presets son un buen punto de partida — luego puedes ajustar cada control.",
               "\"Reiniciar\" vuelve todos los valores a su punto original.",
-              "Para fotos de e-commerce, el preset \"Product Clean\" da resultados profesionales rapidos.",
+              "Para fotos de e-commerce, el preset \"E-Commerce\" da resultados profesionales rapidos.",
               "Todo el procesamiento es local y gratuito — no usa IA.",
             ]}
           />

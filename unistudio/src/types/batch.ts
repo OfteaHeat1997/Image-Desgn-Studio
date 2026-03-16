@@ -30,7 +30,7 @@ export interface BatchResult {
   originalUrl: string;
   processedUrl: string | null;
   stepsCompleted: number;
-  cost: number;            // cost in cents
+  cost: number;            // cost in dollars (e.g. 0.05 = five cents)
   error: string | null;
 }
 
@@ -42,7 +42,7 @@ export interface BatchJob {
   status: BatchJobStatus;
   progress: number;         // 0 to 100
   results: BatchResult[];
-  totalCost: number;        // accumulated cost in cents
+  totalCost: number;        // accumulated cost in dollars
   createdAt: number;        // Unix timestamp
   completedAt: number | null;
 }

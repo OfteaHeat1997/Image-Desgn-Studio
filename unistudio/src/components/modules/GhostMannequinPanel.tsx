@@ -81,7 +81,10 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
     const file = files[0];
     if (!file) return;
     setModelFile(file);
-    setModelImage(URL.createObjectURL(file));
+    setModelImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   }, []);
 
   const handleProcess = useCallback(async () => {

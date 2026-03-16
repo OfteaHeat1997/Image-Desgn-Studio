@@ -311,6 +311,7 @@ function getSocialPipeline(
 
 function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
   const budget = req.budget ?? "economic";
+  const analysis = req.imageAnalysis;
   let steps: PipelineStep[];
   let name: string;
   let description: string;
@@ -335,6 +336,66 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       steps = getEcommercePipeline(req.productCategory, budget);
       name = "Agente E-Commerce";
       description = "Pipeline por defecto.";
+  }
+
+  // --- Smart adjustments based on image analysis ---
+  if (analysis && budget !== "free") {
+    // Prepend watermark removal if detected
+    if (analysis.hasWatermark) {
+      steps.unshift(
+        makeStep(
+          "inpaint",
+          "Remover marca de agua",
+          { prompt: "Remove watermark, logo, and text overlay completely", provider: "kontext" },
+          0.05,
+          "Marca de agua detectada — la removemos antes de procesar.",
+        ),
+      );
+    }
+
+    // Skip bg-remove if background is already transparent or white (for e-commerce)
+    if (
+      (analysis.backgroundType === "transparent" || analysis.backgroundType === "white") &&
+      req.agentType === "ecommerce"
+    ) {
+      steps = steps.filter((s) => s.module !== "bg-remove");
+    }
+
+    // Add enhance if lighting/color issues detected and not already in pipeline
+    if (
+      (analysis.lightingQuality !== "good" || analysis.colorBalance !== "good") &&
+      !steps.some((s) => s.module === "enhance")
+    ) {
+      // Insert enhance early (after bg-remove or inpaint, before shadows/outpaint)
+      const insertIndex = Math.max(
+        steps.findIndex((s) => s.module === "bg-remove"),
+        steps.findIndex((s) => s.module === "inpaint"),
+      ) + 1;
+      steps.splice(
+        Math.max(insertIndex, 1),
+        0,
+        makeStep(
+          "enhance",
+          "Corregir iluminacion/color",
+          { preset: "auto" },
+          0,
+          `Correccion automatica: ${analysis.lightingQuality !== "good" ? "iluminacion " + analysis.lightingQuality : ""}${analysis.colorBalance !== "good" ? " color " + analysis.colorBalance : ""}.`,
+        ),
+      );
+    }
+
+    // Append upscale if low resolution and not already in pipeline
+    if (analysis.isLowResolution && !steps.some((s) => s.module === "upscale")) {
+      steps.push(
+        makeStep(
+          "upscale",
+          "Escalar resolucion",
+          { provider: "real-esrgan", scale: 2 },
+          0.02,
+          `Resolucion baja (${analysis.width}x${analysis.height}) — escalamos a 2x para e-commerce.`,
+        ),
+      );
+    }
   }
 
   const totalCost = steps.reduce((sum, s) => sum + s.estimatedCost, 0);
@@ -394,6 +455,19 @@ async function planWithClaude(req: AgentPlanRequest): Promise<AgentPlan | null> 
   if (!ANTHROPIC_API_KEY) return null;
 
   try {
+    // Build image analysis context for Claude
+    const analysisContext = req.imageAnalysis
+      ? `\n## Image Analysis Results
+- Resolution: ${req.imageAnalysis.width}x${req.imageAnalysis.height} (${req.imageAnalysis.isLowResolution ? "LOW — needs upscale" : "OK"})
+- Background: ${req.imageAnalysis.backgroundType}${req.imageAnalysis.backgroundType === "white" ? " (already white, skip bg-remove if goal is white bg)" : req.imageAnalysis.backgroundType === "transparent" ? " (already transparent, skip bg-remove)" : ""}
+- Watermark: ${req.imageAnalysis.hasWatermark ? "YES — add inpaint step FIRST to remove it" : "no"}
+- Text/tags: ${req.imageAnalysis.hasText ? "YES — consider inpaint to remove" : "no"}
+- Lighting: ${req.imageAnalysis.lightingQuality}${req.imageAnalysis.lightingQuality !== "good" ? " — add enhance step" : ""}
+- Color balance: ${req.imageAnalysis.colorBalance}${req.imageAnalysis.colorBalance !== "good" ? " — add enhance step" : ""}
+- Suggested steps: ${req.imageAnalysis.suggestedSteps.join(", ") || "none"}
+- Warnings: ${req.imageAnalysis.warnings.join("; ") || "none"}`
+      : "";
+
     const userPrompt = `Plan a pipeline for:
 - Agent: ${req.agentType}
 - Product: ${req.productCategory}
@@ -402,6 +476,12 @@ async function planWithClaude(req: AgentPlanRequest): Promise<AgentPlan | null> 
 ${req.contentType ? `- Content type: ${req.contentType}` : ""}
 ${req.preferences ? `- Model preferences: ${JSON.stringify(req.preferences)}` : ""}
 ${req.imageCount ? `- Images: ${req.imageCount}` : ""}
+${analysisContext}
+
+IMPORTANT: If watermark is detected, add an "inpaint" step as the FIRST step with params: {prompt: "Remove watermark, logo, and text overlay completely", provider: "kontext"}.
+If image is already transparent or white background, do NOT add bg-remove step unless needed for isolating the product.
+If lighting or color is bad, add an "enhance" step early in the pipeline.
+If resolution is low, add "upscale" as the LAST step.
 
 Return JSON: {"id","name","description","agentType","steps":[{"id","module","label","params","estimatedCost","reasoning"}],"totalEstimatedCost","estimatedDuration"}`;
 
@@ -440,11 +520,39 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
       return null;
     }
 
+    // Validate each step's module is a valid AgentModule
+    const validModules = new Set([
+      "bg-remove", "bg-generate", "enhance", "shadows", "outpaint",
+      "upscale", "tryon", "model-create", "inpaint", "video",
+      "ad-create", "jewelry-tryon",
+    ]);
+    const invalidSteps = plan.steps.filter((s) => !validModules.has(s.module));
+    if (invalidSteps.length > 0) {
+      console.error(
+        "[ai-agent/plan] Claude returned invalid modules:",
+        invalidSteps.map((s) => s.module),
+      );
+      return null; // Fall back to templates
+    }
+
+    // Validate budget constraints on Claude's output
+    const totalCost = plan.steps.reduce((sum, s) => sum + (s.estimatedCost ?? 0), 0);
+    const budgetLimit = req.budget === "free" ? 0 : req.budget === "economic" ? 0.20 : Infinity;
+    if (totalCost > budgetLimit) {
+      console.error(
+        `[ai-agent/plan] Claude plan cost $${totalCost.toFixed(3)} exceeds ${req.budget} budget limit $${budgetLimit}`,
+      );
+      return null; // Fall back to templates which respect budget
+    }
+
     // Ensure IDs exist
     plan.id = plan.id || `plan-${Date.now()}`;
     plan.steps.forEach((step, i) => {
       step.id = step.id || `step-${i}-${Date.now()}`;
     });
+
+    // Recalculate totalEstimatedCost from actual steps (don't trust Claude's math)
+    plan.totalEstimatedCost = plan.steps.reduce((sum, s) => sum + (s.estimatedCost ?? 0), 0);
 
     return plan;
   } catch (err) {

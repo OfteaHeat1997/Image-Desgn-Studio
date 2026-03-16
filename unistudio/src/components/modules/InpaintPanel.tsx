@@ -34,14 +34,14 @@ interface QuickPreset {
 }
 
 const QUICK_PRESETS: QuickPreset[] = [
-  { id: "remove-tag", label: "Quitar Etiqueta", prompt: "Remove the tag and fill with matching fabric" },
-  { id: "remove-wrinkles", label: "Quitar Arrugas", prompt: "Smooth out wrinkles and creases" },
-  { id: "fix-stain", label: "Quitar Mancha", prompt: "Remove stain and restore original surface" },
-  { id: "color-red", label: "Rojo", prompt: "Change color to red" },
-  { id: "color-blue", label: "Azul", prompt: "Change color to blue" },
-  { id: "color-black", label: "Negro", prompt: "Change color to black" },
-  { id: "color-white", label: "Blanco", prompt: "Change color to white" },
-  { id: "remove-reflection", label: "Sin Reflejo", prompt: "Remove reflections and glare" },
+  { id: "remove-tag", label: "Quitar Etiqueta", prompt: "Quitar la etiqueta y rellenar con la misma tela" },
+  { id: "remove-wrinkles", label: "Quitar Arrugas", prompt: "Alisar arrugas y pliegues" },
+  { id: "fix-stain", label: "Quitar Mancha", prompt: "Quitar la mancha y restaurar la superficie original" },
+  { id: "color-red", label: "Rojo", prompt: "Cambiar el color a rojo" },
+  { id: "color-blue", label: "Azul", prompt: "Cambiar el color a azul" },
+  { id: "color-black", label: "Negro", prompt: "Cambiar el color a negro" },
+  { id: "color-white", label: "Blanco", prompt: "Cambiar el color a blanco" },
+  { id: "remove-reflection", label: "Sin Reflejo", prompt: "Quitar reflejos y brillos" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -198,7 +198,7 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
           <textarea
             value={negativePrompt}
             onChange={(e) => setNegativePrompt(e.target.value)}
-            placeholder="ej. blurry, distorted, low quality..."
+            placeholder="ej. borroso, distorsionado, baja calidad..."
             rows={2}
             className="mt-1.5 w-full rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors resize-none"
           />

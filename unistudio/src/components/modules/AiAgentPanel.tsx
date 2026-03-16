@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   ShoppingBag,
   User,
@@ -16,6 +16,14 @@ import {
   Clock,
   ImageIcon,
   X,
+  Download,
+  Eye,
+  Info,
+  ZoomIn,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -25,11 +33,14 @@ import { cn } from "@/lib/utils/cn";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import type {
   AgentType,
+  AgentModule,
+  AgentPlan,
   ProductCategory,
   BudgetTier,
   SocialContentType,
   AgentPlanRequest,
   PipelineStep,
+  ImageAnalysis,
 } from "@/types/agent";
 import { toast } from "@/hooks/use-toast";
 
@@ -97,6 +108,15 @@ const BUDGET_OPTIONS: { value: BudgetTier; label: string; desc: string }[] = [
   { value: "premium", label: "Premium", desc: "Mejor calidad, sin limite" },
 ];
 
+/** Free tier warnings per agent type */
+const FREE_TIER_WARNINGS: Record<AgentType, string | null> = {
+  ecommerce: null, // Free ecommerce works fine (bg-remove + enhance + shadows)
+  modelo:
+    "El modo Gratis solo puede quitar fondo y mejorar la imagen. Para generar un modelo IA y vestirlo necesitas minimo el plan Economico.",
+  social:
+    "El modo Gratis solo genera videos Ken Burns basicos. Para fondos creativos, videos IA y anuncios usa el plan Economico.",
+};
+
 const GENDER_OPTIONS = [
   { value: "female", label: "Femenino" },
   { value: "male", label: "Masculino" },
@@ -146,6 +166,22 @@ const MODULE_ICONS: Record<string, string> = {
   "ad-create": "📱",
 };
 
+/** Modules available for "add step" in plan editor */
+const ADDABLE_MODULES: { module: AgentModule; label: string; cost: number }[] = [
+  { module: "bg-remove", label: "Quitar fondo", cost: 0 },
+  { module: "bg-generate", label: "Generar fondo", cost: 0.05 },
+  { module: "enhance", label: "Mejorar imagen", cost: 0 },
+  { module: "shadows", label: "Agregar sombras", cost: 0 },
+  { module: "inpaint", label: "Inpainting / Remover", cost: 0.05 },
+  { module: "outpaint", label: "Extender imagen", cost: 0.05 },
+  { module: "upscale", label: "Escalar resolucion", cost: 0.02 },
+  { module: "model-create", label: "Crear modelo IA", cost: 0.055 },
+  { module: "tryon", label: "Try-On virtual", cost: 0.02 },
+  { module: "jewelry-tryon", label: "Try-On joyeria", cost: 0.05 },
+  { module: "video", label: "Generar video", cost: 0.05 },
+  { module: "ad-create", label: "Crear anuncio", cost: 0 },
+];
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
@@ -171,13 +207,64 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   // Error state (inline, visible in panel)
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Cost confirmation dialog
+  const [showCostConfirm, setShowCostConfirm] = useState(false);
+
+  // Image analysis (runs on upload, informs planner)
+  const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Expanded step preview (click thumbnail to see full image)
+  const [previewStepUrl, setPreviewStepUrl] = useState<string | null>(null);
+  const [previewStepLabel, setPreviewStepLabel] = useState<string>("");
+
+  // Plan editor state
+  const [editedPlan, setEditedPlan] = useState<AgentPlan | null>(null);
+  const [showAddStep, setShowAddStep] = useState(false);
+
   // Pipeline hook
   const pipeline = useAgentPipeline();
-  const { plan, planMethod, execution, isPlanning } = pipeline;
+  const { plan: rawPlan, planMethod, execution, isPlanning } = pipeline;
+
+  // Use editedPlan if user has modified, otherwise use raw plan from pipeline
+  const plan = editedPlan ?? rawPlan;
 
   // Elapsed time tracking
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+
+  // Analyze image automatically when user uploads one
+  useEffect(() => {
+    if (!imageFile) {
+      setImageAnalysis(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsAnalyzing(true);
+    setImageAnalysis(null);
+
+    const analyze = async () => {
+      try {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const res = await fetch("/api/analyze-image", { method: "POST", body: formData });
+        if (!res.ok) throw new Error(`Analysis failed: ${res.status}`);
+        const json = await res.json();
+        if (!cancelled && json.success && json.data) {
+          setImageAnalysis(json.data as ImageAnalysis);
+        }
+      } catch (err) {
+        console.error("[AiAgentPanel] Image analysis failed:", err);
+        // Non-blocking — analysis is optional, planning still works without it
+      } finally {
+        if (!cancelled) setIsAnalyzing(false);
+      }
+    };
+
+    analyze();
+    return () => { cancelled = true; };
+  }, [imageFile]);
 
   // Tick elapsed every second during execution
   React.useEffect(() => {
@@ -215,6 +302,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
       budget,
       contentType: agentType === "social" ? contentType : undefined,
       preferences: agentType === "modelo" ? { gender, skinTone, bodyType, pose, ageRange } : undefined,
+      imageAnalysis: imageAnalysis ?? undefined,
     };
 
     try {
@@ -226,10 +314,18 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
       setErrorMsg(msg);
       toast.error(msg);
     }
-  }, [agentType, description, category, budget, contentType, gender, skinTone, bodyType, pose, ageRange, pipeline]);
+  }, [agentType, description, category, budget, contentType, gender, skinTone, bodyType, pose, ageRange, pipeline, imageAnalysis]);
 
   const handleExecute = useCallback(async () => {
     if (!plan || !imageFile) return;
+
+    // Show cost confirmation for paid pipelines
+    if (plan.totalEstimatedCost > 0 && !showCostConfirm) {
+      setShowCostConfirm(true);
+      return;
+    }
+
+    setShowCostConfirm(false);
     setErrorMsg(null);
     setPhase("executing");
     setStartTime(Date.now());
@@ -248,16 +344,18 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
       setErrorMsg(err instanceof Error ? err.message : "Error inesperado durante ejecucion");
       setPhase("input");
     }
-  }, [plan, imageFile, pipeline]);
+  }, [plan, imageFile, pipeline, showCostConfirm]);
 
   const handleRetry = useCallback(async (index: number) => {
     if (!plan || !imageFile) return;
     setPhase("executing");
-    await pipeline.retryFromStep(plan, imageFile, index);
-    if (execution?.status === "completed") {
+    // FIX: retryFromStep returns the final execution state directly,
+    // so we check the returned value instead of the stale React state
+    const result = await pipeline.retryFromStep(plan, imageFile, index);
+    if (result?.status === "completed") {
       setPhase("results");
     }
-  }, [plan, imageFile, pipeline, execution]);
+  }, [plan, imageFile, pipeline]);
 
   const handleUseResult = useCallback(() => {
     if (!finalResultUrl) return;
@@ -270,7 +368,60 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     setDescription("");
     setStartTime(null);
     setElapsed(0);
+    setImageAnalysis(null);
+    setEditedPlan(null);
+    setShowAddStep(false);
   }, [pipeline]);
+
+  // ----- Plan editing helpers -----
+
+  /** Get or create the editable plan copy */
+  const getEditablePlan = useCallback((): AgentPlan | null => {
+    if (editedPlan) return editedPlan;
+    if (!rawPlan) return null;
+    // Deep clone the raw plan for editing
+    return JSON.parse(JSON.stringify(rawPlan)) as AgentPlan;
+  }, [editedPlan, rawPlan]);
+
+  const recalcPlanCost = (p: AgentPlan): AgentPlan => {
+    p.totalEstimatedCost = p.steps.reduce((sum, s) => sum + s.estimatedCost, 0);
+    return p;
+  };
+
+  const handleRemoveStep = useCallback((index: number) => {
+    const p = getEditablePlan();
+    if (!p || p.steps.length <= 1) return; // Don't allow empty plan
+    p.steps.splice(index, 1);
+    setEditedPlan(recalcPlanCost({ ...p, steps: [...p.steps] }));
+  }, [getEditablePlan]);
+
+  const handleMoveStep = useCallback((index: number, direction: "up" | "down") => {
+    const p = getEditablePlan();
+    if (!p) return;
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= p.steps.length) return;
+    const steps = [...p.steps];
+    [steps[index], steps[newIndex]] = [steps[newIndex], steps[index]];
+    setEditedPlan({ ...p, steps });
+  }, [getEditablePlan]);
+
+  const handleAddStep = useCallback((module: AgentModule) => {
+    const p = getEditablePlan();
+    if (!p) return;
+    const tmpl = ADDABLE_MODULES.find((m) => m.module === module);
+    if (!tmpl) return;
+    const newStep: PipelineStep = {
+      id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      module,
+      label: tmpl.label,
+      params: {},
+      estimatedCost: tmpl.cost,
+      reasoning: "Paso agregado manualmente.",
+    };
+    p.steps.push(newStep);
+    setEditedPlan(recalcPlanCost({ ...p, steps: [...p.steps] }));
+    setShowAddStep(false);
+  }, [getEditablePlan]);
 
   // ----- Section header -----
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -423,6 +574,120 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           ))}
         </div>
 
+        {/* Free tier warning */}
+        {budget === "free" && FREE_TIER_WARNINGS[agentType] && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
+            <Info className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[10px] text-amber-300 leading-relaxed">
+              {FREE_TIER_WARNINGS[agentType]}
+            </p>
+          </div>
+        )}
+
+        {/* Image preview + analysis */}
+        {imageFile && (
+          <div className="space-y-1.5">
+            <SectionLabel>Imagen a Procesar</SectionLabel>
+            <div className="relative overflow-hidden rounded-lg border border-surface-lighter">
+              <img
+                src={URL.createObjectURL(imageFile)}
+                alt="Imagen seleccionada"
+                className="w-full aspect-[4/3] object-contain bg-black/20"
+              />
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
+                <p className="text-[9px] text-gray-300 truncate">{imageFile.name}</p>
+                <p className="text-[9px] text-gray-500">
+                  {imageAnalysis
+                    ? `${imageAnalysis.width}x${imageAnalysis.height} · ${imageAnalysis.format.toUpperCase()} · ${imageAnalysis.aspectRatio}`
+                    : `${(imageFile.size / 1024).toFixed(0)}KB`}
+                </p>
+              </div>
+              {/* Analysis spinner overlay */}
+              {isAnalyzing && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
+                  <Loader2 className="h-3 w-3 animate-spin text-accent-light" />
+                  <span className="text-[9px] text-gray-300">Analizando...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Analysis results */}
+            {imageAnalysis && (
+              <div className="space-y-1.5">
+                {/* Warnings (watermark, bad lighting, low res, etc.) */}
+                {imageAnalysis.warnings.length > 0 && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <AlertCircle className="h-3 w-3 text-amber-400 shrink-0" />
+                      <span className="text-[10px] font-semibold text-amber-300">
+                        Problemas detectados ({imageAnalysis.warnings.length})
+                      </span>
+                    </div>
+                    <ul className="space-y-0.5 pl-4">
+                      {imageAnalysis.warnings.map((w, i) => (
+                        <li key={i} className="text-[9px] text-amber-200/80 list-disc">{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Quick info chips */}
+                <div className="flex flex-wrap gap-1">
+                  {imageAnalysis.hasWatermark && (
+                    <span className="text-[8px] bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded border border-red-500/30">
+                      Marca de agua
+                    </span>
+                  )}
+                  {imageAnalysis.isLowResolution && (
+                    <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                      Baja resolucion
+                    </span>
+                  )}
+                  {imageAnalysis.lightingQuality !== "good" && (
+                    <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                      {imageAnalysis.lightingQuality === "dark" ? "Oscura" :
+                       imageAnalysis.lightingQuality === "overexposed" ? "Sobreexpuesta" : "Luz desigual"}
+                    </span>
+                  )}
+                  {imageAnalysis.backgroundType === "white" && (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                      Fondo blanco
+                    </span>
+                  )}
+                  {imageAnalysis.backgroundType === "transparent" && (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                      Transparente
+                    </span>
+                  )}
+                  {imageAnalysis.backgroundType === "complex" && (
+                    <span className="text-[8px] bg-gray-500/20 text-gray-300 px-1.5 py-0.5 rounded border border-gray-500/30">
+                      Fondo complejo
+                    </span>
+                  )}
+                  {imageAnalysis.warnings.length === 0 && imageAnalysis.lightingQuality === "good" && (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                      Imagen lista
+                    </span>
+                  )}
+                </div>
+
+                {/* Budget recommendation */}
+                {imageAnalysis.minBudgetNeeded !== "free" && budget === "free" && (
+                  <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
+                    <Info className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-[9px] text-amber-200/80">
+                      Esta imagen necesita minimo presupuesto <strong className="text-amber-300">
+                      {imageAnalysis.minBudgetNeeded === "economic" ? "Economico" : "Premium"}</strong> para
+                      {imageAnalysis.hasWatermark ? " remover marca de agua" :
+                       imageAnalysis.isLowResolution ? " escalar resolucion" : " procesamiento optimo"}.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Error card */}
         {errorMsg && (
           <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
@@ -441,10 +706,10 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           className="w-full"
           leftIcon={<Sparkles className="h-3.5 w-3.5" />}
           onClick={handleCreatePlan}
-          loading={isPlanning}
-          disabled={!imageFile || isPlanning}
+          loading={isPlanning || isAnalyzing}
+          disabled={!imageFile || isPlanning || isAnalyzing}
         >
-          {isPlanning ? "Planificando..." : "Crear Plan IA"}
+          {isAnalyzing ? "Analizando imagen..." : isPlanning ? "Planificando..." : "Crear Plan IA"}
         </Button>
 
         {!imageFile && (
@@ -475,8 +740,8 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         </div>
         <p className="text-[11px] text-gray-400">{plan.description}</p>
 
-        {/* Steps */}
-        <SectionLabel>Pipeline ({plan.steps.length} pasos)</SectionLabel>
+        {/* Steps (editable) */}
+        <SectionLabel>Pipeline ({plan.steps.length} pasos) — editable</SectionLabel>
         <div className="space-y-2">
           {plan.steps.map((step, i) => (
             <div
@@ -484,15 +749,15 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
               className="rounded-lg border border-surface-lighter bg-surface-light p-2.5"
             >
               <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 text-[10px] font-bold text-accent-light">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 text-[10px] font-bold text-accent-light shrink-0">
                   {i + 1}
                 </span>
-                <span className="text-sm">{MODULE_ICONS[step.module] ?? "⚙️"}</span>
-                <span className="flex-1 text-xs font-medium text-gray-200">
+                <span className="text-sm shrink-0">{MODULE_ICONS[step.module] ?? "⚙️"}</span>
+                <span className="flex-1 text-xs font-medium text-gray-200 truncate">
                   {step.label}
                 </span>
                 {step.estimatedCost > 0 && (
-                  <span className="text-[10px] tabular-nums text-emerald-400">
+                  <span className="text-[10px] tabular-nums text-emerald-400 shrink-0">
                     ${step.estimatedCost.toFixed(3)}
                   </span>
                 )}
@@ -501,8 +766,77 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                 )}
               </div>
               <p className="mt-1 text-[10px] text-gray-500 pl-7">{step.reasoning}</p>
+              {/* Edit controls */}
+              <div className="flex items-center gap-1 mt-1.5 pl-7">
+                <button
+                  type="button"
+                  onClick={() => handleMoveStep(i, "up")}
+                  disabled={i === 0}
+                  className="p-0.5 rounded text-gray-500 hover:text-gray-300 hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Mover arriba"
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveStep(i, "down")}
+                  disabled={i === plan.steps.length - 1}
+                  className="p-0.5 rounded text-gray-500 hover:text-gray-300 hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Mover abajo"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveStep(i)}
+                  disabled={plan.steps.length <= 1}
+                  className="p-0.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+                  title="Eliminar paso"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
             </div>
           ))}
+
+          {/* Add step button */}
+          {!showAddStep ? (
+            <button
+              type="button"
+              onClick={() => setShowAddStep(true)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-surface-lighter bg-surface-light/50 py-2 text-[10px] text-gray-500 hover:border-accent/40 hover:text-accent-light transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Agregar paso
+            </button>
+          ) : (
+            <div className="rounded-lg border border-accent/30 bg-accent/5 p-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-accent-light">Agregar Paso</span>
+                <button type="button" onClick={() => setShowAddStep(false)} className="text-gray-500 hover:text-gray-300">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {ADDABLE_MODULES.map((m) => (
+                  <button
+                    key={m.module}
+                    type="button"
+                    onClick={() => handleAddStep(m.module)}
+                    className="flex items-center gap-1.5 rounded border border-surface-lighter bg-surface-light px-2 py-1.5 text-left hover:border-accent/40 transition-colors"
+                  >
+                    <span className="text-xs shrink-0">{MODULE_ICONS[m.module] ?? "⚙️"}</span>
+                    <div className="min-w-0">
+                      <p className="text-[9px] text-gray-300 truncate">{m.label}</p>
+                      <p className="text-[8px] text-gray-500">
+                        {m.cost > 0 ? `$${m.cost.toFixed(3)}` : "Gratis"}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Summary */}
@@ -519,28 +853,71 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           </div>
         </div>
 
+        {/* Cost confirmation dialog */}
+        {showCostConfirm && plan.totalEstimatedCost > 0 && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-amber-400" />
+              <span className="text-xs font-semibold text-amber-300">Confirmar Costo</span>
+            </div>
+            <div className="space-y-1">
+              {plan.steps.filter(s => s.estimatedCost > 0).map((step) => (
+                <div key={step.id} className="flex items-center justify-between text-[10px]">
+                  <span className="text-gray-300">{MODULE_ICONS[step.module]} {step.label}</span>
+                  <span className="text-amber-300 tabular-nums">${step.estimatedCost.toFixed(3)}</span>
+                </div>
+              ))}
+              <div className="border-t border-amber-500/20 pt-1 flex items-center justify-between text-xs font-semibold">
+                <span className="text-amber-200">Total estimado</span>
+                <span className="text-amber-200">${plan.totalEstimatedCost.toFixed(3)}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowCostConfirm(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                className="flex-1"
+                leftIcon={<Play className="h-3.5 w-3.5" />}
+                onClick={handleExecute}
+              >
+                Confirmar y Ejecutar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
-            onClick={() => setPhase("input")}
-          >
-            Regenerar
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1"
-            leftIcon={<Play className="h-3.5 w-3.5" />}
-            onClick={handleExecute}
-            disabled={!imageFile}
-          >
-            Ejecutar
-          </Button>
-        </div>
+        {!showCostConfirm && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+              onClick={() => { setPhase("input"); setEditedPlan(null); setShowAddStep(false); }}
+            >
+              Regenerar
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="flex-1"
+              leftIcon={<Play className="h-3.5 w-3.5" />}
+              onClick={handleExecute}
+              disabled={!imageFile}
+            >
+              Ejecutar{plan.totalEstimatedCost > 0 ? ` ($${plan.totalEstimatedCost.toFixed(2)})` : ""}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -586,8 +963,8 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           </span>
         </div>
 
-        {/* Step list */}
-        <div className="space-y-1.5">
+        {/* Step list — each step shows full-width result preview */}
+        <div className="space-y-2">
           {plan.steps.map((step, i) => {
             const stepExec = execution.steps[i];
             const isRunning = stepExec.status === "running";
@@ -598,45 +975,114 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
               <div
                 key={step.id}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-all",
+                  "rounded-lg border overflow-hidden transition-all",
                   isRunning ? "border-accent/50 bg-accent/5" :
                   isCompleted ? "border-emerald-500/30 bg-emerald-500/5" :
                   isFailed ? "border-red-500/30 bg-red-500/5" :
                   "border-surface-lighter bg-surface-light opacity-50",
                 )}
               >
-                {/* Status icon */}
-                {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-light shrink-0" />}
-                {isCompleted && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
-                {isFailed && <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />}
-                {stepExec.status === "pending" && (
-                  <span className="flex h-3.5 w-3.5 items-center justify-center text-[9px] text-gray-600 shrink-0">
-                    {i + 1}
-                  </span>
-                )}
+                {/* Step header row */}
+                <div className="flex items-center gap-2 px-2.5 py-2">
+                  {/* Status icon */}
+                  {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-light shrink-0" />}
+                  {isCompleted && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
+                  {isFailed && <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+                  {stepExec.status === "pending" && (
+                    <span className="flex h-3.5 w-3.5 items-center justify-center text-[9px] text-gray-600 shrink-0">
+                      {i + 1}
+                    </span>
+                  )}
 
-                {/* Label */}
-                <span className="flex-1 text-[11px] text-gray-300 truncate">{step.label}</span>
+                  {/* Icon + Label */}
+                  <span className="text-sm shrink-0">{MODULE_ICONS[step.module] ?? "⚙️"}</span>
+                  <span className="flex-1 text-[11px] text-gray-300 truncate">{step.label}</span>
 
-                {/* Thumbnail for completed */}
+                  {/* Cost */}
+                  {isCompleted && stepExec.actualCost > 0 && (
+                    <span className="text-[9px] tabular-nums text-emerald-400 shrink-0">
+                      ${stepExec.actualCost.toFixed(3)}
+                    </span>
+                  )}
+                  {isCompleted && stepExec.actualCost === 0 && (
+                    <span className="text-[9px] text-emerald-400/60 shrink-0">Gratis</span>
+                  )}
+                </div>
+
+                {/* RESULT PREVIEW — large, visible, the whole point */}
                 {isCompleted && stepExec.resultUrl && (
-                  <img
-                    src={stepExec.resultUrl}
-                    alt=""
-                    className="h-6 w-6 rounded border border-surface-lighter object-cover shrink-0"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewStepUrl(stepExec.resultUrl);
+                      setPreviewStepLabel(step.label);
+                    }}
+                    className="relative w-full group cursor-pointer"
+                  >
+                    <img
+                      src={stepExec.resultUrl}
+                      alt={step.label}
+                      className="w-full aspect-[16/10] object-contain bg-black/30 border-t border-surface-lighter"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                      <ZoomIn className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="absolute bottom-1 right-1">
+                      <span className="text-[8px] bg-black/60 text-gray-300 px-1.5 py-0.5 rounded">
+                        Paso {i + 1} de {plan.steps.length}
+                      </span>
+                    </div>
+                  </button>
                 )}
 
-                {/* Cost */}
-                {isCompleted && stepExec.actualCost > 0 && (
-                  <span className="text-[9px] tabular-nums text-emerald-400 shrink-0">
-                    ${stepExec.actualCost.toFixed(3)}
-                  </span>
+                {/* Running animation */}
+                {isRunning && (
+                  <div className="flex items-center justify-center py-6 border-t border-accent/20">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-accent-light" />
+                      <span className="text-[10px] text-accent-light animate-pulse">
+                        Procesando {step.label.toLowerCase()}...
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Failed message */}
+                {isFailed && stepExec.error && (
+                  <div className="px-2.5 pb-2">
+                    <p className="text-[10px] text-red-400">{stepExec.error}</p>
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
+
+        {/* Step preview modal overlay */}
+        {previewStepUrl && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setPreviewStepUrl(null)}
+          >
+            <div className="relative max-w-2xl w-full max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-3 py-2 bg-surface rounded-t-xl border border-surface-lighter">
+                <span className="text-xs font-medium text-gray-200">{previewStepLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewStepUrl(null)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <img
+                src={previewStepUrl}
+                alt={previewStepLabel}
+                className="w-full max-h-[75vh] object-contain bg-black rounded-b-xl border-x border-b border-surface-lighter"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Failed step error + retry */}
         {failedIndex >= 0 && (
@@ -737,25 +1183,44 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         )}
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              className="flex-1"
+              leftIcon={<ImageIcon className="h-3.5 w-3.5" />}
+              onClick={handleUseResult}
+              disabled={!finalResultUrl}
+            >
+              Usar en Editor
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Download className="h-3.5 w-3.5" />}
+              disabled={!finalResultUrl}
+              onClick={() => {
+                if (!finalResultUrl) return;
+                const a = document.createElement("a");
+                a.href = finalResultUrl;
+                a.download = `unistudio-agent-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }}
+            >
+              Descargar
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="w-full"
             leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             onClick={handleReset}
           >
             Nuevo Plan
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1"
-            leftIcon={<ImageIcon className="h-3.5 w-3.5" />}
-            onClick={handleUseResult}
-            disabled={!finalResultUrl}
-          >
-            Usar Resultado
           </Button>
         </div>
       </div>

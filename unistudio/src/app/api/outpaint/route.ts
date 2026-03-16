@@ -29,7 +29,6 @@ const PLATFORM_SPECS: Record<string, { aspectRatio: string; description: string 
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
   kontext: 0.05,
-  'flux-fill-pro': 0.05,
 };
 
 export async function POST(request: NextRequest) {
@@ -85,9 +84,8 @@ export async function POST(request: NextRequest) {
       'Extend the image naturally, maintaining consistent lighting, perspective, and style. ' +
       'Fill the extended area with appropriate background content that matches the original scene.';
 
-    if (provider === 'kontext' || provider === 'flux-fill-pro' || !provider) {
+    if (provider === 'kontext' || !provider) {
       // Use Flux Kontext Pro via Replicate for instruction-based outpainting
-      // Note: flux-fill-pro does not support aspect_ratio, so we route both to Kontext
       const fullPrompt = `Extend this image to ${aspectRatio} aspect ratio. ${outpaintPrompt}`;
       const output = await runModel('black-forest-labs/flux-kontext-pro', {
         input_image: imageUrl,
@@ -99,7 +97,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: `Unsupported provider "${provider}". Use "kontext" or "flux-fill-pro".`,
+          error: `Unsupported provider "${provider}". Use "kontext".`,
         },
         { status: 400 },
       );

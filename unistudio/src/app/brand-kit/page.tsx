@@ -72,27 +72,27 @@ const FONT_OPTIONS = [
 ];
 
 const BG_STYLE_OPTIONS = [
-  { value: "studio-white", label: "Studio White" },
-  { value: "gradient", label: "Gradient" },
-  { value: "outdoor-natural", label: "Outdoor Natural" },
-  { value: "minimalist", label: "Minimalist" },
-  { value: "lifestyle", label: "Lifestyle Scene" },
+  { value: "studio-white", label: "Estudio Blanco" },
+  { value: "gradient", label: "Degradado" },
+  { value: "outdoor-natural", label: "Exterior Natural" },
+  { value: "minimalist", label: "Minimalista" },
+  { value: "lifestyle", label: "Escena Lifestyle" },
 ];
 
 const ENHANCE_PRESET_OPTIONS = [
-  { value: "auto", label: "Auto" },
+  { value: "auto", label: "Automatico" },
   { value: "ecommerce", label: "E-Commerce" },
-  { value: "fashion", label: "Fashion" },
-  { value: "luxury", label: "Luxury" },
+  { value: "fashion", label: "Moda" },
+  { value: "luxury", label: "Lujo" },
   { value: "natural", label: "Natural" },
-  { value: "crisp-clean", label: "Crisp & Clean" },
+  { value: "crisp-clean", label: "Nitido y Limpio" },
 ];
 
 const SHADOW_TYPE_OPTIONS = [
-  { value: "drop", label: "Drop Shadow" },
-  { value: "contact", label: "Contact Shadow" },
-  { value: "reflection", label: "Reflection" },
-  { value: "none", label: "None" },
+  { value: "drop", label: "Sombra Proyectada" },
+  { value: "contact", label: "Sombra de Contacto" },
+  { value: "reflection", label: "Reflejo" },
+  { value: "none", label: "Ninguna" },
 ];
 
 const WATERMARK_POSITIONS: { value: WatermarkPosition; label: string }[] = [
@@ -261,17 +261,17 @@ export default function BrandKitPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Brand Kit</h1>
+          <h1 className="text-2xl font-bold">Kit de Marca</h1>
           <p className="mt-1 text-sm text-gray-400">
-            Define your brand identity for consistent product photography.
+            Define la identidad de tu marca para fotografia de producto consistente.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" leftIcon={<RotateCcw className="h-3.5 w-3.5" />} onClick={handleReset}>
-            Reset
+            Restablecer
           </Button>
           <Button variant="primary" size="sm" leftIcon={<Save className="h-3.5 w-3.5" />} loading={isSaving} onClick={handleSave}>
-            Save Brand Kit
+            Guardar Kit de Marca
           </Button>
         </div>
       </div>
@@ -283,26 +283,26 @@ export default function BrandKitPage() {
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <PaletteIcon className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Brand Colors</h2>
+              <h2 className="text-sm font-semibold text-gray-200">Colores de Marca</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ColorPicker
-                label="Primary"
+                label="Primario"
                 value={state.colors.primary}
                 onChange={(v) => updateColor("primary", v)}
               />
               <ColorPicker
-                label="Secondary"
+                label="Secundario"
                 value={state.colors.secondary}
                 onChange={(v) => updateColor("secondary", v)}
               />
               <ColorPicker
-                label="Accent"
+                label="Acento"
                 value={state.colors.accent}
                 onChange={(v) => updateColor("accent", v)}
               />
               <ColorPicker
-                label="Background"
+                label="Fondo"
                 value={state.colors.background}
                 onChange={(v) => updateColor("background", v)}
               />
@@ -313,14 +313,14 @@ export default function BrandKitPage() {
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <ImageIcon className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Logo</h2>
+              <h2 className="text-sm font-semibold text-gray-200">Logotipo</h2>
             </div>
             {state.logoUrl ? (
               <div className="flex items-center gap-4">
                 <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-surface-lighter bg-surface">
                   <img
                     src={state.logoUrl}
-                    alt="Brand logo"
+                    alt="Logotipo de marca"
                     className="max-h-full max-w-full object-contain"
                   />
                 </div>
@@ -329,15 +329,15 @@ export default function BrandKitPage() {
                   size="sm"
                   onClick={() => setState((prev) => ({ ...prev, logoUrl: null }))}
                 >
-                  Remove
+                  Eliminar
                 </Button>
               </div>
             ) : (
               <Dropzone
                 onDrop={handleLogoUpload}
                 multiple={false}
-                label="Upload your brand logo"
-                hint="PNG or SVG, transparent background recommended"
+                label="Sube tu logotipo"
+                hint="PNG o SVG, se recomienda fondo transparente"
                 className="min-h-[100px]"
               />
             )}
@@ -347,17 +347,17 @@ export default function BrandKitPage() {
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <Type className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Typography</h2>
+              <h2 className="text-sm font-semibold text-gray-200">Tipografia</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Select
-                label="Primary Font"
+                label="Fuente Principal"
                 value={state.fonts.primary}
                 onValueChange={(v) => updateFont("primary", v)}
                 options={FONT_OPTIONS}
               />
               <Select
-                label="Secondary Font"
+                label="Fuente Secundaria"
                 value={state.fonts.secondary}
                 onValueChange={(v) => updateFont("secondary", v)}
                 options={FONT_OPTIONS}
@@ -368,11 +368,11 @@ export default function BrandKitPage() {
           {/* Watermark */}
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-200">Watermark</h2>
+              <h2 className="text-sm font-semibold text-gray-200">Marca de Agua</h2>
               <Switch
                 checked={state.watermark.enabled}
                 onCheckedChange={(checked) => updateWatermark({ enabled: checked })}
-                label={state.watermark.enabled ? "Enabled" : "Disabled"}
+                label={state.watermark.enabled ? "Habilitada" : "Deshabilitada"}
                 labelPosition="left"
               />
             </div>
@@ -382,7 +382,7 @@ export default function BrandKitPage() {
                 {/* Position grid */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-300">
-                    Position
+                    Posicion
                   </label>
                   <div className="grid grid-cols-3 gap-1.5 w-fit">
                     {WATERMARK_POSITIONS.map((pos) => (
@@ -405,7 +405,7 @@ export default function BrandKitPage() {
 
                 {/* Opacity */}
                 <Slider
-                  label="Opacity"
+                  label="Opacidad"
                   value={[state.watermark.opacity]}
                   onValueChange={([v]) => updateWatermark({ opacity: v })}
                   min={5}
@@ -416,7 +416,7 @@ export default function BrandKitPage() {
 
                 {/* Size */}
                 <Slider
-                  label="Size"
+                  label="Tamaño"
                   value={[state.watermark.size]}
                   onValueChange={([v]) => updateWatermark({ size: v })}
                   min={5}
@@ -431,23 +431,23 @@ export default function BrandKitPage() {
           {/* Default Style Presets */}
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <h2 className="mb-4 text-sm font-semibold text-gray-200">
-              Default Style Presets
+              Presets de Estilo por Defecto
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Select
-                label="Background Style"
+                label="Estilo de Fondo"
                 value={state.defaultBgStyle}
                 onValueChange={(v) => setState((prev) => ({ ...prev, defaultBgStyle: v }))}
                 options={BG_STYLE_OPTIONS}
               />
               <Select
-                label="Enhancement Preset"
+                label="Preset de Mejora"
                 value={state.defaultEnhancePreset}
                 onValueChange={(v) => setState((prev) => ({ ...prev, defaultEnhancePreset: v }))}
                 options={ENHANCE_PRESET_OPTIONS}
               />
               <Select
-                label="Shadow Type"
+                label="Tipo de Sombra"
                 value={state.defaultShadowType}
                 onValueChange={(v) => setState((prev) => ({ ...prev, defaultShadowType: v }))}
                 options={SHADOW_TYPE_OPTIONS}
@@ -461,7 +461,7 @@ export default function BrandKitPage() {
           <div className="sticky top-8 rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <Eye className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Preview</h2>
+              <h2 className="text-sm font-semibold text-gray-200">Vista Previa</h2>
             </div>
 
             {/* Preview card */}
@@ -530,7 +530,7 @@ export default function BrandKitPage() {
                 {state.fonts.primary}
               </p>
               <p className="text-xs text-gray-400" style={{ fontFamily: state.fonts.secondary }}>
-                {state.fonts.secondary} - body text
+                {state.fonts.secondary} - texto secundario
               </p>
             </div>
           </div>

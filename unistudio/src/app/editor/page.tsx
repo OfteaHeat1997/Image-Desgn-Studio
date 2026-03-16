@@ -35,6 +35,9 @@ import { AiPromptPanel } from "@/components/modules/AiPromptPanel";
 import { AdCreatorPanel } from "@/components/modules/AdCreatorPanel";
 import { SmartEditorPanel } from "@/components/modules/SmartEditorPanel";
 import { AiAgentPanel } from "@/components/modules/AiAgentPanel";
+import { UpscalePanel } from "@/components/modules/UpscalePanel";
+import { BatchProcessPanel } from "@/components/modules/BatchProcessPanel";
+import { BrandKitPanel } from "@/components/modules/BrandKitPanel";
 
 /* ------------------------------------------------------------------ */
 /*  Module map                                                          */
@@ -60,6 +63,9 @@ const MODULE_PANELS: Record<
   "smart-editor": SmartEditorPanel,
   "ad-creator": AdCreatorPanel,
   "ai-agent": AiAgentPanel,
+  upscale: UpscalePanel,
+  batch: BatchProcessPanel,
+  "brand-kit": BrandKitPanel,
 };
 
 /** Modules that can work without an uploaded image */

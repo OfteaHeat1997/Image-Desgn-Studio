@@ -102,5 +102,5 @@ export interface ProcessingJob {
   progress: number;      // 0 to 100
   result: string | null; // resulting image URL or data URL on success
   error: string | null;  // error message on failure
-  cost: number;          // cost in cents for this operation
+  cost: number;          // cost in dollars for this operation
 }

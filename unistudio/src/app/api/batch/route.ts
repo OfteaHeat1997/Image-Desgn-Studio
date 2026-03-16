@@ -32,11 +32,13 @@ interface BatchResult {
 // ---------------------------------------------------------------------------
 
 function getInternalUrl(path: string): string {
-  // In development, use localhost. In production, use the app's URL.
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
-  return `${baseUrl}${path}`;
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return `${process.env.NEXT_PUBLIC_APP_URL}${path}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}${path}`;
+  }
+  return `http://localhost:3000${path}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +46,7 @@ function getInternalUrl(path: string): string {
 // ---------------------------------------------------------------------------
 
 const OPERATION_COSTS: Record<string, number> = {
-  'bg-remove': 0.02,
+  'bg-remove': 0.01,
   'bg-generate': 0.05,
   enhance: 0,
   upscale: 0.03,

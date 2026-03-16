@@ -46,6 +46,33 @@ export type SocialContentType =
 export type BudgetTier = 'free' | 'economic' | 'premium';
 
 // -----------------------------------------------------------------------------
+// Image Analysis (pre-planning intelligence)
+// -----------------------------------------------------------------------------
+
+export interface ImageAnalysis {
+  /** Basic metadata */
+  width: number;
+  height: number;
+  format: string;
+  fileSize: number;
+  aspectRatio: string;
+
+  /** Content analysis */
+  isLowResolution: boolean;
+  needsUpscale: boolean;
+  backgroundType: 'white' | 'solid-color' | 'complex' | 'transparent' | 'unknown';
+  hasWatermark: boolean;
+  hasText: boolean;
+  lightingQuality: 'good' | 'dark' | 'overexposed' | 'uneven';
+  colorBalance: 'good' | 'warm' | 'cool' | 'oversaturated' | 'desaturated';
+
+  /** Recommendations for the agent */
+  suggestedSteps: AgentModule[];
+  warnings: string[];
+  minBudgetNeeded: BudgetTier;
+}
+
+// -----------------------------------------------------------------------------
 // Pipeline Plan
 // -----------------------------------------------------------------------------
 
@@ -84,7 +111,7 @@ export interface StepExecution {
   completedAt: number | null;
 }
 
-export type PipelineStatus = 'idle' | 'planning' | 'ready' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type PipelineStatus = 'idle' | 'planning' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export interface PipelineExecution {
   planId: string;
@@ -112,6 +139,8 @@ export interface AgentPlanRequest {
     pose?: string;
     ageRange?: string;
   };
+  /** Image analysis results — informs smarter planning */
+  imageAnalysis?: ImageAnalysis;
 }
 
 export interface AgentPlanResponse {

@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
     let imageUrl: string | undefined;
     let imageBuffer: Buffer | undefined;
     let shadowType: string;
-    let params: Record<string, any> = {};
+    let params: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic JSON params
     let provider: string | undefined;
     let preset: string | undefined;
     let prompt: string | undefined;

@@ -44,6 +44,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate duration
+    if (typeof duration !== 'number' || duration < 1 || duration > 30) {
+      return NextResponse.json(
+        { success: false, error: 'Duration must be a number between 1 and 30 seconds.' },
+        { status: 400 },
+      );
+    }
+
+    // Validate aspectRatio format
+    const validAspectRatios = ['16:9', '9:16', '1:1', '4:3', '3:4'];
+    if (!validAspectRatios.includes(aspectRatio)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid aspectRatio "${aspectRatio}". Valid: ${validAspectRatios.join(', ')}` },
+        { status: 400 },
+      );
+    }
+
     // Resolve provider config
     const provider = VIDEO_PROVIDERS[providerKey];
     if (!provider) {

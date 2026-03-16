@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type {
   AgentPlan,
   AgentPlanRequest,
@@ -333,12 +333,112 @@ async function executeStep(
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "ad-create failed");
-      return { resultUrl: data.data.url, cost: data.cost ?? 0.05, updatedCtx: {} };
+      return { resultUrl: data.data.videoUrl ?? data.data.url, cost: data.cost ?? 0.05, updatedCtx: {} };
     }
 
     default:
       throw new Error(`Unknown module: ${module}`);
   }
+}
+
+// -----------------------------------------------------------------------------
+// Parallel execution: detect independent steps
+// -----------------------------------------------------------------------------
+
+/** Steps that don't depend on the current image flow (they generate from scratch) */
+const INDEPENDENT_MODULES = new Set(["model-create"]);
+
+/**
+ * Find groups of consecutive steps that can run in parallel.
+ * Returns arrays of step indices: [[0], [1, 2], [3]] means steps 1+2 run together.
+ */
+function findParallelGroups(steps: PipelineStep[]): number[][] {
+  const groups: number[][] = [];
+  let i = 0;
+
+  while (i < steps.length) {
+    // Check if next step is independent and can run in parallel with current
+    if (
+      i + 1 < steps.length &&
+      !INDEPENDENT_MODULES.has(steps[i].module) &&
+      INDEPENDENT_MODULES.has(steps[i + 1].module)
+    ) {
+      // Current step + next independent step can run in parallel
+      groups.push([i, i + 1]);
+      i += 2;
+    } else if (
+      i + 1 < steps.length &&
+      INDEPENDENT_MODULES.has(steps[i].module) &&
+      !INDEPENDENT_MODULES.has(steps[i + 1].module)
+    ) {
+      // Independent step first, then dependent — still parallel
+      groups.push([i, i + 1]);
+      i += 2;
+    } else {
+      groups.push([i]);
+      i += 1;
+    }
+  }
+
+  return groups;
+}
+
+// -----------------------------------------------------------------------------
+// Quality validation between steps
+// -----------------------------------------------------------------------------
+
+async function validateStepResult(
+  resultUrl: string,
+  module: string,
+): Promise<{ valid: boolean; warning?: string }> {
+  // Skip validation for video/ad steps (not images)
+  if (module === "video" || module === "ad-create") {
+    return { valid: !!resultUrl };
+  }
+
+  if (!resultUrl) {
+    return { valid: false, warning: "No se recibio resultado del paso" };
+  }
+
+  // For blob: or data: URLs, check they're not empty
+  if (resultUrl.startsWith("blob:") || resultUrl.startsWith("data:")) {
+    try {
+      const res = await fetch(resultUrl);
+      const blob = await res.blob();
+      if (blob.size < 100) {
+        return { valid: false, warning: `Resultado vacio o corrupto (${blob.size} bytes)` };
+      }
+      // Check it's actually an image
+      if (!blob.type.startsWith("image/")) {
+        return { valid: false, warning: `Tipo de archivo inesperado: ${blob.type}` };
+      }
+    } catch {
+      return { valid: false, warning: "No se pudo leer el resultado" };
+    }
+  }
+
+  // For HTTP URLs, do a HEAD check
+  if (resultUrl.startsWith("http")) {
+    try {
+      const res = await fetch(resultUrl, { method: "HEAD" });
+      if (!res.ok) {
+        return { valid: false, warning: `URL no accesible (${res.status})` };
+      }
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.startsWith("image/") && !contentType.startsWith("video/")) {
+        return { valid: false, warning: `Tipo inesperado: ${contentType}` };
+      }
+      const contentLength = parseInt(res.headers.get("content-length") ?? "0", 10);
+      if (contentLength > 0 && contentLength < 100) {
+        return { valid: false, warning: `Resultado sospechosamente pequeno (${contentLength} bytes)` };
+      }
+    } catch {
+      // HEAD might fail on some CDNs — not a hard failure
+      return { valid: true, warning: "No se pudo validar la URL del resultado" };
+    }
+  }
+
+  return { valid: true };
 }
 
 // -----------------------------------------------------------------------------
@@ -369,6 +469,19 @@ export function useAgentPipeline() {
   const [execution, setExecution] = useState<PipelineExecution | null>(null);
   const [isPlanning, setIsPlanning] = useState(false);
   const abortRef = useRef(false);
+
+  // Track blob URLs for cleanup to prevent memory leaks
+  const blobUrlsRef = useRef<string[]>([]);
+
+  // Cleanup blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      for (const url of blobUrlsRef.current) {
+        try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+      }
+      blobUrlsRef.current = [];
+    };
+  }, []);
 
   // ----- Request a plan from the API -----
   const requestPlan = useCallback(async (req: AgentPlanRequest) => {
@@ -404,7 +517,7 @@ export function useAgentPipeline() {
     }
   }, []);
 
-  // ----- Execute the plan -----
+  // ----- Execute the plan (with parallel support) -----
   const execute = useCallback(async (agentPlan: AgentPlan, imageFile: File) => {
     abortRef.current = false;
     const steps = agentPlan.steps;
@@ -415,6 +528,7 @@ export function useAgentPipeline() {
 
     // Build initial context
     const inputUrl = URL.createObjectURL(imageFile);
+    blobUrlsRef.current.push(inputUrl); // Track for cleanup
     const ctx: StepContext = {
       currentUrl: inputUrl,
       garmentUrl: null,
@@ -422,56 +536,116 @@ export function useAgentPipeline() {
       inputFile: imageFile,
     };
 
-    for (let i = 0; i < steps.length; i++) {
+    // Find parallel groups
+    const groups = findParallelGroups(steps);
+
+    for (const group of groups) {
       if (abortRef.current) {
         exec.status = "cancelled";
         setExecution({ ...exec });
         return exec;
       }
 
-      const step = steps[i];
-      exec.currentStepIndex = i;
-      exec.steps[i] = {
-        ...exec.steps[i],
-        status: "running",
-        startedAt: Date.now(),
-      };
+      // Mark all steps in this group as running
+      for (const idx of group) {
+        exec.currentStepIndex = idx;
+        exec.steps[idx] = { ...exec.steps[idx], status: "running", startedAt: Date.now() };
+      }
       setExecution({ ...exec });
 
-      try {
-        const result = await executeStep(step, ctx);
+      if (group.length === 1) {
+        // Single step — sequential execution
+        const i = group[0];
+        const step = steps[i];
+        try {
+          const result = await executeStep(step, ctx);
 
-        // Update context: model-create doesn't change current flow image
-        if (step.module === "model-create") {
-          ctx.modelUrl = result.resultUrl;
-        } else {
-          ctx.currentUrl = result.resultUrl;
+          const validation = await validateStepResult(result.resultUrl, step.module);
+          if (!validation.valid) {
+            throw new Error(validation.warning ?? "Validacion de calidad fallida");
+          }
+
+          if (step.module === "model-create") {
+            ctx.modelUrl = result.resultUrl;
+          } else {
+            ctx.currentUrl = result.resultUrl;
+          }
+          if (result.updatedCtx.garmentUrl) ctx.garmentUrl = result.updatedCtx.garmentUrl;
+          if (result.updatedCtx.modelUrl) ctx.modelUrl = result.updatedCtx.modelUrl;
+
+          exec.steps[i] = {
+            ...exec.steps[i],
+            status: "completed",
+            resultUrl: result.resultUrl,
+            actualCost: result.cost,
+            completedAt: Date.now(),
+            error: validation.warning ?? null,
+          };
+          exec.totalCost += result.cost;
+          setExecution({ ...exec });
+        } catch (err) {
+          exec.steps[i] = {
+            ...exec.steps[i],
+            status: "failed",
+            error: err instanceof Error ? err.message : "Unknown error",
+            completedAt: Date.now(),
+          };
+          exec.status = "failed";
+          setExecution({ ...exec });
+          return exec;
         }
+      } else {
+        // Parallel group — run all steps concurrently
+        const promises = group.map(async (idx) => {
+          const step = steps[idx];
+          const result = await executeStep(step, ctx);
+          const validation = await validateStepResult(result.resultUrl, step.module);
+          if (!validation.valid) {
+            throw new Error(validation.warning ?? "Validacion de calidad fallida");
+          }
+          return { idx, step, result, warning: validation.warning };
+        });
 
-        // Apply any additional context updates
-        if (result.updatedCtx.garmentUrl) ctx.garmentUrl = result.updatedCtx.garmentUrl;
-        if (result.updatedCtx.modelUrl) ctx.modelUrl = result.updatedCtx.modelUrl;
+        try {
+          const results = await Promise.all(promises);
 
-        exec.steps[i] = {
-          ...exec.steps[i],
-          status: "completed",
-          resultUrl: result.resultUrl,
-          actualCost: result.cost,
-          completedAt: Date.now(),
-        };
-        exec.totalCost += result.cost;
-        setExecution({ ...exec });
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        exec.steps[i] = {
-          ...exec.steps[i],
-          status: "failed",
-          error: errorMsg,
-          completedAt: Date.now(),
-        };
-        exec.status = "failed";
-        setExecution({ ...exec });
-        return exec;
+          // Apply all results to context and execution
+          for (const { idx, step, result, warning } of results) {
+            if (step.module === "model-create") {
+              ctx.modelUrl = result.resultUrl;
+            } else {
+              ctx.currentUrl = result.resultUrl;
+            }
+            if (result.updatedCtx.garmentUrl) ctx.garmentUrl = result.updatedCtx.garmentUrl;
+            if (result.updatedCtx.modelUrl) ctx.modelUrl = result.updatedCtx.modelUrl;
+
+            exec.steps[idx] = {
+              ...exec.steps[idx],
+              status: "completed",
+              resultUrl: result.resultUrl,
+              actualCost: result.cost,
+              completedAt: Date.now(),
+              error: warning ?? null,
+            };
+            exec.totalCost += result.cost;
+          }
+          setExecution({ ...exec });
+        } catch (err) {
+          // Mark all steps in the group that haven't completed as failed
+          for (const idx of group) {
+            if (exec.steps[idx].status !== "completed") {
+              exec.steps[idx] = {
+                ...exec.steps[idx],
+                status: "failed",
+                error: err instanceof Error ? err.message : "Unknown error",
+                completedAt: Date.now(),
+              };
+            }
+          }
+          exec.status = "failed";
+          setExecution({ ...exec });
+          return exec;
+        }
       }
     }
 
@@ -500,10 +674,18 @@ export function useAgentPipeline() {
         completedAt: null,
       };
     }
+
+    // FIX: Recalculate totalCost from ONLY completed steps (not accumulate on top of stale total)
+    exec.totalCost = exec.steps.reduce(
+      (sum, s) => sum + (s.status === "completed" ? s.actualCost : 0),
+      0,
+    );
+
     setExecution({ ...exec });
 
     // Build context from completed steps
     const inputUrl = URL.createObjectURL(imageFile);
+    blobUrlsRef.current.push(inputUrl); // Track for cleanup
     const ctx: StepContext = {
       currentUrl: inputUrl,
       garmentUrl: null,
@@ -542,6 +724,13 @@ export function useAgentPipeline() {
 
       try {
         const result = await executeStep(step, ctx);
+
+        // Validate result quality before continuing
+        const validation = await validateStepResult(result.resultUrl, step.module);
+        if (!validation.valid) {
+          throw new Error(validation.warning ?? "Validacion de calidad fallida");
+        }
+
         if (step.module === "model-create") {
           ctx.modelUrl = result.resultUrl;
         } else {
@@ -556,6 +745,7 @@ export function useAgentPipeline() {
           resultUrl: result.resultUrl,
           actualCost: result.cost,
           completedAt: Date.now(),
+          error: validation.warning ?? null,
         };
         exec.totalCost += result.cost;
         setExecution({ ...exec });
@@ -585,6 +775,12 @@ export function useAgentPipeline() {
 
   // ----- Reset -----
   const reset = useCallback(() => {
+    // Revoke all tracked blob URLs to free memory
+    for (const url of blobUrlsRef.current) {
+      try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+    }
+    blobUrlsRef.current = [];
+
     setPlan(null);
     setPlanMethod("fallback");
     setExecution(null);

@@ -144,7 +144,7 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
         title="Extender Imagen"
         description="Amplia los bordes de tu imagen con IA para adaptarla al formato de cualquier plataforma. La IA genera contenido nuevo que se fusiona naturalmente con la imagen original."
         whyNeeded="Instagram requiere 1:1, Stories 9:16, Amazon 1:1. No recortes — extiende con IA."
-        costLabel="$0.03/img"
+        costLabel="$0.05/img"
         steps={[
           "Sube tu imagen al area central del editor",
           "Elige un preset de plataforma (Instagram, Amazon, etc.) o define tamanio personalizado",

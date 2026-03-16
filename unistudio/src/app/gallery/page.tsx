@@ -66,10 +66,12 @@ export default function GalleryPage() {
         const res = await fetch("/api/db/history?limit=50");
         if (!res.ok) return;
         const data = await res.json();
-        if (!data.success || !Array.isArray(data.data)) return;
+        if (!data.success || !data.data) return;
+        const jobs = Array.isArray(data.data) ? data.data : data.data.jobs;
+        if (!Array.isArray(jobs)) return;
 
         const existingIds = new Set(images.map((img) => img.id));
-        for (const job of data.data) {
+        for (const job of jobs) {
           const id = `db-${job.id}`;
           if (existingIds.has(id)) continue;
           addImage({

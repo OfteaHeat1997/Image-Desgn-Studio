@@ -1,6 +1,6 @@
 // =============================================================================
 // Image Enhancement API Route - UniStudio
-// POST: Accepts FormData with 'file' and 'options' (JSON string or preset name).
+// POST: Accepts FormData with 'file' OR JSON with 'imageUrl'.
 // Uses sharp for local image enhancement. Cost: $0.
 // =============================================================================
 
@@ -11,26 +11,65 @@ import { enhanceImage, enhanceWithPreset, ENHANCE_PRESETS } from '@/lib/processi
 import type { EnhanceOptions } from '@/types/api';
 
 // ---------------------------------------------------------------------------
+// Helper: resolve image buffer from FormData file or JSON imageUrl
+// ---------------------------------------------------------------------------
+
+async function resolveImageBuffer(
+  request: NextRequest,
+): Promise<{ buffer: Buffer; optionsStr: string | null; presetName: string | null }> {
+  const contentType = request.headers.get('content-type') ?? '';
+
+  // --- JSON body (from batch route or agent pipeline) ---
+  if (contentType.includes('application/json')) {
+    const body = await request.json();
+    const { imageUrl, preset, options } = body as {
+      imageUrl?: string;
+      preset?: string;
+      options?: EnhanceOptions | string;
+    };
+
+    if (!imageUrl) {
+      throw new Error('Missing "imageUrl" in JSON body.');
+    }
+
+    let buffer: Buffer;
+    if (imageUrl.startsWith('data:')) {
+      // data URL → extract base64 portion
+      const base64 = imageUrl.split(',')[1];
+      buffer = Buffer.from(base64, 'base64');
+    } else {
+      // HTTP URL → fetch
+      const res = await fetch(imageUrl);
+      if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+      buffer = Buffer.from(await res.arrayBuffer());
+    }
+
+    const optionsStr = typeof options === 'string' ? options : options ? JSON.stringify(options) : null;
+    return { buffer, optionsStr, presetName: preset ?? null };
+  }
+
+  // --- FormData body (from editor panel) ---
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+  if (!file) {
+    throw new Error('No file provided. Include a "file" field in the form data or send JSON with "imageUrl".');
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    optionsStr: formData.get('options') as string | null,
+    presetName: formData.get('preset') as string | null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    const optionsStr = formData.get('options') as string | null;
-    const presetName = formData.get('preset') as string | null;
-
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided. Include a "file" field in the form data.' },
-        { status: 400 },
-      );
-    }
-
-    // Read file into buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const { buffer, optionsStr, presetName } = await resolveImageBuffer(request);
 
     // Apply enhancement
     let enhancedBuffer: Buffer;

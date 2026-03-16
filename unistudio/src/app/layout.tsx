@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "UniStudio - AI Product Photography",
+  title: "UniStudio — Fotografia de Producto con IA",
   description:
-    "Professional AI-powered product photography studio. Remove backgrounds, generate scenes, enhance images, and more.",
+    "Estudio profesional de fotografia de producto con IA. Quita fondos, genera escenas, mejora imagenes y mas.",
 };
 
 export default function RootLayout({
@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="es" className="dark" suppressHydrationWarning>
       <body
         className={`${inter.variable} bg-surface text-white antialiased font-sans`}
       >

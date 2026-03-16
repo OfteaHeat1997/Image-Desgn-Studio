@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
       case 'clarity': {
         // Clarity upscaler via Replicate (prompt-guided)
-        const input: Record<string, any> = {
+        const input: Record<string, string | number | boolean> = {
           image: imageUrl,
           scale_factor: scale,
           resemblance: 0.6,

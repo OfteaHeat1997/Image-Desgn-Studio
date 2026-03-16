@@ -349,7 +349,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "Error al remover fondo");
 
-        operationCost = data.data.cost ?? 0.01;
+        operationCost = data.cost ?? 0.01;
 
         // Download the result as blob
         const resultRes = await fetch(data.data.url);

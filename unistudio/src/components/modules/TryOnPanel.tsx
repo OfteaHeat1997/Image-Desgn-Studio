@@ -123,7 +123,10 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
     const file = files[0];
     if (!file) return;
     setModelFile(file);
-    setModelImage(URL.createObjectURL(file));
+    setModelImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   }, []);
 
   const handleGenerate = useCallback(async () => {
@@ -137,14 +140,14 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
       modelFormData.append("file", modelFile);
       const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
       const modelUploadData = await modelUploadRes.json();
-      if (!modelUploadData.success) throw new Error(modelUploadData.error || "Model image upload failed");
+      if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir imagen del modelo");
 
       // Step 2: Upload garment image
       const garmentFormData = new FormData();
       garmentFormData.append("file", imageFile);
       const garmentUploadRes = await fetch("/api/upload", { method: "POST", body: garmentFormData });
       const garmentUploadData = await garmentUploadRes.json();
-      if (!garmentUploadData.success) throw new Error(garmentUploadData.error || "Garment image upload failed");
+      if (!garmentUploadData.success) throw new Error(garmentUploadData.error || "Error al subir imagen de la prenda");
 
       // Step 3: Call try-on API
       const effectiveProvider = isLingerieOrSwimwear ? "idm-vton" : provider;
@@ -162,7 +165,7 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
       });
       const data = await res.json();
 
-      if (!data.success) throw new Error(data.error || "Try-on generation failed");
+      if (!data.success) throw new Error(data.error || "Error en la generacion de prueba virtual");
 
       // Resolve cost
       const providerDef = PROVIDERS.find((p) => p.id === effectiveProvider);
@@ -171,7 +174,7 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
       onProcess(data.data.url, modelUploadData.data.url, cost);
     } catch (error) {
       console.error("Try-on error:", error);
-      setErrorMsg(error instanceof Error ? error.message : "Try-on generation failed");
+      setErrorMsg(error instanceof Error ? error.message : "Error en la generacion de prueba virtual");
     } finally {
       setIsProcessing(false);
     }

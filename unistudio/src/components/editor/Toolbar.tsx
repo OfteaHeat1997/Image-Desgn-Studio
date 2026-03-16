@@ -39,10 +39,11 @@ interface ToolbarProps {
 /* ------------------------------------------------------------------ */
 
 const MODULE_OPTIONS = [
-  { value: "ai-agent", label: "AI Agent (Auto)" },
+  { value: "ai-agent", label: "Agente IA (Auto)" },
   { value: "bg-remove", label: "Quitar Fondo" },
   { value: "bg-generate", label: "Fondos con IA" },
   { value: "enhance", label: "Mejorar Calidad" },
+  { value: "upscale", label: "Aumentar Resolucion" },
   { value: "shadows", label: "Sombras e Iluminacion" },
   { value: "inpaint", label: "Borrar y Reemplazar" },
   { value: "outpaint", label: "Extender Imagen" },
@@ -50,7 +51,7 @@ const MODULE_OPTIONS = [
   { value: "model-create", label: "Crear Modelo IA" },
   { value: "ghost-mannequin", label: "Maniqui Invisible" },
   { value: "jewelry-tryon", label: "Joyeria Virtual" },
-  { value: "video", label: "Video Studio" },
+  { value: "video", label: "Estudio de Video" },
   { value: "batch", label: "Procesamiento Masivo" },
   { value: "brand-kit", label: "Kit de Marca" },
   { value: "compliance", label: "Verificar Marketplace" },

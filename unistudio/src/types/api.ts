@@ -238,5 +238,5 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
   error: ApiError | null;
-  cost: number;              // cost in cents
+  cost: number;              // cost in dollars (e.g. 0.05 = five cents)
 }

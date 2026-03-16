@@ -26,14 +26,14 @@ export interface OperationCost {
   id: string;
   operation: string;       // e.g. 'bg-remove', 'enhance', 'upscale'
   provider: ApiProvider;
-  cost: number;            // cents
+  cost: number;            // dollars
   timestamp: number;       // Unix timestamp
   imageId: string | null;  // optional reference to the image
 }
 
 /** Aggregated cost tracking */
 export interface CostTracker {
-  totalSpent: number;      // cents
+  totalSpent: number;      // dollars
   operationCosts: OperationCost[];
 }
 
@@ -45,7 +45,7 @@ export interface AppSettings {
   theme: AppTheme;
   autoSave: boolean;
   showCostWarnings: boolean;
-  costWarningThreshold: number; // cents - warn when a single operation exceeds this
+  costWarningThreshold: number; // dollars - warn when a single operation exceeds this
 }
 
 // -----------------------------------------------------------------------------

@@ -52,7 +52,10 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
     const file = files[0];
     if (!file) return;
     setModelFile(file);
-    setModelImage(URL.createObjectURL(file));
+    setModelImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
     setErrorMsg(null);
   }, []);
 

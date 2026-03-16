@@ -12,6 +12,7 @@ export async function GET() {
     "ANTHROPIC_API_KEY",
     "HEDRA_API_KEY",
     "GOOGLE_TTS_KEY",
+    "FASHN_API_KEY",
   ];
 
   for (const v of requiredVars) {
@@ -31,12 +32,45 @@ export async function GET() {
     dbStatus = `error: ${err instanceof Error ? err.message : "unknown"}`;
   }
 
+  // Check Replicate connectivity
+  let replicateStatus = "not checked";
+  if (process.env.REPLICATE_API_TOKEN) {
+    try {
+      const res = await fetch("https://api.replicate.com/v1/account", {
+        headers: { Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      replicateStatus = res.ok ? "connected" : `error: HTTP ${res.status}`;
+    } catch (err) {
+      replicateStatus = `error: ${err instanceof Error ? err.message : "unreachable"}`;
+    }
+  }
+
+  // Check fal.ai connectivity
+  let falStatus = "not checked";
+  if (process.env.FAL_KEY) {
+    try {
+      const res = await fetch("https://queue.fal.run/fal-ai/fast-sdxl/status", {
+        headers: { Authorization: `Key ${process.env.FAL_KEY}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      // 404/422 is fine — it means the API responded (no job ID given)
+      falStatus = res.status < 500 ? "connected" : `error: HTTP ${res.status}`;
+    } catch (err) {
+      falStatus = `error: ${err instanceof Error ? err.message : "unreachable"}`;
+    }
+  }
+
   const allRequired = requiredVars.every((v) => process.env[v]);
 
   return NextResponse.json({
     status: allRequired ? "healthy" : "degraded",
     timestamp: new Date().toISOString(),
     database: dbStatus,
+    backends: {
+      replicate: replicateStatus,
+      fal: falStatus,
+    },
     env: checks,
   });
 }

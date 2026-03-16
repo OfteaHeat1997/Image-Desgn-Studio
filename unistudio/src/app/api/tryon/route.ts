@@ -116,13 +116,21 @@ async function smartTryOn(
   category: string,
   garmentType?: string,
 ): Promise<{ url: string; provider: string }> {
-  // Prefer FASHN when API key is configured (highest quality)
+  const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
+
+  // For intimate/lingerie garments, always use IDM-VTON (best for delicate garments)
+  if (isIntimate) {
+    const url = await tryOnIdmVton(modelImage, garmentImage, category);
+    return { url, provider: 'idm-vton' };
+  }
+
+  // Prefer FASHN when API key is configured (highest quality for non-intimate)
   if (process.env.FASHN_API_KEY) {
     const url = await tryOnFashn(modelImage, garmentImage, category);
     return { url, provider: 'fashn' };
   }
 
-  // Default to IDM-VTON for all garment types
+  // Default to IDM-VTON
   const url = await tryOnIdmVton(modelImage, garmentImage, category);
   return { url, provider: 'idm-vton' };
 }
