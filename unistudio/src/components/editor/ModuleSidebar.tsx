@@ -22,6 +22,7 @@ import {
   ZoomIn,
   Layers,
   Palette,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -72,6 +73,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     name: "EDICION",
     modules: [
       { id: "inpaint", label: "Borrar y Reemplazar", icon: Eraser, cost: "$0.03-$0.05", description: "Elimina objetos o cambia colores con IA" },
+      { id: "smart-editor", label: "Editor Avanzado", icon: SlidersHorizontal, cost: "Gratis", description: "Rotar, recortar, filtros, texto y ajustes" },
       { id: "compliance", label: "Verificar Marketplace", icon: CheckCircle, cost: "Gratis", description: "Verifica requisitos de Amazon, Shopify, Etsy" },
     ],
   },

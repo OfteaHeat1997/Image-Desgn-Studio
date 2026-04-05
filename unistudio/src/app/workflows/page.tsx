@@ -516,10 +516,8 @@ const FEATURES: FeatureDetail[] = [
     files: [
       { label: "Pagina", path: "src/app/batch/page.tsx", purpose: "UI completa de batch processing" },
       { label: "API Route", path: "src/app/api/batch/route.ts", purpose: "Recibe imagenes[] + pipeline, ejecuta secuencialmente" },
-      { label: "Pipeline", path: "src/lib/batch/pipeline.ts", purpose: "Define PipelineStep, presets (Quick Clean, Amazon Ready, etc)" },
-      { label: "Queue", path: "src/lib/batch/queue.ts", purpose: "Cola de procesamiento" },
-      { label: "Hook", path: "src/hooks/useBatchProcessing.ts", purpose: "Estado de batch, progreso, resultados" },
-      { label: "Store", path: "src/stores/batch-store.ts", purpose: "Zustand store de batch" },
+      { label: "Panel", path: "src/components/modules/BatchProcessPanel.tsx", purpose: "Pipeline builder con presets y ejecucion" },
+      { label: "Pagina", path: "src/app/batch/page.tsx", purpose: "Procesamiento masivo con inventario" },
     ],
     providers: [
       { name: "Depende del pipeline", cost: "Variable", quality: "Configurable" },

@@ -131,16 +131,8 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
       />
 
       {/* Mode indicator */}
-      <div className="flex gap-1.5">
-        <div className="flex-1 rounded-lg border border-accent bg-accent/10 px-3 py-2 text-center text-xs font-medium text-accent-light">
-          Guiado por Texto
-        </div>
-        <div className="flex-1 rounded-lg border border-surface-lighter bg-surface px-3 py-2 text-center text-xs font-medium text-gray-500 opacity-50 cursor-not-allowed relative">
-          Mascara + IA
-          <span className="ml-1 rounded bg-amber-500/20 px-1 py-0.5 text-[8px] font-bold text-amber-400">
-            PRONTO
-          </span>
-        </div>
+      <div className="rounded-lg border border-accent bg-accent/10 px-3 py-2 text-center text-xs font-medium text-accent-light">
+        Edicion Guiada por Texto
       </div>
       <p className="text-[10px] text-gray-500">
         Describe lo que quieres cambiar. No necesitas mascara — la IA identificara y editara las areas relevantes automaticamente.

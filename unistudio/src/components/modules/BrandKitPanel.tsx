@@ -54,32 +54,7 @@ export function BrandKitPanel({ imageFile, onProcess: _onProcess }: BrandKitPane
   const watermarkEnabled = brandKit.watermark?.enabled ?? false;
   const watermarkHasImage = Boolean(brandKit.watermark?.imageUrl);
 
-  /* ---- Handlers ---- */
-
-  function handleApplyWatermark() {
-    if (!imageFile) {
-      toast.warning("Sube una imagen primero para aplicar la marca de agua.");
-      return;
-    }
-    if (!watermarkEnabled) {
-      toast.info("La marca de agua esta desactivada. Activala en la pagina de Kit de Marca.");
-      return;
-    }
-    if (!watermarkHasImage && !hasLogo) {
-      toast.info("Configura tu marca de agua en la pagina de Kit de Marca.");
-      return;
-    }
-    // Watermark application is configured on /brand-kit page.
-    toast.info("Configura tu marca de agua en la pagina de Kit de Marca.");
-  }
-
-  function handleExportWithBrand() {
-    toast.info("Usa el boton Exportar en la barra de herramientas.");
-  }
-
   /* ---- Render ---- */
-
-  const canWatermark = watermarkEnabled && (watermarkHasImage || hasLogo);
 
   return (
     <div className="space-y-4">
@@ -211,48 +186,11 @@ export function BrandKitPanel({ imageFile, onProcess: _onProcess }: BrandKitPane
         </div>
       </div>
 
-      {/* ── Quick Apply ── */}
-      <div className="space-y-2">
-        <span className="block text-[11px] font-semibold text-gray-400">
-          Aplicacion Rapida
-        </span>
-
-        {/* Apply watermark button */}
-        <div className="space-y-1">
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={handleApplyWatermark}
-            disabled={!imageFile}
-            leftIcon={<ImageIcon className="h-3.5 w-3.5" />}
-          >
-            Aplicar Marca de Agua
-          </Button>
-
-          {/* Contextual hint */}
-          {!canWatermark && (
-            <p className="text-[10px] text-gray-500 text-center">
-              {!watermarkEnabled
-                ? "Activa la marca de agua en Kit de Marca"
-                : "Sube un logo en Kit de Marca primero"}
-            </p>
-          )}
-          {!imageFile && (
-            <p className="text-[10px] text-amber-400 text-center">
-              Sube una imagen en el editor primero
-            </p>
-          )}
-        </div>
-
-        {/* Export with brand button */}
-        <Button
-          variant="ghost"
-          className="w-full"
-          onClick={handleExportWithBrand}
-          leftIcon={<Palette className="h-3.5 w-3.5" />}
-        >
-          Exportar con Marca
-        </Button>
+      {/* ── Info ── */}
+      <div className="rounded-lg border border-surface-lighter bg-surface-light p-3">
+        <p className="text-[10px] text-gray-500 leading-relaxed">
+          Este panel muestra un resumen de tu identidad de marca. Para editar colores, fuentes, logo o marca de agua, abre la pagina completa de Kit de Marca.
+        </p>
       </div>
 
       {/* ── Link to full brand kit page ── */}
