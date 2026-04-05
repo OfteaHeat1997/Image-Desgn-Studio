@@ -76,10 +76,10 @@ const OPERATIONS = [
 ];
 
 const PROVIDERS = [
-  { value: "auto", label: "Auto (Recommended)" },
+  { value: "auto", label: "Auto (Recomendado)" },
   { value: "replicate", label: "Replicate" },
   { value: "fal", label: "Fal.ai" },
-  { value: "browser", label: "Browser (Free)" },
+  { value: "browser", label: "Navegador (Gratis)" },
 ];
 
 interface PresetDef {
@@ -92,44 +92,44 @@ interface PresetDef {
 const PIPELINE_PRESETS: PresetDef[] = [
   {
     id: "quick-clean",
-    name: "Quick Clean",
-    description: "Remove background + auto enhance",
+    name: "Limpieza Rapida",
+    description: "Eliminar fondo + mejora automatica",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Background Removal" },
-      { id: "s2", operation: "enhance", provider: "auto", label: "Enhancement" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejora" },
     ],
   },
   {
     id: "amazon-ready",
-    name: "Amazon Ready",
-    description: "BG remove + white bg + compliance check",
+    name: "Listo para Amazon",
+    description: "Fondo blanco + mejora + verificacion",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Background Removal" },
-      { id: "s2", operation: "enhance", provider: "auto", label: "Enhancement" },
-      { id: "s3", operation: "compliance", provider: "auto", label: "Compliance Check" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejora" },
+      { id: "s3", operation: "compliance", provider: "auto", label: "Verificacion" },
     ],
   },
   {
     id: "instagram-lifestyle",
     name: "Instagram Lifestyle",
-    description: "BG generate + enhance + resize for IG",
+    description: "Fondo IA + mejora + redimensionar para IG",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Background Removal" },
-      { id: "s2", operation: "outpaint", provider: "auto", label: "Outpaint" },
-      { id: "s3", operation: "enhance", provider: "auto", label: "Enhancement" },
-      { id: "s4", operation: "resize", provider: "auto", label: "Resize" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
+      { id: "s2", operation: "outpaint", provider: "auto", label: "Extender Imagen" },
+      { id: "s3", operation: "enhance", provider: "auto", label: "Mejora" },
+      { id: "s4", operation: "resize", provider: "auto", label: "Redimensionar" },
     ],
   },
   {
     id: "full-production",
-    name: "Full Production",
-    description: "Complete pipeline: BG + enhance + shadows + upscale + watermark",
+    name: "Produccion Completa",
+    description: "Pipeline completo: Fondo + mejora + sombras + upscale + marca",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Background Removal" },
-      { id: "s2", operation: "enhance", provider: "auto", label: "Enhancement" },
-      { id: "s3", operation: "shadows", provider: "auto", label: "Add Shadows" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejora" },
+      { id: "s3", operation: "shadows", provider: "auto", label: "Sombras" },
       { id: "s4", operation: "upscale", provider: "auto", label: "Upscale 2x" },
-      { id: "s5", operation: "watermark", provider: "auto", label: "Add Watermark" },
+      { id: "s5", operation: "watermark", provider: "auto", label: "Marca de Agua" },
     ],
   },
 ];

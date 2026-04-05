@@ -183,10 +183,9 @@ export async function runFal(
   interval: number = 3000,
 ): Promise<any> {
   const queue = await submitFal(modelId, input);
+  const MAX_POLLS = 100; // ~5 minutes at 3s interval
 
-  // Poll until terminal state
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  for (let i = 0; i < MAX_POLLS; i++) {
     const status = await getFalStatus(queue.status_url);
 
     if (status.status === 'COMPLETED') {
@@ -203,6 +202,11 @@ export async function runFal(
 
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
+
+  throw new FalApiError(
+    `fal.ai job timed out after ${MAX_POLLS} polls: ${queue.request_id}`,
+    'POLL_TIMEOUT',
+  );
 }
 
 /**

@@ -287,15 +287,50 @@ export async function addReflection(
 }
 
 // ---------------------------------------------------------------------------
-// AI Relighting (both use Flux Kontext Pro)
+// AI Relighting — IC-Light (dedicated relighting model)
 // ---------------------------------------------------------------------------
 
-export async function relightWithAI(
+/**
+ * Relight an image using the IC-Light model, a dedicated relighting specialist.
+ * Better at physically-accurate lighting changes than general-purpose models.
+ * Cost: ~$0.04 via Replicate.
+ */
+export async function relightIcLight(
+  imageUrl: string,
+  lightingPrompt: string,
+): Promise<string> {
+  const output = await runModel(
+    'zsxkib/ic-light:d41bcb1066bb350981ef938837b1f84e28f8d0f2da8619821fa18e3af1a3f790',
+    {
+      prompt: lightingPrompt,
+      image: imageUrl,
+      steps: 25,
+      cfg_scale: 2.0,
+      light_source: 'None',
+      highres_scale: 1.5,
+      lowres_denoise: 0.95,
+      highres_denoise: 0.5,
+      bg_source: 'None',
+    },
+  );
+  return extractOutputUrl(output);
+}
+
+// ---------------------------------------------------------------------------
+// AI Relighting — Flux Kontext Pro (instruction-based)
+// ---------------------------------------------------------------------------
+
+/**
+ * Relight an image using Flux Kontext Pro with instruction-based prompting.
+ * More flexible for creative lighting changes, less physically-accurate.
+ * Cost: ~$0.05 via Replicate.
+ */
+export async function relightKontext(
   imageUrl: string,
   lightingPrompt: string,
 ): Promise<string> {
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
-    image: imageUrl,
+    input_image: imageUrl,
     prompt: lightingPrompt + ' Keep the product exactly the same, only change the lighting and shadows.',
     output_format: 'png',
   });

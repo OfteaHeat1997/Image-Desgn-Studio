@@ -80,10 +80,9 @@ async function processStep(
       break;
 
     case 'enhance':
-      // Enhancement via URL approach - download and re-upload would be needed
-      // For batch, we pass the URL and let the enhance endpoint handle it
+      // Enhance uses Sharp locally ($0). Pass imageUrl + preset/options (not provider).
       apiPath = '/api/enhance';
-      requestBody = { imageUrl, provider, ...params };
+      requestBody = { imageUrl, preset: params.preset ?? 'auto', options: params.options };
       break;
 
     case 'upscale':

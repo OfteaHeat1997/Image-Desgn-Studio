@@ -2,6 +2,7 @@
 // DB Persistence Helpers - UniStudio
 // Fire-and-forget save functions for API routes.
 // Errors are logged but never propagate to callers.
+// Gracefully no-ops when DATABASE_URL is not configured.
 // =============================================================================
 
 import { Prisma } from '@prisma/client';
@@ -14,6 +15,7 @@ import { prisma } from './prisma';
 let cachedProjectId: string | null = null;
 
 export async function getDefaultProjectId(): Promise<string> {
+  if (!prisma) return 'no-db';
   if (cachedProjectId) return cachedProjectId;
 
   let project = await prisma.project.findFirst({
@@ -42,6 +44,7 @@ export async function saveUploadedImage(data: {
   fileSize: number;
   mimeType: string;
 }): Promise<string | null> {
+  if (!prisma) return null;
   try {
     const projectId = await getDefaultProjectId();
     const row = await prisma.image.create({
@@ -76,6 +79,7 @@ export async function saveJob(data: {
   cost: number;
   processingTimeMs?: number;
 }): Promise<void> {
+  if (!prisma) return;
   try {
     await prisma.processingJob.create({
       data: {

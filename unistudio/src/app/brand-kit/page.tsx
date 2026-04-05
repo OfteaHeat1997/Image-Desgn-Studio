@@ -201,8 +201,14 @@ export default function BrandKitPage() {
   const handleLogoUpload = useCallback((files: File[]) => {
     const file = files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setState((prev) => ({ ...prev, logoUrl: url }));
+    // Convert to data URL so it persists across sessions (blob URLs die on reload)
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setState((prev) => ({ ...prev, logoUrl: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
   }, []);
 
   const handleSave = useCallback(async () => {

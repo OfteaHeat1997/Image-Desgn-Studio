@@ -655,7 +655,7 @@ function Hero() {
           {/* Stats row */}
           <div className="flex items-center gap-6">
             {[
-              { value: "17", label: "herramientas" },
+              { value: "18", label: "herramientas" },
               { value: "6", label: "gratis" },
               { value: "$0.02", label: "costo promedio" },
             ].map((s, i) => (
@@ -975,7 +975,7 @@ export default function DashboardPage() {
         <section>
           <div className="mb-12">
             <h2 className="text-[28px] font-bold text-heading mb-2">Herramientas</h2>
-            <p className="text-[15px] text-muted leading-relaxed">17 herramientas de IA diseñadas para fotografia profesional de producto — desde la foto cruda hasta contenido listo para vender</p>
+            <p className="text-[15px] text-muted leading-relaxed">18 herramientas de IA diseñadas para fotografia profesional de producto — desde la foto cruda hasta contenido listo para vender</p>
           </div>
 
           {categories.map((category) => {

@@ -90,7 +90,7 @@ export function useApiCost(): UseApiCostReturn {
       settingsAddCost({
         operation,
         provider: provider as ApiProvider,
-        cost: Math.round(cost * 100), // settings store uses cents
+        cost, // dollars — settings store OperationCost.cost is in dollars
         imageId: null,
       });
 

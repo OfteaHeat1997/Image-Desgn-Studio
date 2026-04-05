@@ -6,6 +6,10 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 
+// When prisma is null (no DATABASE_URL), all queries gracefully return empty/null.
+// Each function guards with `if (!prisma)` before using `db`.
+const db = prisma as NonNullable<typeof prisma>;
+
 // -----------------------------------------------------------------------------
 // Types (matching DB table shapes)
 // -----------------------------------------------------------------------------
@@ -274,8 +278,9 @@ function mapPromptTemplate(r: {
 // -----------------------------------------------------------------------------
 
 export async function getProjects(): Promise<Project[]> {
+  if (!prisma) return [];
   try {
-    const rows = await prisma.project.findMany({
+    const rows = await db.project.findMany({
       orderBy: { updatedAt: 'desc' },
     });
     return rows.map(mapProject);
@@ -289,8 +294,9 @@ export async function createProject(
   name: string,
   description?: string,
 ): Promise<Project | null> {
+  if (!prisma) return null;
   try {
-    const row = await prisma.project.create({
+    const row = await db.project.create({
       data: { name, description: description ?? null },
     });
     return mapProject(row);
@@ -305,8 +311,9 @@ export async function createProject(
 // -----------------------------------------------------------------------------
 
 export async function getImages(projectId: string): Promise<Image[]> {
+  if (!prisma) return [];
   try {
-    const rows = await prisma.image.findMany({
+    const rows = await db.image.findMany({
       where: { projectId },
       orderBy: { createdAt: 'desc' },
     });
@@ -326,8 +333,9 @@ export async function createImage(input: {
   fileSize: number;
   mimeType: string;
 }): Promise<Image | null> {
+  if (!prisma) return null;
   try {
-    const row = await prisma.image.create({
+    const row = await db.image.create({
       data: {
         projectId: input.projectId,
         originalUrl: input.originalUrl,
@@ -349,6 +357,7 @@ export async function updateImage(
   imageId: string,
   updates: Partial<Image>,
 ): Promise<Image | null> {
+  if (!prisma) return null;
   try {
     const data: Record<string, unknown> = {};
     if (updates.processed_url !== undefined) data.processedUrl = updates.processed_url;
@@ -359,7 +368,7 @@ export async function updateImage(
     if (updates.mime_type !== undefined) data.mimeType = updates.mime_type;
     if (updates.metadata !== undefined) data.metadata = updates.metadata;
 
-    const row = await prisma.image.update({
+    const row = await db.image.update({
       where: { id: imageId },
       data,
     });
@@ -381,8 +390,9 @@ export async function createProcessingJob(input: {
   model: string;
   inputParams: Record<string, unknown>;
 }): Promise<ProcessingJobRecord | null> {
+  if (!prisma) return null;
   try {
-    const row = await prisma.processingJob.create({
+    const row = await db.processingJob.create({
       data: {
         imageId: input.imageId,
         operation: input.operation,
@@ -410,6 +420,7 @@ export async function updateProcessingJob(
     processingTime?: number;
   },
 ): Promise<ProcessingJobRecord | null> {
+  if (!prisma) return null;
   try {
     const data: Record<string, unknown> = {};
     if (updates.status !== undefined) data.status = updates.status;
@@ -418,7 +429,7 @@ export async function updateProcessingJob(
     if (updates.cost !== undefined) data.cost = updates.cost;
     if (updates.processingTime !== undefined) data.processingTime = updates.processingTime;
 
-    const row = await prisma.processingJob.update({
+    const row = await db.processingJob.update({
       where: { id: jobId },
       data,
     });
@@ -432,8 +443,9 @@ export async function updateProcessingJob(
 export async function getProcessingJobs(
   limit: number = 50,
 ): Promise<ProcessingJobRecord[]> {
+  if (!prisma) return [];
   try {
-    const rows = await prisma.processingJob.findMany({
+    const rows = await db.processingJob.findMany({
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
@@ -449,8 +461,9 @@ export async function getProcessingJobs(
 // -----------------------------------------------------------------------------
 
 export async function getBrandKit(): Promise<BrandKitRecord | null> {
+  if (!prisma) return null;
   try {
-    const row = await prisma.brandKit.findFirst({
+    const row = await db.brandKit.findFirst({
       orderBy: { createdAt: 'desc' },
     });
     return row ? mapBrandKit(row) : null;
@@ -463,8 +476,9 @@ export async function getBrandKit(): Promise<BrandKitRecord | null> {
 export async function updateBrandKit(
   updates: Partial<BrandKitRecord>,
 ): Promise<BrandKitRecord | null> {
+  if (!prisma) return null;
   try {
-    const existing = await prisma.brandKit.findFirst({
+    const existing = await db.brandKit.findFirst({
       orderBy: { createdAt: 'desc' },
     });
 
@@ -478,7 +492,7 @@ export async function updateBrandKit(
       if (updates.default_bg_style !== undefined) data.defaultBgStyle = updates.default_bg_style;
       if (updates.default_enhance_preset !== undefined) data.defaultEnhancePreset = updates.default_enhance_preset;
 
-      const row = await prisma.brandKit.update({
+      const row = await db.brandKit.update({
         where: { id: existing.id },
         data,
       });
@@ -486,7 +500,7 @@ export async function updateBrandKit(
     }
 
     // No existing brand kit — create one
-    const row = await prisma.brandKit.create({
+    const row = await db.brandKit.create({
       data: {
         name: updates.name ?? 'My Brand',
         colors: updates.colors ?? {
@@ -514,8 +528,9 @@ export async function updateBrandKit(
 // -----------------------------------------------------------------------------
 
 export async function getAiModels(): Promise<AiModelRecord[]> {
+  if (!prisma) return [];
   try {
-    const rows = await prisma.aiModel.findMany({
+    const rows = await db.aiModel.findMany({
       orderBy: { createdAt: 'desc' },
     });
     return rows.map(mapAiModel);
@@ -537,8 +552,9 @@ export async function saveAiModel(input: {
   previewUrl: string;
   metadata: Record<string, unknown>;
 }): Promise<AiModelRecord | null> {
+  if (!prisma) return null;
   try {
-    const row = await prisma.aiModel.create({
+    const row = await db.aiModel.create({
       data: {
         name: input.name,
         provider: input.provider,
@@ -564,8 +580,9 @@ export async function saveAiModel(input: {
 // -----------------------------------------------------------------------------
 
 export async function getPromptTemplates(): Promise<PromptTemplateRecord[]> {
+  if (!prisma) return [];
   try {
-    const rows = await prisma.promptTemplate.findMany({
+    const rows = await db.promptTemplate.findMany({
       orderBy: { createdAt: 'desc' },
     });
     return rows.map(mapPromptTemplate);
@@ -583,8 +600,9 @@ export async function savePromptTemplate(input: {
   previewUrl: string;
   isPublic: boolean;
 }): Promise<PromptTemplateRecord | null> {
+  if (!prisma) return null;
   try {
-    const row = await prisma.promptTemplate.create({
+    const row = await db.promptTemplate.create({
       data: {
         category: input.category,
         name: input.name,

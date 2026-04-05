@@ -11,7 +11,8 @@
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
     "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "postinstall": "DATABASE_URL=${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder} prisma generate"
   },
   "dependencies": {
     "@fal-ai/client": "^1.2.1",

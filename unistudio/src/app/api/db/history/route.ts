@@ -8,6 +8,13 @@ import { prisma } from '@/lib/db/prisma';
 
 export async function GET(request: NextRequest) {
   try {
+    if (!prisma) {
+      return NextResponse.json({
+        success: true,
+        data: { jobs: [], images: [], totalCost: 0, jobCount: 0, imageCount: 0 },
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Number(searchParams.get('limit') || 100), 500);
     const operation = searchParams.get('operation'); // optional filter

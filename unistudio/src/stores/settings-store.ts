@@ -45,7 +45,7 @@ export interface AppSettings {
   theme: AppTheme;
   autoSave: boolean;
   showCostWarnings: boolean;
-  costWarningThreshold: number; // dollars - warn when a single operation exceeds this
+  costWarningThreshold: number; // dollars — warn when a single operation exceeds this
 }
 
 // -----------------------------------------------------------------------------
@@ -100,7 +100,7 @@ export const useSettingsStore = create<SettingsStoreState>()(
   theme: 'system',
   autoSave: true,
   showCostWarnings: true,
-  costWarningThreshold: 50, // warn above $0.50
+  costWarningThreshold: 0.50, // warn above $0.50
 
   // -- Settings actions -------------------------------------------------------
 

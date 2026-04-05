@@ -38,6 +38,7 @@ export function ImageCompare({
   const [dragging, setDragging] = useState(false);
   const [loaded, setLoaded] = useState({ before: false, after: false });
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
 
   const bothLoaded = loaded.before && loaded.after;
 
@@ -46,7 +47,31 @@ export function ImageCompare({
     setLoaded({ before: false, after: false });
     setSliderPos(position);
     setHasInteracted(false);
+    setAspectRatio(null);
   }, [beforeSrc, afterSrc, position]);
+
+  // Measure the largest aspect ratio from both images so both fit in the same box
+  const handleAfterLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth && img.naturalHeight) {
+      setAspectRatio((prev) => {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        return prev ? Math.min(prev, ratio) : ratio;
+      });
+    }
+    setLoaded((s) => ({ ...s, after: true }));
+  }, []);
+
+  const handleBeforeLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth && img.naturalHeight) {
+      setAspectRatio((prev) => {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        return prev ? Math.min(prev, ratio) : ratio;
+      });
+    }
+    setLoaded((s) => ({ ...s, before: true }));
+  }, []);
 
   const updatePosition = useCallback((clientX: number) => {
     const el = containerRef.current;
@@ -56,7 +81,7 @@ export function ImageCompare({
     setSliderPos(pct);
   }, []);
 
-  // Mouse drag
+  // Pointer drag
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
@@ -91,39 +116,42 @@ export function ImageCompare({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      style={{ cursor: dragging ? "ew-resize" : "col-resize" }}
+      style={{
+        cursor: dragging ? "ew-resize" : "col-resize",
+      }}
     >
       {/* Loading overlay */}
       {!bothLoaded && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-surface-light" style={{ minHeight: 300 }}>
           <div className="flex flex-col items-center gap-2">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-            <span className="text-xs text-gray-400">Loading preview...</span>
+            <span className="text-xs text-gray-400">Cargando preview...</span>
           </div>
         </div>
       )}
 
       {/*
-        Layout: AFTER image is in normal flow (sets the container height).
-        BEFORE image is absolute-positioned on top, clipped with clip-path.
+        Both images are absolutely positioned in the same box with object-contain.
+        This ensures they have the same visual scale regardless of their native dimensions.
+        The container's aspect-ratio is set dynamically based on the tallest image.
       */}
 
-      {/* AFTER image — full size, in flow (sets container height) */}
+      {/* AFTER image — in normal flow, sets container height */}
       <img
         src={afterSrc}
         alt={afterAlt}
         draggable={false}
-        onLoad={() => setLoaded((s) => ({ ...s, after: true }))}
+        onLoad={handleAfterLoad}
         className="block w-full h-auto object-contain"
       />
 
-      {/* BEFORE image — absolute overlay, clipped from the right */}
+      {/* BEFORE image — absolute on top, clipped by slider */}
       <img
         src={beforeSrc}
         alt={beforeAlt}
         draggable={false}
-        onLoad={() => setLoaded((s) => ({ ...s, before: true }))}
-        className="absolute top-0 left-0 block w-full h-full object-contain"
+        onLoad={handleBeforeLoad}
+        className="absolute top-0 left-0 w-full h-full object-contain"
         style={{
           clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
         }}

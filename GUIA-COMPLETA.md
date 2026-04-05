@@ -2,6 +2,7 @@
 
 > Esta guia explica TODO el proyecto como si fueras estudiante.
 > No necesitas saber todo de memoria — usa esta guia como referencia.
+> **Ultima actualizacion**: 23 de marzo de 2026
 
 ---
 
@@ -305,6 +306,15 @@ El Agente IA es el modulo mas complejo. Automatiza todo:
 ║  │  3. tryon (vestir modelo con prenda)   │                    ║
 ║  └──────────────────┬───────────────────┘                    ║
 ║                     │                                        ║
+║  [FASE 3.5: EDITAR PLAN]                                     ║
+║  ┌──────────────────▼───────────────────┐                    ║
+║  │ El usuario puede modificar el plan:   │                    ║
+║  │  • Mover pasos arriba/abajo          │                    ║
+║  │  • Eliminar pasos que no quiere      │                    ║
+║  │  • Agregar nuevos pasos (12 modulos) │                    ║
+║  │  • Costo se recalcula en tiempo real │                    ║
+║  └──────────────────┬───────────────────┘                    ║
+║                     │                                        ║
 ║  [FASE 4: EJECUCION]                                         ║
 ║  ┌──────────────────▼───────────────────┐                    ║
 ║  │ useAgentPipeline.ts ejecuta cada paso │                    ║
@@ -504,6 +514,12 @@ Las paginas estan en `src/app/`. Cada carpeta = una URL:
 | `src/app/page.tsx` | `/` | Como se arma el dashboard |
 | `src/app/editor/page.tsx` | `/editor` | **EL MAS IMPORTANTE** — como funciona todo |
 | `src/app/agent/page.tsx` | `/agent` | Como funciona la automatizacion |
+| `src/app/batch/page.tsx` | `/batch` | Procesamiento masivo de imagenes |
+| `src/app/brand-kit/page.tsx` | `/brand-kit` | Kit de marca (colores, fuentes, logo) |
+| `src/app/gallery/page.tsx` | `/gallery` | Historial de imagenes procesadas |
+| `src/app/workflows/page.tsx` | `/workflows` | Guias visuales paso a paso |
+| `src/app/docs/page.tsx` | `/docs` | Documentacion interactiva del proyecto |
+| `src/app/architecture/page.tsx` | `/architecture` | Diagrama interactivo de arquitectura |
 
 ### Paso 2: Sigue un modulo de principio a fin
 
@@ -551,23 +567,27 @@ brand-store.ts     → Colores y fuentes de la marca
 ## 9. DECISIONES DE MEJORA — Que Puedes Hacer
 
 ### Nivel Facil (no requiere API keys)
-- [ ] Agregar mas presets de color en BG Remove
-- [ ] Agregar mas presets de enhance (filtros)
+- [ ] Agregar mas presets de color en Enhance
 - [ ] Mejorar textos/descripciones en el dashboard
 - [ ] Agregar mas formatos de marketplace en Compliance
 - [ ] Personalizar el tema de colores (CSS variables en `globals.css`)
+- [ ] Agregar slider de comparacion antes/despues en los paneles
 
 ### Nivel Medio (requiere entender el flujo)
 - [ ] Agregar un nuevo proveedor de video
 - [ ] Crear presets de outpaint para nuevas plataformas
 - [ ] Mejorar el sistema de galeria (filtros, busqueda)
-- [ ] Agregar notificaciones por email cuando termina un batch
+- [ ] Implementar modo de mascara de inpaint (dibujar con Fabric.js)
+- [ ] Arreglar incompatibilidad batch + enhance (JSON vs FormData)
+- [ ] Arreglar outpaint (ambos proveedores usan el mismo modelo)
 
 ### Nivel Avanzado (requiere entender la arquitectura)
 - [ ] Agregar autenticacion de usuarios (NextAuth)
 - [ ] Implementar rate limiting por usuario
 - [ ] Agregar webhook para notificar cuando termina un job
 - [ ] Crear un modulo completamente nuevo
+- [ ] Agente multi-imagen con consistencia visual
+- [ ] Integracion con n8n para workflows externos
 
 ### Para Agregar un Modulo Nuevo:
 

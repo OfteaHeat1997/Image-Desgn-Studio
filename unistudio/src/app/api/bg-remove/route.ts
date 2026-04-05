@@ -55,14 +55,10 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     case 'withoutbg': {
       const healthy = await isWithoutBgHealthy();
       if (!healthy) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              'withoutBG Docker container is not running. Start it with: docker run -p 8000:80 withoutbg/app:latest',
-          },
-          { status: 503 },
-        );
+        // Auto-fallback to Replicate when Docker is not available
+        console.log('[API /bg-remove] withoutBG not available, falling back to Replicate');
+        resultUrl = await removeBgReplicate(imageUrl);
+        break;
       }
       resultUrl = await removeBgWithoutBg(imageUrl);
       break;

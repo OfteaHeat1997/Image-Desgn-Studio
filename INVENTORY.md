@@ -4,7 +4,7 @@
 > It maps every product, image, data source, and known issue so you can fix images,
 > update products, and sync data accurately.
 >
-> **Last updated:** 2026-02-25
+> **Last updated:** 2026-03-23
 
 ---
 

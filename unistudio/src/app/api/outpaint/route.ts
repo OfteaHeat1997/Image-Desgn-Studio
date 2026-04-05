@@ -29,6 +29,7 @@ const PLATFORM_SPECS: Record<string, { aspectRatio: string; description: string 
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
   kontext: 0.05,
+  'flux-fill': 0.025,
 };
 
 export async function POST(request: NextRequest) {
@@ -93,11 +94,20 @@ export async function POST(request: NextRequest) {
         aspect_ratio: aspectRatio,
       });
       resultUrl = extractOutputUrl(output);
+    } else if (provider === 'flux-fill') {
+      // Use Flux Fill Dev via Replicate — mask-free outpainting at lower cost
+      const fillPrompt = `${outpaintPrompt} Seamlessly extended image with consistent lighting and style.`;
+      const output = await runModel('black-forest-labs/flux-fill-dev', {
+        image: imageUrl,
+        prompt: fillPrompt,
+        aspect_ratio: aspectRatio,
+      });
+      resultUrl = extractOutputUrl(output);
     } else {
       return NextResponse.json(
         {
           success: false,
-          error: `Unsupported provider "${provider}". Use "kontext".`,
+          error: `Unsupported provider "${provider}". Use "kontext" or "flux-fill".`,
         },
         { status: 400 },
       );

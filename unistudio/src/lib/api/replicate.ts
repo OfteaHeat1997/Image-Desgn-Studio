@@ -192,10 +192,10 @@ export async function pollPrediction(
   interval: number = 2000,
 ): Promise<any> {
   const terminalStatuses = new Set(['succeeded', 'failed', 'canceled']);
+  const MAX_POLLS = 150; // ~5 minutes at 2s interval
 
   try {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    for (let i = 0; i < MAX_POLLS; i++) {
       const prediction = await getPrediction(id);
 
       if (terminalStatuses.has(prediction.status)) {
@@ -216,6 +216,11 @@ export async function pollPrediction(
 
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
+
+    throw new ReplicateApiError(
+      `Prediction "${id}" timed out after ${MAX_POLLS} polls`,
+      'POLL_TIMEOUT',
+    );
   } catch (error) {
     if (error instanceof ReplicateApiError) throw error;
     throw new ReplicateApiError(

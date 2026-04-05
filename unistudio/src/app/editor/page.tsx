@@ -13,7 +13,8 @@ import { PropertiesPanel } from "@/components/editor/PropertiesPanel";
 import { ShadowsGuidePanel, type SessionResult } from "@/components/editor/ShadowsGuidePanel";
 import { TryOnGuidePanel } from "@/components/editor/TryOnGuidePanel";
 import { useGalleryStore } from "@/stores/gallery-store";
-import { ArrowRight, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { useEditor } from "@/hooks/useEditor";
+import { ArrowRight, RotateCcw, Eye, EyeOff, ImagePlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ResultBanner } from "@/components/ui/result-banner";
@@ -195,6 +196,9 @@ function EditorInner() {
   const [hasModelImage, setHasModelImage] = useState(false);
   const [lastCost, setLastCost] = useState<number | undefined>(undefined);
 
+  // Connect to the layers system
+  const { addImage: addLayerImage } = useEditor();
+
   // Track blob URLs to revoke on cleanup
   const blobUrlsRef = useRef<string[]>([]);
   const trackBlobUrl = useCallback((url: string) => {
@@ -212,7 +216,19 @@ function EditorInner() {
     setCurrentImage(url);
     setOriginalImage(url);
     setProcessedImage(null);
-  }, [trackBlobUrl]);
+    // Add to layers panel
+    addLayerImage(file);
+  }, [trackBlobUrl, addLayerImage]);
+
+  /** Upload a new image without reloading the page */
+  const handleNewImage = useCallback(() => {
+    setCurrentImage(null);
+    setOriginalImage(null);
+    setCurrentImageFile(null);
+    setProcessedImage(null);
+    setShowingOriginal(false);
+    setLastCost(undefined);
+  }, []);
 
   const addToGallery = useGalleryStore((s) => s.addImage);
 
@@ -279,19 +295,20 @@ function EditorInner() {
     if (!processedImage) return;
     setImageLoading(true);
     try {
-      const file = await blobUrlToFile(
-        processedImage,
-        currentImageFile?.name ?? "processed.png"
-      );
+      const baseName = currentImageFile?.name?.replace(/\.[^.]+$/, "") ?? "processed";
+      const newName = `${baseName}_${selectedModule}.png`;
+      const file = await blobUrlToFile(processedImage, newName);
       setCurrentImageFile(file);
       setCurrentImage(processedImage);
       setProcessedImage(null);
+      // Add processed result as a new layer
+      addLayerImage(file);
     } catch (error) {
       console.error("Failed to accept result:", error);
     } finally {
       setImageLoading(false);
     }
-  }, [processedImage, currentImageFile]);
+  }, [processedImage, currentImageFile, selectedModule, addLayerImage]);
 
   /** Reset back to the original uploaded image */
   const handleResetToOriginal = useCallback(() => {
@@ -473,17 +490,28 @@ function EditorInner() {
             </div>
           ) : (
             /* Single image preview */
-            <div
-              className="relative"
-              style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
-            >
-              <div className="checkerboard-bg rounded-lg">
-                <img
-                  src={currentImage}
-                  alt="Current"
-                  className="max-h-[70vh] rounded-lg border border-surface-lighter object-contain"
-                />
+            <div className="flex flex-col items-center gap-4">
+              <div
+                className="relative"
+                style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+              >
+                <div className="checkerboard-bg rounded-lg">
+                  <img
+                    src={currentImage}
+                    alt="Current"
+                    className="max-h-[70vh] rounded-lg border border-surface-lighter object-contain"
+                  />
+                </div>
               </div>
+              {/* Button to upload a new image without reloading */}
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<ImagePlus className="h-3.5 w-3.5" />}
+                onClick={handleNewImage}
+              >
+                Nueva Imagen
+              </Button>
             </div>
           )}
 

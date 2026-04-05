@@ -54,16 +54,28 @@ export async function POST(request: NextRequest) {
 
     // Read file into buffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    let buffer: Buffer = Buffer.from(arrayBuffer);
 
     // Get image metadata using sharp
     const metadata = await sharp(buffer).metadata();
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
 
+    // Optimize large images to stay within Vercel's 4.5MB response limit
+    // Base64 encoding expands size by ~33%, so target ~3MB buffer max
+    const MAX_BUFFER_SIZE = 3 * 1024 * 1024;
+    let outputMime = file.type;
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      buffer = Buffer.from(await sharp(buffer)
+        .resize({ width: Math.min(width, 2048), withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer());
+      outputMime = 'image/jpeg';
+    }
+
     // Convert to base64 data URL
     const base64 = buffer.toString('base64');
-    const dataUrl = `data:${file.type};base64,${base64}`;
+    const dataUrl = `data:${outputMime};base64,${base64}`;
 
     // Save to database
     const imageId = await saveUploadedImage({

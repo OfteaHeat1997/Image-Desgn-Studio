@@ -155,7 +155,7 @@ export async function editKontext(
   editInstruction: string,
 ): Promise<string> {
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
-    image: imageUrl,
+    input_image: imageUrl,
     prompt: editInstruction,
   });
 

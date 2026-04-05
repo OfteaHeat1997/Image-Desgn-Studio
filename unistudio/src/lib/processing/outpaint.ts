@@ -157,7 +157,7 @@ export async function outpaintKontext(
     : `Extend the image canvas to ${targetAspectRatio} aspect ratio. Naturally extend the background and scene. Keep the original content EXACTLY the same.`;
 
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
-    image: imageUrl,
+    input_image: imageUrl,
     prompt: outpaintPrompt,
     aspect_ratio: targetAspectRatio,
   });

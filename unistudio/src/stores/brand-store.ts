@@ -4,6 +4,7 @@
 // =============================================================================
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type {
   BrandKit,
   BrandColors,
@@ -87,7 +88,9 @@ interface BrandStoreState {
 // Store
 // -----------------------------------------------------------------------------
 
-export const useBrandStore = create<BrandStoreState>()((set, get) => ({
+export const useBrandStore = create<BrandStoreState>()(
+  persist(
+  (set, get) => ({
   // -- Initial state ----------------------------------------------------------
   brandKit: DEFAULT_BRAND_KIT,
   templates: [],
@@ -156,4 +159,6 @@ export const useBrandStore = create<BrandStoreState>()((set, get) => ({
   getTemplatesForPlatform: (platform) => {
     return get().templates.filter((t) => t.platform === platform);
   },
-}));
+}),
+  { name: 'unistudio-brand-kit' },
+));

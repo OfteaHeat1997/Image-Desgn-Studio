@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { addDropShadow, addContactShadow, addReflection, relightWithAI } from '@/lib/processing/shadows';
+import { addDropShadow, addContactShadow, addReflection, relightIcLight, relightKontext } from '@/lib/processing/shadows';
 import { urlToBuffer, bufferToDataUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler } from '@/lib/api/route-helpers';
@@ -143,7 +143,21 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
       break;
     }
 
-    case 'ai-relight':
+    case 'ai-relight': {
+      if (!imageUrl && imageBuffer) {
+        imageUrl = bufferToDataUrl(imageBuffer, 'image/png');
+      }
+      if (!imageUrl) {
+        return NextResponse.json({ success: false, error: 'Image URL required for AI relighting.' }, { status: 400 });
+      }
+      const relightPromptText = preset
+        ? SHADOW_PRESETS[preset] || preset
+        : prompt || 'Professional product photography with soft diffused studio lighting and natural shadows.';
+
+      resultUrl = await relightIcLight(imageUrl, relightPromptText);
+      break;
+    }
+
     case 'ai-kontext': {
       if (!imageUrl && imageBuffer) {
         imageUrl = bufferToDataUrl(imageBuffer, 'image/png');
@@ -151,11 +165,11 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
       if (!imageUrl) {
         return NextResponse.json({ success: false, error: 'Image URL required for AI relighting.' }, { status: 400 });
       }
-      const aiPrompt = preset
+      const kontextPromptText = preset
         ? SHADOW_PRESETS[preset] || preset
         : prompt || 'Add natural, professional product photography shadows and lighting. Keep the product exactly the same.';
 
-      resultUrl = await relightWithAI(imageUrl, aiPrompt);
+      resultUrl = await relightKontext(imageUrl, kontextPromptText);
       break;
     }
 

@@ -55,6 +55,7 @@ const PLATFORM_PRESETS: PlatformPreset[] = [
 
 export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [provider, setProvider] = useState<"kontext" | "flux-fill">("kontext");
   const [customWidth, setCustomWidth] = useState(2000);
   const [customHeight, setCustomHeight] = useState(2000);
   const [extendTop, setExtendTop] = useState(true);
@@ -104,6 +105,7 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
           platform: platformId,
           targetAspectRatio,
           prompt: fullPrompt || undefined,
+          provider,
         }),
       });
       const data = await res.json();
@@ -112,10 +114,10 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
       setStatus("Listo!");
       onProcess(data.data.url, undefined, data.data.cost ?? 0.05);
     });
-  }, [imageFile, customWidth, customHeight, selectedPreset, bgPrompt, extendTop, extendBottom, extendLeft, extendRight, onProcess, run]);
+  }, [imageFile, customWidth, customHeight, selectedPreset, bgPrompt, extendTop, extendBottom, extendLeft, extendRight, provider, onProcess, run]);
 
   const activeDirections = [extendTop, extendBottom, extendLeft, extendRight].filter(Boolean).length;
-  const estimatedCost = activeDirections > 0 ? 0.05 : 0;
+  const estimatedCost = activeDirections > 0 ? (provider === "flux-fill" ? 0.025 : 0.05) : 0;
 
   return (
     <div className="space-y-5">
@@ -138,6 +140,41 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
           "Funciona mejor con imagenes de alta resolucion y fondos simples.",
         ]}
       />
+
+      {/* Provider selector */}
+      <div>
+        <label className="mb-2 block text-xs font-medium text-gray-400">
+          Proveedor de IA
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setProvider("kontext")}
+            className={cn(
+              "rounded-lg border p-2.5 text-center transition-all",
+              provider === "kontext"
+                ? "border-accent bg-accent/10"
+                : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+            )}
+          >
+            <span className="block text-[11px] font-semibold text-gray-200">Kontext Pro</span>
+            <span className="block text-[9px] text-gray-500">Mejor calidad — $0.05</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setProvider("flux-fill")}
+            className={cn(
+              "rounded-lg border p-2.5 text-center transition-all",
+              provider === "flux-fill"
+                ? "border-accent bg-accent/10"
+                : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+            )}
+          >
+            <span className="block text-[11px] font-semibold text-gray-200">Flux Fill</span>
+            <span className="block text-[9px] text-gray-500">Mas economico — $0.025</span>
+          </button>
+        </div>
+      </div>
 
       {/* Platform presets grid */}
       <div>

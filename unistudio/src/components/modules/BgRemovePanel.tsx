@@ -43,28 +43,20 @@ type OutputType = "transparent" | "solid" | "blur";
 
 const PROVIDERS: Provider[] = [
   {
+    id: "replicate",
+    name: "Replicate IA",
+    cost: "$0.004",
+    quality: 5,
+    icon: Star,
+    description: "Mejor calidad, rapido, recomendado",
+  },
+  {
     id: "browser",
     name: "Navegador",
     cost: "Gratis",
     quality: 3,
     icon: Monitor,
     description: "Se procesa en tu PC, sin costo",
-  },
-  {
-    id: "withoutbg",
-    name: "Docker Local",
-    cost: "Gratis",
-    quality: 4,
-    icon: HardDrive,
-    description: "Requiere Docker corriendo",
-  },
-  {
-    id: "replicate",
-    name: "Replicate",
-    cost: "$0.01",
-    quality: 4,
-    icon: Cpu,
-    description: "Alta calidad, usa API",
   },
 ];
 
@@ -219,6 +211,7 @@ async function resizeForMarketplace(
   imageBlob: Blob,
   sizeStr: string,
   autoCropMargin: number,
+  keepTransparent: boolean = false,
 ): Promise<Blob> {
   if (sizeStr === "none") return imageBlob;
 
@@ -228,9 +221,11 @@ async function resizeForMarketplace(
   const canvas = new OffscreenCanvas(targetW, targetH);
   const ctx = canvas.getContext("2d")!;
 
-  // Fill white background (for non-transparent formats)
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, targetW, targetH);
+  // Only fill white background if NOT transparent mode
+  if (!keepTransparent) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, targetW, targetH);
+  }
 
   // Calculate scale to fit with margin
   const marginFraction = autoCropMargin / 100;
@@ -378,7 +373,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
       // 3. Marketplace resize
       if (marketplaceSize !== "none") {
         setStatusText("Redimensionando para marketplace...");
-        resultBlob = await resizeForMarketplace(resultBlob, marketplaceSize, autoCropMargin);
+        resultBlob = await resizeForMarketplace(resultBlob, marketplaceSize, autoCropMargin, outputType === "transparent");
       }
 
       // 4. Convert format
@@ -432,7 +427,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         <label className="mb-2 block text-xs font-medium text-gray-400">
           Proveedor
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {PROVIDERS.map((provider) => (
             <button
               key={provider.id}

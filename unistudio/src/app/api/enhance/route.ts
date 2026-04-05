@@ -94,12 +94,21 @@ export async function POST(request: NextRequest) {
       enhancedBuffer = await enhanceWithPreset(buffer, 'auto');
     }
 
+    // Optimize large outputs to stay within Vercel's 4.5MB response limit
+    const MAX_BUFFER_SIZE = 3 * 1024 * 1024;
+    let outputBuffer: Buffer = enhancedBuffer;
+    let outputMime = 'image/png';
+    if (enhancedBuffer.length > MAX_BUFFER_SIZE) {
+      outputBuffer = Buffer.from(await sharp(enhancedBuffer).jpeg({ quality: 90 }).toBuffer());
+      outputMime = 'image/jpeg';
+    }
+
     // Convert to base64 data URL
-    const base64 = enhancedBuffer.toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
+    const base64 = outputBuffer.toString('base64');
+    const dataUrl = `data:${outputMime};base64,${base64}`;
 
     // Get output metadata
-    const metadata = await sharp(enhancedBuffer).metadata();
+    const metadata = await sharp(outputBuffer).metadata();
 
     await saveJob({
       operation: 'enhance',

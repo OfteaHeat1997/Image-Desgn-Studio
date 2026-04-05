@@ -70,14 +70,14 @@ export const useGalleryStore = create<GalleryStoreState>()(
       // Filter out entries with invalid URLs on rehydration
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        const isValidUrl = (url: string) =>
-          url.startsWith("blob:") ||
+        // Blob URLs die after page reload — only keep persistent URLs
+        const isPersistentUrl = (url: string) =>
           url.startsWith("data:") ||
           url.startsWith("http://") ||
           url.startsWith("https://") ||
           url === "";
         state.images = state.images.filter(
-          (img) => isValidUrl(img.resultUrl) && isValidUrl(img.originalUrl),
+          (img) => isPersistentUrl(img.resultUrl) && isPersistentUrl(img.originalUrl),
         );
       },
     },

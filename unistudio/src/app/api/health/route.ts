@@ -11,7 +11,7 @@ export async function GET() {
   const optionalVars = [
     "ANTHROPIC_API_KEY",
     "HEDRA_API_KEY",
-    "GOOGLE_TTS_KEY",
+    "GOOGLE_TTS_API_KEY",
     "FASHN_API_KEY",
   ];
 
@@ -26,8 +26,12 @@ export async function GET() {
   let dbStatus = "not checked";
   try {
     const { prisma } = await import("@/lib/db/prisma");
-    await prisma.$queryRaw`SELECT 1`;
-    dbStatus = "connected";
+    if (!prisma) {
+      dbStatus = "not configured (DATABASE_URL not set)";
+    } else {
+      await prisma.$queryRaw`SELECT 1`;
+      dbStatus = "connected";
+    }
   } catch (err) {
     dbStatus = `error: ${err instanceof Error ? err.message : "unknown"}`;
   }

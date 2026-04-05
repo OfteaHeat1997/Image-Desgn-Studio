@@ -37,6 +37,9 @@ function getBaseUrl(): string {
  * Never throws.
  */
 export async function isWithoutBgHealthy(): Promise<boolean> {
+  // Skip health check entirely if no URL is configured (avoids 3s timeout on Vercel)
+  if (!process.env.WITHOUTBG_URL) return false;
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
