@@ -121,6 +121,7 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
         contrast: settings.contrast,
         saturation: settings.saturation,
         sharpness: settings.sharpness,
+        vibrance: 0, // required by enhanceImage — default to 0 for custom mode
         exposure: settings.exposure * 50, // convert -2..2 to -100..100
         noiseReduction: settings.noiseReduction,
         ...(wbKelvin ? { whiteBalance: wbKelvin } : {}),

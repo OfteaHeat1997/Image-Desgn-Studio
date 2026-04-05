@@ -82,9 +82,18 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
 
       setStatus("Extendiendo imagen con IA... (30-90 seg)");
 
-      const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-      const d = gcd(w, h);
-      const targetAspectRatio = `${w / d}:${h / d}`;
+      // Snap to nearest standard aspect ratio (Replicate models only accept standard ratios)
+      const STANDARD_RATIOS = [
+        { r: 1/1, label: "1:1" }, { r: 4/3, label: "4:3" }, { r: 3/4, label: "3:4" },
+        { r: 16/9, label: "16:9" }, { r: 9/16, label: "9:16" }, { r: 3/2, label: "3:2" },
+        { r: 2/3, label: "2:3" }, { r: 4/5, label: "4:5" }, { r: 5/4, label: "5:4" },
+        { r: 21/9, label: "21:9" }, { r: 9/21, label: "9:21" },
+      ];
+      const actual = w / h;
+      const closest = STANDARD_RATIOS.reduce((best, cur) =>
+        Math.abs(cur.r - actual) < Math.abs(best.r - actual) ? cur : best
+      );
+      const targetAspectRatio = closest.label;
       const platformId = selectedPreset || undefined;
 
       const dirs: string[] = [];

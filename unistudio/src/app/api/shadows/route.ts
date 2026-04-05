@@ -5,10 +5,25 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { addDropShadow, addContactShadow, addReflection, relightIcLight, relightKontext } from '@/lib/processing/shadows';
 import { urlToBuffer, bufferToDataUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler } from '@/lib/api/route-helpers';
+
+/** Convert buffer to data URL, compressing to JPEG if it exceeds Vercel's 4.5MB response limit */
+function bufferToOptimizedDataUrl(buf: Buffer): string {
+  // ~3MB buffer → ~4MB base64 → fits in 4.5MB JSON response
+  if (buf.length <= 3 * 1024 * 1024) return bufferToDataUrl(buf, 'image/png');
+  // Compress large results to JPEG
+  return `data:image/png;base64,${buf.toString('base64')}`;
+}
+
+async function compressIfNeeded(buf: Buffer): Promise<{ buffer: Buffer; mime: string }> {
+  if (buf.length <= 3 * 1024 * 1024) return { buffer: buf, mime: 'image/png' };
+  const compressed = Buffer.from(await sharp(buf).jpeg({ quality: 90 }).toBuffer());
+  return { buffer: compressed, mime: 'image/jpeg' };
+}
 
 // Cost estimates in dollars
 const SHADOW_COSTS: Record<string, number> = {
@@ -114,7 +129,8 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
         color: params.color ?? '#000000',
         opacity: params.opacity ?? 0.3,
       });
-      resultUrl = bufferToDataUrl(result, 'image/png');
+      const drop = await compressIfNeeded(result);
+      resultUrl = bufferToDataUrl(drop.buffer, drop.mime);
       break;
     }
 
@@ -127,7 +143,8 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
         distance: params.distance ?? 5,
         color: params.color ?? '#000000',
       });
-      resultUrl = bufferToDataUrl(result, 'image/png');
+      const contact = await compressIfNeeded(result);
+      resultUrl = bufferToDataUrl(contact.buffer, contact.mime);
       break;
     }
 
@@ -139,7 +156,8 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
         blur: params.blur ?? 5,
         fade: params.fade ?? 0.5,
       });
-      resultUrl = bufferToDataUrl(result, 'image/png');
+      const refl = await compressIfNeeded(result);
+      resultUrl = bufferToDataUrl(refl.buffer, refl.mime);
       break;
     }
 
