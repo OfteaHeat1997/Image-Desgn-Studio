@@ -88,10 +88,15 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
     setErrorMsg(null);
 
     try {
-      const imageUrl = await fileToDataUrl(imageFile);
+      // Upload via /api/upload (handles compression for large images)
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen");
 
       const body: Record<string, unknown> = {
-        imageUrl,
+        imageUrl: uploadData.data.url,
         provider,
         scale,
       };

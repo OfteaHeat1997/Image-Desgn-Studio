@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
 
-    // Optimize large images to stay within Vercel's 4.5MB response limit
-    // Base64 encoding expands size by ~33%, so target ~3MB buffer max
-    const MAX_BUFFER_SIZE = 3 * 1024 * 1024;
+    // Optimize large images to stay within Vercel's 4.5MB response/request limits
+    // Base64 encoding expands size by ~33%, so target ~2.5MB buffer max (~3.3MB base64)
+    const MAX_BUFFER_SIZE = 2.5 * 1024 * 1024;
     let outputMime = file.type;
     if (buffer.length > MAX_BUFFER_SIZE) {
       buffer = Buffer.from(await sharp(buffer)
