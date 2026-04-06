@@ -2,12 +2,14 @@
 // Upload API Route - UniStudio
 // POST: Accepts multipart FormData with 'file' field.
 // Validates file type (png/jpg/webp/gif) and size (max 50MB).
-// Converts to base64 data URL and returns metadata.
+// Uploads to Replicate file hosting for permanent HTTP URLs.
+// Falls back to base64 data URL if Replicate upload fails.
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { saveUploadedImage } from '@/lib/db/persist';
+import { ensureHttpUrl } from '@/lib/api/replicate';
 
 const ALLOWED_TYPES = new Set([
   'image/png',
@@ -61,8 +63,7 @@ export async function POST(request: NextRequest) {
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
 
-    // Optimize large images to stay within Vercel's 4.5MB response/request limits
-    // Base64 encoding expands size by ~33%, so target ~2.5MB buffer max (~3.3MB base64)
+    // Optimize large images (max 2048px, JPEG if over 2.5MB)
     const MAX_BUFFER_SIZE = 2.5 * 1024 * 1024;
     let outputMime = file.type;
     if (buffer.length > MAX_BUFFER_SIZE) {
@@ -73,28 +74,38 @@ export async function POST(request: NextRequest) {
       outputMime = 'image/jpeg';
     }
 
-    // Convert to base64 data URL
+    // Build data URL (needed as fallback and for DB storage)
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${outputMime};base64,${base64}`;
+
+    // Try to upload to Replicate file hosting for a permanent HTTP URL
+    // This URL survives page refreshes and can be shared across browsers
+    let permanentUrl: string = dataUrl;
+    try {
+      permanentUrl = await ensureHttpUrl(dataUrl);
+    } catch (err) {
+      console.warn('[upload] Replicate file upload failed, using data URL fallback:', err);
+      // Keep dataUrl as fallback — works but doesn't survive refresh
+    }
 
     // Save to database
     const imageId = await saveUploadedImage({
       filename: file.name,
-      originalUrl: dataUrl,
+      originalUrl: permanentUrl,
       width,
       height,
-      fileSize: file.size,
-      mimeType: file.type,
+      fileSize: buffer.length,
+      mimeType: outputMime,
     });
 
     return NextResponse.json({
       success: true,
       data: {
-        url: dataUrl,
+        url: permanentUrl,
         filename: file.name,
         width,
         height,
-        fileSize: file.size,
+        fileSize: buffer.length,
         imageId,
       },
       cost: 0,
