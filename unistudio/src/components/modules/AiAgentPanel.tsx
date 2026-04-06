@@ -214,9 +214,11 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Expanded step preview (click thumbnail to see full image)
+  // Expanded step preview (click thumbnail to see full image — before/after)
   const [previewStepUrl, setPreviewStepUrl] = useState<string | null>(null);
+  const [previewStepInputUrl, setPreviewStepInputUrl] = useState<string | null>(null);
   const [previewStepLabel, setPreviewStepLabel] = useState<string>("");
+  const [previewShowBefore, setPreviewShowBefore] = useState(false);
 
   // Plan editor state
   const [editedPlan, setEditedPlan] = useState<AgentPlan | null>(null);
@@ -1009,30 +1011,49 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                   )}
                 </div>
 
-                {/* RESULT PREVIEW — large, visible, the whole point */}
+                {/* BEFORE/AFTER PREVIEW — side by side comparison */}
                 {isCompleted && stepExec.resultUrl && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewStepUrl(stepExec.resultUrl);
-                      setPreviewStepLabel(step.label);
-                    }}
-                    className="relative w-full group cursor-pointer"
-                  >
-                    <img
-                      src={stepExec.resultUrl}
-                      alt={step.label}
-                      className="w-full aspect-[16/10] object-contain bg-black/30 border-t border-surface-lighter"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                      <ZoomIn className="h-5 w-5 text-white" />
+                  <div className="border-t border-surface-lighter">
+                    {/* Before/After side by side */}
+                    <div className="grid grid-cols-2 gap-px bg-surface-lighter">
+                      {/* BEFORE */}
+                      <div className="relative bg-black/30">
+                        <img
+                          src={stepExec.inputUrl ?? ""}
+                          alt={`Antes: ${step.label}`}
+                          className="w-full aspect-square object-contain"
+                        />
+                        <span className="absolute top-1 left-1 text-[8px] bg-red-500/80 text-white px-1.5 py-0.5 rounded font-semibold">
+                          ANTES
+                        </span>
+                      </div>
+                      {/* AFTER */}
+                      <div className="relative bg-black/30">
+                        <img
+                          src={stepExec.resultUrl}
+                          alt={`Despues: ${step.label}`}
+                          className="w-full aspect-square object-contain"
+                        />
+                        <span className="absolute top-1 left-1 text-[8px] bg-emerald-500/80 text-white px-1.5 py-0.5 rounded font-semibold">
+                          DESPUES
+                        </span>
+                      </div>
                     </div>
-                    <div className="absolute bottom-1 right-1">
-                      <span className="text-[8px] bg-black/60 text-gray-300 px-1.5 py-0.5 rounded">
-                        Paso {i + 1} de {plan.steps.length}
-                      </span>
-                    </div>
-                  </button>
+                    {/* Click to expand */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewStepUrl(stepExec.resultUrl);
+                        setPreviewStepInputUrl(stepExec.inputUrl);
+                        setPreviewStepLabel(step.label);
+                        setPreviewShowBefore(false);
+                      }}
+                      className="flex w-full items-center justify-center gap-1 py-1.5 text-[9px] text-gray-500 hover:text-accent-light transition-colors"
+                    >
+                      <ZoomIn className="h-3 w-3" />
+                      Ver ampliado — Paso {i + 1} de {plan.steps.length}
+                    </button>
+                  </div>
                 )}
 
                 {/* Running animation */}
@@ -1058,28 +1079,64 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           })}
         </div>
 
-        {/* Step preview modal overlay */}
+        {/* Step preview modal overlay — with before/after toggle */}
         {previewStepUrl && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setPreviewStepUrl(null)}
+            onClick={() => { setPreviewStepUrl(null); setPreviewStepInputUrl(null); }}
           >
             <div className="relative max-w-2xl w-full max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between px-3 py-2 bg-surface rounded-t-xl border border-surface-lighter">
                 <span className="text-xs font-medium text-gray-200">{previewStepLabel}</span>
-                <button
-                  type="button"
-                  onClick={() => setPreviewStepUrl(null)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* Before/After toggle */}
+                  {previewStepInputUrl && (
+                    <div className="flex rounded-lg overflow-hidden border border-surface-lighter text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewShowBefore(false)}
+                        className={cn(
+                          "px-2.5 py-1 font-semibold transition-colors",
+                          !previewShowBefore ? "bg-emerald-500/20 text-emerald-400" : "bg-surface-light text-gray-500 hover:text-gray-300",
+                        )}
+                      >
+                        Despues
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewShowBefore(true)}
+                        className={cn(
+                          "px-2.5 py-1 font-semibold transition-colors",
+                          previewShowBefore ? "bg-red-500/20 text-red-400" : "bg-surface-light text-gray-500 hover:text-gray-300",
+                        )}
+                      >
+                        Antes
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setPreviewStepUrl(null); setPreviewStepInputUrl(null); }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <img
-                src={previewStepUrl}
-                alt={previewStepLabel}
-                className="w-full max-h-[75vh] object-contain bg-black rounded-b-xl border-x border-b border-surface-lighter"
-              />
+              <div className="relative">
+                <img
+                  src={previewShowBefore && previewStepInputUrl ? previewStepInputUrl : previewStepUrl}
+                  alt={previewStepLabel}
+                  className="w-full max-h-[75vh] object-contain bg-black rounded-b-xl border-x border-b border-surface-lighter"
+                />
+                {/* Label overlay */}
+                <span className={cn(
+                  "absolute top-2 left-2 text-[10px] font-bold px-2 py-1 rounded",
+                  previewShowBefore ? "bg-red-500/80 text-white" : "bg-emerald-500/80 text-white",
+                )}>
+                  {previewShowBefore ? "ANTES" : "DESPUES"}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -1143,41 +1200,111 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           </span>
         </div>
 
-        {/* Results gallery */}
-        <SectionLabel>Resultados por Paso</SectionLabel>
-        <div className="grid grid-cols-2 gap-2">
+        {/* Results gallery — Before/After per step */}
+        <SectionLabel>Resultados por Paso (Antes → Despues)</SectionLabel>
+        <div className="space-y-3">
           {completedSteps.map((stepExec, i) => {
             const stepDef = plan.steps.find((s) => s.id === stepExec.stepId);
             return (
               <div
                 key={stepExec.stepId}
-                className="group relative overflow-hidden rounded-lg border border-surface-lighter"
+                className="rounded-lg border border-surface-lighter overflow-hidden"
               >
-                <img
-                  src={stepExec.resultUrl!}
-                  alt={stepDef?.label ?? `Paso ${i + 1}`}
-                  className="aspect-square w-full object-cover"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
-                  <p className="text-[9px] font-medium text-white truncate">
+                {/* Step header */}
+                <div className="flex items-center gap-2 px-2.5 py-1.5 bg-surface-light">
+                  <span className="text-sm">{MODULE_ICONS[stepDef?.module ?? ""] ?? "⚙️"}</span>
+                  <span className="text-[10px] font-semibold text-gray-300 flex-1 truncate">
                     {stepDef?.label ?? `Paso ${i + 1}`}
-                  </p>
+                  </span>
+                  {stepExec.actualCost > 0 && (
+                    <span className="text-[9px] tabular-nums text-emerald-400">${stepExec.actualCost.toFixed(3)}</span>
+                  )}
+                  {stepExec.actualCost === 0 && (
+                    <span className="text-[9px] text-emerald-400/60">Gratis</span>
+                  )}
                 </div>
+                {/* Before/After side by side */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewStepUrl(stepExec.resultUrl);
+                    setPreviewStepInputUrl(stepExec.inputUrl);
+                    setPreviewStepLabel(stepDef?.label ?? `Paso ${i + 1}`);
+                    setPreviewShowBefore(false);
+                  }}
+                  className="w-full cursor-pointer"
+                >
+                  <div className="grid grid-cols-2 gap-px bg-surface-lighter">
+                    {/* Before */}
+                    <div className="relative bg-black/20">
+                      {stepExec.inputUrl ? (
+                        <img
+                          src={stepExec.inputUrl}
+                          alt="Antes"
+                          className="w-full aspect-[4/3] object-contain"
+                        />
+                      ) : (
+                        <div className="w-full aspect-[4/3] flex items-center justify-center text-[10px] text-gray-600">
+                          Original
+                        </div>
+                      )}
+                      <span className="absolute top-1 left-1 text-[7px] bg-red-500/70 text-white px-1 py-0.5 rounded font-bold">
+                        ANTES
+                      </span>
+                    </div>
+                    {/* After */}
+                    <div className="relative bg-black/20">
+                      <img
+                        src={stepExec.resultUrl!}
+                        alt="Despues"
+                        className="w-full aspect-[4/3] object-contain"
+                      />
+                      <span className="absolute top-1 left-1 text-[7px] bg-emerald-500/70 text-white px-1 py-0.5 rounded font-bold">
+                        DESPUES
+                      </span>
+                    </div>
+                  </div>
+                </button>
               </div>
             );
           })}
         </div>
 
-        {/* Final result large */}
+        {/* Final result — Before (original) vs After (final) */}
         {finalResultUrl && (
           <>
-            <SectionLabel>Resultado Final</SectionLabel>
+            <SectionLabel>Resultado Final — Antes vs Despues</SectionLabel>
             <div className="overflow-hidden rounded-xl border border-accent/30">
-              <img
-                src={finalResultUrl}
-                alt="Resultado final"
-                className="w-full object-contain"
-              />
+              <div className="grid grid-cols-2 gap-px bg-surface-lighter">
+                {/* Original input */}
+                <div className="relative bg-black/20">
+                  {imageFile ? (
+                    <img
+                      src={URL.createObjectURL(imageFile)}
+                      alt="Imagen original"
+                      className="w-full aspect-[4/3] object-contain"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[4/3] flex items-center justify-center text-gray-600 text-xs">
+                      Original
+                    </div>
+                  )}
+                  <span className="absolute top-2 left-2 text-[9px] bg-red-500/80 text-white px-2 py-0.5 rounded font-bold">
+                    ORIGINAL
+                  </span>
+                </div>
+                {/* Final result */}
+                <div className="relative bg-black/20">
+                  <img
+                    src={finalResultUrl}
+                    alt="Resultado final"
+                    className="w-full aspect-[4/3] object-contain"
+                  />
+                  <span className="absolute top-2 left-2 text-[9px] bg-emerald-500/80 text-white px-2 py-0.5 rounded font-bold">
+                    FINAL
+                  </span>
+                </div>
+              </div>
             </div>
           </>
         )}

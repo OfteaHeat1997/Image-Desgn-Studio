@@ -339,9 +339,9 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
   }
 
   // --- Smart adjustments based on image analysis ---
-  if (analysis && budget !== "free") {
-    // Prepend watermark removal if detected
-    if (analysis.hasWatermark) {
+  if (analysis) {
+    // Prepend watermark removal if detected (paid only)
+    if (analysis.hasWatermark && budget !== "free") {
       steps.unshift(
         makeStep(
           "inpaint",
@@ -353,7 +353,34 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       );
     }
 
-    // Skip bg-remove if background is already transparent or white (for e-commerce)
+    // CRITICAL: Ensure bg-remove is present when image has complex/colored background
+    // This fixes the issue where the agent gets confused with non-white backgrounds
+    const hasBgRemove = steps.some((s) => s.module === "bg-remove");
+    const bgType = analysis.backgroundType as string;
+    const needsBgRemove =
+      bgType === "complex" ||
+      bgType === "colored" ||
+      bgType === "gradient" ||
+      // If background is NOT white and NOT transparent, we need to remove it
+      (bgType !== "transparent" && bgType !== "white");
+
+    if (needsBgRemove && !hasBgRemove) {
+      // Insert bg-remove as the first step (or after inpaint if watermark removal is first)
+      const insertIdx = steps.findIndex((s) => s.module === "inpaint") >= 0 ? 1 : 0;
+      steps.splice(
+        insertIdx,
+        0,
+        makeStep(
+          "bg-remove",
+          "Quitar fondo (detectado automaticamente)",
+          { provider: "browser" },
+          0,
+          `Fondo ${analysis.backgroundType} detectado — lo removemos primero para mejor resultado.`,
+        ),
+      );
+    }
+
+    // Skip bg-remove ONLY if background is already transparent or white AND agent is e-commerce
     if (
       (analysis.backgroundType === "transparent" || analysis.backgroundType === "white") &&
       req.agentType === "ecommerce"
@@ -384,8 +411,8 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       );
     }
 
-    // Append upscale if low resolution and not already in pipeline
-    if (analysis.isLowResolution && !steps.some((s) => s.module === "upscale")) {
+    // Append upscale if low resolution and not already in pipeline (paid only)
+    if (analysis.isLowResolution && !steps.some((s) => s.module === "upscale") && budget !== "free") {
       steps.push(
         makeStep(
           "upscale",
@@ -478,10 +505,13 @@ ${req.preferences ? `- Model preferences: ${JSON.stringify(req.preferences)}` : 
 ${req.imageCount ? `- Images: ${req.imageCount}` : ""}
 ${analysisContext}
 
-IMPORTANT: If watermark is detected, add an "inpaint" step as the FIRST step with params: {prompt: "Remove watermark, logo, and text overlay completely", provider: "kontext"}.
-If image is already transparent or white background, do NOT add bg-remove step unless needed for isolating the product.
-If lighting or color is bad, add an "enhance" step early in the pipeline.
-If resolution is low, add "upscale" as the LAST step.
+IMPORTANT RULES for image analysis:
+1. If background is "complex", "colored", or anything other than "transparent"/"white": ALWAYS add "bg-remove" as the FIRST image processing step. The agent CANNOT work properly with complex backgrounds.
+2. If watermark is detected, add "inpaint" step BEFORE bg-remove with params: {prompt: "Remove watermark, logo, and text overlay completely", provider: "kontext"}.
+3. If image is already transparent or white background for e-commerce: skip bg-remove.
+4. If lighting or color is bad, add an "enhance" step early in the pipeline.
+5. If resolution is low, add "upscale" as the LAST step.
+6. For modelo/tryon pipelines: bg-remove is MANDATORY to isolate the garment, even if background looks simple.
 
 Return JSON: {"id","name","description","agentType","steps":[{"id","module","label","params","estimatedCost","reasoning"}],"totalEstimatedCost","estimatedDuration"}`;
 

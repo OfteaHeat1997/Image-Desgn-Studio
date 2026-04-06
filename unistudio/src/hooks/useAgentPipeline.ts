@@ -452,6 +452,7 @@ function createEmptyExecution(planId: string, steps: PipelineStep[]): PipelineEx
     steps: steps.map((s) => ({
       stepId: s.id,
       status: "pending",
+      inputUrl: null,
       resultUrl: null,
       error: null,
       actualCost: 0,
@@ -557,6 +558,11 @@ export function useAgentPipeline() {
         // Single step — sequential execution
         const i = group[0];
         const step = steps[i];
+        // Capture input URL before this step runs (for before/after)
+        const stepInputUrl = step.module === "model-create" ? (ctx.modelUrl ?? ctx.currentUrl) : ctx.currentUrl;
+        exec.steps[i] = { ...exec.steps[i], inputUrl: stepInputUrl };
+        setExecution({ ...exec });
+
         try {
           const result = await executeStep(step, ctx);
 
@@ -576,6 +582,7 @@ export function useAgentPipeline() {
           exec.steps[i] = {
             ...exec.steps[i],
             status: "completed",
+            inputUrl: stepInputUrl,
             resultUrl: result.resultUrl,
             actualCost: result.cost,
             completedAt: Date.now(),
@@ -596,6 +603,14 @@ export function useAgentPipeline() {
         }
       } else {
         // Parallel group — run all steps concurrently
+        // Capture input URLs before parallel execution
+        for (const idx of group) {
+          const step = steps[idx];
+          const stepInputUrl = step.module === "model-create" ? (ctx.modelUrl ?? ctx.currentUrl) : ctx.currentUrl;
+          exec.steps[idx] = { ...exec.steps[idx], inputUrl: stepInputUrl };
+        }
+        setExecution({ ...exec });
+
         const promises = group.map(async (idx) => {
           const step = steps[idx];
           const result = await executeStep(step, ctx);
@@ -622,6 +637,7 @@ export function useAgentPipeline() {
             exec.steps[idx] = {
               ...exec.steps[idx],
               status: "completed",
+              inputUrl: exec.steps[idx].inputUrl,
               resultUrl: result.resultUrl,
               actualCost: result.cost,
               completedAt: Date.now(),
@@ -718,8 +734,9 @@ export function useAgentPipeline() {
       }
 
       const step = agentPlan.steps[i];
+      const stepInputUrl = step.module === "model-create" ? (ctx.modelUrl ?? ctx.currentUrl) : ctx.currentUrl;
       exec.currentStepIndex = i;
-      exec.steps[i] = { ...exec.steps[i], status: "running", startedAt: Date.now() };
+      exec.steps[i] = { ...exec.steps[i], status: "running", inputUrl: stepInputUrl, startedAt: Date.now() };
       setExecution({ ...exec });
 
       try {
@@ -742,6 +759,7 @@ export function useAgentPipeline() {
         exec.steps[i] = {
           ...exec.steps[i],
           status: "completed",
+          inputUrl: stepInputUrl,
           resultUrl: result.resultUrl,
           actualCost: result.cost,
           completedAt: Date.now(),

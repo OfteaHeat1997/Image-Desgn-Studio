@@ -104,6 +104,7 @@ export type StepStatus = 'pending' | 'running' | 'completed' | 'failed';
 export interface StepExecution {
   stepId: string;
   status: StepStatus;
+  inputUrl: string | null;
   resultUrl: string | null;
   error: string | null;
   actualCost: number;

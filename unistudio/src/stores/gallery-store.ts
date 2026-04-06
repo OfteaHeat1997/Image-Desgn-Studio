@@ -67,18 +67,22 @@ export const useGalleryStore = create<GalleryStoreState>()(
     }),
     {
       name: "unistudio-gallery",
-      // Filter out entries with invalid URLs on rehydration
+      // Clean up stale blob URLs on rehydration (they die after page reload)
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        // Blob URLs die after page reload — only keep persistent URLs
         const isPersistentUrl = (url: string) =>
           url.startsWith("data:") ||
           url.startsWith("http://") ||
           url.startsWith("https://") ||
           url === "";
-        state.images = state.images.filter(
-          (img) => isPersistentUrl(img.resultUrl) && isPersistentUrl(img.originalUrl),
-        );
+        // Clear stale blob URLs but KEEP entries that have at least one good URL
+        state.images = state.images
+          .map((img) => ({
+            ...img,
+            resultUrl: isPersistentUrl(img.resultUrl) ? img.resultUrl : "",
+            originalUrl: isPersistentUrl(img.originalUrl) ? img.originalUrl : "",
+          }))
+          .filter((img) => img.resultUrl !== ""); // Only drop entries with no result
       },
     },
   ),

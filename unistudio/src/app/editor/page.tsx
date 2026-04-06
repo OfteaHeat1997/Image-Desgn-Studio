@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, Suspense } from "react";
+import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Dropzone } from "@/components/ui/dropzone";
 import { ImageCompare } from "@/components/ui/image-compare";
@@ -148,6 +148,38 @@ async function blobUrlToDataUrl(blobUrl: string): Promise<string> {
   });
 }
 
+/**
+ * Convert any image URL (blob, data, http) to a compressed JPEG data URL
+ * for persistent gallery storage. Max 600px wide, JPEG quality 0.75.
+ * This keeps each thumbnail under ~50KB so localStorage doesn't overflow.
+ */
+async function toPersistentThumbnail(url: string): Promise<string> {
+  // Already a persistent URL (http) — keep as-is
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // Already a small data URL — keep as-is
+  if (url.startsWith("data:") && url.length < 80000) return url;
+
+  return new Promise<string>((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const MAX_W = 600;
+      const scale = img.naturalWidth > MAX_W ? MAX_W / img.naturalWidth : 1;
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas context failed")); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.75));
+    };
+    img.onerror = () => reject(new Error("Failed to load image for thumbnail"));
+    img.src = url;
+  });
+}
+
 /** Auto-save a processed result to the output folder (fire and forget) */
 async function autoSaveResult(
   imageUrl: string,
@@ -195,6 +227,8 @@ function EditorInner() {
   const lastTryOnProviderRef = useRef<string>("auto");
   const [hasModelImage, setHasModelImage] = useState(false);
   const [lastCost, setLastCost] = useState<number | undefined>(undefined);
+  /** Persistent HTTP URL of the uploaded original image (for gallery) */
+  const [uploadedOriginalUrl, setUploadedOriginalUrl] = useState<string | null>(null);
 
   // Connect to the layers system
   const { addImage: addLayerImage } = useEditor();
@@ -203,6 +237,14 @@ function EditorInner() {
   const blobUrlsRef = useRef<string[]>([]);
   const trackBlobUrl = useCallback((url: string) => {
     if (url.startsWith("blob:")) blobUrlsRef.current.push(url);
+  }, []);
+
+  // Revoke all tracked blob URLs on unmount to free memory
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      blobUrlsRef.current = [];
+    };
   }, []);
 
   /* ---- Handlers ---- */
@@ -216,18 +258,36 @@ function EditorInner() {
     setCurrentImage(url);
     setOriginalImage(url);
     setProcessedImage(null);
+    setUploadedOriginalUrl(null);
     // Add to layers panel
     addLayerImage(file);
+    // Upload in background to get a persistent URL for gallery
+    (async () => {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.success) setUploadedOriginalUrl(data.data.url);
+      } catch {
+        // Silent — gallery will fall back to empty originalUrl
+      }
+    })();
   }, [trackBlobUrl, addLayerImage]);
 
   /** Upload a new image without reloading the page */
   const handleNewImage = useCallback(() => {
+    // Revoke all blob URLs to free memory before loading a new image
+    blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    blobUrlsRef.current = [];
     setCurrentImage(null);
     setOriginalImage(null);
     setCurrentImageFile(null);
     setProcessedImage(null);
     setShowingOriginal(false);
     setLastCost(undefined);
+    setUploadedOriginalUrl(null);
+    setSessionResults([]);
   }, []);
 
   const addToGallery = useGalleryStore((s) => s.addImage);
@@ -241,8 +301,9 @@ function EditorInner() {
       trackBlobUrl(localUrl);
 
       // For try-on modules, use the model image as "before" instead of the garment
+      let localBefore: string | undefined;
       if (beforeImage) {
-        const localBefore = await toBlobUrl(beforeImage);
+        localBefore = await toBlobUrl(beforeImage);
         trackBlobUrl(localBefore);
         setCurrentImage(localBefore);
       }
@@ -264,21 +325,39 @@ function EditorInner() {
         : selectedModule === "tryon"
           ? lastTryOnProviderRef.current
           : selectedModule;
-      setSessionResults((prev) => [
-        ...prev,
-        { url: localUrl, label: resultLabel, timestamp: Date.now() },
-      ]);
-
-      // Save to gallery
-      addToGallery({
-        id: `editor-${Date.now()}`,
-        filename: currentImageFile?.name ?? "untitled.png",
-        resultUrl: localUrl,
-        originalUrl: beforeImage ?? currentImage ?? "",
-        date: new Date().toISOString().split("T")[0],
-        operations: [selectedModule],
-        project: "editor",
+      setSessionResults((prev) => {
+        // Revoke blob URLs from old results being dropped to free memory
+        const next = [
+          ...prev,
+          { url: localUrl, label: resultLabel, timestamp: Date.now() },
+        ];
+        if (next.length > 20) {
+          const dropped = next.splice(0, next.length - 20);
+          dropped.forEach((r) => {
+            if (r.url.startsWith("blob:")) URL.revokeObjectURL(r.url);
+          });
+        }
+        return next;
       });
+
+      // Convert to compressed thumbnails for persistent gallery storage
+      // (blob URLs die on refresh — data URL thumbnails survive in localStorage)
+      const persistentResult = await toPersistentThumbnail(localUrl).catch(() => "");
+      const persistentOriginal = await toPersistentThumbnail(
+        localBefore ?? uploadedOriginalUrl ?? currentImage ?? ""
+      ).catch(() => "");
+
+      if (persistentResult) {
+        addToGallery({
+          id: `editor-${Date.now()}`,
+          filename: currentImageFile?.name ?? "untitled.png",
+          resultUrl: persistentResult,
+          originalUrl: persistentOriginal,
+          date: new Date().toISOString().split("T")[0],
+          operations: [selectedModule],
+          project: "editor",
+        });
+      }
 
       // Auto-save to disk (fire and forget — never blocks the UI)
       autoSaveResult(localUrl, selectedModule, currentImageFile?.name ?? "untitled.png");
@@ -288,7 +367,7 @@ function EditorInner() {
     } finally {
       setImageLoading(false);
     }
-  }, [addToGallery, currentImageFile, currentImage, selectedModule, trackBlobUrl]);
+  }, [addToGallery, currentImageFile, currentImage, selectedModule, trackBlobUrl, uploadedOriginalUrl]);
 
   /** Accept the processed result as the new working image for chaining */
   const handleAcceptResult = useCallback(async () => {
@@ -458,10 +537,10 @@ function EditorInner() {
                       afterSrc={processedImage}
                       beforeLabel="ANTES"
                       afterLabel="DESPUES"
-                      position={20}
+                      position={50}
                       showHeaderLabels={true}
                       showDragHint={true}
-                      dragHintText="← Arrastra para ver el original"
+                      dragHintText="← Arrastra para comparar →"
                       className="w-full max-h-[70vh]"
                     />
                   </div>
