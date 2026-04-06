@@ -74,24 +74,25 @@ export async function POST(request: NextRequest) {
       outputMime = 'image/jpeg';
     }
 
-    // Build data URL (needed as fallback and for DB storage)
+    // Build data URL — used by local processing endpoints (enhance, shadows, upscale)
+    // and as a fallback display URL
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${outputMime};base64,${base64}`;
 
-    // Try to upload to Replicate file hosting for a permanent HTTP URL
-    // This URL survives page refreshes and can be shared across browsers
-    let permanentUrl: string = dataUrl;
+    // Also upload to Replicate file hosting — this URL is passed to Replicate AI models.
+    // Note: Replicate file URLs are only accessible by Replicate models, NOT downloadable
+    // by our server. So we return BOTH: dataUrl for local processing, replicateUrl for AI.
+    let replicateUrl: string | null = null;
     try {
-      permanentUrl = await ensureHttpUrl(dataUrl);
+      replicateUrl = await ensureHttpUrl(dataUrl);
     } catch (err) {
-      console.warn('[upload] Replicate file upload failed, using data URL fallback:', err);
-      // Keep dataUrl as fallback — works but doesn't survive refresh
+      console.warn('[upload] Replicate file upload failed:', err);
     }
 
     // Save to database
     const imageId = await saveUploadedImage({
       filename: file.name,
-      originalUrl: permanentUrl,
+      originalUrl: dataUrl,
       width,
       height,
       fileSize: buffer.length,
@@ -101,7 +102,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        url: permanentUrl,
+        // Primary URL: data URL (works everywhere — local processing + display)
+        url: dataUrl,
+        // Replicate URL: for passing to AI models (only Replicate can access)
+        replicateUrl,
         filename: file.name,
         width,
         height,
