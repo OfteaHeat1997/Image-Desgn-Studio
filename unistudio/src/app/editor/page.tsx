@@ -71,7 +71,7 @@ const MODULE_PANELS: Record<
 };
 
 /** Modules that can work without an uploaded image */
-const NO_IMAGE_MODULES = new Set(["model-create", "ai-prompt", "ai-agent"]);
+const NO_IMAGE_MODULES = new Set(["model-create", "ai-prompt", "ai-agent", "jewelry-tryon"]);
 
 /* ------------------------------------------------------------------ */
 /*  Helper: convert any image URL to a reliable local blob URL          */

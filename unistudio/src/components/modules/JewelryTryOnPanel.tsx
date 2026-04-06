@@ -109,6 +109,10 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   const [accessoryType, setAccessoryType] = useState<AccessoryType>("necklace");
   const [modelSource, setModelSource] = useState<ModelSource>("generate");
 
+  // Jewelry image uploaded directly from panel (when no editor image)
+  const [localJewelryFile, setLocalJewelryFile] = useState<File | null>(null);
+  const [localJewelryPreview, setLocalJewelryPreview] = useState<string | null>(null);
+
   // Manual upload state
   const [modelImage, setModelImage] = useState<string | null>(null);
   const [modelFile, setModelFile] = useState<File | null>(null);
@@ -129,6 +133,20 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   const [progressPct, setProgressPct] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // The effective jewelry file: editor image takes priority, fallback to local upload
+  const effectiveJewelryFile = imageFile ?? localJewelryFile;
+
+  const handleJewelryUpload = useCallback((files: File[]) => {
+    const file = files[0];
+    if (!file) return;
+    setLocalJewelryFile(file);
+    setLocalJewelryPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setErrorMsg(null);
+  }, []);
+
   const handleModelUpload = useCallback((files: File[]) => {
     const file = files[0];
     if (!file) return;
@@ -141,7 +159,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   }, []);
 
   const handleProcess = useCallback(async () => {
-    if (!imageFile) return;
+    if (!effectiveJewelryFile) return;
     setIsProcessing(true);
     setErrorMsg(null);
     setProgressPct(0);
@@ -204,7 +222,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       setProgressPct(50);
 
       const jewelryFormData = new FormData();
-      jewelryFormData.append("file", imageFile);
+      jewelryFormData.append("file", effectiveJewelryFile);
       const jewelryUploadRes = await fetch("/api/upload", { method: "POST", body: jewelryFormData });
       const jewelryUploadData = await jewelryUploadRes.json();
       if (!jewelryUploadData.success) throw new Error(jewelryUploadData.error || "Error al subir imagen del accesorio");
@@ -243,11 +261,11 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         setProgressPct(0);
       }, 3000);
     }
-  }, [imageFile, modelFile, modelSource, accessoryType, gender, skinTone, ageRange, bgStyle, metalType, finish, onProcess]);
+  }, [effectiveJewelryFile, modelFile, modelSource, accessoryType, gender, skinTone, ageRange, bgStyle, metalType, finish, onProcess]);
 
   const selectedAccessory = ACCESSORY_TYPES.find((a) => a.id === accessoryType)!;
   const estimatedCost = modelSource === "generate" ? "$0.105" : "$0.05";
-  const canProcess = imageFile && (modelSource === "generate" || modelFile);
+  const canProcess = effectiveJewelryFile && (modelSource === "generate" || modelFile);
 
   return (
     <div className="space-y-4">
@@ -300,21 +318,40 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         </p>
       </div>
 
-      {/* Jewelry image (current editor image) */}
+      {/* Jewelry image — from editor OR uploaded directly here */}
       <div>
         <label className="mb-1.5 block text-xs font-medium text-gray-400">Imagen del Accesorio</label>
-        {imageFile ? (
+        {effectiveJewelryFile ? (
           <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
             <span className="text-lg">{selectedAccessory.emoji}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] text-gray-300 truncate">{imageFile.name}</p>
-              <p className="text-[9px] text-gray-500">{(imageFile.size / 1024).toFixed(0)}KB</p>
+              <p className="text-[11px] text-gray-300 truncate">{effectiveJewelryFile.name}</p>
+              <p className="text-[9px] text-gray-500">{(effectiveJewelryFile.size / 1024).toFixed(0)}KB</p>
             </div>
             <span className="text-[9px] text-emerald-400 font-semibold">Listo</span>
+            {/* Allow changing if it was a local upload */}
+            {!imageFile && localJewelryFile && (
+              <button
+                type="button"
+                onClick={() => { setLocalJewelryFile(null); setLocalJewelryPreview(null); }}
+                className="text-[9px] text-gray-500 hover:text-gray-300"
+              >
+                Cambiar
+              </button>
+            )}
           </div>
         ) : (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-center">
-            <p className="text-[11px] text-amber-300">Sube una imagen del accesorio en el editor primero.</p>
+          <Dropzone
+            onDrop={handleJewelryUpload}
+            multiple={false}
+            label="Sube la foto de tu joyeria"
+            hint="Collar, aretes, pulsera, anillo, etc."
+            className="min-h-[80px]"
+          />
+        )}
+        {localJewelryPreview && !imageFile && (
+          <div className="mt-1.5 overflow-hidden rounded-lg border border-surface-lighter">
+            <img src={localJewelryPreview} alt="Accesorio" className="w-full aspect-[4/3] object-contain bg-black/20" />
           </div>
         )}
       </div>
@@ -514,9 +551,9 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         }
       </Button>
 
-      {!imageFile && !isProcessing && (
+      {!effectiveJewelryFile && !isProcessing && (
         <p className="text-center text-[10px] text-amber-400/80">
-          Sube una imagen del accesorio primero.
+          Sube una imagen del accesorio arriba para comenzar.
         </p>
       )}
 
