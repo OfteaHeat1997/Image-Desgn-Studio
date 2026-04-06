@@ -123,9 +123,11 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
 
   return (
     <div className="flex flex-col h-full border-r border-surface-lighter bg-surface w-56 shrink-0">
-      {/* Header */}
+      {/* Header — logo links back to dashboard */}
       <div className="flex items-center gap-2 border-b border-surface-lighter px-3 py-2.5">
-        <span className="text-sm font-bold text-gradient cursor-default">UniStudio</span>
+        <a href="/" className="text-sm font-bold text-gradient hover:opacity-80 transition-opacity" title="Volver al Dashboard">
+          UniStudio
+        </a>
         <span className="text-[9px] text-gray-600 uppercase tracking-wider">Modulos</span>
       </div>
 
