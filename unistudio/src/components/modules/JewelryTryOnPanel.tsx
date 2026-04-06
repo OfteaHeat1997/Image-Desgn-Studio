@@ -152,11 +152,14 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       let totalCost = 0;
 
       if (modelSource === "generate") {
-        // ---- STEP 1: Generate AI model ----
-        setStatusText("Generando modelo IA...");
+        // ---- STEP 1: Generate AI model with professional pose for this accessory ----
+        setStatusText("Generando modelo profesional...");
         setProgressPct(10);
 
         const pose = ACCESSORY_POSE[accessoryType];
+        const bgPrompt = BG_PROMPTS[bgStyle] || BG_PROMPTS["luxury-dark"];
+        const isHandShot = accessoryType === "ring" || accessoryType === "bracelet" || accessoryType === "watch";
+
         const modelRes = await fetch("/api/model-create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -165,11 +168,11 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             ageRange,
             skinTone,
             bodyType: "average",
-            pose: "standing",
+            pose: isHandShot ? "hand closeup" : "portrait",
             expression: "confident",
-            hairStyle: gender === "male" ? "short clean cut" : "natural professional",
-            background: "studio white",
-            customDetails: `${pose}, professional fashion photography, studio lighting`,
+            hairStyle: gender === "male" ? "short clean cut" : "natural elegant updo showing ears and neck",
+            background: bgStyle,
+            customDetails: `${pose}, ${bgPrompt}, NOT wearing any jewelry or accessories, bare skin ready for jewelry placement, 8K ultra-detailed, luxury brand campaign quality`,
           }),
         });
         const modelData = await modelRes.json();
@@ -217,6 +220,8 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
           modelImage: modelImageUrl,
           jewelryImage: jewelryUploadData.data.url,
           type: accessoryType,
+          metalType,
+          finish,
         }),
       });
       const data = await res.json();
