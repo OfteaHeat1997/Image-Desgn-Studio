@@ -9,6 +9,43 @@ import { cn } from "@/lib/utils/cn";
 import { removeBgBrowser } from "@/lib/processing/bg-remove-browser";
 
 /* ------------------------------------------------------------------ */
+/*  Helpers                                                              */
+/* ------------------------------------------------------------------ */
+
+/** Compress an image file in the browser to fit within Vercel's 4.5MB body limit */
+function compressImageForUpload(file: File, maxDim = 2048, quality = 0.85): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      // Downscale if too large
+      if (width > maxDim || height > maxDim) {
+        const ratio = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas not supported"));
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Compression failed"));
+          const name = file.name.replace(/\.[^.]+$/, ".jpg");
+          resolve(new File([blob], name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality,
+      );
+    };
+    img.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -222,12 +259,22 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           }
         }
 
+        setStatusText("Comprimiendo imagen...");
+        setProgressPct(20);
+
+        // Compress image in browser before upload to avoid 413 errors
+        const compressedFile = await compressImageForUpload(imageFile, 2048, 0.85);
+
         setStatusText("Subiendo imagen...");
-        setProgressPct(25);
+        setProgressPct(30);
 
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressedFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!uploadRes.ok) {
+          const text = await uploadRes.text().catch(() => "");
+          throw new Error(text.startsWith("{") ? JSON.parse(text).error : `Error al subir imagen (${uploadRes.status})`);
+        }
         const uploadData = await uploadRes.json();
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
 
@@ -276,19 +323,20 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
       <ModuleHeader
         icon={<ImageIcon className="h-4 w-4" />}
         title="Fondos con IA"
-        description="Coloca tu producto sobre cualquier escenario — desde estudio clasico hasta paisajes creativos. Los fondos de estudio son gratis, los demas usan IA generativa."
-        whyNeeded="Fotos lifestyle venden 30% mas que fondo blanco. Crea escenas de lujo sin estudio fotografico."
+        description="Coloca tu producto en cualquier escenario sin necesidad de estudio fotografico. Desde una mesa de marmol elegante hasta una playa tropical — la IA genera el fondo completo alrededor de tu producto."
+        whyNeeded="Las fotos con contexto (lifestyle) venden hasta 30% mas que fondo blanco segun estudios de Shopify. Un bloqueador solar sobre arena de playa es mucho mas atractivo que sobre fondo plano. Este modulo te da fotos de catalogo de lujo sin fotografo."
         costLabel="Desde gratis"
         steps={[
-          "Sube tu imagen de producto al area central",
-          "Elige un estilo de fondo (los de Estudio son gratis)",
-          "O escribe una descripcion para un fondo personalizado con IA",
-          "Haz clic en \"Generar Fondo\" y espera el resultado",
+          "Sube tu foto de producto (mejor si ya tiene el fondo removido)",
+          "Elige un estilo de fondo: Estudio (gratis), Lifestyle, Minimalista, Lujo, etc.",
+          "Opcionalmente personaliza el prompt describiendo exactamente lo que quieres",
+          "Haz clic en \"Generar Fondo\" — la IA crea el escenario completo",
         ]}
         tips={[
-          "Los fondos de Estudio se procesan en tu navegador, sin costo ni envio de datos.",
-          "Para fondos IA, usa descripciones especificas: \"mesa de marmol con luz natural\" funciona mejor que \"mesa bonita\".",
-          "Las imagenes PNG sin fondo dan los mejores resultados al combinar con escenarios IA.",
+          "Los fondos de Estudio son 100% gratis — se procesan en tu navegador sin enviar datos.",
+          "Se especifico en tu descripcion: \"mesa de madera clara con luz natural suave\" da mejor resultado que \"mesa bonita\".",
+          "Primero quita el fondo con el modulo anterior, luego genera el fondo nuevo aqui — el resultado es mucho mejor.",
+          "Para consistencia de marca, usa el mismo estilo de fondo en todos tus productos.",
         ]}
       />
 
