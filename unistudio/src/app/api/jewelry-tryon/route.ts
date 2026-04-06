@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       // ---- FormData mode (preferred — avoids huge JSON bodies) ----
       const formData = await request.formData();
       const jewelryFile = formData.get('jewelryFile') as File | null;
+      const modelFile = formData.get('modelFile') as File | null;
       modelImage = formData.get('modelImage') as string || '';
       type = formData.get('type') as string || '';
       metalType = (formData.get('metalType') as string) || undefined;
@@ -36,10 +37,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Convert file to data URL for processing
-      const buffer = Buffer.from(await jewelryFile.arrayBuffer());
-      const mime = jewelryFile.type || 'image/png';
-      jewelryImage = `data:${mime};base64,${buffer.toString('base64')}`;
+      // Convert jewelry file to data URL
+      const jBuffer = Buffer.from(await jewelryFile.arrayBuffer());
+      const jMime = jewelryFile.type || 'image/png';
+      jewelryImage = `data:${jMime};base64,${jBuffer.toString('base64')}`;
+
+      // Convert model file to data URL if provided
+      if (modelFile) {
+        const mBuffer = Buffer.from(await modelFile.arrayBuffer());
+        const mMime = modelFile.type || 'image/jpeg';
+        modelImage = `data:${mMime};base64,${mBuffer.toString('base64')}`;
+      }
     } else {
       // ---- JSON mode (legacy, for smaller payloads) ----
       const body = await request.json();

@@ -29,6 +29,20 @@ import { useGalleryStore } from "@/stores/gallery-store";
 import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
+/*  Safe JSON helper — handles "Request Entity Too Large" text errors   */
+/* ------------------------------------------------------------------ */
+
+async function safeJson(res: Response): Promise<{ success: boolean; data?: any; error?: string; cost?: number }> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Server returned non-JSON (e.g. "Request Entity Too Large")
+    throw new Error(text.length > 100 ? text.slice(0, 100) + "..." : text || `HTTP ${res.status}`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Inventory types                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -381,7 +395,7 @@ export default function BatchPage() {
     const formData = new FormData();
     formData.append("file", img.file);
     const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-    const uploadData = await uploadRes.json();
+    const uploadData = await safeJson(uploadRes);
     if (!uploadData.success) throw new Error(uploadData.error || "Upload failed");
 
     let currentImageUrl = uploadData.data.url;
@@ -397,7 +411,7 @@ export default function BatchPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ imageUrl: currentImageUrl, provider: bgProvider }),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!data.success) throw new Error(data.error || "BG removal failed");
           currentImageUrl = data.data.url || data.data.imageUrl;
           break;
@@ -409,7 +423,7 @@ export default function BatchPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ imageUrl: currentImageUrl, preset: presetName, ...step.params }),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!data.success) throw new Error(data.error || "Enhancement failed");
           currentImageUrl = data.data.url;
           break;
@@ -433,7 +447,7 @@ export default function BatchPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(shadowBody),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!data.success) throw new Error(data.error || "Shadow generation failed");
           currentImageUrl = data.data.url;
           break;
@@ -449,7 +463,7 @@ export default function BatchPage() {
               faceEnhance: (step.params?.faceEnhance as boolean) ?? false,
             }),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!data.success) throw new Error(data.error || "Upscale failed");
           currentImageUrl = data.data.url;
           break;
@@ -465,7 +479,7 @@ export default function BatchPage() {
               prompt: (step.params?.prompt as string) ?? "pure white background, professional product photography, centered",
             }),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!data.success) throw new Error(data.error || "Outpaint failed");
           currentImageUrl = data.data.url;
           break;
@@ -480,7 +494,7 @@ export default function BatchPage() {
               prompt: (step.params?.prompt as string) ?? "Extend the background naturally to fit the new aspect ratio.",
             }),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!data.success) throw new Error(data.error || "Resize failed");
           currentImageUrl = data.data.url;
           break;

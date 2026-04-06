@@ -342,6 +342,17 @@ function EditorInner() {
     }
     if (s.sessionCost > 0) setSessionCost(s.sessionCost);
     if (s.activeModule) setSelectedModule(s.activeModule);
+
+    // Load image from URL parameter (e.g., from Gallery "Abrir en Editor")
+    const imageUrlParam = searchParams.get("imageUrl");
+    if (imageUrlParam) {
+      setCurrentImage(imageUrlParam);
+      setOriginalImage(imageUrlParam);
+      fetch(imageUrlParam)
+        .then((r) => r.blob())
+        .then((blob) => setCurrentImageFile(new File([blob], "gallery-image.jpg", { type: blob.type || "image/jpeg" })))
+        .catch(() => {});
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track blob URLs to revoke on cleanup
