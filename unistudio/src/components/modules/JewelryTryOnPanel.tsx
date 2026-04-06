@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { Gem, AlertCircle, Sparkles, Upload, User, Loader2 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -210,7 +211,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             customDetails: `${pose}, ${bgPrompt}, NOT wearing any jewelry or accessories, bare skin ready for jewelry placement, 8K ultra-detailed, luxury brand campaign quality`,
           }),
         });
-        const modelData = await modelRes.json();
+        const modelData = await safeJson(modelRes);
         if (!modelData.success) throw new Error(modelData.error || "Error al generar modelo IA");
 
         modelImageUrl = modelData.data.url;
@@ -226,7 +227,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         const modelFormData = new FormData();
         modelFormData.append("file", modelFile);
         const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
-        const modelUploadData = await modelUploadRes.json();
+        const modelUploadData = await safeJson(modelUploadRes);
         if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir foto del modelo");
 
         modelImageUrl = modelUploadData.data.url;
@@ -235,24 +236,33 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       }
 
       // ---- STEP 2: Apply jewelry ----
-      setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
+      setStatusText("Preparando imagenes...");
       setProgressPct(50);
 
-      // Convert model data URL to a File to keep FormData small
-      let modelFile2: File | null = null;
-      if (modelImageUrl.startsWith("data:")) {
+      // Compress jewelry image for upload
+      const compressedJewelry = await compressImage(effectiveJewelryFile);
+
+      // Convert model URL to compressed File
+      let modelFileForUpload: File;
+      if (modelImageUrl.startsWith("data:") || modelImageUrl.startsWith("blob:")) {
         const blobRes = await fetch(modelImageUrl);
         const blob = await blobRes.blob();
-        modelFile2 = new File([blob], "model.jpg", { type: blob.type || "image/jpeg" });
+        const rawFile = new File([blob], "model.jpg", { type: blob.type || "image/jpeg" });
+        modelFileForUpload = await compressImage(rawFile);
+      } else {
+        // HTTP URL — fetch and compress
+        const blobRes = await fetch(modelImageUrl);
+        const blob = await blobRes.blob();
+        const rawFile = new File([blob], "model.jpg", { type: blob.type || "image/jpeg" });
+        modelFileForUpload = await compressImage(rawFile);
       }
 
+      setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
+      setProgressPct(60);
+
       const jewelryFormData = new FormData();
-      jewelryFormData.append("jewelryFile", effectiveJewelryFile);
-      if (modelFile2) {
-        jewelryFormData.append("modelFile", modelFile2);
-      } else {
-        jewelryFormData.append("modelImage", modelImageUrl);
-      }
+      jewelryFormData.append("jewelryFile", compressedJewelry);
+      jewelryFormData.append("modelFile", modelFileForUpload);
       jewelryFormData.append("type", accessoryType);
       if (metalType) jewelryFormData.append("metalType", metalType);
       if (finish) jewelryFormData.append("finish", finish);
@@ -261,7 +271,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         method: "POST",
         body: jewelryFormData,
       });
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!data.success) throw new Error(data.error || "Error en prueba de joyeria");
 
