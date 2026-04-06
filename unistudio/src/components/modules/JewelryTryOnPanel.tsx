@@ -243,7 +243,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         setProgressPct(0);
       }, 3000);
     }
-  }, [imageFile, modelFile, modelSource, accessoryType, gender, skinTone, ageRange, onProcess]);
+  }, [imageFile, modelFile, modelSource, accessoryType, gender, skinTone, ageRange, bgStyle, metalType, finish, onProcess]);
 
   const selectedAccessory = ACCESSORY_TYPES.find((a) => a.id === accessoryType)!;
   const estimatedCost = modelSource === "generate" ? "$0.105" : "$0.05";
@@ -408,11 +408,42 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             </div>
           </div>
 
+          {/* Background style */}
+          <Select
+            value={bgStyle}
+            onValueChange={setBgStyle}
+            options={BACKGROUND_OPTIONS}
+            label="Estilo de Fondo"
+          />
+
           <p className="text-[9px] text-gray-500">
             Se generara un modelo {gender === "male" ? "masculino" : "femenino"} con pose ideal para {selectedAccessory.name.toLowerCase()}.
           </p>
         </div>
       )}
+
+      {/* Metal & Finish options */}
+      <div className="space-y-3 rounded-lg border border-surface-lighter bg-surface-light/50 p-3">
+        <div className="flex items-center gap-1.5">
+          <Gem className="h-3.5 w-3.5 text-amber-400" />
+          <span className="text-[11px] font-semibold text-gray-300">Estilo de Joyeria</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Select
+            value={metalType}
+            onValueChange={setMetalType}
+            options={METAL_OPTIONS}
+            label="Metal"
+          />
+          <Select
+            value={finish}
+            onValueChange={setFinish}
+            options={FINISH_OPTIONS}
+            label="Acabado"
+          />
+        </div>
+      </div>
 
       {/* Manual upload */}
       {modelSource === "upload" && (
