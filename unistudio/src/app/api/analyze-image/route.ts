@@ -328,7 +328,8 @@ export async function POST(request: NextRequest) {
         buffer = Buffer.from(matches[2], "base64");
         fileSize = buffer.length;
       } else {
-        const res = await fetch(imageUrl);
+        const { replicateHeaders } = await import('@/lib/utils/image');
+        const res = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
         if (!res.ok) {
           return NextResponse.json(
             { success: false, error: `Failed to fetch image: ${res.status}` },

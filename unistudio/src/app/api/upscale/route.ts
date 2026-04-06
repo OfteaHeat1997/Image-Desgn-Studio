@@ -30,7 +30,8 @@ async function ensureFitsGpu(imageUrl: string): Promise<string> {
     const base64 = imageUrl.split(',')[1];
     buffer = Buffer.from(base64, 'base64');
   } else {
-    const res = await fetch(imageUrl);
+    const { replicateHeaders } = await import('@/lib/utils/image');
+    const res = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
     if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
     buffer = Buffer.from(await res.arrayBuffer());
   }

@@ -67,8 +67,19 @@ export function blobToFile(blob: Blob, filename: string): File {
  * @param url - The URL to fetch.
  * @returns A promise resolving to a Buffer of the response body.
  */
+/**
+ * Build fetch headers for image URLs. Replicate file API URLs
+ * (api.replicate.com/v1/files/*) require Bearer token authentication.
+ */
+export function replicateHeaders(url: string): Record<string, string> {
+  if (url.includes('api.replicate.com') && process.env.REPLICATE_API_TOKEN) {
+    return { Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}` };
+  }
+  return {};
+}
+
 export async function urlToBuffer(url: string): Promise<Buffer> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: replicateHeaders(url) });
   if (!response.ok) {
     throw new Error(`Failed to fetch URL "${url}": ${response.status} ${response.statusText}`);
   }

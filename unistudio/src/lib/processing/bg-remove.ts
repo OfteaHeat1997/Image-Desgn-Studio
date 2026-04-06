@@ -89,7 +89,8 @@ export async function removeBgBuffer(
   const resultUrl = await removeBgReplicate(dataUrl);
 
   // Download the result back as a buffer
-  const response = await fetch(resultUrl);
+  const { replicateHeaders } = await import('@/lib/utils/image');
+  const response = await fetch(resultUrl, { headers: replicateHeaders(resultUrl) });
   if (!response.ok) {
     throw new Error(`Failed to download rembg result: ${response.status}`);
   }

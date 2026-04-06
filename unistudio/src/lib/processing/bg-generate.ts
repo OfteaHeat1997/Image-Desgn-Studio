@@ -303,7 +303,8 @@ async function generateBgPreciseFallback(
   const transparentUrl = await removeBgReplicate(imageUrl);
 
   // Step 2: Download the transparent image
-  const transparentRes = await fetch(transparentUrl);
+  const { replicateHeaders } = await import('@/lib/utils/image');
+  const transparentRes = await fetch(transparentUrl, { headers: replicateHeaders(transparentUrl) });
   if (!transparentRes.ok) throw new Error(`Failed to download transparent image: ${transparentRes.status}`);
   const transparentBuffer = Buffer.from(await transparentRes.arrayBuffer());
 
@@ -354,7 +355,7 @@ async function generateBgPreciseFallback(
   const bgUrl = await extractOutputUrl(bgOutput);
 
   // Download background and composite
-  const bgRes = await fetch(bgUrl);
+  const bgRes = await fetch(bgUrl, { headers: replicateHeaders(bgUrl) });
   if (!bgRes.ok) throw new Error(`Failed to download generated background: ${bgRes.status}`);
   const bgBuffer = Buffer.from(await bgRes.arrayBuffer());
 
