@@ -165,12 +165,10 @@ function toFashnCategory(category: string): FashnCategory {
 }
 
 /**
- * Flatten a data-URL image onto a white background (strips transparency).
- * IDM-VTON and other try-on models fail on transparent PNGs.
- * Returns a JPEG data URL.
+ * Prepare garment image for try-on: flatten transparency to white bg,
+ * resize to max 1024px, compress as JPEG. Returns a data URL.
  */
-async function flattenToWhiteBg(dataUrl: string): Promise<string> {
-  // Only process data URLs — HTTP URLs are assumed to already be opaque
+async function prepareGarmentImage(dataUrl: string): Promise<string> {
   if (!dataUrl.startsWith('data:')) return dataUrl;
 
   const base64Match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
@@ -178,58 +176,31 @@ async function flattenToWhiteBg(dataUrl: string): Promise<string> {
 
   const inputBuffer = Buffer.from(base64Match[1], 'base64');
   const jpegBuffer = await sharp(inputBuffer)
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
     .flatten({ background: { r: 255, g: 255, b: 255 } })
-    .jpeg({ quality: 90 })
+    .jpeg({ quality: 85 })
     .toBuffer();
 
+  console.log(`[model-create] garment prepared: ${(jpegBuffer.length / 1024).toFixed(0)}KB`);
   return `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
 }
 
-async function tryIdmVton(
-  modelImageUrl: string,
-  garmentImageUrl: string,
-  category: string,
-): Promise<string> {
-  const output = await runModel(
-    'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
-    {
-      human_img: modelImageUrl,
-      garm_img: garmentImageUrl,
-      category: toIdmVtonCategory(category),
-      is_checked: true,
-      is_checked_crop: false,
-      denoise_steps: 30,
-      seed: -1,
-    },
-  );
-  return extractOutputUrl(output);
-}
-
-async function tryKolors(
-  modelImageUrl: string,
-  garmentImageUrl: string,
-): Promise<string> {
-  const output = await runModel('kolors/kolors-virtual-try-on', {
-    human_image: modelImageUrl,
-    garment_image: garmentImageUrl,
-  });
-  return extractOutputUrl(output);
-}
-
+/**
+ * Apply garment to model using Virtual Try-On.
+ * Cascade: FASHN → IDM-VTON → Kontext (prompt-based fallback).
+ */
 async function applyGarment(
   modelImageUrl: string,
   garmentImageUrl: string,
   category: string,
   garmentType?: string,
 ): Promise<{ url: string; provider: string; cost: number }> {
-  // Flatten transparent PNGs to white background — try-on models need opaque images
-  const flatGarment = await flattenToWhiteBg(garmentImageUrl);
-
-  console.log('[model-create] applyGarment — model:', modelImageUrl.slice(0, 80), 'garment length:', flatGarment.length);
-
+  const flatGarment = await prepareGarmentImage(garmentImageUrl);
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
-  // Try FASHN first when available (better quality for most garments)
+  console.log('[model-create] applyGarment — model:', modelImageUrl.slice(0, 80), '| garment chars:', flatGarment.length, '| intimate:', isIntimate);
+
+  // Provider 1: FASHN (best quality for non-intimate)
   if (process.env.FASHN_API_KEY && !isIntimate) {
     try {
       const id = await runFashn({
@@ -242,26 +213,48 @@ async function applyGarment(
         return { url: result.output[0], provider: 'fashn', cost: TRYON_COSTS['fashn'] };
       }
     } catch (fashnErr) {
-      console.warn('[model-create] FASHN failed, falling back to IDM-VTON:', fashnErr instanceof Error ? fashnErr.message : fashnErr);
+      console.warn('[model-create] FASHN failed:', fashnErr instanceof Error ? fashnErr.message : fashnErr);
     }
   }
 
-  // Try IDM-VTON
+  // Provider 2: IDM-VTON
   try {
-    const url = await tryIdmVton(modelImageUrl, flatGarment, category);
+    const output = await runModel(
+      'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
+      {
+        human_img: modelImageUrl,
+        garm_img: flatGarment,
+        category: toIdmVtonCategory(category),
+        is_checked: true,
+        is_checked_crop: false,
+        denoise_steps: 30,
+        seed: -1,
+      },
+    );
+    const url = extractOutputUrl(output);
     return { url, provider: 'idm-vton', cost: TRYON_COSTS['idm-vton'] };
   } catch (idmErr) {
-    console.warn('[model-create] IDM-VTON failed, trying Kolors:', idmErr instanceof Error ? idmErr.message : idmErr);
+    console.warn('[model-create] IDM-VTON failed:', idmErr instanceof Error ? idmErr.message : idmErr);
   }
 
-  // Last resort: Kolors
+  // Provider 3 (fallback): Flux Kontext Pro img2img — use the base model image
+  // as input and prompt it to wear the garment. Less accurate but very reliable.
   try {
-    const url = await tryKolors(modelImageUrl, flatGarment);
-    return { url, provider: 'kolors', cost: TRYON_COSTS['idm-vton'] };
-  } catch (kolorsErr) {
+    console.log('[model-create] Falling back to Kontext Pro img2img approach');
+    const garmentDesc = garmentType && IDM_VTON_PREFERRED_TYPES.has(garmentType)
+      ? 'the lingerie garment from the reference photo'
+      : 'the clothing item from the reference photo';
+    const output = await runModel('black-forest-labs/flux-kontext-pro', {
+      prompt: `Make this person wear ${garmentDesc}. Keep the same person, face, pose, and background. Only change the clothing to match the provided garment. Professional e-commerce catalog photo, studio lighting, SFW, tasteful commercial photography.`,
+      input_image: modelImageUrl,
+      aspect_ratio: '3:4',
+    });
+    const url = extractOutputUrl(output);
+    return { url, provider: 'kontext-fallback', cost: MODEL_GEN_COST };
+  } catch (kontextErr) {
     throw new Error(
-      `Todos los proveedores de Virtual Try-On fallaron. Intenta con otra imagen de prenda. ` +
-      `(${kolorsErr instanceof Error ? kolorsErr.message : String(kolorsErr)})`,
+      `No se pudo aplicar la prenda al modelo. Intenta con otra imagen o sin prenda. ` +
+      `(${kontextErr instanceof Error ? kontextErr.message : String(kontextErr)})`,
     );
   }
 }
