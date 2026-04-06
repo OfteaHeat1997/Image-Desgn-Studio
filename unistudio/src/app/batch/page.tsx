@@ -415,11 +415,23 @@ export default function BatchPage() {
           break;
         }
         case "shadows": {
-          const shadowParams = step.params ?? { type: "drop", offsetX: 5, offsetY: 10, blur: 20, opacity: 0.3, color: "#000000", spread: 0 };
+          const shadowParams = step.params ?? {};
+          const shadowBody = {
+            imageUrl: currentImageUrl,
+            type: (shadowParams.type as string) || "drop",
+            offsetX: (shadowParams.offsetX as number) ?? 5,
+            offsetY: (shadowParams.offsetY as number) ?? 10,
+            blur: (shadowParams.blur as number) ?? 20,
+            opacity: (shadowParams.opacity as number) ?? 0.3,
+            color: (shadowParams.color as string) || "#000000",
+            spread: (shadowParams.spread as number) ?? 0,
+            distance: (shadowParams.distance as number) ?? undefined,
+            fade: (shadowParams.fade as number) ?? undefined,
+          };
           const res = await fetch("/api/shadows", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageUrl: currentImageUrl, ...shadowParams }),
+            body: JSON.stringify(shadowBody),
           });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "Shadow generation failed");
