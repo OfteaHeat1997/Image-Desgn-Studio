@@ -8,7 +8,6 @@ import type {
   ImageLayer,
   Tool,
   HistoryEntry,
-  LayerFilters,
 } from '@/types/editor';
 
 // -----------------------------------------------------------------------------
@@ -39,20 +38,17 @@ interface EditorStoreState {
   addLayer: (layer: ImageLayer) => void;
   removeLayer: (layerId: string) => void;
   updateLayer: (layerId: string, updates: Partial<Omit<ImageLayer, 'id'>>) => void;
-  updateLayerFilters: (layerId: string, filters: Partial<LayerFilters>) => void;
   selectLayer: (layerId: string | null) => void;
   reorderLayers: (fromIndex: number, toIndex: number) => void;
 
   // Tool & canvas actions
   setTool: (tool: Tool) => void;
   setZoom: (zoom: number) => void;
-  setCanvasSize: (width: number, height: number) => void;
 
   // History actions
   undo: () => void;
   redo: () => void;
   pushHistory: () => void;
-  clearHistory: () => void;
 }
 
 // -----------------------------------------------------------------------------
@@ -117,16 +113,6 @@ export const useEditorStore = create<EditorStoreState>()((set, get) => ({
     }));
   },
 
-  updateLayerFilters: (layerId, filters) => {
-    set((state) => ({
-      layers: state.layers.map((l) =>
-        l.id === layerId
-          ? { ...l, filters: { ...l.filters, ...filters } }
-          : l
-      ),
-    }));
-  },
-
   selectLayer: (layerId) => {
     set({ selectedLayerId: layerId });
   },
@@ -156,10 +142,6 @@ export const useEditorStore = create<EditorStoreState>()((set, get) => ({
 
   setZoom: (zoom) => {
     set({ zoom: Math.max(0.1, Math.min(10, zoom)) });
-  },
-
-  setCanvasSize: (width, height) => {
-    set({ canvasWidth: width, canvasHeight: height });
   },
 
   // -- History actions --------------------------------------------------------
@@ -218,7 +200,4 @@ export const useEditorStore = create<EditorStoreState>()((set, get) => ({
     });
   },
 
-  clearHistory: () => {
-    set({ history: [], historyIndex: -1 });
-  },
 }));
