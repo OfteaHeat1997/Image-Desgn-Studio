@@ -55,6 +55,7 @@ interface UploadedImage {
   id: string;
   file: File;
   preview: string;
+  originalUrl?: string;
   resultUrl?: string;
   status: "pending" | "processing" | "done" | "error";
   error?: string;
@@ -90,6 +91,17 @@ interface PresetDef {
 }
 
 const PIPELINE_PRESETS: PresetDef[] = [
+  {
+    id: "ecommerce-pro",
+    name: "E-Commerce Profesional",
+    description: "Fondo blanco puro + mejora + sombra + cuadrado 1:1 — listo para web",
+    steps: [
+      { id: "s1", operation: "bg-remove", provider: "replicate", label: "Quitar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "ecommerce" } },
+      { id: "s3", operation: "shadows", provider: "auto", label: "Sombra Suave", params: { type: "drop", offsetX: 0, offsetY: 8, blur: 25, opacity: 0.2, color: "#000000", spread: 0 } },
+      { id: "s4", operation: "outpaint", provider: "auto", label: "Fondo Blanco 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional product photography, centered product" } },
+    ],
+  },
   {
     id: "quick-clean",
     name: "Limpieza Rapida",
@@ -383,26 +395,24 @@ export default function BatchPage() {
           break;
         }
         case "enhance": {
-          const enhanceRes = await fetch(currentImageUrl);
-          const enhanceBlob = await enhanceRes.blob();
-          const enhanceFormData = new FormData();
-          enhanceFormData.append("file", enhanceBlob, "image.png");
           const presetName = (step.params?.preset as string) ?? "product-clean";
-          enhanceFormData.append("preset", presetName);
-          const res = await fetch("/api/enhance", { method: "POST", body: enhanceFormData });
+          const res = await fetch("/api/enhance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: currentImageUrl, preset: presetName, ...step.params }),
+          });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "Enhancement failed");
           currentImageUrl = data.data.url;
           break;
         }
         case "shadows": {
-          const shadowRes = await fetch(currentImageUrl);
-          const shadowBlob = await shadowRes.blob();
-          const shadowFormData = new FormData();
-          shadowFormData.append("file", shadowBlob, "image.png");
           const shadowParams = step.params ?? { type: "drop", offsetX: 5, offsetY: 10, blur: 20, opacity: 0.3, color: "#000000", spread: 0 };
-          shadowFormData.append("params", JSON.stringify(shadowParams));
-          const res = await fetch("/api/shadows", { method: "POST", body: shadowFormData });
+          const res = await fetch("/api/shadows", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: currentImageUrl, ...shadowParams }),
+          });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "Shadow generation failed");
           currentImageUrl = data.data.url;
@@ -568,7 +578,7 @@ export default function BatchPage() {
 
           try {
             const result = await processOneImage(img, pipelineSteps);
-            const done: UploadedImage = { ...img, status: "done", resultUrl: result.resultUrl };
+            const done: UploadedImage = { ...img, status: "done", resultUrl: result.resultUrl, originalUrl: img.preview };
             setImages((prev) => prev.map((i) => i.id === img.id ? done : i));
             allResults.push(done);
 
@@ -613,7 +623,7 @@ export default function BatchPage() {
       try {
         const result = await processOneImage(images[i], steps);
         setImages((prev) => prev.map((img, idx) =>
-          idx === i ? { ...img, status: "done" as const, resultUrl: result.resultUrl } : img,
+          idx === i ? { ...img, status: "done" as const, resultUrl: result.resultUrl, originalUrl: images[i].preview } : img,
         ));
 
         // Save to gallery
@@ -845,27 +855,44 @@ export default function BatchPage() {
                   Descargar Todo
                 </Button>
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {images
                   .filter((img) => img.status === "done")
                   .map((img) => (
                     <div
                       key={img.id}
-                      className="group relative aspect-square overflow-hidden rounded-lg border border-surface-lighter"
+                      className="group overflow-hidden rounded-lg border border-surface-lighter bg-surface"
                     >
-                      <img
-                        src={img.resultUrl || img.preview}
-                        alt={img.file.name}
-                        className="h-full w-full object-cover"
-                      />
-                      {/* Download single image */}
-                      <a
-                        href={img.resultUrl || img.preview}
-                        download={`processed-${img.file.name}`}
-                        className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Download className="h-5 w-5 text-white" />
-                      </a>
+                      {/* Before / After side by side */}
+                      <div className="grid grid-cols-2 gap-0.5 bg-surface-lighter">
+                        <div className="relative aspect-square">
+                          <img
+                            src={img.preview}
+                            alt="Original"
+                            className="h-full w-full object-cover"
+                          />
+                          <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-gray-300 uppercase">Antes</span>
+                        </div>
+                        <div className="relative aspect-square">
+                          <img
+                            src={img.resultUrl || img.preview}
+                            alt="Resultado"
+                            className="h-full w-full object-cover"
+                          />
+                          <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[8px] font-bold text-white uppercase">Despues</span>
+                        </div>
+                      </div>
+                      {/* File info + download */}
+                      <div className="flex items-center justify-between px-2 py-1.5">
+                        <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{img.file.name}</span>
+                        <a
+                          href={img.resultUrl || img.preview}
+                          download={`processed-${img.file.name}`}
+                          className="flex items-center gap-1 rounded bg-accent/20 px-2 py-0.5 text-[9px] font-medium text-accent-light hover:bg-accent/30 transition-colors"
+                        >
+                          <Download className="h-3 w-3" /> Descargar
+                        </a>
+                      </div>
                     </div>
                   ))}
               </div>
