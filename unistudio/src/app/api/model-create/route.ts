@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
 import type { FashnCategory } from '@/lib/api/fashn';
@@ -163,42 +164,106 @@ function toFashnCategory(category: string): FashnCategory {
   }
 }
 
+/**
+ * Flatten a data-URL image onto a white background (strips transparency).
+ * IDM-VTON and other try-on models fail on transparent PNGs.
+ * Returns a JPEG data URL.
+ */
+async function flattenToWhiteBg(dataUrl: string): Promise<string> {
+  // Only process data URLs — HTTP URLs are assumed to already be opaque
+  if (!dataUrl.startsWith('data:')) return dataUrl;
+
+  const base64Match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+  if (!base64Match) return dataUrl;
+
+  const inputBuffer = Buffer.from(base64Match[1], 'base64');
+  const jpegBuffer = await sharp(inputBuffer)
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  return `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
+}
+
+async function tryIdmVton(
+  modelImageUrl: string,
+  garmentImageUrl: string,
+  category: string,
+): Promise<string> {
+  const output = await runModel(
+    'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
+    {
+      human_img: modelImageUrl,
+      garm_img: garmentImageUrl,
+      category: toIdmVtonCategory(category),
+      is_checked: true,
+      is_checked_crop: false,
+      denoise_steps: 30,
+      seed: -1,
+    },
+  );
+  return extractOutputUrl(output);
+}
+
+async function tryKolors(
+  modelImageUrl: string,
+  garmentImageUrl: string,
+): Promise<string> {
+  const output = await runModel('kolors/kolors-virtual-try-on', {
+    human_image: modelImageUrl,
+    garment_image: garmentImageUrl,
+  });
+  return extractOutputUrl(output);
+}
+
 async function applyGarment(
   modelImageUrl: string,
   garmentImageUrl: string,
   category: string,
   garmentType?: string,
 ): Promise<{ url: string; provider: string; cost: number }> {
+  // Flatten transparent PNGs to white background — try-on models need opaque images
+  const flatGarment = await flattenToWhiteBg(garmentImageUrl);
+
+  console.log('[model-create] applyGarment — model:', modelImageUrl.slice(0, 80), 'garment length:', flatGarment.length);
+
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
-  // For intimate/lingerie garments, always use IDM-VTON
-  if (isIntimate || !process.env.FASHN_API_KEY) {
-    const output = await runModel(
-      'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
-      {
-        human_img: modelImageUrl,
-        garm_img: garmentImageUrl,
-        category: toIdmVtonCategory(category),
-        is_checked: true,
-        is_checked_crop: false,
-        denoise_steps: 30,
-        seed: -1,
-      },
-    );
-    return { url: extractOutputUrl(output), provider: 'idm-vton', cost: TRYON_COSTS['idm-vton'] };
+  // Try FASHN first when available (better quality for most garments)
+  if (process.env.FASHN_API_KEY && !isIntimate) {
+    try {
+      const id = await runFashn({
+        model_image: modelImageUrl,
+        garment_image: flatGarment,
+        category: toFashnCategory(category),
+      });
+      const result = await pollFashn(id);
+      if (result.output && result.output.length > 0) {
+        return { url: result.output[0], provider: 'fashn', cost: TRYON_COSTS['fashn'] };
+      }
+    } catch (fashnErr) {
+      console.warn('[model-create] FASHN failed, falling back to IDM-VTON:', fashnErr instanceof Error ? fashnErr.message : fashnErr);
+    }
   }
 
-  // FASHN when available
-  const id = await runFashn({
-    model_image: modelImageUrl,
-    garment_image: garmentImageUrl,
-    category: toFashnCategory(category),
-  });
-  const result = await pollFashn(id);
-  if (result.output && result.output.length > 0) {
-    return { url: result.output[0], provider: 'fashn', cost: TRYON_COSTS['fashn'] };
+  // Try IDM-VTON
+  try {
+    const url = await tryIdmVton(modelImageUrl, flatGarment, category);
+    return { url, provider: 'idm-vton', cost: TRYON_COSTS['idm-vton'] };
+  } catch (idmErr) {
+    console.warn('[model-create] IDM-VTON failed, trying Kolors:', idmErr instanceof Error ? idmErr.message : idmErr);
   }
-  throw new Error('FASHN prediction completed but returned no output');
+
+  // Last resort: Kolors
+  try {
+    const url = await tryKolors(modelImageUrl, flatGarment);
+    return { url, provider: 'kolors', cost: TRYON_COSTS['idm-vton'] };
+  } catch (kolorsErr) {
+    throw new Error(
+      `Todos los proveedores de Virtual Try-On fallaron. Intenta con otra imagen de prenda. ` +
+      `(${kolorsErr instanceof Error ? kolorsErr.message : String(kolorsErr)})`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
