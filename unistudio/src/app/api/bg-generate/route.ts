@@ -11,6 +11,7 @@ import {
   generateBgFast,
   BACKGROUND_PRESETS,
 } from '@/lib/processing/bg-generate';
+import { ensureHttpUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
 
 // Cost estimates in dollars per generation
@@ -56,9 +57,15 @@ export async function POST(request: NextRequest) {
     let resultUrl: string;
     const cost = MODE_COSTS[mode] ?? 0;
 
+    // Convert data URLs to Replicate HTTP URLs to avoid payload size limits
+    let httpImageUrl = imageUrl;
+    if (imageUrl && imageUrl.startsWith('data:')) {
+      httpImageUrl = await ensureHttpUrl(imageUrl);
+    }
+
     switch (mode) {
       case 'precise': {
-        if (!imageUrl) {
+        if (!httpImageUrl) {
           return NextResponse.json(
             {
               success: false,
@@ -67,7 +74,7 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        resultUrl = await generateBgPrecise(imageUrl, style, customPrompt, aspectRatio);
+        resultUrl = await generateBgPrecise(httpImageUrl, style, customPrompt, aspectRatio);
         break;
       }
 

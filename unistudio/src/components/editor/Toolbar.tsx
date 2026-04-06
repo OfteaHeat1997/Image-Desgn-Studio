@@ -15,7 +15,6 @@ import { Modal, ModalFooter } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils/cn";
-import { useEditorStore } from "@/stores/editor-store";
 import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
@@ -32,6 +31,8 @@ interface ToolbarProps {
   sessionCost: number;
   processedImageUrl?: string | null;
   originalImageUrl?: string | null;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,16 +83,13 @@ export function Toolbar({
   sessionCost,
   processedImageUrl,
   originalImageUrl,
+  onUndo,
+  onRedo,
 }: ToolbarProps) {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<"png" | "jpg" | "webp">("png");
   const [exportQuality, setExportQuality] = useState(90);
   const [isExporting, setIsExporting] = useState(false);
-
-  const { undo, redo, historyIndex, history } = useEditorStore();
-
-  const canUndo = historyIndex >= 0;
-  const canRedo = historyIndex < history.length - 1;
 
   const handleExport = useCallback(async () => {
     const imageUrl = processedImageUrl || originalImageUrl;
@@ -159,22 +157,22 @@ export function Toolbar({
   return (
     <>
       <div className="flex h-12 items-center gap-1 border-b border-surface-lighter bg-surface px-3">
-        {/* Undo / Redo */}
+        {/* Undo / Redo — controls image processing history */}
         <Button
           variant="ghost"
           size="sm"
-          disabled={!canUndo}
-          onClick={undo}
-          aria-label="Undo"
+          onClick={onUndo}
+          aria-label="Deshacer"
+          title="Deshacer ultimo procesamiento"
         >
           <Undo2 className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          disabled={!canRedo}
-          onClick={redo}
-          aria-label="Redo"
+          onClick={onRedo}
+          aria-label="Rehacer"
+          title="Rehacer"
         >
           <Redo2 className="h-4 w-4" />
         </Button>

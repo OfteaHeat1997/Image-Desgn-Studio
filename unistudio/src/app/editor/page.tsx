@@ -259,6 +259,53 @@ function EditorInner() {
   const lastTryOnProviderRef = useRef<string>("auto");
   const [hasModelImage, setHasModelImage] = useState(false);
   const [lastCost, setLastCost] = useState<number | undefined>(undefined);
+
+  // ---- Image undo/redo history ----
+  interface ImageSnapshot {
+    currentImage: string | null;
+    processedImage: string | null;
+    currentImageFile: File | null;
+  }
+  const imageHistoryRef = useRef<ImageSnapshot[]>([]);
+  const imageHistoryIndexRef = useRef(-1);
+
+  const pushImageHistory = useCallback(() => {
+    const snapshot: ImageSnapshot = { currentImage, processedImage, currentImageFile };
+    // Truncate forward history
+    imageHistoryRef.current = imageHistoryRef.current.slice(0, imageHistoryIndexRef.current + 1);
+    imageHistoryRef.current.push(snapshot);
+    if (imageHistoryRef.current.length > 20) imageHistoryRef.current.shift();
+    imageHistoryIndexRef.current = imageHistoryRef.current.length - 1;
+  }, [currentImage, processedImage, currentImageFile]);
+
+  const handleUndo = useCallback(() => {
+    if (imageHistoryIndexRef.current < 0) {
+      // No history — at least go back to original
+      if (originalImage) {
+        setCurrentImage(originalImage);
+        setProcessedImage(null);
+        toast.info("Volviendo al original");
+      }
+      return;
+    }
+    const snap = imageHistoryRef.current[imageHistoryIndexRef.current];
+    imageHistoryIndexRef.current--;
+    setCurrentImage(snap.currentImage);
+    setProcessedImage(snap.processedImage);
+    setCurrentImageFile(snap.currentImageFile);
+    toast.info("Deshacer");
+  }, [originalImage]);
+
+  const handleRedo = useCallback(() => {
+    const nextIdx = imageHistoryIndexRef.current + 2;
+    if (nextIdx >= imageHistoryRef.current.length) return;
+    imageHistoryIndexRef.current++;
+    const snap = imageHistoryRef.current[nextIdx];
+    setCurrentImage(snap.currentImage);
+    setProcessedImage(snap.processedImage);
+    setCurrentImageFile(snap.currentImageFile);
+    toast.info("Rehacer");
+  }, []);
   /** Persistent HTTP URL of the uploaded original image (for gallery) */
   const [uploadedOriginalUrl, setUploadedOriginalUrl] = useState<string | null>(null);
 
@@ -368,6 +415,7 @@ function EditorInner() {
 
   const handleProcess = useCallback(async (resultUrl: string, beforeImage?: string, cost?: number) => {
     setImageLoading(true);
+    pushImageHistory(); // Save current state before changing
 
     try {
       // Convert the result to a local blob URL for reliable display
@@ -467,6 +515,7 @@ function EditorInner() {
   /** Accept the processed result as the new working image for chaining */
   const handleAcceptResult = useCallback(async () => {
     if (!processedImage) return;
+    pushImageHistory(); // Save current state before changing
     setImageLoading(true);
     try {
       const baseName = currentImageFile?.name?.replace(/\.[^.]+$/, "") ?? "processed";
@@ -523,6 +572,8 @@ function EditorInner() {
         sessionCost={sessionCost}
         processedImageUrl={processedImage}
         originalImageUrl={currentImage}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
 
       {/* Main workspace */}

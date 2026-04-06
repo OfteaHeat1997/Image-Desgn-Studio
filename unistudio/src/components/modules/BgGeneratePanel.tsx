@@ -245,6 +245,10 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
             aspectRatio,
           }),
         });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text.startsWith("{") ? JSON.parse(text).error : `Error del servidor (${res.status})`);
+        }
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "Error al generar el fondo");
 
