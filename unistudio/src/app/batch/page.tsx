@@ -26,6 +26,7 @@ import { Dropzone } from "@/components/ui/dropzone";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils/cn";
 import { useGalleryStore } from "@/stores/gallery-store";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Inventory types                                                     */
@@ -242,6 +243,7 @@ function StatusIcon({ status }: { status: UploadedImage["status"] }) {
 export default function BatchPage() {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [steps, setSteps] = useState<PipelineStep[]>([]);
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
   const addToGallery = useGalleryStore((s) => s.addImage);
@@ -332,6 +334,12 @@ export default function BatchPage() {
       ?? AGENT_PRESETS.find((p) => p.id === presetId);
     if (preset) {
       setSteps(preset.steps.map((s) => ({ ...s, id: `step-${Date.now()}-${Math.random()}` })));
+      setActivePresetId(presetId);
+      toast.success(`Pipeline "${preset.name}" cargado — ${preset.steps.length} pasos`);
+      // Auto-scroll to pipeline steps section
+      setTimeout(() => {
+        document.getElementById("pipeline-steps")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
     }
   }, []);
 
@@ -918,8 +926,10 @@ export default function BatchPage() {
                   type="button"
                   onClick={() => loadPreset(preset.id)}
                   className={cn(
-                    "flex flex-col rounded-lg border border-accent/20 bg-surface p-3 text-left transition-all",
-                    "hover:border-accent/50 hover:bg-accent/10",
+                    "flex flex-col rounded-lg border p-3 text-left transition-all",
+                    activePresetId === preset.id
+                      ? "border-accent bg-accent/15 ring-1 ring-accent/30"
+                      : "border-accent/20 bg-surface hover:border-accent/50 hover:bg-accent/10",
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -947,8 +957,10 @@ export default function BatchPage() {
                   type="button"
                   onClick={() => loadPreset(preset.id)}
                   className={cn(
-                    "flex flex-col rounded-lg border border-surface-lighter bg-surface p-3 text-left transition-all",
-                    "hover:border-accent/40 hover:bg-surface-light",
+                    "flex flex-col rounded-lg border p-3 text-left transition-all",
+                    activePresetId === preset.id
+                      ? "border-accent bg-accent/15 ring-1 ring-accent/30"
+                      : "border-surface-lighter bg-surface hover:border-accent/40 hover:bg-surface-light",
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -964,7 +976,7 @@ export default function BatchPage() {
           </div>
 
           {/* Steps */}
-          <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
+          <div id="pipeline-steps" className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-200">Pasos del Pipeline</h2>
               <Button
