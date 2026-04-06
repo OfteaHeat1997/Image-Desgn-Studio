@@ -40,6 +40,28 @@ const ACCESSORY_TYPES: AccessoryDef[] = [
   { id: "watch", name: "Reloj", emoji: "⏱️", hint: "Muneca visible y despejada" },
 ];
 
+const METAL_OPTIONS = [
+  { value: "gold", label: "Oro" },
+  { value: "silver", label: "Plata" },
+  { value: "rose-gold", label: "Oro Rosa" },
+  { value: "platinum", label: "Platino" },
+];
+
+const FINISH_OPTIONS = [
+  { value: "polished", label: "Pulido" },
+  { value: "matte", label: "Mate" },
+  { value: "brushed", label: "Cepillado" },
+  { value: "hammered", label: "Martillado" },
+];
+
+const BACKGROUND_OPTIONS = [
+  { value: "studio-white", label: "Estudio Blanco" },
+  { value: "luxury-dark", label: "Lujo Oscuro" },
+  { value: "marble", label: "Marmol" },
+  { value: "velvet", label: "Terciopelo" },
+  { value: "editorial", label: "Editorial" },
+];
+
 const GENDER_OPTIONS = [
   { value: "female", label: "Femenino" },
   { value: "male", label: "Masculino" },
@@ -60,14 +82,23 @@ const AGE_OPTIONS = [
   { value: "46-55", label: "46-55" },
 ];
 
-/* Best pose for each accessory type */
+/* Detailed professional pose descriptions per accessory type */
 const ACCESSORY_POSE: Record<AccessoryType, string> = {
-  earrings: "head and shoulders portrait, slight 3/4 angle",
-  necklace: "upper body portrait, neck and chest visible",
-  ring: "hand portrait, elegant hand pose showing ring finger",
-  bracelet: "wrist and forearm portrait, elegant hand pose",
-  sunglasses: "head and shoulders portrait, facing camera",
-  watch: "wrist and forearm portrait, elegant hand pose",
+  earrings: "close-up head and shoulders portrait, slight 3/4 angle, ears fully visible, hair pulled back or tucked behind ears, elegant expression, luxury fashion editorial photography, soft studio lighting highlighting the ear area",
+  necklace: "elegant upper body portrait showing neck, collarbones and upper chest clearly, wearing a simple v-neck or strapless top, sophisticated pose, luxury jewelry campaign photography, Rembrandt lighting on skin",
+  ring: "extreme close-up of an elegant feminine hand with long slender fingers naturally posed, ring finger prominently displayed, soft natural nail polish, luxury jewelry photography on dark velvet surface, shallow depth of field, cinematic lighting",
+  bracelet: "close-up of an elegant wrist and forearm, delicate hand gracefully posed, fingers slightly curved, luxury jewelry photography, soft directional lighting highlighting the wrist area, shallow depth of field",
+  sunglasses: "head and shoulders portrait facing camera, confident expression, strong jawline, professional fashion photography, studio lighting with subtle reflections",
+  watch: "close-up of a confident wrist and forearm, hand relaxed in a natural power pose, sleeve slightly rolled up, luxury lifestyle photography, warm golden hour lighting, shallow depth of field",
+};
+
+/* Background prompt modifiers */
+const BG_PROMPTS: Record<string, string> = {
+  "studio-white": "clean white studio background, professional product photography",
+  "luxury-dark": "dark moody luxury background, dramatic lighting, high-end jewelry campaign",
+  "marble": "white Carrara marble surface background, luxury still life photography",
+  "velvet": "deep burgundy velvet fabric background, luxury jewelry display",
+  "editorial": "blurred luxury boutique interior background, editorial fashion photography",
 };
 
 /* ------------------------------------------------------------------ */
@@ -86,6 +117,11 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   const [gender, setGender] = useState("female");
   const [skinTone, setSkinTone] = useState("medium");
   const [ageRange, setAgeRange] = useState("26-35");
+  const [bgStyle, setBgStyle] = useState("luxury-dark");
+
+  // Jewelry style options
+  const [metalType, setMetalType] = useState("gold");
+  const [finish, setFinish] = useState("polished");
 
   // Processing
   const [isProcessing, setIsProcessing] = useState(false);
