@@ -217,30 +217,20 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         setProgressPct(30);
       }
 
-      // ---- STEP 2: Upload jewelry image ----
-      setStatusText("Subiendo imagen del accesorio...");
+      // ---- STEP 2: Apply jewelry (send file as FormData to avoid size limits) ----
+      setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
       setProgressPct(50);
 
       const jewelryFormData = new FormData();
-      jewelryFormData.append("file", effectiveJewelryFile);
-      const jewelryUploadRes = await fetch("/api/upload", { method: "POST", body: jewelryFormData });
-      const jewelryUploadData = await jewelryUploadRes.json();
-      if (!jewelryUploadData.success) throw new Error(jewelryUploadData.error || "Error al subir imagen del accesorio");
-
-      // ---- STEP 3: Apply jewelry ----
-      setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
-      setProgressPct(70);
+      jewelryFormData.append("jewelryFile", effectiveJewelryFile);
+      jewelryFormData.append("modelImage", modelImageUrl);
+      jewelryFormData.append("type", accessoryType);
+      if (metalType) jewelryFormData.append("metalType", metalType);
+      if (finish) jewelryFormData.append("finish", finish);
 
       const res = await fetch("/api/jewelry-tryon", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelImage: modelImageUrl,
-          jewelryImage: jewelryUploadData.data.url,
-          type: accessoryType,
-          metalType,
-          finish,
-        }),
+        body: jewelryFormData,
       });
       const data = await res.json();
 
