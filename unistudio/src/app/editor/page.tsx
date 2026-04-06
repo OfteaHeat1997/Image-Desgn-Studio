@@ -13,6 +13,7 @@ import { PropertiesPanel } from "@/components/editor/PropertiesPanel";
 import { ShadowsGuidePanel, type SessionResult } from "@/components/editor/ShadowsGuidePanel";
 import { TryOnGuidePanel } from "@/components/editor/TryOnGuidePanel";
 import { useGalleryStore } from "@/stores/gallery-store";
+import { useEditorSessionStore } from "@/stores/editor-session-store";
 import { useEditor } from "@/hooks/useEditor";
 import { ArrowRight, RotateCcw, Eye, EyeOff, ImagePlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -180,6 +181,37 @@ async function toPersistentThumbnail(url: string): Promise<string> {
   });
 }
 
+/**
+ * Convert any image URL to a persistent data URL for editor session storage.
+ * Higher quality than gallery thumbnails — 1200px max, JPEG quality 0.85.
+ * Keeps each image ~200-400KB — fits 3 images in localStorage comfortably.
+ */
+async function toPersistentDataUrl(url: string): Promise<string> {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("data:")) return url;
+
+  return new Promise<string>((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const MAX_W = 1200;
+      const scale = img.naturalWidth > MAX_W ? MAX_W / img.naturalWidth : 1;
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas context failed")); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => reject(new Error("Failed to persist image"));
+    img.src = url;
+  });
+}
+
 /** Auto-save a processed result to the output folder (fire and forget) */
 async function autoSaveResult(
   imageUrl: string,
@@ -233,6 +265,37 @@ function EditorInner() {
   // Connect to the layers system
   const { addImage: addLayerImage } = useEditor();
 
+  // Session persistence — restore last working state after page refresh
+  const editorSession = useEditorSessionStore();
+  const sessionRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (sessionRestoredRef.current) return;
+    sessionRestoredRef.current = true;
+
+    const s = useEditorSessionStore.getState();
+    // Only restore if session is recent (< 2 hours old) and has data
+    const isRecent = s.lastSaved > 0 && Date.now() - s.lastSaved < 2 * 60 * 60 * 1000;
+    if (!isRecent) return;
+
+    if (s.currentImage) {
+      setCurrentImage(s.currentImage);
+      setOriginalImage(s.originalImage);
+    }
+    if (s.processedImage) {
+      setProcessedImage(s.processedImage);
+    }
+    if (s.filename) {
+      // Reconstruct a minimal File object for panels that need it
+      fetch(s.currentImage || s.processedImage || "")
+        .then((r) => r.blob())
+        .then((blob) => setCurrentImageFile(new File([blob], s.filename || "restored.jpg", { type: "image/jpeg" })))
+        .catch(() => {}); // Silent — some data URLs may fail
+    }
+    if (s.sessionCost > 0) setSessionCost(s.sessionCost);
+    if (s.activeModule) setSelectedModule(s.activeModule);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Track blob URLs to revoke on cleanup
   const blobUrlsRef = useRef<string[]>([]);
   const trackBlobUrl = useCallback((url: string) => {
@@ -268,16 +331,25 @@ function EditorInner() {
         formData.append("file", file);
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const data = await res.json();
-        if (data.success) setUploadedOriginalUrl(data.data.url);
+        if (data.success) {
+          setUploadedOriginalUrl(data.data.url);
+          // Persist to session so upload survives refresh
+          editorSession.saveSession({
+            currentImage: data.data.url,
+            originalImage: data.data.url,
+            processedImage: null,
+            filename: file.name,
+            activeModule: selectedModule,
+          });
+        }
       } catch {
         // Silent — gallery will fall back to empty originalUrl
       }
     })();
-  }, [trackBlobUrl, addLayerImage]);
+  }, [trackBlobUrl, addLayerImage, editorSession, selectedModule]);
 
   /** Upload a new image without reloading the page */
   const handleNewImage = useCallback(() => {
-    // Revoke all blob URLs to free memory before loading a new image
     blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     blobUrlsRef.current = [];
     setCurrentImage(null);
@@ -288,7 +360,8 @@ function EditorInner() {
     setLastCost(undefined);
     setUploadedOriginalUrl(null);
     setSessionResults([]);
-  }, []);
+    editorSession.clearSession();
+  }, [editorSession]);
 
   const addToGallery = useGalleryStore((s) => s.addImage);
 
@@ -361,6 +434,27 @@ function EditorInner() {
 
       // Auto-save to disk (fire and forget — never blocks the UI)
       autoSaveResult(localUrl, selectedModule, currentImageFile?.name ?? "untitled.png");
+
+      // Persist editor session so it survives page refresh
+      (async () => {
+        try {
+          const [pResult, pCurrent, pOriginal] = await Promise.all([
+            toPersistentDataUrl(localUrl),
+            toPersistentDataUrl(localBefore ?? currentImage ?? ""),
+            toPersistentDataUrl(originalImage ?? ""),
+          ]);
+          editorSession.saveSession({
+            processedImage: pResult,
+            currentImage: pCurrent,
+            originalImage: pOriginal,
+            filename: currentImageFile?.name ?? "untitled.png",
+            activeModule: selectedModule,
+            sessionCost: sessionCost + (cost ?? 0.02),
+          });
+        } catch {
+          // Silent — session save is best-effort
+        }
+      })();
     } catch (error) {
       console.error("Failed to load processed image:", error);
       toast.error(`Error al cargar resultado: ${error instanceof Error ? error.message : "Error desconocido"}`);
