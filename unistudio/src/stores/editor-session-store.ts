@@ -34,7 +34,7 @@ const EMPTY_SESSION: EditorSession = {
   originalImage: null,
   processedImage: null,
   filename: null,
-  activeModule: "ai-agent",
+  activeModule: "bg-remove",
   sessionCost: 0,
   lastSaved: 0,
 };

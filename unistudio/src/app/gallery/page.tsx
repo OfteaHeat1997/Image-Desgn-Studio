@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ImageOff,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import { Modal } from "@/components/ui/modal";
 import { ImageCompare } from "@/components/ui/image-compare";
 import { cn } from "@/lib/utils/cn";
 import { useGalleryStore, type GalleryImage } from "@/stores/gallery-store";
+import { useRouter } from "next/navigation";
 
 /* ------------------------------------------------------------------ */
 /*  Filter constants                                                    */
@@ -54,6 +56,7 @@ const PROJECT_OPTIONS = [
 /* ------------------------------------------------------------------ */
 
 export default function GalleryPage() {
+  const router = useRouter();
   const images = useGalleryStore((s) => s.images);
   const addImage = useGalleryStore((s) => s.addImage);
   const removeImage = useGalleryStore((s) => s.removeImage);
@@ -310,13 +313,23 @@ export default function GalleryPage() {
                       type="button"
                       onClick={() => setPreviewImage(img)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-white transition-colors"
+                      title="Ver"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
+                      onClick={() => router.push(`/editor?imageUrl=${encodeURIComponent(img.resultUrl)}`)}
+                      className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-accent-light transition-colors"
+                      title="Abrir en Editor"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => downloadImage(img)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-white transition-colors"
+                      title="Descargar"
                     >
                       <Download className="h-4 w-4" />
                     </button>
@@ -324,6 +337,7 @@ export default function GalleryPage() {
                       type="button"
                       onClick={() => removeImage(img.id)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-red-400 transition-colors"
+                      title="Eliminar"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

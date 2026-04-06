@@ -261,9 +261,44 @@ export default function BrandKitPage() {
     }
   }, [state]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
     setState(INITIAL_STATE);
-  }, []);
+    // Persist the reset defaults to the database so they survive page refresh
+    try {
+      await fetch("/api/brand-kit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "My Brand",
+          colors: INITIAL_STATE.colors,
+          fonts: INITIAL_STATE.fonts,
+          logo_url: INITIAL_STATE.logoUrl,
+          watermark: null,
+          default_bg_style: INITIAL_STATE.defaultBgStyle,
+          default_enhance_preset: INITIAL_STATE.defaultEnhancePreset,
+          default_shadow_type: INITIAL_STATE.defaultShadowType,
+        }),
+      });
+      updateBrandKit({
+        colors: INITIAL_STATE.colors,
+        fonts: INITIAL_STATE.fonts,
+        logoUrl: "",
+        watermark: {
+          enabled: false,
+          position: INITIAL_STATE.watermark.position,
+          opacity: INITIAL_STATE.watermark.opacity / 100,
+          size: INITIAL_STATE.watermark.size,
+          imageUrl: "",
+        },
+        defaultBgStyle: INITIAL_STATE.defaultBgStyle,
+        defaultEnhancePreset: INITIAL_STATE.defaultEnhancePreset,
+      });
+      toast.success("Kit de marca restablecido");
+    } catch (e) {
+      console.error("Failed to reset brand kit:", e);
+      toast.error("Error al restablecer el kit de marca");
+    }
+  }, [updateBrandKit]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">

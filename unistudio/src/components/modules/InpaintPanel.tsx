@@ -48,8 +48,6 @@ const QUICK_PRESETS: QuickPreset[] = [
 
 export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
   const [prompt, setPrompt] = useState("");
-  const [negativePrompt, setNegativePrompt] = useState("");
-  const [showNegative, setShowNegative] = useState(false);
   const [provider, setProvider] = useState("kontext");
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState("");
@@ -87,7 +85,6 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
         body: JSON.stringify({
           imageUrl: uploadData.data.url,
           prompt,
-          negativePrompt: negativePrompt || undefined,
           provider,
         }),
       });
@@ -104,7 +101,7 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
       setIsProcessing(false);
       setTimeout(() => setStatusText(""), 3000);
     }
-  }, [imageFile, prompt, negativePrompt, provider, onProcess]);
+  }, [imageFile, prompt, provider, onProcess]);
 
   return (
     <div className="space-y-5">
@@ -172,27 +169,6 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
           rows={3}
           className="w-full rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors resize-none"
         />
-      </div>
-
-      {/* Negative prompt (collapsible) */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowNegative(!showNegative)}
-          className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          <span className={cn("transition-transform text-[8px]", showNegative ? "rotate-90" : "")}>▶</span>
-          Prompt negativo (opcional)
-        </button>
-        {showNegative && (
-          <textarea
-            value={negativePrompt}
-            onChange={(e) => setNegativePrompt(e.target.value)}
-            placeholder="ej. borroso, distorsionado, baja calidad..."
-            rows={2}
-            className="mt-1.5 w-full rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors resize-none"
-          />
-        )}
       </div>
 
       {/* Provider */}

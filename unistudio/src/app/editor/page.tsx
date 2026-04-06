@@ -242,7 +242,7 @@ async function autoSaveResult(
 
 function EditorInner() {
   const searchParams = useSearchParams();
-  const moduleParam = searchParams.get("module") ?? "ai-agent";
+  const moduleParam = searchParams.get("module") ?? "bg-remove";
 
   const [selectedModule, setSelectedModule] = useState(moduleParam);
   const [currentImage, setCurrentImage] = useState<string | null>(null);

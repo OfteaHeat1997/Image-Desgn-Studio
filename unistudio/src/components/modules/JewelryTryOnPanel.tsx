@@ -217,13 +217,25 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         setProgressPct(30);
       }
 
-      // ---- STEP 2: Apply jewelry (send file as FormData to avoid size limits) ----
+      // ---- STEP 2: Apply jewelry ----
       setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
       setProgressPct(50);
 
+      // Convert model data URL to a File to keep FormData small
+      let modelFile2: File | null = null;
+      if (modelImageUrl.startsWith("data:")) {
+        const blobRes = await fetch(modelImageUrl);
+        const blob = await blobRes.blob();
+        modelFile2 = new File([blob], "model.jpg", { type: blob.type || "image/jpeg" });
+      }
+
       const jewelryFormData = new FormData();
       jewelryFormData.append("jewelryFile", effectiveJewelryFile);
-      jewelryFormData.append("modelImage", modelImageUrl);
+      if (modelFile2) {
+        jewelryFormData.append("modelFile", modelFile2);
+      } else {
+        jewelryFormData.append("modelImage", modelImageUrl);
+      }
       jewelryFormData.append("type", accessoryType);
       if (metalType) jewelryFormData.append("metalType", metalType);
       if (finish) jewelryFormData.append("finish", finish);

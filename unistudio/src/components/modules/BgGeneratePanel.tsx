@@ -192,10 +192,18 @@ async function processLocalStudio(
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
+type ApiMode = "precise" | "fast";
+
+const API_MODE_OPTIONS: { value: ApiMode; label: string; cost: string; description: string }[] = [
+  { value: "precise", label: "Preciso", cost: "$0.05", description: "Kontext Pro — maxima calidad, preserva el producto" },
+  { value: "fast", label: "Rapido", cost: "$0.003", description: "Flux Schnell — previsualizacion barata y rapida" },
+];
+
 export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) {
   const [selectedPreset, setSelectedPreset] = useState("studio-white");
   const [customPrompt, setCustomPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [apiMode, setApiMode] = useState<ApiMode>("precise");
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [progressPct, setProgressPct] = useState(0);
@@ -286,7 +294,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageUrl: uploadData.data.url,
-            mode: "precise",
+            mode: apiMode,
             style: selectedPreset,
             customPrompt: optimizedPrompt,
             aspectRatio,
@@ -301,7 +309,8 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
 
         setProgressPct(100);
         setStatusText("Listo!");
-        onProcess(data.data.url, undefined, data.data.cost ?? 0.05);
+        const modeCost = apiMode === "fast" ? 0.003 : 0.05;
+        onProcess(data.data.url, undefined, data.data.cost ?? modeCost);
       }
     } catch (error) {
       console.error("BG generation error:", error);
@@ -314,7 +323,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
         setProgressPct(0);
       }, 3000);
     }
-  }, [imageFile, isFree, preset, selectedPreset, customPrompt, aspectRatio, onProcess]);
+  }, [imageFile, isFree, preset, selectedPreset, customPrompt, aspectRatio, apiMode, onProcess]);
 
   const categories = Array.from(new Set(STYLE_PRESETS.map((p) => p.category)));
 
@@ -372,7 +381,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           <p className="text-[9px] text-gray-500">
             {isFree
               ? "Se procesa en tu PC — sin costo, sin limite"
-              : `Costo estimado: ~$0.05 por imagen`}
+              : `Costo estimado: ~${apiMode === "fast" ? "$0.003" : "$0.05"} por imagen`}
           </p>
         </div>
         <span className={cn(
@@ -381,9 +390,44 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
             ? "bg-emerald-500/20 text-emerald-400"
             : "bg-amber-500/20 text-amber-400"
         )}>
-          {isFree ? "GRATIS" : "~$0.05"}
+          {isFree ? "GRATIS" : apiMode === "fast" ? "~$0.003" : "~$0.05"}
         </span>
       </div>
+
+      {/* API Mode selector (only visible when not free) */}
+      {!isFree && (
+        <div>
+          <label className="mb-2 block text-xs font-medium text-gray-400">
+            Modo de Generacion
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {API_MODE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setApiMode(opt.value)}
+                className={cn(
+                  "flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-all",
+                  apiMode === opt.value
+                    ? "border-accent bg-accent/10"
+                    : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+                )}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="text-[11px] font-medium text-gray-200">{opt.label}</span>
+                  <span className={cn(
+                    "text-[9px] font-semibold",
+                    opt.value === "fast" ? "text-emerald-400" : "text-amber-400",
+                  )}>
+                    {opt.cost}
+                  </span>
+                </div>
+                <span className="text-[9px] text-gray-500">{opt.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Style presets grid */}
       <div>
@@ -498,7 +542,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           ? statusText || "Procesando..."
           : isFree
             ? "Generar Fondo (Gratis)"
-            : "Generar Fondo (~$0.05)"}
+            : `Generar Fondo (~${apiMode === "fast" ? "$0.003" : "$0.05"})`}
       </Button>
 
       {!imageFile && (

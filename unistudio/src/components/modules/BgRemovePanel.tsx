@@ -55,7 +55,7 @@ const PROVIDERS: Provider[] = [
   {
     id: "replicate",
     name: "Replicate IA",
-    cost: "$0.004",
+    cost: "$0.01",
     quality: 5,
     icon: Cpu,
     description: "Maxima calidad para bordes complejos",

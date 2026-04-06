@@ -54,40 +54,40 @@ interface ModuleSidebarProps {
 
 const MODULE_CATEGORIES: ModuleCategory[] = [
   {
-    name: "FONDOS",
+    name: "E-COMMERCE",
     modules: [
-      { id: "bg-remove", label: "Quitar Fondo", icon: Scissors, cost: "Gratis-$0.01", description: "Elimina el fondo de cualquier foto de producto" },
-      { id: "bg-generate", label: "Fondos con IA", icon: ImageIcon, cost: "$0.003-$0.05", description: "Reemplaza el fondo con escenas profesionales" },
+      { id: "bg-remove", label: "1. Quitar Fondo", icon: Scissors, cost: "Gratis", description: "Fondo blanco profesional — el primer paso para cualquier foto de producto" },
+      { id: "enhance", label: "2. Mejorar Calidad", icon: Sparkles, cost: "Gratis", description: "Brillo, contraste y nitidez profesional — gratis" },
+      { id: "shadows", label: "3. Agregar Sombra", icon: Sun, cost: "Gratis", description: "Sombra suave para que el producto no flote" },
+      { id: "compliance", label: "4. Verificar", icon: CheckCircle, cost: "Gratis", description: "Verifica que la foto cumple con Amazon, Shopify, etc." },
     ],
   },
   {
-    name: "MEJORA",
+    name: "FONDOS",
     modules: [
-      { id: "enhance", label: "Mejorar Calidad", icon: Sparkles, cost: "Gratis", description: "Ajusta brillo, contraste, nitidez y color" },
-      { id: "upscale", label: "Aumentar Resolucion", icon: ZoomIn, cost: "$0.02-$0.05", description: "Agranda tu imagen 2x o 4x sin perder calidad" },
-      { id: "shadows", label: "Sombras e Iluminacion", icon: Sun, cost: "Gratis-$0.05", description: "Agrega sombras realistas y cambia iluminacion" },
+      { id: "bg-generate", label: "Fondos con IA", icon: ImageIcon, cost: "$0.003-$0.05", description: "Reemplaza el fondo con escenas profesionales" },
       { id: "outpaint", label: "Extender Imagen", icon: Expand, cost: "$0.05", description: "Expande los bordes para cualquier formato" },
     ],
   },
   {
     name: "EDICION",
     modules: [
-      { id: "inpaint", label: "Borrar y Reemplazar", icon: Eraser, cost: "$0.03-$0.05", description: "Elimina objetos o cambia colores con IA" },
+      { id: "inpaint", label: "Borrar y Reemplazar", icon: Eraser, cost: "$0.03-$0.05", description: "Elimina etiquetas, manchas o cambia colores" },
+      { id: "upscale", label: "Aumentar Resolucion", icon: ZoomIn, cost: "$0.02-$0.05", description: "Agranda tu imagen 2x o 4x sin perder calidad" },
       { id: "smart-editor", label: "Editor Avanzado", icon: SlidersHorizontal, cost: "Gratis", description: "Rotar, recortar, filtros, texto y ajustes" },
-      { id: "compliance", label: "Verificar Marketplace", icon: CheckCircle, cost: "Gratis", description: "Verifica requisitos de Amazon, Shopify, Etsy" },
     ],
   },
   {
-    name: "MODELOS",
+    name: "MODELOS Y MODA",
     modules: [
       { id: "tryon", label: "Prueba Virtual", icon: Shirt, cost: "$0.02-$0.05", description: "Coloca tu prenda sobre un modelo virtual" },
-      { id: "model-create", label: "Crear Modelo IA", icon: User, cost: "$0.055", description: "Genera modelos virtuales personalizables" },
-      { id: "ghost-mannequin", label: "Maniqui Invisible", icon: Ghost, cost: "$0.05-$0.08", description: "Elimina el maniqui de fotos de ropa" },
+      { id: "model-create", label: "Crear Modelo IA", icon: User, cost: "$0.055", description: "Genera modelos diversos sin fotografo" },
+      { id: "ghost-mannequin", label: "Maniqui Invisible", icon: Ghost, cost: "$0.05", description: "Elimina el maniqui de fotos de ropa" },
       { id: "jewelry-tryon", label: "Joyeria Virtual", icon: Gem, cost: "$0.05", description: "Prueba joyeria sobre fotos de modelos" },
     ],
   },
   {
-    name: "CONTENIDO",
+    name: "VIDEO Y ADS",
     modules: [
       { id: "video", label: "Estudio de Video", icon: Film, cost: "$0-$0.35", description: "Convierte fotos en videos para redes sociales" },
       { id: "ad-creator", label: "Crear Anuncios", icon: Megaphone, cost: "$0.04-$0.35", description: "Genera videos publicitarios por plataforma" },
@@ -95,16 +95,11 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     ],
   },
   {
-    name: "GESTION",
-    modules: [
-      { id: "batch", label: "Procesamiento Masivo", icon: Layers, cost: "Variable", description: "Procesa multiples imagenes con la misma secuencia" },
-      { id: "brand-kit", label: "Kit de Marca", icon: Palette, cost: "Gratis", description: "Colores, fuentes, logo y marca de agua de tu marca" },
-    ],
-  },
-  {
     name: "AUTOMATIZACION",
     modules: [
       { id: "ai-agent", label: "Agente IA (Auto)", icon: Bot, cost: "Variable", description: "Describe lo que quieres, el agente lo hace" },
+      { id: "batch", label: "Procesamiento Masivo", icon: Layers, cost: "Variable", description: "Procesa multiples imagenes automaticamente" },
+      { id: "brand-kit", label: "Kit de Marca", icon: Palette, cost: "Gratis", description: "Colores, fuentes, logo y marca de agua" },
     ],
   },
 ];
