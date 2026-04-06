@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Monitor,
   Cpu,
   HardDrive,
   Star,
   Scissors,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -43,20 +45,20 @@ type OutputType = "transparent" | "solid" | "blur";
 
 const PROVIDERS: Provider[] = [
   {
+    id: "browser",
+    name: "Navegador (Recomendado)",
+    cost: "Gratis",
+    quality: 4,
+    icon: Monitor,
+    description: "Gratis, privado, se procesa en tu PC",
+  },
+  {
     id: "replicate",
     name: "Replicate IA",
     cost: "$0.004",
     quality: 5,
-    icon: Star,
-    description: "Mejor calidad, rapido, recomendado",
-  },
-  {
-    id: "browser",
-    name: "Navegador",
-    cost: "Gratis",
-    quality: 3,
-    icon: Monitor,
-    description: "Se procesa en tu PC, sin costo",
+    icon: Cpu,
+    description: "Maxima calidad para bordes complejos",
   },
 ];
 
@@ -282,6 +284,51 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const isFree = selectedProvider === "browser" || selectedProvider === "withoutbg";
 
+  /* ---- Auto-recommendation based on image ---- */
+  const recommendation = useMemo(() => {
+    if (!imageFile) return null;
+
+    const sizeMB = imageFile.size / (1024 * 1024);
+    const isLarge = sizeMB > 8;
+    const isPng = imageFile.type === "image/png";
+
+    // For most images, browser is great and free
+    if (!isLarge) {
+      return {
+        provider: "browser" as const,
+        outputType: "transparent" as OutputType,
+        marketplace: "none",
+        reason: "Tu imagen es ideal para procesamiento gratuito en el navegador.",
+        badge: "Gratis",
+      };
+    }
+
+    // Very large images may benefit from server processing
+    return {
+      provider: "replicate" as const,
+      outputType: "transparent" as OutputType,
+      marketplace: "none",
+      reason: `Imagen grande (${sizeMB.toFixed(1)}MB) — el servidor procesa mas rapido.`,
+      badge: "$0.004",
+    };
+  }, [imageFile]);
+
+  const applyRecommendation = useCallback(() => {
+    if (!recommendation) return;
+    setSelectedProvider(recommendation.provider);
+    setOutputType(recommendation.outputType);
+    if (recommendation.marketplace !== "none") {
+      setMarketplaceSize(recommendation.marketplace);
+    }
+  }, [recommendation]);
+
+  // Auto-apply free recommendation on first image load
+  useEffect(() => {
+    if (recommendation && recommendation.provider === "browser") {
+      applyRecommendation();
+    }
+  }, [imageFile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleProcess = useCallback(async () => {
     if (!imageFile) return;
     setIsProcessing(true);
@@ -421,6 +468,51 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
           "Para marketplace, elige el formato destino antes de procesar.",
         ]}
       />
+
+      {/* Auto-recommendation banner */}
+      {recommendation && imageFile && (
+        <div
+          className={cn(
+            "flex items-start gap-2.5 rounded-lg border p-3",
+            recommendation.provider === "browser"
+              ? "border-emerald-500/30 bg-emerald-500/10"
+              : "border-amber-500/30 bg-amber-500/10",
+          )}
+        >
+          <Sparkles className={cn(
+            "h-4 w-4 shrink-0 mt-0.5",
+            recommendation.provider === "browser" ? "text-emerald-400" : "text-amber-400",
+          )} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-semibold text-gray-200">
+                Recomendacion Automatica
+              </span>
+              <span className={cn(
+                "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
+                recommendation.provider === "browser"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-amber-500/20 text-amber-400",
+              )}>
+                {recommendation.badge}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              {recommendation.reason}
+            </p>
+            {selectedProvider !== recommendation.provider && (
+              <button
+                type="button"
+                onClick={applyRecommendation}
+                className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-accent-light hover:text-accent transition-colors"
+              >
+                <Zap className="h-3 w-3" />
+                Aplicar recomendacion
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Provider selector */}
       <div>
