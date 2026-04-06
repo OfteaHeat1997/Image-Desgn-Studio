@@ -201,6 +201,24 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
           );
         })}
       </nav>
+
+      {/* Quick links */}
+      <div className="border-t border-surface-lighter p-2 space-y-1">
+        <a
+          href="/gallery"
+          className="flex items-center gap-2 rounded-md px-2.5 py-2 text-[11px] font-medium text-gray-400 hover:bg-surface-light hover:text-gray-200 transition-all"
+        >
+          <ImageIcon className="h-3.5 w-3.5 text-gray-500" />
+          Galeria
+        </a>
+        <a
+          href="/batch"
+          className="flex items-center gap-2 rounded-md px-2.5 py-2 text-[11px] font-medium text-gray-400 hover:bg-surface-light hover:text-gray-200 transition-all"
+        >
+          <Layers className="h-3.5 w-3.5 text-gray-500" />
+          Batch Masivo
+        </a>
+      </div>
     </div>
   );
 }

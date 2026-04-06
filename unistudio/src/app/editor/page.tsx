@@ -32,7 +32,7 @@ import { ModelCreatePanel } from "@/components/modules/ModelCreatePanel";
 import { VideoPanel } from "@/components/modules/VideoPanel";
 import { CompliancePanel } from "@/components/modules/CompliancePanel";
 import { GhostMannequinPanel } from "@/components/modules/GhostMannequinPanel";
-import { JewelryTryOnPanel } from "@/components/modules/JewelryTryOnPanel";
+import { JewelryTryOnPanel } from "@/components/modules/JewelryTryonPanel";
 import { AiPromptPanel } from "@/components/modules/AiPromptPanel";
 import { AdCreatorPanel } from "@/components/modules/AdCreatorPanel";
 import { SmartEditorPanel } from "@/components/modules/SmartEditorPanel";
@@ -384,7 +384,7 @@ function EditorInner() {
       setProcessedImage(localUrl);
       setShowingOriginal(false);
       setIsProcessing(false);
-      setSessionCost((prev) => prev + (cost ?? 0.02));
+      setSessionCost((prev) => prev + (cost ?? 0));
 
       setLastCost(cost);
 

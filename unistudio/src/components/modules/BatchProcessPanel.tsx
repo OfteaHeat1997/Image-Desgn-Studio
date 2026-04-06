@@ -138,7 +138,7 @@ const OP_DEFAULT_PARAMS: Record<string, Record<string, unknown>> = {
   "bg-remove": { provider: "replicate" },
   "bg-generate": { provider: "kontext", prompt: "fondo blanco profesional para e-commerce" },
   "enhance": { preset: "ecommerce" },
-  "shadows": { type: "soft" },
+  "shadows": { type: "drop" },
   "inpaint": { provider: "kontext", prompt: "eliminar objeto no deseado" },
   "outpaint": { provider: "kontext", direction: "all", pixels: 200 },
   "upscale": { provider: "real-esrgan", scale: 2 },
