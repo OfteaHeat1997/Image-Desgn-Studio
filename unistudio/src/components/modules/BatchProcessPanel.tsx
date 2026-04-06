@@ -136,7 +136,7 @@ const OP_ENDPOINT: Record<string, string> = {
 /* Default params per operation */
 const OP_DEFAULT_PARAMS: Record<string, Record<string, unknown>> = {
   "bg-remove": { provider: "replicate" },
-  "bg-generate": { provider: "kontext", prompt: "fondo blanco profesional para e-commerce" },
+  "bg-generate": { mode: "precise", style: "studio-white", prompt: "fondo blanco profesional para e-commerce" },
   "enhance": { preset: "ecommerce" },
   "shadows": { type: "drop" },
   "inpaint": { provider: "kontext", prompt: "eliminar objeto no deseado" },
@@ -333,20 +333,20 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
       <ModuleHeader
         icon={<Layers className="h-4 w-4" />}
         title="Procesamiento en Lote"
-        description="Construye un pipeline de pasos y aplicalos a tu imagen. Cada paso encadena su resultado al siguiente automaticamente."
-        whyNeeded="Procesa varias imagenes automaticamente con la misma secuencia de pasos. Ideal para lotes de productos."
+        description="Crea un pipeline de pasos (quitar fondo → mejorar calidad → agregar sombra → redimensionar) y aplicalos a tu imagen automaticamente. Cada paso usa el resultado del anterior. Ideal para estandarizar el look de todos tus productos."
+        whyNeeded="Si tienes 50 fotos de productos y cada una necesita el mismo tratamiento (quitar fondo, mejorar, sombra), hacerlo una por una toma horas. Con el pipeline, defines los pasos una vez y los aplicas a todas. Para lotes grandes (10+ imagenes) usa la pagina dedicada en /batch."
         costLabel={totalCost === 0 ? "Gratis" : `~$${totalCost.toFixed(3)}/imagen`}
         steps={[
           "Sube una imagen al area central del editor",
-          "Selecciona una operacion del menu y haz clic en \"Agregar\"",
-          "Organiza y activa/desactiva los pasos segun necesites",
-          "Haz clic en \"Ejecutar Pipeline\" para procesar",
+          "Elige operaciones del menu y haz clic en \"Agregar\" para crear tu pipeline",
+          "Ordena y activa/desactiva los pasos segun necesites (el orden importa)",
+          "Haz clic en \"Ejecutar Pipeline\" — cada paso se ejecuta automaticamente",
         ]}
         tips={[
-          "El orden de los pasos importa — quitar fondo antes de generar uno nuevo da mejores resultados.",
-          "Desactiva pasos con el toggle sin eliminarlos para probar variaciones rapido.",
-          "Para lotes grandes usa la pagina /batch — este panel procesa una imagen a la vez.",
-          "Los pasos gratuitos (Mejorar, Sombras) no consumen creditos de API.",
+          "Orden recomendado: Quitar Fondo → Mejorar → Sombras → Redimensionar. Este flujo es el estandar de e-commerce.",
+          "Desactiva pasos con el toggle sin eliminarlos — asi pruebas variaciones rapidamente.",
+          "Los pasos gratuitos (Mejorar, Sombras locales) no consumen creditos de API.",
+          "Para procesar muchas imagenes a la vez, usa la pagina dedicada /batch con mas opciones.",
         ]}
       />
 

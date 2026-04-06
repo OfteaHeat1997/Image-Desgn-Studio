@@ -272,14 +272,20 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       <ModuleHeader
         icon={<Gem className="h-4 w-4" />}
         title="Joyeria Virtual"
-        description="Prueba joyeria y accesorios sobre modelos IA o fotos reales. Genera un modelo automaticamente o sube tu propia foto."
-        whyNeeded="Muestra como se ve la joyeria puesta sin sesion fotografica."
+        description="Muestra tus joyas y accesorios como se verian puestos en una persona real. Sube la foto de tu joya y el sistema genera un modelo IA usandola, o sube tu propia foto de modelo. Funciona con aretes, collares, anillos, pulseras, relojes y lentes."
+        whyNeeded="La joyeria en foto plana es dificil de visualizar — los clientes quieren ver como luce puesta. Las fotos con modelo aumentan la confianza del comprador y reducen devoluciones. Con este modulo no necesitas sesion fotografica para cada pieza."
         costLabel={`Desde ${estimatedCost}`}
         steps={[
-          "Sube la foto del accesorio al area central del editor",
-          "Elige el tipo de accesorio (collar, aretes, anillo, etc.)",
-          "Genera un modelo IA o sube una foto existente",
-          "Haz clic en \"Aplicar\" — la IA coloca el accesorio automaticamente",
+          "Sube la foto de tu joya al area central del editor",
+          "Elige el tipo de accesorio: aretes, collar, anillo, pulsera, reloj o lentes",
+          "Elige si generar un modelo IA o subir tu propia foto de modelo",
+          "Haz clic en \"Aplicar Accesorio\" — la IA coloca la joya en la posicion correcta",
+        ]}
+        tips={[
+          "Fotografia la joya sobre fondo blanco con buena luz — la IA la entiende mejor asi.",
+          "Para anillos y pulseras, la IA genera una foto de mano con la pose correcta.",
+          "Para aretes y collares, genera un modelo de rostro/cuello automaticamente.",
+          "Prueba diferentes estilos de fondo (Luxury Dark, Marble, etc.) para resaltar tu joya.",
         ]}
       />
 

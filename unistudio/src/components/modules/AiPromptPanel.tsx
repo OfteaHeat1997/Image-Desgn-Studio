@@ -286,20 +286,20 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
       <ModuleHeader
         icon={<Wand2 className="h-4 w-4" />}
         title="Director Creativo IA"
-        description="Claude IA disena tu foto perfecta. Elige tu producto y la plataforma destino — la IA te sugiere 4 conceptos profesionales de fotografia y los genera automaticamente."
-        whyNeeded="Cuando no sabes que estilo usar, el Director Creativo genera ideas profesionales."
+        description="No sabes que fondo o estilo usar para tu foto? La IA actua como tu director creativo: analiza tu producto, la plataforma donde lo publicaras, y genera 4 conceptos de fotografia profesional. Tu eliges el que mas te guste y la IA lo crea."
+        whyNeeded="Un director creativo profesional cobra $500+ por sesion. Este modulo usa Claude IA para generar ideas de fotografia adaptadas a tu producto y plataforma. Elige entre conceptos como 'minimalismo japones', 'playa tropical', 'estudio de lujo' — cada uno unico y profesional."
         costLabel="$0.05/foto"
         steps={[
-          "Sube tu producto al area central y elige el tipo (lenceria, joyeria, etc.)",
-          "Selecciona para donde es la foto (Instagram, Amazon, catalogo, etc.)",
-          "La IA genera 4 conceptos creativos — elige el que mas te guste",
-          "Haz clic en \"Crear Foto\" y la IA produce la imagen final",
+          "Sube tu producto al area central y elige el tipo (lenceria, bloqueador, joyeria, etc.)",
+          "Selecciona la plataforma destino (Instagram, Amazon, catalogo, etc.)",
+          "Haz clic en \"Pedir Ideas\" — la IA genera 4 conceptos creativos con preview",
+          "Elige el concepto que mas te guste y haz clic en \"Crear Foto\"",
         ]}
         tips={[
-          "Claude IA optimiza el prompt automaticamente para cada plataforma.",
-          "Los conceptos generados son unicos cada vez — puedes regenerar para ver mas opciones.",
-          "Funciona especialmente bien con lenceria, joyeria y productos de belleza.",
-          "El procesamiento incluye remocion de fondo + generacion de escenario — todo automatico.",
+          "Cada vez que pides ideas obtienes conceptos diferentes — regenera si no te convence.",
+          "La IA adapta los conceptos a tu plataforma: para Amazon sugiere fondos limpios, para Instagram sugiere lifestyle.",
+          "Funciona especialmente bien con lenceria, joyeria, cosmeticos y productos de belleza.",
+          "Puedes editar el prompt generado antes de crear la foto para ajustar detalles.",
         ]}
       />
 

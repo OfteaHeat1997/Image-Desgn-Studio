@@ -524,20 +524,22 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
       <ModuleHeader
         icon={<Scissors className="h-4 w-4" />}
         title="Quitar Fondo"
-        description="Elimina el fondo de cualquier foto de producto con precision profesional. El modo Navegador es completamente gratis y no envia datos a ningun servidor."
-        whyNeeded="Amazon, Shopify y la mayoria de marketplaces requieren fondo blanco. Ahorra horas de edicion manual en Photoshop."
+        description="Elimina el fondo de tus fotos de producto y reemplazalo con blanco puro, un color personalizado o dejalo transparente. Todo se procesa en tu computadora — gratis, privado, sin enviar nada a internet."
+        whyNeeded="Amazon, Shopify, eBay y casi todos los marketplaces exigen fondo blanco uniforme. Sin fondo limpio, tus productos se ven poco profesionales y algunos marketplaces rechazan la foto directamente. Con este modulo ahorras horas de Photoshop."
         costLabel="Desde gratis"
         steps={[
-          "Arrastra tu foto de producto al area central del editor",
-          "Elige el proveedor (Navegador = gratis, no envia datos)",
-          "Configura las opciones de salida: color de fondo, formato, marketplace",
-          "Haz clic en \"Quitar Fondo\" y espera el resultado",
+          "Sube tu foto de producto arrastrando al area central",
+          "Haz clic en \"Modo E-Commerce\" para configuracion perfecta automatica, o ajusta manualmente",
+          "Elige tipo de salida: fondo blanco, color personalizado, transparente o difuminado",
+          "Selecciona un tamanio de marketplace (todas las fotos salen del mismo tamanio)",
+          "Haz clic en \"Remover Fondo\" — el producto queda centrado, nitido y profesional",
         ]}
         tips={[
-          "El modo Navegador procesa todo localmente — ideal para fotos sensibles.",
-          "Usa imagenes PNG con buena iluminacion para bordes mas limpios.",
-          "Activa \"Auto-Crop\" para recortar el espacio extra automaticamente.",
-          "Para marketplace, elige el formato destino antes de procesar.",
+          "Usa \"Modo E-Commerce (1 clic)\" para resultados perfectos sin configurar nada — fondo blanco, centrado, 1200x1200, con sombra suave.",
+          "El producto se recorta y centra automaticamente — no importa si la foto original tiene mucho espacio alrededor.",
+          "Para una web profesional, usa siempre el mismo tamanio (ej: 1200x1200) para que todas las fotos se vean uniformes.",
+          "JPG es mas liviano para web (~50KB vs 200KB PNG). Usa PNG solo si necesitas transparencia.",
+          "El margen de recorte (8-12%) es ideal para e-commerce — deja espacio alrededor del producto sin que se vea lejano.",
         ]}
       />
 

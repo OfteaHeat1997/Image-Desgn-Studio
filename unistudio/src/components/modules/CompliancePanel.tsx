@@ -462,20 +462,20 @@ export function CompliancePanel({ imageFile, onProcess }: CompliancePanelProps) 
       <ModuleHeader
         icon={<CheckSquare className="h-4 w-4" />}
         title="Verificar Marketplace"
-        description="Verifica que tu imagen cumple las especificaciones de cada plataforma antes de publicar. Detecta problemas de tamano, formato y resolucion con auto-correccion instantanea."
-        whyNeeded="Fotos rechazadas = productos no publicados = ventas perdidas."
+        description="Antes de subir tu foto a Amazon, Shopify, eBay u otra plataforma, verificala aqui. El sistema detecta si el tamanio, formato o resolucion no cumple las reglas del marketplace y te ofrece correccion automatica con un clic."
+        whyNeeded="Cada marketplace tiene reglas diferentes — Amazon exige minimo 1000px y fondo blanco, eBay pide minimo 500px, Shopify recomienda 2048px. Si tu foto no cumple, el marketplace la rechaza y tu producto no se publica. Este modulo lo verifica todo ANTES de que pierdas tiempo."
         costLabel="Gratis"
         steps={[
           "Sube la imagen que quieres verificar al area central",
-          "Selecciona las plataformas donde vas a publicar (Amazon, Shopify, etc.)",
-          'Haz clic en "Verificar" para ver el diagnostico completo',
-          'Si hay errores, usa "Corregir" en cada problema o "Corregir Todo" para arreglarlos en un clic',
+          "Selecciona las plataformas donde vas a publicar (puedes elegir varias)",
+          "Haz clic en \"Verificar\" para ver el diagnostico completo",
+          "Si hay problemas, haz clic en \"Corregir Todo\" para arreglarlos automaticamente",
         ]}
         tips={[
-          "Cada plataforma tiene requisitos diferentes de tamano, formato y resolucion.",
-          "La auto-correccion escala, comprime o convierte el formato sin perder calidad visible.",
-          "Verifica siempre antes de publicar — un rechazo por imagen puede retrasar tu listado.",
-          "Este modulo es completamente gratis — no usa IA ni servicios externos.",
+          "Verifica SIEMPRE antes de publicar — un rechazo puede retrasar tu listado dias.",
+          "\"Corregir Todo\" ajusta tamanio, formato y compresion automaticamente sin perder calidad.",
+          "Amazon es el mas estricto: requiere fondo blanco puro, minimo 1000x1000px, sin texto ni logos.",
+          "Este modulo es 100% gratis — no usa IA ni envia datos a ningun servidor.",
         ]}
       />
 

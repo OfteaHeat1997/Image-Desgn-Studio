@@ -175,20 +175,20 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
       <ModuleHeader
         icon={<User className="h-4 w-4" />}
         title="Crear Modelo IA"
-        description="Genera un modelo fotorrealista personalizado para tu marca. Elige genero, edad, tono de piel, tipo de cuerpo, pose y expresion — sin contratar modelos ni fotografos."
-        whyNeeded="Diversifica tu catalogo con modelos de todas las etnias sin sesion fotografica."
+        description="Genera una persona fotorrealista para mostrar tu producto puesto. Elige genero, edad, tono de piel, tipo de cuerpo, pose y expresion. La IA crea un modelo unico en segundos — sin contratar modelos, fotografos ni estudio."
+        whyNeeded="Contratar un modelo real cuesta $200-500 por sesion. Con este modulo, generas modelos diversos (diferentes etnias, edades, tipos de cuerpo) por $0.055 cada uno. Ideal para lenceria, ropa, accesorios y cosmeticos. Puedes crear un catalogo completo en minutos."
         costLabel="$0.055/img"
         steps={[
-          "Configura las caracteristicas del modelo: genero, edad, tono de piel",
-          "Elige tipo de cuerpo, pose y expresion facial",
-          "Opcionalmente, sube una imagen de referencia de tu prenda",
-          "Haz clic en \"Generar Modelo\" para crear la foto",
+          "Elige genero, rango de edad y tono de piel del modelo",
+          "Configura tipo de cuerpo, pose y expresion facial",
+          "Opcionalmente sube tu prenda — el modelo aparecera vistiendo la",
+          "Haz clic en \"Generar Modelo\" y en ~15 segundos tendras la foto",
         ]}
         tips={[
-          "Puedes usar el modelo generado en el modulo Try-On para vestirlo con tu prenda.",
-          "Los modelos con pose \"frontal\" funcionan mejor para pruebas virtuales de ropa.",
-          "Para consistencia de marca, guarda los parametros de tu modelo favorito.",
-          "Cada generacion produce un modelo unico — genera varios para elegir el mejor.",
+          "Para lenceria/ropa: sube la foto de la prenda y el modelo aparecera vistiendo la automaticamente.",
+          "Pose \"frontal\" es la mejor para pruebas virtuales y catalogos de e-commerce.",
+          "Genera 3-4 modelos diferentes y elige el mejor — cada uno es unico.",
+          "Puedes usar el modelo generado despues en \"Prueba Virtual\" para ponerle mas prendas encima.",
         ]}
       />
 

@@ -160,20 +160,20 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
           <ModuleHeader
             icon={<SlidersHorizontal className="h-4 w-4" />}
             title="Mejorar Calidad"
-            description="Ajusta brillo, contraste, nitidez y color de tu imagen. Usa un preset profesional o controles manuales para lograr el look exacto que necesitas."
-            whyNeeded="Fotos de celular salen oscuras o descoloridas. Este modulo las convierte en calidad profesional."
+            description="Corrige fotos oscuras, borrosas o con colores apagados. Ajusta brillo, contraste, nitidez y saturacion con presets profesionales o controles manuales. Todo gratis y se procesa en tu computadora."
+            whyNeeded="Las fotos tomadas con celular suelen salir oscuras, amarillentas o sin nitidez. Los compradores no confian en productos con fotos de mala calidad — este modulo convierte una foto de celular en calidad de catalogo profesional en segundos."
             costLabel="Gratis"
             steps={[
               "Sube tu imagen al area central del editor",
-              "Elige un preset profesional o ajusta los controles manualmente",
-              "Modifica brillo, contraste, saturacion, nitidez y mas",
-              "Haz clic en \"Aplicar Mejoras\" para ver el resultado",
+              "Elige un preset rapido (E-Commerce, Vivido, Suave) o ajusta manualmente",
+              "Usa los controles de brillo, contraste, saturacion y nitidez",
+              "Haz clic en \"Aplicar Mejora\" para ver el antes/despues",
             ]}
             tips={[
-              "Los presets son un buen punto de partida — luego puedes ajustar cada control.",
-              "\"Reiniciar\" vuelve todos los valores a su punto original.",
-              "Para fotos de e-commerce, el preset \"E-Commerce\" da resultados profesionales rapidos.",
-              "Todo el procesamiento es local y gratuito — no usa IA.",
+              "El preset \"E-Commerce\" es ideal para productos — optimiza brillo, contraste y nitidez automaticamente.",
+              "No exageres la saturacion — colores muy intensos se ven falsos y generan devoluciones.",
+              "La nitidez debe ser sutil — bordes muy marcados hacen la imagen artificial.",
+              "Todo es gratis y se procesa localmente — puedes experimentar sin costo.",
             ]}
           />
           <button

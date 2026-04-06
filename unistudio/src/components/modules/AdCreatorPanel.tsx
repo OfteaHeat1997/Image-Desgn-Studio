@@ -177,20 +177,20 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
       <ModuleHeader
         icon={<Megaphone className="h-4 w-4" />}
         title="Crear Anuncios"
-        description="Genera videos publicitarios listos para redes sociales. Elige una plataforma, escribe tu titular y la IA crea el video con el formato y duracion correcta."
-        whyNeeded="Cada red social requiere dimensiones especificas. Genera ads listos para publicar."
+        description="Crea videos publicitarios profesionales para Instagram, TikTok, Facebook y YouTube en segundos. Elige la plataforma, escribe tu titular y la IA genera el video con el formato, duracion y tamanio exacto que necesita cada red social."
+        whyNeeded="Hacer un video publicitario normalmente requiere editor de video, conocer formatos y dimensiones de cada plataforma, y horas de trabajo. Este modulo lo hace todo automaticamente: elige el formato correcto, genera el video y lo deja listo para publicar."
         costLabel="Desde $0.04"
         steps={[
           "Sube tu imagen de producto al area central del editor",
-          "Elige la plataforma destino (Instagram Reel, TikTok, Facebook, etc.)",
-          "Escribe un titular atractivo y un CTA (llamada a la accion)",
-          "Haz clic en \"Crear Anuncio\" y la IA genera el video listo para publicar",
+          "Elige la plataforma: Instagram Reel, TikTok, Facebook Ad, YouTube Short, etc.",
+          "Escribe un titular atractivo y un boton de accion (ej: \"Compra Ahora\")",
+          "Haz clic en \"Crear Anuncio Video\" — la IA genera el video listo para publicar",
         ]}
         tips={[
-          "Cada plataforma tiene su formato y duracion optima — el sistema lo ajusta automaticamente.",
-          "Un buen CTA como \"Compra Ahora\" o \"Ver Coleccion\" mejora la conversion del anuncio.",
-          "Facebook Marketplace usa formato cuadrado 1:1 sin texto overlay.",
-          "Para TikTok e IG Reels, los videos verticales 9:16 tienen mejor rendimiento.",
+          "El sistema ajusta automaticamente el formato y duracion para cada plataforma.",
+          "Un buen CTA (\"Compra Ahora\", \"Ver Coleccion\", \"Oferta Limitada\") mejora la conversion.",
+          "Usa \"Generar Caption IA\" para que la IA escriba la descripcion del anuncio por ti.",
+          "Para TikTok e IG Reels usa formato vertical 9:16. Para Facebook usa cuadrado 1:1.",
         ]}
       />
 

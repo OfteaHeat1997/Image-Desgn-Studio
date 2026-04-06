@@ -153,20 +153,20 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
       <ModuleHeader
         icon={<Shirt className="h-4 w-4" />}
         title="Maniqui Invisible"
-        description="Crea el efecto hollow-man que usan las grandes marcas de moda. Elimina el maniqui para mostrar la prenda con volumen 3D, o convierte entre flat lay y vista en modelo."
-        whyNeeded="Los maniquis distraen al comprador. El efecto invisible es estandar en moda profesional."
+        description="Fotografiaste tu prenda en un maniqui? Este modulo elimina el maniqui y deja la prenda flotando con forma 3D — el efecto 'hollow-man' que usan Zara, H&M y las grandes marcas. Tambien convierte fotos planas (flat lay) a vista en modelo."
+        whyNeeded="Los maniquis se ven poco profesionales en una tienda online — distraen al comprador. El efecto invisible muestra la prenda con volumen y forma, como si la vistiera una persona invisible. Es el estandar de la industria de moda."
         costLabel="$0.05/img"
         steps={[
-          "Sube una foto de la prenda sobre maniqui al area central",
-          "Elige la operacion: quitar maniqui, flat-to-model o model-to-flat",
-          "Si necesitas modelo, sube una foto de referencia",
-          "Haz clic en \"Procesar\" para generar el resultado",
+          "Sube la foto de tu prenda sobre maniqui",
+          "Elige la operacion: Quitar Maniqui, Flat to Model, o Model to Flat",
+          "Para 'Flat to Model', opcionalmente sube una foto de modelo de referencia",
+          "Haz clic en \"Procesar\" y la IA elimina el maniqui manteniendo la forma",
         ]}
         tips={[
-          "\"Quitar Maniqui\" deja la prenda flotando con volumen 3D — efecto premium de e-commerce.",
-          "\"Flat to Model\" convierte tu foto de flat lay en vista en modelo sin necesidad de fotografo.",
-          "Usa fotos con buena iluminacion uniforme para los mejores resultados.",
-          "El efecto hollow-man funciona mejor con prendas de parte superior (camisas, chaquetas).",
+          "Funciona mejor con prendas de parte superior (camisas, chaquetas, vestidos) que muestran volumen claro.",
+          "\"Flat to Model\" es genial si solo tienes fotos de la prenda acostada y quieres verla puesta.",
+          "Usa fotos con buena iluminacion uniforme y fondo simple para mejores resultados.",
+          "Despues de quitar el maniqui, puedes agregarle sombra con el modulo de Sombras para un look mas profesional.",
         ]}
       />
 

@@ -245,20 +245,20 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
       <ModuleHeader
         icon={<Sun className="h-4 w-4" />}
         title="Sombras e Iluminacion"
-        description="Dale profundidad profesional a tus fotos. Elige entre sombras flotantes, de contacto, reflejos o cambia toda la iluminacion con IA. Las sombras basicas son gratis."
-        whyNeeded="Sin sombras, los productos parecen flotando. Las sombras dan profundidad y realismo profesional."
+        description="Agrega sombras realistas debajo de tu producto para que no se vea 'flotando' en el aire. Elige sombra suave, fuerte, reflejo o cambia toda la iluminacion con IA. Las sombras basicas son gratis."
+        whyNeeded="Un producto sin sombra sobre fondo blanco se ve plano y falso — como si estuviera pegado con Paint. Una sombra sutil lo 'ancla' al fondo y le da dimension profesional. Las grandes marcas siempre usan sombras suaves en sus catalogos."
         costLabel="Desde gratis"
         steps={[
-          "Sube una imagen de producto (idealmente PNG sin fondo)",
-          "Elige un tipo de sombra de las opciones abajo",
-          "Ajusta los controles de intensidad, opacidad y color",
-          "Haz clic en \"Aplicar Sombra\" y compara el antes/despues",
+          "Sube una imagen de producto (mejor si ya le quitaste el fondo)",
+          "Elige el tipo de sombra: Suelta (debajo), Contacto (pegada), Reflejo (espejo), o IA",
+          "Ajusta intensidad, tamano y opacidad con los controles",
+          "Haz clic en \"Aplicar Sombra\" y compara antes/despues en la vista central",
         ]}
         tips={[
-          "Sombra Suelta, Contacto y Reflejo son gratis — se procesan localmente.",
-          "Iluminacion IA y Sombras IA usan modelos de Replicate (pago por uso).",
-          "Puedes encadenar sombras: aplica una, acepta, y aplica otra encima.",
-          "Usa PNG con fondo transparente para los bordes mas limpios.",
+          "Sombra Suelta y Contacto son las mas usadas en e-commerce — sutiles y profesionales.",
+          "Sombra Suelta, Contacto y Reflejo son GRATIS — se procesan en tu computadora.",
+          "Iluminacion IA cambia toda la luz de la foto (como si cambiaras las luces del estudio).",
+          "Primero quita el fondo, luego agrega sombra — el resultado es mucho mas limpio.",
         ]}
       />
 

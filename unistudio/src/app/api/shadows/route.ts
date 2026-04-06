@@ -11,14 +11,6 @@ import { urlToBuffer, bufferToDataUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler } from '@/lib/api/route-helpers';
 
-/** Convert buffer to data URL, compressing to JPEG if it exceeds Vercel's 4.5MB response limit */
-function bufferToOptimizedDataUrl(buf: Buffer): string {
-  // ~3MB buffer → ~4MB base64 → fits in 4.5MB JSON response
-  if (buf.length <= 3 * 1024 * 1024) return bufferToDataUrl(buf, 'image/png');
-  // Compress large results to JPEG
-  return `data:image/png;base64,${buf.toString('base64')}`;
-}
-
 async function compressIfNeeded(buf: Buffer): Promise<{ buffer: Buffer; mime: string }> {
   if (buf.length <= 3 * 1024 * 1024) return { buffer: buf, mime: 'image/png' };
   const compressed = Buffer.from(await sharp(buf).jpeg({ quality: 90 }).toBuffer());

@@ -6,7 +6,6 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
 
@@ -129,22 +128,21 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
       <ModuleHeader
         icon={<ArrowUpCircle className="h-4 w-4" />}
         title="Escalar Imagen (Upscale)"
-        description="Aumenta la resolucion de tu imagen 2x o 4x usando IA. Ideal para fotos de baja calidad que necesitan verse bien en pantallas grandes o en impresion."
-        whyNeeded="Tu foto tiene poca resolucion? El upscale la agranda 2x o 4x sin perder calidad, ideal para impresion o zoom en marketplace."
+        description="Tu foto se ve borrosa o pixelada al ampliarla? Este modulo usa IA para aumentar la resolucion 2x o 4x sin perder calidad. Una foto de 500x500 se convierte en 2000x2000 con detalles nitidos."
+        whyNeeded="Los marketplaces recomiendan fotos de alta resolucion (1000-2000px minimo) para que los clientes puedan hacer zoom y ver los detalles del producto. Si tus fotos son de baja resolucion, este modulo las agranda sin que se vean borrosas."
         costLabel={`$${estimatedCost.toFixed(2)}/imagen`}
         steps={[
           "Sube tu imagen al area central del editor",
-          "Elige el proveedor segun tu necesidad (velocidad vs calidad)",
-          "Selecciona el factor de escala: 2x o 4x",
-          "Activa opciones adicionales segun el proveedor elegido",
-          'Haz clic en "Escalar Imagen" y espera el resultado',
+          "Elige el proveedor: Real-ESRGAN (rapido y barato), Clarity (alta calidad) o AuraSR (balance)",
+          "Selecciona 2x (duplicar) o 4x (cuadruplicar) la resolucion",
+          "Haz clic en \"Escalar Imagen\" y la IA agranda tu foto sin perder nitidez",
         ]}
         tips={[
-          "Real-ESRGAN es la opcion mas rapida y economica para la mayoria de fotos de producto.",
-          "Clarity acepta un prompt para guiar la mejora — describe los detalles que quieres preservar.",
-          "Activa 'Mejorar rostros' solo si tu imagen tiene personas o modelos.",
-          "AuraSR ofrece un balance entre calidad y costo sin configuracion adicional.",
-          "Para impresion, usa siempre 4x para maxima resolucion.",
+          "Real-ESRGAN ($0.02) es ideal para la mayoria de fotos de producto — rapido y economico.",
+          "Clarity ($0.05) acepta un prompt para guiar la mejora — escribi \"photo of sunscreen bottle\" para mejor resultado.",
+          "Si tu foto tiene personas, activa 'Mejorar rostros' para que los rasgos se vean naturales.",
+          "Para imprimir tu foto, usa siempre 4x para maxima resolucion.",
+          "Imagenes muy grandes se redimensionan automaticamente para evitar errores de GPU.",
         ]}
       />
 

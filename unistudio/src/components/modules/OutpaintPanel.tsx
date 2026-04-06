@@ -133,20 +133,20 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
       <ModuleHeader
         icon={<Expand className="h-4 w-4" />}
         title="Extender Imagen"
-        description="Amplia los bordes de tu imagen con IA para adaptarla al formato de cualquier plataforma. La IA genera contenido nuevo que se fusiona naturalmente con la imagen original."
-        whyNeeded="Instagram requiere 1:1, Stories 9:16, Amazon 1:1. No recortes — extiende con IA."
+        description="Tu foto es cuadrada pero necesitas formato vertical para Instagram Stories? O horizontal para un banner? Este modulo extiende los bordes de tu imagen con IA — genera contenido nuevo que se ve natural, no estirado."
+        whyNeeded="Cada plataforma pide un formato diferente: Amazon 1:1, Instagram Stories 9:16, Pinterest 2:3, banner web 16:9. En vez de recortar tu producto (perdiendo partes), la IA genera los bordes faltantes. Asi tu producto se ve completo en todas las plataformas."
         costLabel="$0.05/img"
         steps={[
           "Sube tu imagen al area central del editor",
-          "Elige un preset de plataforma (Instagram, Amazon, etc.) o define tamanio personalizado",
-          "Ajusta los margenes con las flechas de direccion",
-          "Haz clic en \"Extender Imagen\" y la IA rellena los bordes",
+          "Elige la plataforma destino (Amazon, Instagram, Pinterest, etc.) — el tamanio se ajusta solo",
+          "O define tu propio tamanio personalizado con las flechas de direccion",
+          "Haz clic en \"Extender Imagen\" y la IA rellena los bordes con contenido natural",
         ]}
         tips={[
-          "Los presets de plataforma ajustan el tamanio exacto que requiere cada marketplace.",
-          "La IA genera contenido coherente en los bordes — no solo estira la imagen.",
-          "Ideal para convertir fotos cuadradas de producto a formato vertical de Instagram Stories.",
-          "Funciona mejor con imagenes de alta resolucion y fondos simples.",
+          "Elige la plataforma primero — el sistema sabe exactamente que tamanio necesita cada una.",
+          "La IA genera contenido coherente (no estira pixeles) — el resultado se ve natural.",
+          "Ideal para reutilizar una sola foto de producto en todas tus redes sociales.",
+          "Funciona mejor con fondos simples (blanco, solido) — fondos complejos pueden verse raros en los bordes.",
         ]}
       />
 

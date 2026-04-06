@@ -62,9 +62,21 @@ export function BrandKitPanel({ imageFile, onProcess: _onProcess }: BrandKitPane
       <ModuleHeader
         icon={<Palette className="h-4 w-4" />}
         title="Kit de Marca"
-        description="Resumen de tu identidad de marca. Aplica tu logo, colores y marca de agua a las fotos del editor."
-        whyNeeded="Mantiene la identidad visual de tu marca consistente en todas las fotos. Colores, fuentes, logo y marca de agua."
+        description="Define los colores, fuentes, logo y marca de agua de tu marca en un solo lugar. Todos los demas modulos pueden usar esta configuracion para mantener la consistencia visual automaticamente."
+        whyNeeded="Si cada foto de producto tiene colores diferentes, fuentes diferentes o sin logo, tu marca se ve desorganizada y poco confiable. El Kit de Marca asegura que TODAS tus fotos mantengan la misma identidad visual — como lo hacen las marcas profesionales."
         costLabel="Gratis"
+        steps={[
+          "Define tus colores de marca: principal, secundario, acento y fondo",
+          "Configura la marca de agua: logo, posicion, opacidad y tamanio",
+          "Elige las fuentes para titulos y textos",
+          "Guarda — todos los demas modulos usaran estos ajustes automaticamente",
+        ]}
+        tips={[
+          "Usa los colores exactos de tu marca (codigos hex) para maxima consistencia.",
+          "La marca de agua debe ser visible pero no distraer — opacidad 20-40% es ideal.",
+          "Para e-commerce, fondo blanco es estandar. Pero tu marca de agua puede usar tu color acento.",
+          "Los cambios aqui se aplican automaticamente al generar fotos en otros modulos.",
+        ]}
       />
 
       {/* ── Brand Colors ── */}

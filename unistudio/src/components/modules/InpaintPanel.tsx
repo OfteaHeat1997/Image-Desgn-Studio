@@ -111,20 +111,20 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
       <ModuleHeader
         icon={<Eraser className="h-4 w-4" />}
         title="Borrar y Reemplazar"
-        description="Elimina objetos no deseados, cambia colores o corrige imperfecciones. Describe el cambio que quieres y la IA lo aplica automaticamente."
-        whyNeeded="Quitar etiquetas, manchas, arrugas o cambiar el color del producto sin re-fotografiar."
+        description="Elimina etiquetas de precio, manchas, arrugas, logos o cualquier objeto no deseado de tu foto. Tambien puedes cambiar colores (ej: camisa azul a roja). Solo describe lo que quieres y la IA lo hace."
+        whyNeeded="Tus fotos de producto pueden tener etiquetas de tienda, stickers de precio, manchas en la tela o reflejos no deseados. En vez de volver a fotografiar, la IA los elimina en segundos. Tambien sirve para cambiar colores de producto sin tener cada variante fisicamente."
         costLabel="Desde $0.03"
         steps={[
           "Sube tu imagen al area central del editor",
-          "Elige el modo: Mascara + IA o Guiado por Texto",
-          "Describe lo que quieres cambiar (ej: \"quitar etiqueta\", \"cambiar color a rojo\")",
-          "Haz clic en \"Aplicar\" y la IA editara la imagen",
+          "Usa las Acciones Rapidas (quitar etiqueta, quitar mancha, etc.) o escribe tu instruccion",
+          "Se especifico: \"eliminar etiqueta blanca del cuello\" funciona mejor que \"limpiar\"",
+          "Haz clic en \"Aplicar Cambio\" y la IA edita solo esa parte de la imagen",
         ]}
         tips={[
-          "El modo Guiado por Texto no necesita mascara — la IA identifica areas automaticamente.",
-          "Se especifico: \"eliminar mancha en la esquina superior derecha\" funciona mejor que \"limpiar\".",
-          "Kontext ($0.05) es ideal para cambios creativos como colores o estilos.",
-          "Flux Fill ($0.03) es mas economico para borrar objetos simples (requiere mascara).",
+          "Las Acciones Rapidas cubren los casos mas comunes con un solo clic.",
+          "Para cambiar colores, escribe: \"cambiar el color de la camiseta de azul a rojo\".",
+          "Kontext ($0.05) es mejor para cambios creativos. Flux Fill ($0.03) es mas barato para borrar cosas simples.",
+          "Puedes aplicar multiples cambios uno tras otro — acepta el resultado y aplica otro cambio encima.",
         ]}
       />
 

@@ -383,20 +383,21 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       <ModuleHeader
         icon={<Video className="h-4 w-4" />}
         title="Video Studio"
-        description="Crea videos profesionales a partir de tus fotos de producto. Elige entre producto, moda o avatar con voz. Modo Auto hace todo con un clic."
-        whyNeeded="Videos tienen 5x mas engagement que fotos en Instagram y TikTok."
+        description="Convierte tus fotos de producto en videos profesionales para TikTok, Instagram Reels y YouTube Shorts. Elige entre 3 modos: Producto (el producto se mueve/gira), Moda (modelo caminando con tu ropa), o Avatar (una persona hablando sobre tu producto con voz IA)."
+        whyNeeded="Los videos tienen 5x mas engagement que las fotos estaticas en redes sociales. TikTok e Instagram priorizan videos en sus algoritmos. Un video corto de 5-15 segundos de tu producto puede generar mas ventas que 10 fotos."
         costLabel="Desde gratis"
         steps={[
           "Sube tu imagen de producto al area central del editor",
-          "Elige la pestana: Producto (producto girando), Moda (modelo caminando) o Avatar (persona hablando)",
-          "Selecciona el proveedor de video (Ken Burns es gratis)",
-          "Haz clic en \"Generar Video\" y espera el resultado",
+          "Elige la pestana: Producto, Moda o Avatar",
+          "Modo Auto: un clic genera todo. Modo Manual: elige proveedor, duracion y estilo",
+          "Haz clic en \"Generar Video\" — el resultado se previsualiza directamente",
         ]}
         tips={[
-          "Ken Burns (zoom/pan animado) es gratis y no requiere API key.",
-          "El modo Auto escribe el prompt, elige proveedor y genera todo con un solo clic.",
-          "Para avatares, sube una foto de rostro y escribe el texto que quieres que diga.",
-          "Edge TTS (voz) es gratis e incluye voces en espanol latam y castellano.",
+          "Ken Burns (zoom/pan suave) es GRATIS — ideal para empezar sin gastar.",
+          "Modo Auto escribe el prompt, elige el mejor proveedor y genera todo automaticamente.",
+          "Para Avatar: sube una foto de rostro, escribe el texto que debe decir, y la IA genera el video con voz.",
+          "Edge TTS (voz) es gratis e incluye voces en espanol latino y castellano.",
+          "Videos de 5-10 segundos funcionan mejor en TikTok e Instagram Reels.",
         ]}
       />
 

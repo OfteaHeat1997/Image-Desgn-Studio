@@ -112,12 +112,17 @@ export function SmartEditorPanel({ imageFile, onProcess }: SmartEditorPanelProps
     return new Promise((resolve, reject) => {
       if (!imageFile) return reject(new Error("No hay imagen cargada"));
       const img = new Image();
+      const blobUrl = URL.createObjectURL(imageFile);
       img.onload = () => {
+        URL.revokeObjectURL(blobUrl);
         imgRef.current = img;
         resolve(img);
       };
-      img.onerror = () => reject(new Error("Error al cargar imagen"));
-      img.src = URL.createObjectURL(imageFile);
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error("Error al cargar imagen"));
+      };
+      img.src = blobUrl;
     });
   }, [imageFile]);
 
@@ -263,20 +268,20 @@ export function SmartEditorPanel({ imageFile, onProcess }: SmartEditorPanelProps
       <ModuleHeader
         icon={<PenTool className="h-4 w-4" />}
         title="Editor Avanzado"
-        description="Ajusta brillo, contraste, rota, voltea, agrega texto y recorta tu imagen. Todo se procesa localmente — sin costo y sin limites."
-        whyNeeded="Ediciones rapidas sin salir de la plataforma. Ideal para retoques finales antes de publicar."
+        description="Haz ajustes finales a tu imagen sin abrir otro programa. Rota, voltea, recorta, ajusta brillo/contraste, agrega texto o marca de agua. Todo gratis y se procesa en tu computadora."
+        whyNeeded="A veces la foto necesita un pequeno ajuste antes de publicar: rotar 90 grados, recortar un borde, agregar el nombre de tu marca, o ajustar el brillo un poco. Este editor te permite hacer esos retoques rapidos sin salir de UniStudio."
         costLabel="Gratis"
         steps={[
           "Sube tu imagen al area central del editor",
-          "Usa las pestanas para ajustar, transformar, agregar texto o recortar",
-          "Configura los parametros a tu gusto",
-          "Haz clic en \"Aplicar Edicion\" para ver el resultado",
+          "Elige la herramienta: Ajustar (brillo/contraste), Transformar (rotar/voltear), Texto, o Recortar",
+          "Configura los parametros como quieras — ves el cambio en tiempo real",
+          "Haz clic en \"Aplicar Edicion\" para guardar el resultado",
         ]}
         tips={[
-          "Todo es local y gratuito — puedes experimentar sin costo.",
-          "Combina ajustes + texto para crear banners rapidos.",
-          "Los presets de recorte son ideales para adaptar a redes sociales.",
-          "Exporta en WebP para el mejor balance entre calidad y tamanio.",
+          "Todo es gratis e ilimitado — puedes experimentar sin costo.",
+          "Ideal para agregar tu marca o texto promocional sobre la foto del producto.",
+          "Los presets de recorte (1:1, 4:5, 16:9) son perfectos para adaptar a redes sociales.",
+          "Puedes encadenar ediciones: aplica una, acepta, y aplica otra.",
         ]}
       />
 
