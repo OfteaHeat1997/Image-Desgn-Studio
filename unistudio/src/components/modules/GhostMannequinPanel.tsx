@@ -136,7 +136,7 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
       if (!data.success) throw new Error(data.error || "Error al procesar la imagen");
 
       setStatusText("Listo.");
-      onProcess(data.data.url, uploadData.data.url, data.data.cost ?? data.cost);
+      onProcess(data.data.url, uploadData.data.url, data.cost ?? data.data?.cost ?? 0.05);
     } catch (error) {
       console.error("Ghost mannequin error:", error);
       setErrorMsg(

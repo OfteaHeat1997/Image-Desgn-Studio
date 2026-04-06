@@ -46,15 +46,6 @@ const SCALE_OPTIONS = [
 /*  Helper: File -> data URL                                            */
 /* ------------------------------------------------------------------ */
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
@@ -132,10 +123,6 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
       setIsProcessing(false);
     }
   }, [imageFile, provider, scale, faceEnhance, prompt, estimatedCost, onProcess]);
-
-  if (!imageFile) {
-    return <EmptyState module="upscale" />;
-  }
 
   return (
     <div className="space-y-5">

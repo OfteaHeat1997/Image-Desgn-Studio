@@ -48,7 +48,7 @@ import type {
 
 interface VideoPanelProps {
   imageFile: File | null;
-  onProcess: (result: string) => void;
+  onProcess: (result: string, beforeImage?: string, cost?: number) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,7 +197,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           createdAt: new Date().toISOString(),
           options: { avatarImageUrl: uploadData.data.url, provider: ai.recommendedProvider as AvatarProviderKey, script: ai.script || autoPrompt, ttsProvider: (store.ttsProvider || "edge-tts") as TtsProviderKey, voice: store.voice, language: store.language },
         });
-        onProcess(data.data.videoUrl);
+        onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
       } else {
         // Product / Fashion video
         store.setAutoStep("Generando video...");
@@ -234,7 +234,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           createdAt: new Date().toISOString(),
           options: { imageUrl: uploadData.data.url, provider: ai.recommendedProvider as VideoProviderKey, prompt: ai.enhancedPrompt, duration: ai.recommendedDuration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
         });
-        onProcess(data.data.url);
+        onProcess(data.data.url, undefined, data.cost ?? data.data?.cost ?? 0);
       }
     } catch (err) {
       console.error("Auto generation error:", err);
@@ -301,7 +301,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           createdAt: new Date().toISOString(),
           options: { avatarImageUrl: uploadData.data.url, provider: store.avatarProvider, script: store.script, ttsProvider: store.ttsProvider, voice: store.voice, language: store.language },
         });
-        onProcess(data.data.videoUrl);
+        onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
       } else {
         const formData = new FormData();
         formData.append("file", imageFile!);
@@ -350,7 +350,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           createdAt: new Date().toISOString(),
           options: { imageUrl: uploadData.data.url, provider: store.selectedProvider, prompt, duration: store.duration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
         });
-        onProcess(data.data.url);
+        onProcess(data.data.url, undefined, data.cost ?? data.data?.cost ?? 0);
       }
     } catch (err) {
       console.error("Video generation error:", err);

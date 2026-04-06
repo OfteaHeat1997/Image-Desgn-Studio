@@ -285,9 +285,10 @@ function EditorInner() {
     if (s.processedImage) {
       setProcessedImage(s.processedImage);
     }
-    if (s.filename) {
+    const restoreUrl = s.currentImage || s.processedImage;
+    if (s.filename && restoreUrl) {
       // Reconstruct a minimal File object for panels that need it
-      fetch(s.currentImage || s.processedImage || "")
+      fetch(restoreUrl)
         .then((r) => r.blob())
         .then((blob) => setCurrentImageFile(new File([blob], s.filename || "restored.jpg", { type: "image/jpeg" })))
         .catch(() => {}); // Silent — some data URLs may fail

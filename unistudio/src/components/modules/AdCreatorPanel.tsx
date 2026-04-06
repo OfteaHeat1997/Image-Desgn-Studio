@@ -29,7 +29,7 @@ import type { AdFormat, VideoProviderKey } from "@/types/video";
 
 interface AdCreatorPanelProps {
   imageFile: File | null;
-  onProcess: (result: string) => void;
+  onProcess: (result: string, beforeImage?: string, cost?: number) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,7 +161,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
         throw new Error(data.error || "Error al crear el anuncio");
 
       setVideoResult(data.data.videoUrl);
-      onProcess(data.data.videoUrl);
+      onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
     } catch (err) {
       console.error("Ad creation error:", err);
       setError(
