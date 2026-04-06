@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { runModel, extractOutputUrl } from '@/lib/api/replicate';
+import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
 import type { FashnCategory } from '@/lib/api/fashn';
 import { saveJob } from '@/lib/db/persist';
@@ -180,24 +180,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Ensure both images are HTTP URLs (IDM-VTON/Kolors can't process data URIs)
+    const httpModelImage = await ensureHttpUrl(modelImage);
+    const httpGarmentImage = await ensureHttpUrl(garmentImage);
+
     let resultUrl: string;
     let usedProvider: string;
 
     if (provider === 'auto' || !provider) {
-      const result = await smartTryOn(modelImage, garmentImage, category, garmentType);
+      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType);
       resultUrl = result.url;
       usedProvider = result.provider;
     } else {
       usedProvider = provider;
       switch (provider) {
         case 'idm-vton':
-          resultUrl = await tryOnIdmVton(modelImage, garmentImage, category);
+          resultUrl = await tryOnIdmVton(httpModelImage, httpGarmentImage, category);
           break;
         case 'kolors':
-          resultUrl = await tryOnKolors(modelImage, garmentImage);
+          resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);
           break;
         case 'fashn':
-          resultUrl = await tryOnFashn(modelImage, garmentImage, category);
+          resultUrl = await tryOnFashn(httpModelImage, httpGarmentImage, category);
           break;
         default:
           return NextResponse.json(

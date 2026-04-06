@@ -205,6 +205,8 @@ export function LayersPanel() {
       opacity: 1,
       visible: true,
       locked: false,
+      flipX: false,
+      flipY: false,
       filters: {
         brightness: 0,
         contrast: 0,

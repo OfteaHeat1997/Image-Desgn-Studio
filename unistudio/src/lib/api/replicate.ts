@@ -60,6 +60,43 @@ export function extractOutputUrl(output: any): string {
 }
 
 /**
+ * Ensure an image URL is an HTTP URL accessible by Replicate models.
+ * If the URL is a data URI, uploads it to Replicate's file hosting first.
+ * HTTP/HTTPS URLs are returned as-is.
+ */
+export async function ensureHttpUrl(url: string): Promise<string> {
+  if (!url) throw new ReplicateApiError('Empty URL provided', 'INVALID_URL');
+
+  // Already an HTTP URL — return as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  // Data URI — upload to Replicate file hosting
+  if (url.startsWith('data:')) {
+    const client = getClient();
+    // Convert data URI to a File-like Blob
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) throw new ReplicateApiError('Invalid data URI format', 'INVALID_DATA_URI');
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    const blob = new Blob([buffer], { type: mimeType });
+    const ext = mimeType.split('/')[1] ?? 'png';
+    const file = new File([blob], `upload.${ext}`, { type: mimeType });
+
+    const fileOutput = await client.files.create(file);
+    // The Replicate files API returns an object with urls.get
+    if (fileOutput && fileOutput.urls && fileOutput.urls.get) {
+      return fileOutput.urls.get;
+    }
+    throw new ReplicateApiError('Failed to upload file to Replicate', 'UPLOAD_FAILED');
+  }
+
+  throw new ReplicateApiError(`Unsupported URL scheme: ${url.slice(0, 30)}...`, 'INVALID_URL');
+}
+
+/**
  * Run a Replicate model synchronously and wait for the result.
  *
  * @param modelId - The model identifier in `owner/name` or `owner/name:version` format.
