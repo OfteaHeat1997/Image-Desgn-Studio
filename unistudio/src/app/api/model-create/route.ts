@@ -43,19 +43,41 @@ interface ModelCreateOptions {
   customDetails?: string;
 }
 
+// Map skin tone IDs to safe descriptive terms
+const SKIN_TONE_MAP: Record<string, string> = {
+  light: 'fair complexion',
+  'medium-light': 'light olive complexion',
+  medium: 'warm tan complexion',
+  'medium-dark': 'rich brown complexion',
+  dark: 'deep brown complexion',
+};
+
+// Map body type IDs to safe, editorial descriptors
+const BODY_TYPE_MAP: Record<string, string> = {
+  slim: 'slender build',
+  athletic: 'athletic build',
+  average: 'average build',
+  curvy: 'full-figured build',
+  'plus-size': 'plus-size build',
+};
+
 function buildModelPrompt(options: ModelCreateOptions): string {
   const parts: string[] = [];
 
-  // Core demographics
-  parts.push(`A ${options.gender} fashion model`);
-  parts.push(`aged ${options.ageRange}`);
+  // Use "professional e-commerce model" framing to avoid content filters
+  const genderWord = options.gender === 'female' ? 'woman' : options.gender === 'male' ? 'man' : 'person';
+  parts.push(`Professional e-commerce catalog photo of a ${genderWord}`);
+  parts.push(`in her ${options.ageRange.replace('-', 's to ')}s`);
 
   if (options.ethnicity) {
     parts.push(`${options.ethnicity} ethnicity`);
   }
 
-  parts.push(`with ${options.skinTone} skin tone`);
-  parts.push(`and ${options.bodyType} body type`);
+  // Use mapped descriptors instead of raw values
+  const skinDesc = SKIN_TONE_MAP[options.skinTone] || `${options.skinTone} skin tone`;
+  parts.push(`with ${skinDesc}`);
+  const bodyDesc = BODY_TYPE_MAP[options.bodyType] || `${options.bodyType} body type`;
+  parts.push(`${bodyDesc}`);
 
   // Physical appearance
   if (options.height) {
@@ -73,9 +95,11 @@ function buildModelPrompt(options: ModelCreateOptions): string {
   parts.push(`in a ${options.pose} pose`);
   parts.push(`with a ${options.expression} expression`);
 
-  // Clothing if specified
+  // Clothing — always specify something appropriate
   if (options.clothing) {
     parts.push(`wearing ${options.clothing}`);
+  } else {
+    parts.push('wearing a professional casual outfit');
   }
 
   // Background
@@ -85,9 +109,9 @@ function buildModelPrompt(options: ModelCreateOptions): string {
     parts.push('against a clean studio white background');
   }
 
-  // Quality modifiers
+  // Quality modifiers — emphasize commercial/catalog context
   parts.push(
-    'Professional fashion photography, full body shot, high resolution, studio lighting, sharp focus, commercial quality, editorial look',
+    'Professional commercial catalog photography, full body shot, high resolution, soft studio lighting, sharp focus, e-commerce product listing style, editorial fashion magazine quality, fully clothed, tasteful, SFW',
   );
 
   // Custom details
@@ -96,6 +120,13 @@ function buildModelPrompt(options: ModelCreateOptions): string {
   }
 
   return parts.join(', ') + '.';
+}
+
+// Retry with a simpler/safer prompt if the first attempt gets flagged
+function buildSafeRetryPrompt(options: ModelCreateOptions): string {
+  const genderWord = options.gender === 'female' ? 'woman' : options.gender === 'male' ? 'man' : 'person';
+  const skinDesc = SKIN_TONE_MAP[options.skinTone] || options.skinTone;
+  return `E-commerce catalog photo of a professional ${genderWord} model with ${skinDesc}, ${options.pose} pose, ${options.expression} expression, wearing a casual business outfit, clean white studio background, commercial product photography, high resolution, SFW.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,12 +292,32 @@ export async function POST(request: NextRequest) {
     });
 
     // Step 1: Generate base model using Flux Kontext Pro
-    const output = await runModel('black-forest-labs/flux-kontext-pro', {
-      prompt,
-      aspect_ratio: '3:4',
-    });
-
-    const baseModelUrl = extractOutputUrl(output);
+    // Retry with safer prompt if content filter triggers
+    let baseModelUrl: string;
+    let usedPrompt = prompt;
+    try {
+      const output = await runModel('black-forest-labs/flux-kontext-pro', {
+        prompt,
+        aspect_ratio: '3:4',
+      });
+      baseModelUrl = extractOutputUrl(output);
+    } catch (firstErr) {
+      const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      if (errMsg.includes('flagged as sensitive') || errMsg.includes('E005')) {
+        console.warn('[model-create] Content filter triggered, retrying with safe prompt...');
+        usedPrompt = buildSafeRetryPrompt({
+          gender, ageRange, skinTone, bodyType, pose, expression,
+          hairStyle, hairColor, background, ethnicity, height,
+        });
+        const retryOutput = await runModel('black-forest-labs/flux-kontext-pro', {
+          prompt: usedPrompt,
+          aspect_ratio: '3:4',
+        });
+        baseModelUrl = extractOutputUrl(retryOutput);
+      } else {
+        throw firstErr;
+      }
+    }
     let totalCost = MODEL_GEN_COST;
 
     // Step 2: If garment image provided, apply it via Virtual Try-On
@@ -290,7 +341,7 @@ export async function POST(request: NextRequest) {
       operation: 'model-create',
       provider: tryonProvider ? `flux-kontext-pro+${tryonProvider}` : 'flux-kontext-pro',
       model: 'black-forest-labs/flux-kontext-pro',
-      inputParams: { gender, ageRange, skinTone, bodyType, pose, expression, prompt, garmentImage: !!garmentImage },
+      inputParams: { gender, ageRange, skinTone, bodyType, pose, expression, prompt: usedPrompt, garmentImage: !!garmentImage },
       outputUrl: finalUrl,
       cost: totalCost,
     });
@@ -306,7 +357,7 @@ export async function POST(request: NextRequest) {
       bodyType,
       pose,
       previewUrl: finalUrl,
-      metadata: { expression, hairStyle, hairColor, background, clothing, ethnicity, height, prompt, garmentApplied: !!garmentImage },
+      metadata: { expression, hairStyle, hairColor, background, clothing, ethnicity, height, prompt: usedPrompt, garmentApplied: !!garmentImage },
     });
 
     return NextResponse.json({
@@ -314,7 +365,7 @@ export async function POST(request: NextRequest) {
       data: {
         url: finalUrl,
         baseModelUrl: garmentImage ? baseModelUrl : undefined,
-        prompt,
+        prompt: usedPrompt,
         cost: totalCost,
         tryonProvider,
         modelId: savedModel?.id ?? null,

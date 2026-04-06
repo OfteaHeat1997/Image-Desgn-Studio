@@ -155,7 +155,12 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
       onProcess(data.data.url, data.data.baseModelUrl, data.data.cost);
     } catch (error) {
       console.error("Model creation error:", error);
-      setErrorMsg(error instanceof Error ? error.message : "Error al crear modelo");
+      const msg = error instanceof Error ? error.message : "Error al crear modelo";
+      if (msg.includes("flagged as sensitive") || msg.includes("E005")) {
+        setErrorMsg("El filtro de contenido bloqueo la generacion. Intenta cambiar el tipo de cuerpo o la pose. El sistema reintenta automaticamente con un prompt mas seguro.");
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setIsProcessing(false);
       setProcessingStep("");
