@@ -1,11 +1,12 @@
 // =============================================================================
 // Jewelry / Accessory Virtual Try-On Processing Module - UniStudio
 // =============================================================================
-// Strategy: Flux Kontext Pro with image_prompt for style reference.
-// The jewelry image is passed as image_prompt so the AI copies the EXACT
-// product design, not a generic version.
+// Strategy: Create a side-by-side composite (model | jewelry product) and use
+// Flux Kontext Pro to place the EXACT jewelry from the right onto the person
+// on the left. This ensures the AI copies the real product design.
 // =============================================================================
 
+import sharp from 'sharp';
 import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 
 // ---------------------------------------------------------------------------
@@ -22,49 +23,53 @@ export const JEWELRY_COSTS: Record<string, number> = {
 };
 
 // ---------------------------------------------------------------------------
-// Placement prompts — tell the AI WHERE to put the jewelry and HOW
-// These focus on placement, not design (the image_prompt handles design)
+// Placement prompts — reference "the jewelry product shown on the RIGHT side"
 // ---------------------------------------------------------------------------
 
 const PLACEMENT_PROMPTS: Record<string, string> = {
   earrings:
-    'Add the EXACT jewelry piece shown in the reference image as earrings on this person. ' +
-    'Place them hanging naturally from both earlobes. ' +
-    'Copy the exact design, material, color, shape, and style from the reference image — do NOT invent a different design. ' +
-    'Match the lighting, shadows, and reflections to the photo. ' +
-    'Keep the person, face, hair, clothing, and background completely unchanged.',
+    'Look at the jewelry product photo on the RIGHT side of this image. ' +
+    'Now place that EXACT pair of earrings on the person shown on the LEFT side. ' +
+    'Hang them naturally from both earlobes. ' +
+    'Copy the exact design, shape, material, color, gemstones, and every detail from the product photo. ' +
+    'The result should show ONLY the left person wearing the earrings — crop out the right reference image. ' +
+    'Match lighting and reflections to the person\'s photo. Keep face, hair, clothing unchanged.',
 
   necklace:
-    'Add the EXACT jewelry piece shown in the reference image as a necklace on this person. ' +
-    'Drape it naturally around the neck and chest area, following the neckline. ' +
-    'Copy the exact chain style, thickness, color, material, pendant, and design from the reference — do NOT invent a different necklace. ' +
-    'The chain links, clasp style, and overall look must match the product photo exactly. ' +
-    'Match lighting and reflections to the scene. ' +
-    'Keep the person, face, clothing, and background completely unchanged.',
+    'Look at the jewelry product photo on the RIGHT side of this image. ' +
+    'Now place that EXACT necklace on the person shown on the LEFT side. ' +
+    'Drape it naturally around the neck following the neckline. ' +
+    'Copy the exact chain style, pendant, material, thickness, and every detail from the product photo. ' +
+    'The result should show ONLY the left person wearing the necklace — crop out the right reference. ' +
+    'Match lighting and reflections. Keep the person unchanged.',
 
   ring:
-    'Add the EXACT jewelry piece shown in the reference image as a ring on this person\'s ring finger. ' +
-    'Copy the exact design, gemstone, metal color, band width, and style from the reference — do NOT invent a different ring. ' +
-    'The ring should fit naturally on the finger with correct perspective and shadows. ' +
-    'Keep everything else completely unchanged.',
+    'Look at the jewelry product photo on the RIGHT side of this image. ' +
+    'Now place that EXACT ring on the ring finger of the hand shown on the LEFT side. ' +
+    'Copy the exact design, gemstone, band, metal color, and every detail from the product photo. ' +
+    'The result should show ONLY the left hand with the ring — crop out the right reference. ' +
+    'Match lighting and perspective. Keep everything else unchanged.',
 
   bracelet:
-    'Add the EXACT jewelry piece shown in the reference image as a bracelet on this person\'s wrist. ' +
-    'Copy the exact chain style, width, color, material, and clasp from the reference — do NOT invent a different bracelet. ' +
-    'The bracelet should sit naturally on the wrist with correct perspective. ' +
+    'Look at the jewelry product photo on the RIGHT side of this image. ' +
+    'Now place that EXACT bracelet on the wrist shown on the LEFT side. ' +
+    'Copy the exact chain style, width, clasp, material, and every detail from the product photo. ' +
+    'The result should show ONLY the left wrist with the bracelet — crop out the right reference. ' +
     'Match lighting and reflections. Keep everything else unchanged.',
 
   sunglasses:
-    'Add the EXACT eyewear shown in the reference image as sunglasses on this person\'s face. ' +
-    'Copy the exact frame shape, color, lens tint, and design from the reference — do NOT invent different sunglasses. ' +
-    'Place them naturally on the nose bridge with correct perspective. ' +
-    'Keep everything else unchanged.',
+    'Look at the eyewear product photo on the RIGHT side of this image. ' +
+    'Now place those EXACT sunglasses on the person shown on the LEFT side. ' +
+    'Copy the exact frame shape, color, lens tint, and design from the product photo. ' +
+    'The result should show ONLY the left person wearing the sunglasses — crop out the right reference. ' +
+    'Place naturally on the nose bridge. Keep everything else unchanged.',
 
   watch:
-    'Add the EXACT watch shown in the reference image on this person\'s wrist. ' +
-    'Copy the exact face design, band style, color, material, and dial from the reference — do NOT invent a different watch. ' +
-    'The watch should sit naturally on the wrist with correct perspective and reflections. ' +
-    'Keep everything else unchanged.',
+    'Look at the watch product photo on the RIGHT side of this image. ' +
+    'Now place that EXACT watch on the wrist shown on the LEFT side. ' +
+    'Copy the exact face design, band style, color, material, and every detail from the product photo. ' +
+    'The result should show ONLY the left wrist with the watch — crop out the right reference. ' +
+    'Match lighting and reflections. Keep everything else unchanged.',
 };
 
 // ---------------------------------------------------------------------------
@@ -89,20 +94,98 @@ const FINISH_PHRASES: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Composite image creation
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a side-by-side composite: [model | jewelry product]
+ * Both images are resized to the same height and placed next to each other.
+ * Returns a data URL of the composite.
+ */
+async function createComposite(
+  modelImageUrl: string,
+  jewelryImageUrl: string,
+): Promise<string> {
+  // Download both images
+  const [modelBuf, jewelryBuf] = await Promise.all([
+    fetchImageBuffer(modelImageUrl),
+    fetchImageBuffer(jewelryImageUrl),
+  ]);
+
+  // Resize both to a standard height (1024px) while maintaining aspect ratios
+  const targetHeight = 1024;
+
+  const modelResized = await sharp(modelBuf)
+    .resize({ height: targetHeight, fit: 'inside' })
+    .png()
+    .toBuffer();
+
+  const jewelryResized = await sharp(jewelryBuf)
+    .resize({ height: targetHeight, fit: 'inside' })
+    .png()
+    .toBuffer();
+
+  // Get dimensions after resize
+  const modelMeta = await sharp(modelResized).metadata();
+  const jewelryMeta = await sharp(jewelryResized).metadata();
+
+  const mw = modelMeta.width || 768;
+  const mh = modelMeta.height || 1024;
+  const jw = jewelryMeta.width || 512;
+  const jh = jewelryMeta.height || 1024;
+
+  // Separator width
+  const sep = 4;
+  const totalWidth = mw + sep + jw;
+  const totalHeight = Math.max(mh, jh);
+
+  // Create composite with white separator bar
+  const composite = await sharp({
+    create: {
+      width: totalWidth,
+      height: totalHeight,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .composite([
+      { input: modelResized, top: Math.round((totalHeight - mh) / 2), left: 0 },
+      { input: jewelryResized, top: Math.round((totalHeight - jh) / 2), left: mw + sep },
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  return `data:image/jpeg;base64,${composite.toString('base64')}`;
+}
+
+/**
+ * Download an image from URL or decode a data URL, returning a Buffer.
+ */
+async function fetchImageBuffer(url: string): Promise<Buffer> {
+  if (url.startsWith('data:')) {
+    const match = url.match(/^data:[^;]+;base64,(.+)$/);
+    if (!match) throw new Error('Invalid data URI');
+    return Buffer.from(match[1], 'base64');
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// ---------------------------------------------------------------------------
 // Main exported function
 // ---------------------------------------------------------------------------
 
 /**
- * Apply a jewelry or accessory virtually to a model photo.
+ * Apply jewelry virtually by creating a composite reference image.
  *
- * Uses Flux Kontext Pro with image_prompt to reference the ACTUAL jewelry product.
- * This ensures the AI copies the exact design instead of inventing a generic one.
+ * 1. Creates a side-by-side composite: [model photo | jewelry product photo]
+ * 2. Uploads the composite to Replicate
+ * 3. Uses Flux Kontext Pro with a prompt that says "place the jewelry from the
+ *    RIGHT side onto the person on the LEFT side"
  *
- * @param modelImageUrl   - URL of the model photo (person to wear the jewelry).
- * @param jewelryImageUrl - URL of the jewelry/accessory product photo.
- * @param accessoryType   - One of: earrings, necklace, ring, bracelet, sunglasses, watch.
- * @param options         - Optional metal type and finish modifiers.
- * @returns URL of the generated result image.
+ * This way the AI can SEE the actual product and copy its exact design.
  */
 export async function applyJewelry(
   modelImageUrl: string,
@@ -118,10 +201,6 @@ export async function applyJewelry(
     );
   }
 
-  // Ensure all URLs are HTTP (Replicate models can't fetch data URIs)
-  const httpModelUrl = await ensureHttpUrl(modelImageUrl);
-  const httpJewelryUrl = await ensureHttpUrl(jewelryImageUrl);
-
   // Build modifier hints
   const modifiers: string[] = [];
   if (options?.metalType && METAL_PHRASES[options.metalType]) {
@@ -132,17 +211,19 @@ export async function applyJewelry(
   }
   const modifierStr = modifiers.length > 0 ? ' ' + modifiers.join(' ') : '';
 
-  // Single call with image_prompt: the jewelry product image is the STYLE REFERENCE
-  // The model image is the input_image (what to edit)
-  // This way the AI sees the actual product and copies its exact design
+  // Create composite image: [model | jewelry product]
+  const compositeDataUrl = await createComposite(modelImageUrl, jewelryImageUrl);
+
+  // Upload composite to Replicate for processing
+  const compositeHttpUrl = await ensureHttpUrl(compositeDataUrl);
+
+  // Build the full prompt
   const fullPrompt = placementPrompt + modifierStr +
-    ' Professional jewelry photography quality, photorealistic, high detail, 8K.';
+    ' Professional jewelry photography quality, photorealistic, high detail.';
 
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
-    input_image: httpModelUrl,
-    image_prompt: httpJewelryUrl,
+    input_image: compositeHttpUrl,
     prompt: fullPrompt,
-    image_prompt_strength: 0.45,
     output_format: 'jpg',
   });
 
