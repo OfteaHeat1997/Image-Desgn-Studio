@@ -87,8 +87,11 @@ export function useEditor(): UseEditorReturn {
    */
   const addImage = useCallback(
     async (file: File) => {
+      // Use blob URL instead of base64 to save ~13MB per image in memory.
+      // Blob URLs are ~50 bytes vs 13MB+ for base64, which makes undo/redo
+      // history dramatically lighter (20 snapshots × 50B vs 20 × 13MB).
       const [src, dimensions] = await Promise.all([
-        fileToBase64(file),
+        Promise.resolve(URL.createObjectURL(file)),
         getImageDimensions(file),
       ]);
 

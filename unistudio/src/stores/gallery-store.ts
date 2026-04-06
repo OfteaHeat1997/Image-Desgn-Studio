@@ -45,12 +45,12 @@ export const useGalleryStore = create<GalleryStoreState>()(
 
       addImage: (image) =>
         set((state) => ({
-          images: [image, ...state.images],
+          images: [image, ...state.images].slice(0, 100),
         })),
 
       addImages: (newImages) =>
         set((state) => ({
-          images: [...newImages, ...state.images],
+          images: [...newImages, ...state.images].slice(0, 100),
         })),
 
       removeImage: (id) =>

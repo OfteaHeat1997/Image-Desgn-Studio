@@ -14,7 +14,7 @@ import type {
 // Constants
 // -----------------------------------------------------------------------------
 
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 20;
 const DEFAULT_CANVAS_WIDTH = 1024;
 const DEFAULT_CANVAS_HEIGHT = 1024;
 const DEFAULT_ZOOM = 1;
