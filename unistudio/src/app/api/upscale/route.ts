@@ -160,11 +160,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API /upscale] Error:', error);
+    const msg = error instanceof Error ? error.message : 'Error inesperado al escalar.';
+    // Provide a friendlier message for GPU memory errors
+    const userMsg = msg.includes('greater than the max size')
+      ? 'La imagen es demasiado grande para la GPU. Se reintentara con imagen redimensionada automaticamente.'
+      : msg;
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred during upscaling.',
-      },
+      { success: false, error: userMsg },
       { status: 500 },
     );
   }
