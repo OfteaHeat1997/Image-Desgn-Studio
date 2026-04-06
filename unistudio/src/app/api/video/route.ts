@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
             prompt: fullPrompt,
             aspect_ratio: aspectRatio === '9:16' ? '9:16' : '16:9',
           });
-          resultUrl = extractOutputUrl(output);
+          resultUrl = await extractOutputUrl(output);
         } else if (providerKey === 'wan-2.2-fast') {
           // Wan 2.2 Fast via wan-video (minimum 81 frames required)
           const output = await runModel(provider.model, {
@@ -147,13 +147,13 @@ export async function POST(request: NextRequest) {
             num_frames: duration >= 10 ? 161 : 81,
             guidance_scale: 5.0,
           });
-          resultUrl = extractOutputUrl(output);
+          resultUrl = await extractOutputUrl(output);
         } else {
           const output = await runModel(provider.model, {
             image: imageUrl,
             prompt: fullPrompt,
           });
-          resultUrl = extractOutputUrl(output);
+          resultUrl = await extractOutputUrl(output);
         }
         break;
       }

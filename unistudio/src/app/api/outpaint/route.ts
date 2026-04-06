@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         prompt: fullPrompt,
         aspect_ratio: aspectRatio,
       });
-      resultUrl = extractOutputUrl(output);
+      resultUrl = await extractOutputUrl(output);
     } else if (provider === 'flux-fill') {
       // Use Flux Fill Dev via Replicate — mask-free outpainting at lower cost
       const fillPrompt = `${outpaintPrompt} Seamlessly extended image with consistent lighting and style.`;
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         prompt: fillPrompt,
         aspect_ratio: aspectRatio,
       });
-      resultUrl = extractOutputUrl(output);
+      resultUrl = await extractOutputUrl(output);
     } else {
       return NextResponse.json(
         {

@@ -45,6 +45,8 @@ export interface ImageLayer {
   height: number;
   rotation: number;      // degrees, 0-360
   opacity: number;       // 0 to 1
+  flipX: boolean;        // horizontal flip
+  flipY: boolean;        // vertical flip
   visible: boolean;
   locked: boolean;
   filters: LayerFilters;

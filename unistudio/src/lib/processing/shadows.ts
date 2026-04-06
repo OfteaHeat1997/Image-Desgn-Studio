@@ -313,7 +313,7 @@ export async function relightIcLight(
       bg_source: 'None',
     },
   );
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,5 +334,5 @@ export async function relightKontext(
     prompt: lightingPrompt + ' Keep the product exactly the same, only change the lighting and shadows.',
     output_format: 'png',
   });
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }

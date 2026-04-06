@@ -106,7 +106,7 @@ export async function inpaintFluxPro(
     prompt,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ export async function inpaintFluxDev(
     prompt,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,5 +159,5 @@ export async function editKontext(
     prompt: editInstruction,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }

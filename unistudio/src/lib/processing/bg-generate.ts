@@ -253,7 +253,7 @@ export async function generateBgPrecise(
       aspect_ratio: aspectRatio,
     });
 
-    return extractOutputUrl(output);
+    return await extractOutputUrl(output);
   } catch (error) {
     const msg = error instanceof Error ? error.message : '';
     const isFlagged = msg.includes('flagged as sensitive') || msg.includes('E005');
@@ -351,7 +351,7 @@ async function generateBgPreciseFallback(
     aspect_ratio: aspectRatio,
     num_outputs: 1,
   });
-  const bgUrl = extractOutputUrl(bgOutput);
+  const bgUrl = await extractOutputUrl(bgOutput);
 
   // Download background and composite
   const bgRes = await fetch(bgUrl);
@@ -402,7 +402,7 @@ export async function generateBgCreative(
     num_outputs: 1,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +427,7 @@ export async function generateBgFast(
     num_outputs: 1,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------

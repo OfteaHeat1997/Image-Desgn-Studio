@@ -118,6 +118,8 @@ export function useEditor(): UseEditorReturn {
         height,
         rotation: 0,
         opacity: 1,
+        flipX: false,
+        flipY: false,
         visible: true,
         locked: false,
         filters: { ...DEFAULT_FILTERS },
@@ -155,11 +157,12 @@ export function useEditor(): UseEditorReturn {
             ctx.save();
             ctx.globalAlpha = layer.opacity;
 
-            // Apply transform (position + rotation)
+            // Apply transform (position + rotation + flip)
             const cx = layer.x + layer.width / 2;
             const cy = layer.y + layer.height / 2;
             ctx.translate(cx, cy);
             ctx.rotate((layer.rotation * Math.PI) / 180);
+            ctx.scale(layer.flipX ? -1 : 1, layer.flipY ? -1 : 1);
             ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height);
 
             ctx.restore();

@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         prompt,
         num_frames: duration >= 10 ? 161 : 81,
       });
-      resultUrl = extractOutputUrl(output);
+      resultUrl = await extractOutputUrl(output);
     } else {
       // kenburns — return the image with config for client-side animation
       resultUrl = imageUrl;

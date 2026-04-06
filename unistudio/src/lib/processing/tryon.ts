@@ -66,7 +66,7 @@ export async function tryOnIdmVton(
     seed: -1,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ export async function tryOnKolors(
     garment_image: garmentImage,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------

@@ -166,7 +166,7 @@ export async function createModel(
     aspect_ratio: '3:4',
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ export async function faceToModel(
     aspect_ratio: '3:4',
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,5 +215,5 @@ export async function modelSwap(
     prompt: newModelPrompt,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }

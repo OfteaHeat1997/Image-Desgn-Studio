@@ -231,7 +231,7 @@ async function applyGarment(
         seed: -1,
       },
     );
-    const url = extractOutputUrl(output);
+    const url = await extractOutputUrl(output);
     return { url, provider: 'idm-vton', cost: TRYON_COSTS['idm-vton'] };
   } catch (idmErr) {
     console.warn('[model-create] IDM-VTON failed:', idmErr instanceof Error ? idmErr.message : idmErr);
@@ -249,7 +249,7 @@ async function applyGarment(
       input_image: modelImageUrl,
       aspect_ratio: '3:4',
     });
-    const url = extractOutputUrl(output);
+    const url = await extractOutputUrl(output);
     return { url, provider: 'kontext-fallback', cost: MODEL_GEN_COST };
   } catch (kontextErr) {
     throw new Error(
@@ -358,7 +358,7 @@ export async function POST(request: NextRequest) {
         prompt,
         aspect_ratio: '3:4',
       });
-      baseModelUrl = extractOutputUrl(output);
+      baseModelUrl = await extractOutputUrl(output);
     } catch (firstErr) {
       const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
       if (errMsg.includes('flagged as sensitive') || errMsg.includes('E005')) {
@@ -371,7 +371,7 @@ export async function POST(request: NextRequest) {
           prompt: usedPrompt,
           aspect_ratio: '3:4',
         });
-        baseModelUrl = extractOutputUrl(retryOutput);
+        baseModelUrl = await extractOutputUrl(retryOutput);
       } else {
         throw firstErr;
       }

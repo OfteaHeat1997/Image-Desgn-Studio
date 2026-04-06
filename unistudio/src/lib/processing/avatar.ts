@@ -28,7 +28,7 @@ async function generateSadTalker(
       still_mode: false,
     },
   );
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ async function generateWav2Lip(
       resize_factor: 1,
     },
   );
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ async function generateLivePortrait(
       driving_audio: audioUrl,
     },
   );
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------

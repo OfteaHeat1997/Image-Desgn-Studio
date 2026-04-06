@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useEditorStore } from "@/stores/editor-store";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
@@ -60,10 +61,70 @@ export function PropertiesPanel() {
     [selectedLayer, lockAspect, updateLayer],
   );
 
-  const handleExport = useCallback(() => {
-    // In a real app, this would download the current layer / canvas
-    console.log("Exporting as", exportFormat, "at quality", exportQuality);
-  }, [exportFormat, exportQuality]);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    if (!selectedLayer?.src) {
+      toast.warning("No hay imagen para descargar.");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const response = await fetch(selectedLayer.src);
+      const blob = await response.blob();
+      const mimeType = exportFormat === "jpg" ? "image/jpeg" : `image/${exportFormat}`;
+
+      let downloadBlob = blob;
+      if (exportFormat !== "png" || blob.type !== mimeType) {
+        const img = new Image();
+        const tempUrl = URL.createObjectURL(blob);
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Error al cargar imagen"));
+          img.src = tempUrl;
+        });
+        URL.revokeObjectURL(tempUrl);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d")!;
+        if (exportFormat === "jpg") {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.drawImage(img, 0, 0);
+        downloadBlob = await new Promise<Blob>((resolve) =>
+          canvas.toBlob((b) => resolve(b!), mimeType, exportQuality / 100)
+        );
+      }
+
+      const downloadUrl = URL.createObjectURL(downloadBlob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `${selectedLayer.name || "imagen"}.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      toast.success("Imagen descargada");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Error al descargar la imagen");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [selectedLayer, exportFormat, exportQuality]);
+
+  const handleFlipH = useCallback(() => {
+    if (!selectedLayer) return;
+    updateLayer(selectedLayer.id, { flipX: !selectedLayer.flipX });
+  }, [selectedLayer, updateLayer]);
+
+  const handleFlipV = useCallback(() => {
+    if (!selectedLayer) return;
+    updateLayer(selectedLayer.id, { flipY: !selectedLayer.flipY });
+  }, [selectedLayer, updateLayer]);
 
   if (!selectedLayer) {
     return (
@@ -178,11 +239,11 @@ export function PropertiesPanel() {
           Transformar
         </label>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={handleFlipH}>
             <FlipHorizontal className="mr-1 h-3.5 w-3.5" />
             Voltear H
           </Button>
-          <Button variant="outline" size="sm" className="flex-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={handleFlipV}>
             <FlipVertical2 className="mr-1 h-3.5 w-3.5" />
             Voltear V
           </Button>
@@ -235,8 +296,10 @@ export function PropertiesPanel() {
           className="w-full"
           leftIcon={<Download className="h-3.5 w-3.5" />}
           onClick={handleExport}
+          loading={isExporting}
+          disabled={!selectedLayer?.src}
         >
-          Descargar {exportFormat.toUpperCase()}
+          {isExporting ? "Descargando..." : `Descargar ${exportFormat.toUpperCase()}`}
         </Button>
       </div>
     </div>

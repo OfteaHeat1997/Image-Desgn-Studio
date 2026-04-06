@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
           mask: maskUrl,
           prompt,
         });
-        resultUrl = extractOutputUrl(output);
+        resultUrl = await extractOutputUrl(output);
         break;
       }
 
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
           mask: maskUrl,
           prompt,
         });
-        resultUrl = extractOutputUrl(output);
+        resultUrl = await extractOutputUrl(output);
         break;
       }
 
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           input_image: imageUrl,
           prompt,
         });
-        resultUrl = extractOutputUrl(output);
+        resultUrl = await extractOutputUrl(output);
         break;
       }
 

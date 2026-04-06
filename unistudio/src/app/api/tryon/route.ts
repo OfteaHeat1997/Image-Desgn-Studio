@@ -13,7 +13,6 @@ import { saveJob } from '@/lib/db/persist';
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
   'idm-vton': 0.02,
-  kolors: 0.015,
   fashn: 0.05,
 };
 
@@ -64,18 +63,7 @@ async function tryOnIdmVton(
       seed: -1,
     },
   );
-  return extractOutputUrl(output);
-}
-
-async function tryOnKolors(
-  modelImage: string,
-  garmentImage: string,
-): Promise<string> {
-  const output = await runModel('kolors/kolors-virtual-try-on', {
-    human_image: modelImage,
-    garment_image: garmentImage,
-  });
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // Map internal categories to FASHN categories
@@ -153,7 +141,7 @@ export async function POST(request: NextRequest) {
       garmentImage: string;
       category: string;
       garmentType?: string;
-      provider?: 'idm-vton' | 'kolors' | 'fashn' | 'auto';
+      provider?: 'idm-vton' | 'fashn' | 'auto';
     };
 
     if (!modelImage) {
@@ -197,9 +185,6 @@ export async function POST(request: NextRequest) {
         case 'idm-vton':
           resultUrl = await tryOnIdmVton(httpModelImage, httpGarmentImage, category);
           break;
-        case 'kolors':
-          resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);
-          break;
         case 'fashn':
           resultUrl = await tryOnFashn(httpModelImage, httpGarmentImage, category);
           break;
@@ -207,7 +192,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               success: false,
-              error: `Unsupported provider "${provider}". Use "fashn", "idm-vton", "kolors", or "auto".`,
+              error: `Proveedor "${provider}" no soportado. Usa "fashn", "idm-vton", o "auto".`,
             },
             { status: 400 },
           );

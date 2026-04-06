@@ -44,19 +44,62 @@ export class ReplicateApiError extends Error {
  * Extract a URL string from Replicate model output.
  * Handles all output shapes: plain string, array, FileOutput (with .url() method),
  * or plain object with .url property.
+ *
+ * IMPORTANT: If the URL is an api.replicate.com/v1/files/ URL (authenticated,
+ * no CORS), we convert it to a base64 data URL so the browser can display it.
  */
-export function extractOutputUrl(output: any): string {
-  if (typeof output === 'string') return output;
-  if (Array.isArray(output) && output.length > 0) return extractOutputUrl(output[0]);
-  if (output && typeof output === 'object') {
+export async function extractOutputUrl(output: any): Promise<string> {
+  let url: string | null = null;
+
+  if (typeof output === 'string') {
+    url = output;
+  } else if (Array.isArray(output) && output.length > 0) {
+    return await extractOutputUrl(output[0]);
+  } else if (output && typeof output === 'object') {
     // Replicate FileOutput has .url() as a method, not a property
-    if (typeof output.url === 'function') return output.url().href;
-    if ('url' in output && typeof output.url === 'string') return output.url;
-    // FileOutput also has toString() that returns the URL
-    const str = String(output);
-    if (str.startsWith('http')) return str;
+    if (typeof output.url === 'function') {
+      url = output.url().href;
+    } else if ('url' in output && typeof output.url === 'string') {
+      url = output.url;
+    } else {
+      // FileOutput also has toString() that returns the URL
+      const str = String(output);
+      if (str.startsWith('http')) url = str;
+    }
   }
-  throw new Error('Unable to extract URL from Replicate model output');
+
+  if (!url) throw new Error('Unable to extract URL from Replicate model output');
+
+  // api.replicate.com/v1/files/ URLs require auth and have no CORS headers.
+  // Convert them to data URLs server-side so the browser can display them.
+  if (url.includes('api.replicate.com/v1/files/')) {
+    return replicateFileToDataUrl(url);
+  }
+
+  return url;
+}
+
+/**
+ * Download a Replicate authenticated file URL and convert to a data URL.
+ * This is needed because api.replicate.com/v1/files/ URLs don't have CORS
+ * headers and require the API token — browsers can't access them directly.
+ */
+async function replicateFileToDataUrl(fileUrl: string): Promise<string> {
+  const token = process.env.REPLICATE_API_TOKEN;
+  const res = await fetch(fileUrl, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!res.ok) {
+    throw new ReplicateApiError(
+      `Failed to download Replicate file: ${res.status} ${res.statusText}`,
+      'FILE_DOWNLOAD_FAILED',
+    );
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const contentType = res.headers.get('content-type') || 'image/png';
+  return `data:${contentType};base64,${buffer.toString('base64')}`;
 }
 
 /**

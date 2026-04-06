@@ -41,7 +41,7 @@ export async function upscaleRealEsrgan(
     },
   );
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ export async function upscaleClarity(
 
   const output = await runModel('philz1337x/clarity-upscaler', input);
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,5 +95,5 @@ export async function upscaleAuraSr(imageUrl: string): Promise<string> {
     image: imageUrl,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }

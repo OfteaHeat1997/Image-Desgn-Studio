@@ -49,7 +49,7 @@ export async function removeMannequin(imageUrl: string): Promise<string> {
     prompt: PROMPTS['remove-mannequin'],
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 /**
@@ -77,7 +77,7 @@ export async function flatToModel(
     seed: -1,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 /**
@@ -93,5 +93,5 @@ export async function modelToFlat(imageUrl: string): Promise<string> {
     prompt: PROMPTS['model-to-flat'],
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }

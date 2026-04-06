@@ -60,7 +60,6 @@ const PROVIDERS: ProviderDef[] = [
   { id: "auto", name: "Auto", desc: "Elige el mejor proveedor automaticamente.", cost: "variable", costNum: 0, badge: "Recomendado" },
   { id: "fashn", name: "FASHN v1.6", desc: "Mejor calidad ropa regular. No soporta lenceria.", cost: "$0.05", costNum: 0.05 },
   { id: "idm-vton", name: "IDM-VTON", desc: "Funciona con todo incluyendo lenceria.", cost: "$0.02", costNum: 0.02 },
-  { id: "kolors", name: "Kolors", desc: "Rapido, buena preservacion de color.", cost: "$0.015", costNum: 0.015 },
 ];
 
 /* ------------------------------------------------------------------ */

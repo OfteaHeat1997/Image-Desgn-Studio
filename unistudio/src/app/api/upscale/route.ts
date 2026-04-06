@@ -7,6 +7,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
+import sharp from 'sharp';
+
+// Real-ESRGAN GPU limit is ~2,096,704 pixels. Use 2M as safe max.
+const MAX_PIXELS = 2_000_000;
 
 // Provider cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
@@ -14,6 +18,42 @@ const PROVIDER_COSTS: Record<string, number> = {
   clarity: 0.05,
   'aura-sr': 0.03,
 };
+
+/**
+ * If the image exceeds MAX_PIXELS, resize it down and return a data URL.
+ * Otherwise, return the original URL unchanged.
+ */
+async function ensureFitsGpu(imageUrl: string): Promise<string> {
+  // Fetch image buffer
+  let buffer: Buffer;
+  if (imageUrl.startsWith('data:')) {
+    const base64 = imageUrl.split(',')[1];
+    buffer = Buffer.from(base64, 'base64');
+  } else {
+    const res = await fetch(imageUrl);
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    buffer = Buffer.from(await res.arrayBuffer());
+  }
+
+  const metadata = await sharp(buffer).metadata();
+  const w = metadata.width ?? 0;
+  const h = metadata.height ?? 0;
+  const totalPixels = w * h;
+
+  if (totalPixels <= MAX_PIXELS) return imageUrl;
+
+  // Calculate new dimensions that fit under MAX_PIXELS, preserving aspect ratio
+  const scale = Math.sqrt(MAX_PIXELS / totalPixels);
+  const newW = Math.floor(w * scale);
+  const newH = Math.floor(h * scale);
+
+  const resized = await sharp(buffer)
+    .resize(newW, newH, { fit: 'inside' })
+    .png()
+    .toBuffer();
+
+  return `data:image/png;base64,${resized.toString('base64')}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,16 +91,17 @@ export async function POST(request: NextRequest) {
 
     switch (provider) {
       case 'real-esrgan': {
-        // Real-ESRGAN via Replicate
+        // Real-ESRGAN has a GPU pixel limit (~2M). Resize large images first.
+        const safeUrl = await ensureFitsGpu(imageUrl);
         const output = await runModel(
           'nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa',
           {
-            image: imageUrl,
+            image: safeUrl,
             scale,
             face_enhance: faceEnhance,
           },
         );
-        resultUrl = extractOutputUrl(output);
+        resultUrl = await extractOutputUrl(output);
         break;
       }
 
@@ -80,16 +121,17 @@ export async function POST(request: NextRequest) {
           'philz1337x/clarity-upscaler:dfad41707589d68ecdccd1dfa600d55a208f9310748e44bfe35b4a6291453d5e',
           input,
         );
-        resultUrl = extractOutputUrl(output);
+        resultUrl = await extractOutputUrl(output);
         break;
       }
 
       case 'aura-sr': {
-        // AuraSR via Replicate (fofr/aura-sr)
+        // AuraSR also has GPU limits — resize large images first
+        const safeUrl = await ensureFitsGpu(imageUrl);
         const output = await runModel('fofr/aura-sr', {
-          image: imageUrl,
+          image: safeUrl,
         });
-        resultUrl = extractOutputUrl(output);
+        resultUrl = await extractOutputUrl(output);
         break;
       }
 

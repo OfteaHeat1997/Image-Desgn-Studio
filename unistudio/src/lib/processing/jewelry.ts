@@ -155,5 +155,5 @@ export async function applyJewelry(
     output_format: 'jpg',
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }

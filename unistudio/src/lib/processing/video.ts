@@ -107,7 +107,7 @@ export async function generateVideoWan(
     aspect_ratio: '16:9',
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ export async function generateVideoKling(
     first_frame_image: imageUrl,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------

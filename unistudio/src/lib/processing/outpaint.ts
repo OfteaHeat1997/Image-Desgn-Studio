@@ -162,7 +162,7 @@ export async function outpaintKontext(
     aspect_ratio: targetAspectRatio,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ export async function outpaintFluxFill(
     prompt,
   });
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------

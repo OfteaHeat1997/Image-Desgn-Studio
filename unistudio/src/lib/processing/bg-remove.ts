@@ -42,7 +42,7 @@ export async function removeBgReplicate(imageUrl: string): Promise<string> {
     { image: imageUrl },
   );
 
-  return extractOutputUrl(output);
+  return await extractOutputUrl(output);
 }
 
 // ---------------------------------------------------------------------------
