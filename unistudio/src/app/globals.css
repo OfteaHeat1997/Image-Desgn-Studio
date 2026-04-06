@@ -93,12 +93,21 @@
    Base Styles
    ========================================================================== */
 
+html {
+  /* Prevent text size inflation on mobile/tablets */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent accidental pinch-zoom on the editor */
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
 
 /* ==========================================================================

@@ -510,7 +510,7 @@ function EditorInner() {
   const PanelComponent = MODULE_PANELS[selectedModule] ?? MODULE_PANELS["bg-remove"];
 
   return (
-    <div className="flex h-screen flex-col bg-surface">
+    <div className="flex h-dvh flex-col bg-surface">
       {/* Top Toolbar */}
       <Toolbar
         selectedModule={selectedModule}
@@ -749,7 +749,7 @@ export default function EditorPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-surface">
+        <div className="flex h-dvh items-center justify-center bg-surface">
           <Spinner size="lg" label="Cargando editor..." />
         </div>
       }
