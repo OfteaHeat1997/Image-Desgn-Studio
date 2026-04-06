@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Gem, AlertCircle } from "lucide-react";
+import { Gem, AlertCircle, Sparkles, Upload, User, Loader2 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 
 /* ------------------------------------------------------------------ */
@@ -17,10 +18,13 @@ interface JewelryTryOnPanelProps {
 }
 
 type AccessoryType = "earrings" | "necklace" | "ring" | "bracelet" | "sunglasses" | "watch";
+type ModelSource = "upload" | "generate";
 
 interface AccessoryDef {
   id: AccessoryType;
   name: string;
+  emoji: string;
+  hint: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -28,24 +32,65 @@ interface AccessoryDef {
 /* ------------------------------------------------------------------ */
 
 const ACCESSORY_TYPES: AccessoryDef[] = [
-  { id: "earrings", name: "Aretes" },
-  { id: "necklace", name: "Collar" },
-  { id: "ring", name: "Anillo" },
-  { id: "bracelet", name: "Pulsera" },
-  { id: "sunglasses", name: "Lentes" },
-  { id: "watch", name: "Reloj" },
+  { id: "earrings", name: "Aretes", emoji: "💎", hint: "Rostro visible, de frente o 3/4" },
+  { id: "necklace", name: "Collar", emoji: "📿", hint: "Cuello y pecho visibles" },
+  { id: "ring", name: "Anillo", emoji: "💍", hint: "Mano visible, dedos extendidos" },
+  { id: "bracelet", name: "Pulsera", emoji: "⌚", hint: "Muneca visible y despejada" },
+  { id: "sunglasses", name: "Lentes", emoji: "🕶️", hint: "Rostro de frente, ojos visibles" },
+  { id: "watch", name: "Reloj", emoji: "⏱️", hint: "Muneca visible y despejada" },
 ];
+
+const GENDER_OPTIONS = [
+  { value: "female", label: "Femenino" },
+  { value: "male", label: "Masculino" },
+];
+
+const SKIN_TONES = [
+  { id: "light", label: "Clara", color: "#FFDBB4" },
+  { id: "medium-light", label: "Media Clara", color: "#E8B98A" },
+  { id: "medium", label: "Media", color: "#C68642" },
+  { id: "medium-dark", label: "Media Oscura", color: "#8D5524" },
+  { id: "dark", label: "Oscura", color: "#5C3317" },
+];
+
+const AGE_OPTIONS = [
+  { value: "18-25", label: "18-25" },
+  { value: "26-35", label: "26-35" },
+  { value: "36-45", label: "36-45" },
+  { value: "46-55", label: "46-55" },
+];
+
+/* Best pose for each accessory type */
+const ACCESSORY_POSE: Record<AccessoryType, string> = {
+  earrings: "head and shoulders portrait, slight 3/4 angle",
+  necklace: "upper body portrait, neck and chest visible",
+  ring: "hand portrait, elegant hand pose showing ring finger",
+  bracelet: "wrist and forearm portrait, elegant hand pose",
+  sunglasses: "head and shoulders portrait, facing camera",
+  watch: "wrist and forearm portrait, elegant hand pose",
+};
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
 export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelProps) {
-  const [accessoryType, setAccessoryType] = useState<AccessoryType>("earrings");
+  const [accessoryType, setAccessoryType] = useState<AccessoryType>("necklace");
+  const [modelSource, setModelSource] = useState<ModelSource>("generate");
+
+  // Manual upload state
   const [modelImage, setModelImage] = useState<string | null>(null);
   const [modelFile, setModelFile] = useState<File | null>(null);
+
+  // AI model generator state
+  const [gender, setGender] = useState("female");
+  const [skinTone, setSkinTone] = useState("medium");
+  const [ageRange, setAgeRange] = useState("26-35");
+
+  // Processing
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState<string>("");
+  const [progressPct, setProgressPct] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleModelUpload = useCallback((files: File[]) => {
@@ -60,36 +105,80 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   }, []);
 
   const handleProcess = useCallback(async () => {
-    if (!imageFile || !modelFile) return;
+    if (!imageFile) return;
     setIsProcessing(true);
     setErrorMsg(null);
-    setStatusText("Subiendo imagen del accesorio...");
+    setProgressPct(0);
 
     try {
-      // Upload jewelry image
+      let modelImageUrl: string;
+      let modelBeforeUrl: string | undefined;
+      let totalCost = 0;
+
+      if (modelSource === "generate") {
+        // ---- STEP 1: Generate AI model ----
+        setStatusText("Generando modelo IA...");
+        setProgressPct(10);
+
+        const pose = ACCESSORY_POSE[accessoryType];
+        const modelRes = await fetch("/api/model-create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gender,
+            ageRange,
+            skinTone,
+            bodyType: "average",
+            pose: "standing",
+            expression: "confident",
+            hairStyle: gender === "male" ? "short clean cut" : "natural professional",
+            background: "studio white",
+            customDetails: `${pose}, professional fashion photography, studio lighting`,
+          }),
+        });
+        const modelData = await modelRes.json();
+        if (!modelData.success) throw new Error(modelData.error || "Error al generar modelo IA");
+
+        modelImageUrl = modelData.data.url;
+        modelBeforeUrl = modelImageUrl;
+        totalCost += modelData.data?.cost ?? 0.055;
+        setProgressPct(40);
+      } else {
+        // ---- Manual upload mode ----
+        if (!modelFile) throw new Error("Sube una foto del modelo primero");
+        setStatusText("Subiendo foto del modelo...");
+        setProgressPct(10);
+
+        const modelFormData = new FormData();
+        modelFormData.append("file", modelFile);
+        const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
+        const modelUploadData = await modelUploadRes.json();
+        if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir foto del modelo");
+
+        modelImageUrl = modelUploadData.data.url;
+        modelBeforeUrl = modelImageUrl;
+        setProgressPct(30);
+      }
+
+      // ---- STEP 2: Upload jewelry image ----
+      setStatusText("Subiendo imagen del accesorio...");
+      setProgressPct(50);
+
       const jewelryFormData = new FormData();
       jewelryFormData.append("file", imageFile);
       const jewelryUploadRes = await fetch("/api/upload", { method: "POST", body: jewelryFormData });
       const jewelryUploadData = await jewelryUploadRes.json();
       if (!jewelryUploadData.success) throw new Error(jewelryUploadData.error || "Error al subir imagen del accesorio");
 
-      setStatusText("Subiendo foto del modelo...");
-
-      // Upload model image
-      const modelFormData = new FormData();
-      modelFormData.append("file", modelFile);
-      const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
-      const modelUploadData = await modelUploadRes.json();
-      if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir foto del modelo");
-
+      // ---- STEP 3: Apply jewelry ----
       setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
+      setProgressPct(70);
 
-      // Call jewelry try-on API
       const res = await fetch("/api/jewelry-tryon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          modelImage: modelUploadData.data.url,
+          modelImage: modelImageUrl,
           jewelryImage: jewelryUploadData.data.url,
           type: accessoryType,
         }),
@@ -98,46 +187,49 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
 
       if (!data.success) throw new Error(data.error || "Error en prueba de joyeria");
 
-      const cost: number | undefined = data.data?.cost;
+      totalCost += data.data?.cost ?? 0.05;
+      setProgressPct(100);
+      setStatusText("Listo!");
 
-      // Pass model image as "before" so comparison shows model vs model+jewelry
-      onProcess(data.data.url, modelUploadData.data.url, cost);
+      onProcess(data.data.url, modelBeforeUrl, totalCost);
     } catch (error) {
       console.error("Jewelry try-on error:", error);
-      setErrorMsg(error instanceof Error ? error.message : "Error en prueba de joyeria. Por favor, intenta de nuevo.");
+      setErrorMsg(error instanceof Error ? error.message : "Error en prueba de joyeria.");
     } finally {
       setIsProcessing(false);
-      setStatusText("");
+      setTimeout(() => {
+        setStatusText("");
+        setProgressPct(0);
+      }, 3000);
     }
-  }, [imageFile, modelFile, accessoryType, onProcess]);
+  }, [imageFile, modelFile, modelSource, accessoryType, gender, skinTone, ageRange, onProcess]);
+
+  const selectedAccessory = ACCESSORY_TYPES.find((a) => a.id === accessoryType)!;
+  const estimatedCost = modelSource === "generate" ? "$0.105" : "$0.05";
+  const canProcess = imageFile && (modelSource === "generate" || modelFile);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ModuleHeader
         icon={<Gem className="h-4 w-4" />}
         title="Joyeria Virtual"
-        description="Prueba virtual de joyeria y accesorios sobre modelos IA. Sube la foto del accesorio y una foto de modelo — la IA lo coloca con iluminacion y perspectiva realista."
+        description="Prueba joyeria y accesorios sobre modelos IA o fotos reales. Genera un modelo automaticamente o sube tu propia foto."
         whyNeeded="Muestra como se ve la joyeria puesta sin sesion fotografica."
-        costLabel="$0.05/img"
+        costLabel={`Desde ${estimatedCost}`}
         steps={[
-          "Sube la foto del accesorio (aretes, collar, anillo, etc.) al area central",
-          "Elige el tipo de accesorio para que la IA sepa donde colocarlo",
-          "Sube una foto del modelo (rostro o cuerpo, segun el accesorio)",
-          "Haz clic en \"Generar\" para ver el resultado virtual",
-        ]}
-        tips={[
-          "Usa fotos del accesorio sobre fondo blanco o transparente para mejores resultados.",
-          "Para aretes, el modelo debe tener el rostro visible y de frente o 3/4.",
-          "Para collares y pulseras, asegurate de que el area del cuello/muneca este despejada.",
-          "Funciona mejor con fotos de alta resolucion y buena iluminacion.",
+          "Sube la foto del accesorio al area central del editor",
+          "Elige el tipo de accesorio (collar, aretes, anillo, etc.)",
+          "Genera un modelo IA o sube una foto existente",
+          "Haz clic en \"Aplicar\" — la IA coloca el accesorio automaticamente",
         ]}
       />
 
       {/* Error card */}
       {errorMsg && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <p className="text-xs text-red-300">{errorMsg}</p>
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
+          <p className="text-[11px] text-red-300 flex-1">{errorMsg}</p>
+          <button type="button" onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-300 text-xs shrink-0">✕</button>
         </div>
       )}
 
@@ -151,84 +243,215 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
               type="button"
               onClick={() => setAccessoryType(type.id)}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-lg border p-2.5 transition-all",
+                "flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-all",
                 accessoryType === type.id
                   ? "border-accent bg-accent/10"
                   : "border-surface-lighter bg-surface-light hover:border-surface-hover",
               )}
             >
-              <span className="text-[11px] font-medium text-gray-300">{type.name}</span>
+              <span className="text-lg">{type.emoji}</span>
+              <span className="text-[10px] font-medium text-gray-300">{type.name}</span>
             </button>
           ))}
         </div>
+        <p className="mt-1.5 text-[10px] text-gray-500">
+          Consejo: {selectedAccessory.hint}
+        </p>
       </div>
 
       {/* Jewelry image (current editor image) */}
       <div>
-        <label className="mb-2 block text-xs font-medium text-gray-400">Imagen del Accesorio</label>
-        <div className="rounded-lg border border-surface-lighter bg-surface-light p-3 text-center">
-          {imageFile ? (
-            <p className="text-xs text-gray-300">
-              Usando: <span className="text-accent-light">{imageFile.name}</span>
-            </p>
-          ) : (
-            <p className="text-xs text-gray-500">Sube una imagen del accesorio en el editor primero.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Model image upload */}
-      <div>
-        <label className="mb-2 block text-xs font-medium text-gray-400">Foto del Modelo</label>
-        {modelImage ? (
-          <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-surface-lighter">
-            <img src={modelImage} alt="Modelo" className="h-full w-full object-cover" />
-            <button
-              type="button"
-              onClick={() => { setModelImage(null); setModelFile(null); }}
-              className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[10px] text-gray-300 hover:text-white transition-colors"
-            >
-              Cambiar
-            </button>
+        <label className="mb-1.5 block text-xs font-medium text-gray-400">Imagen del Accesorio</label>
+        {imageFile ? (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
+            <span className="text-lg">{selectedAccessory.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-gray-300 truncate">{imageFile.name}</p>
+              <p className="text-[9px] text-gray-500">{(imageFile.size / 1024).toFixed(0)}KB</p>
+            </div>
+            <span className="text-[9px] text-emerald-400 font-semibold">Listo</span>
           </div>
         ) : (
-          <Dropzone
-            onDrop={handleModelUpload}
-            multiple={false}
-            label="Sube una foto de modelo"
-            hint="Foto que muestre donde colocar el accesorio"
-            className="min-h-[100px]"
-          />
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-center">
+            <p className="text-[11px] text-amber-300">Sube una imagen del accesorio en el editor primero.</p>
+          </div>
         )}
       </div>
 
-      {/* Cost */}
-      <div className="rounded-lg border border-surface-lighter bg-surface px-3 py-2 text-center">
-        <span className="text-[10px] text-gray-500">
-          Costo: <span className="text-emerald-400 font-semibold">$0.05</span> por prueba
-        </span>
+      {/* Model source toggle */}
+      <div>
+        <label className="mb-2 block text-xs font-medium text-gray-400">Modelo</label>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setModelSource("generate")}
+            className={cn(
+              "flex items-center gap-2 rounded-lg border p-2.5 transition-all",
+              modelSource === "generate"
+                ? "border-accent bg-accent/10"
+                : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+            )}
+          >
+            <Sparkles className={cn("h-4 w-4", modelSource === "generate" ? "text-accent-light" : "text-gray-500")} />
+            <div className="text-left">
+              <p className={cn("text-[11px] font-semibold", modelSource === "generate" ? "text-accent-light" : "text-gray-300")}>
+                Generar IA
+              </p>
+              <p className="text-[9px] text-gray-500">Automatico</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setModelSource("upload")}
+            className={cn(
+              "flex items-center gap-2 rounded-lg border p-2.5 transition-all",
+              modelSource === "upload"
+                ? "border-accent bg-accent/10"
+                : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+            )}
+          >
+            <Upload className={cn("h-4 w-4", modelSource === "upload" ? "text-accent-light" : "text-gray-500")} />
+            <div className="text-left">
+              <p className={cn("text-[11px] font-semibold", modelSource === "upload" ? "text-accent-light" : "text-gray-300")}>
+                Subir Foto
+              </p>
+              <p className="text-[9px] text-gray-500">Manual</p>
+            </div>
+          </button>
+        </div>
       </div>
 
-      {/* Status text during processing */}
-      {isProcessing && statusText && (
-        <p className="text-center text-xs text-accent-light animate-pulse">{statusText}</p>
+      {/* AI Model Generator (inline) */}
+      {modelSource === "generate" && (
+        <div className="space-y-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+          <div className="flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5 text-accent-light" />
+            <span className="text-[11px] font-semibold text-accent-light">Configurar Modelo IA</span>
+          </div>
+
+          {/* Gender */}
+          <Select
+            value={gender}
+            onValueChange={setGender}
+            options={GENDER_OPTIONS}
+            label="Genero"
+          />
+
+          {/* Age */}
+          <Select
+            value={ageRange}
+            onValueChange={setAgeRange}
+            options={AGE_OPTIONS}
+            label="Edad"
+          />
+
+          {/* Skin tone swatches */}
+          <div>
+            <label className="mb-1.5 block text-[10px] font-medium text-gray-400">Tono de Piel</label>
+            <div className="flex gap-2">
+              {SKIN_TONES.map((tone) => (
+                <button
+                  key={tone.id}
+                  type="button"
+                  onClick={() => setSkinTone(tone.id)}
+                  className={cn(
+                    "h-7 w-7 rounded-full border-2 transition-all",
+                    skinTone === tone.id
+                      ? "border-accent ring-2 ring-accent/30 scale-110"
+                      : "border-transparent hover:border-gray-500",
+                  )}
+                  style={{ backgroundColor: tone.color }}
+                  title={tone.label}
+                />
+              ))}
+            </div>
+          </div>
+
+          <p className="text-[9px] text-gray-500">
+            Se generara un modelo {gender === "male" ? "masculino" : "femenino"} con pose ideal para {selectedAccessory.name.toLowerCase()}.
+          </p>
+        </div>
       )}
+
+      {/* Manual upload */}
+      {modelSource === "upload" && (
+        <div>
+          {modelImage ? (
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg border border-surface-lighter">
+              <img src={modelImage} alt="Modelo" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => { setModelImage(null); setModelFile(null); }}
+                className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-1 text-[10px] text-gray-300 hover:text-white transition-colors"
+              >
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <Dropzone
+              onDrop={handleModelUpload}
+              multiple={false}
+              label="Sube una foto de modelo"
+              hint="Foto que muestre donde colocar el accesorio"
+              className="min-h-[100px]"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Progress bar */}
+      {isProcessing && (
+        <div className="space-y-1.5">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface-lighter">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <p className="text-center text-[10px] text-gray-400 animate-pulse">{statusText}</p>
+        </div>
+      )}
+
+      {/* Cost indicator */}
+      <div className="rounded-lg border border-surface-lighter bg-surface px-3 py-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-gray-500">Costo estimado</span>
+          <span className="text-[11px] text-emerald-400 font-semibold">{estimatedCost}</span>
+        </div>
+        {modelSource === "generate" && (
+          <p className="text-[9px] text-gray-600 mt-0.5">
+            Incluye generacion de modelo ($0.055) + prueba de joyeria ($0.05)
+          </p>
+        )}
+      </div>
 
       {/* Process button */}
       <Button
         variant="primary"
         className="w-full"
         onClick={handleProcess}
-        disabled={!imageFile || !modelFile || isProcessing}
+        disabled={!canProcess || isProcessing}
         loading={isProcessing}
         leftIcon={<Gem className="h-4 w-4" />}
       >
-        {isProcessing ? "Aplicando Accesorio..." : "Aplicar Accesorio"}
+        {isProcessing
+          ? statusText || "Procesando..."
+          : modelSource === "generate"
+            ? `Generar Modelo + Aplicar ${selectedAccessory.name}`
+            : `Aplicar ${selectedAccessory.name}`
+        }
       </Button>
 
-      {(!imageFile || !modelFile) && !isProcessing && (
-        <p className="text-center text-xs text-gray-500">
-          Sube una imagen del accesorio y una foto de modelo para comenzar.
+      {!imageFile && !isProcessing && (
+        <p className="text-center text-[10px] text-amber-400/80">
+          Sube una imagen del accesorio primero.
+        </p>
+      )}
+
+      {/* Status after completion */}
+      {!isProcessing && statusText && !errorMsg && (
+        <p className="text-center text-xs text-emerald-400">
+          {statusText}
         </p>
       )}
     </div>
