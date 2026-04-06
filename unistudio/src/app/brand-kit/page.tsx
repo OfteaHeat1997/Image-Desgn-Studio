@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import {
   Save,
   RotateCcw,
@@ -251,8 +252,10 @@ export default function BrandKitPage() {
         defaultBgStyle: state.defaultBgStyle,
         defaultEnhancePreset: state.defaultEnhancePreset,
       });
+      toast.success("Kit de marca guardado correctamente");
     } catch (e) {
       console.error("Failed to save brand kit:", e);
+      toast.error("Error al guardar el kit de marca");
     } finally {
       setIsSaving(false);
     }

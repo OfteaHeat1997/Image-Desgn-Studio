@@ -125,7 +125,7 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
     <div className="flex flex-col h-full border-r border-surface-lighter bg-surface w-56 shrink-0">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-surface-lighter px-3 py-2.5">
-        <a href="/" className="text-sm font-bold text-gradient">UniStudio</a>
+        <span className="text-sm font-bold text-gradient cursor-default">UniStudio</span>
         <span className="text-[9px] text-gray-600 uppercase tracking-wider">Modulos</span>
       </div>
 

@@ -126,7 +126,7 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
   }, [imageFile, customWidth, customHeight, selectedPreset, bgPrompt, extendTop, extendBottom, extendLeft, extendRight, provider, onProcess, run]);
 
   const activeDirections = [extendTop, extendBottom, extendLeft, extendRight].filter(Boolean).length;
-  const estimatedCost = activeDirections > 0 ? (provider === "flux-fill" ? 0.025 : 0.05) : 0;
+  const estimatedCost = activeDirections > 0 ? 0.05 : 0;
 
   return (
     <div className="space-y-5">
@@ -150,39 +150,11 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
         ]}
       />
 
-      {/* Provider selector */}
-      <div>
-        <label className="mb-2 block text-xs font-medium text-gray-400">
-          Proveedor de IA
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setProvider("kontext")}
-            className={cn(
-              "rounded-lg border p-2.5 text-center transition-all",
-              provider === "kontext"
-                ? "border-accent bg-accent/10"
-                : "border-surface-lighter bg-surface-light hover:border-surface-hover",
-            )}
-          >
-            <span className="block text-[11px] font-semibold text-gray-200">Kontext Pro</span>
-            <span className="block text-[9px] text-gray-500">Mejor calidad — $0.05</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setProvider("flux-fill")}
-            className={cn(
-              "rounded-lg border p-2.5 text-center transition-all",
-              provider === "flux-fill"
-                ? "border-accent bg-accent/10"
-                : "border-surface-lighter bg-surface-light hover:border-surface-hover",
-            )}
-          >
-            <span className="block text-[11px] font-semibold text-gray-200">Flux Fill</span>
-            <span className="block text-[9px] text-gray-500">Mas economico — $0.025</span>
-          </button>
-        </div>
+      {/* Provider info */}
+      <div className="rounded-lg border border-surface-lighter bg-surface-light p-2.5 text-center">
+        <span className="text-[11px] font-semibold text-gray-200">Flux Kontext Pro</span>
+        <span className="mx-2 text-[9px] text-gray-500">•</span>
+        <span className="text-[9px] text-emerald-400">$0.05 por imagen</span>
       </div>
 
       {/* Platform presets grid */}
