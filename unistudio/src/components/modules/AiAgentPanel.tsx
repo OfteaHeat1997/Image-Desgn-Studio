@@ -1309,6 +1309,66 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           </>
         )}
 
+        {/* Step preview modal — same as executing phase */}
+        {previewStepUrl && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => { setPreviewStepUrl(null); setPreviewStepInputUrl(null); }}
+          >
+            <div className="relative max-w-2xl w-full max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-3 py-2 bg-surface rounded-t-xl border border-surface-lighter">
+                <span className="text-xs font-medium text-gray-200">{previewStepLabel}</span>
+                <div className="flex items-center gap-2">
+                  {previewStepInputUrl && (
+                    <div className="flex rounded-lg overflow-hidden border border-surface-lighter text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewShowBefore(false)}
+                        className={cn(
+                          "px-2.5 py-1 font-semibold transition-colors",
+                          !previewShowBefore ? "bg-emerald-500/20 text-emerald-400" : "bg-surface-light text-gray-500 hover:text-gray-300",
+                        )}
+                      >
+                        Despues
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewShowBefore(true)}
+                        className={cn(
+                          "px-2.5 py-1 font-semibold transition-colors",
+                          previewShowBefore ? "bg-red-500/20 text-red-400" : "bg-surface-light text-gray-500 hover:text-gray-300",
+                        )}
+                      >
+                        Antes
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setPreviewStepUrl(null); setPreviewStepInputUrl(null); }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="relative">
+                <img
+                  src={previewShowBefore && previewStepInputUrl ? previewStepInputUrl : previewStepUrl}
+                  alt={previewStepLabel}
+                  className="w-full max-h-[75vh] object-contain bg-black rounded-b-xl border-x border-b border-surface-lighter"
+                />
+                <span className={cn(
+                  "absolute top-2 left-2 text-[10px] font-bold px-2 py-1 rounded",
+                  previewShowBefore ? "bg-red-500/80 text-white" : "bg-emerald-500/80 text-white",
+                )}>
+                  {previewShowBefore ? "ANTES" : "DESPUES"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
