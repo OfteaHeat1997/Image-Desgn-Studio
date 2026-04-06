@@ -132,11 +132,13 @@ export async function POST(request: NextRequest) {
 
       case 'replicate': {
         if (providerKey === 'wan-2.1') {
-          // Wan 2.1 via wavespeedai — uses aspect_ratio, no num_frames
+          // Wan 2.1 via wavespeedai — supports aspect_ratio + num_frames (81=~3s, 161=~6s)
+          const wan21Frames = duration >= 6 ? 161 : 81;
           const output = await runModel(provider.model, {
             image: imageUrl,
             prompt: fullPrompt,
             aspect_ratio: aspectRatio === '9:16' ? '9:16' : '16:9',
+            num_frames: wan21Frames,
           });
           resultUrl = await extractOutputUrl(output);
         } else if (providerKey === 'wan-2.2-fast') {

@@ -2,6 +2,7 @@
 // Ghost Mannequin Processing Module - UniStudio
 // =============================================================================
 
+import sharp from 'sharp';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 
 // ---------------------------------------------------------------------------
@@ -53,8 +54,29 @@ export async function removeMannequin(imageUrl: string): Promise<string> {
 }
 
 /**
+ * Flatten a data-URL image to white background JPEG for IDM-VTON compatibility.
+ * Transparent PNGs cause IDM-VTON to crash with NoneType errors.
+ */
+async function flattenForTryOn(imageUrl: string): Promise<string> {
+  if (!imageUrl.startsWith('data:')) return imageUrl;
+
+  const base64Match = imageUrl.match(/^data:[^;]+;base64,(.+)$/);
+  if (!base64Match) return imageUrl;
+
+  const inputBuffer = Buffer.from(base64Match[1], 'base64');
+  const jpegBuffer = await sharp(inputBuffer)
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+
+  return `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
+}
+
+/**
  * Convert a flat-lay garment image into an on-model look via virtual try-on.
  * Uses IDM-VTON on Replicate to dress the supplied model image with the garment.
+ * Falls back to Flux Kontext Pro if IDM-VTON fails.
  *
  * @param garmentUrl - URL of the flat-lay garment image.
  * @param modelUrl   - URL of the model/person image to dress.
@@ -66,18 +88,32 @@ export async function flatToModel(
   modelUrl: string,
   category: string,
 ): Promise<string> {
-  const output = await runModel('cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985', {
-    human_img: modelUrl,
-    garm_img: garmentUrl,
-    category,
-    garment_des: `${category} garment, professional fashion photography`,
-    is_checked: true,
-    is_checked_crop: false,
-    denoise_steps: 30,
-    seed: -1,
-  });
+  // Flatten transparent images to white bg for IDM-VTON compatibility
+  const flatGarment = await flattenForTryOn(garmentUrl);
+  const flatModel = await flattenForTryOn(modelUrl);
 
-  return await extractOutputUrl(output);
+  try {
+    const output = await runModel('cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985', {
+      human_img: flatModel,
+      garm_img: flatGarment,
+      category,
+      garment_des: `${category} garment, professional fashion photography`,
+      is_checked: true,
+      is_checked_crop: false,
+      denoise_steps: 30,
+      seed: -1,
+    });
+    return await extractOutputUrl(output);
+  } catch (idmErr) {
+    // Fallback: use Kontext Pro instruction-based approach
+    console.warn('[ghost-mannequin] IDM-VTON failed, falling back to Kontext:', idmErr instanceof Error ? idmErr.message : idmErr);
+    const output = await runModel('black-forest-labs/flux-kontext-pro', {
+      input_image: flatModel,
+      prompt: `Dress this person in the ${category} garment. Make it look like they are wearing a ${category} clothing item. ` +
+        'Keep the same person, face, pose, and background. Professional e-commerce catalog photography, SFW.',
+    });
+    return await extractOutputUrl(output);
+  }
 }
 
 /**

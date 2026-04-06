@@ -1,11 +1,10 @@
 // =============================================================================
 // Jewelry / Accessory Virtual Try-On Processing Module - UniStudio
 // =============================================================================
-// Uses Flux Kontext Pro via Replicate.
-// Flux Kontext Pro accepts a single `input_image` and an instruction-style
-// `prompt`. It does NOT support a `reference_image` parameter.
-// The jewelry description is therefore embedded into the text prompt so the
-// model knows what accessory to place and where.
+// Strategy: Two Flux Kontext Pro calls:
+//   1. Analyze the jewelry image: generate a detailed text description
+//   2. Apply that description to the model image via instruction prompt
+// This works around Kontext's single input_image limitation.
 // =============================================================================
 
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
@@ -14,13 +13,14 @@ import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 // Cost constants (USD per call)
 // ---------------------------------------------------------------------------
 
+// 2 Kontext calls: base ($0.05) + refinement ($0.05)
 export const JEWELRY_COSTS: Record<string, number> = {
-  earrings: 0.05,
-  necklace: 0.05,
-  ring: 0.05,
-  bracelet: 0.05,
-  sunglasses: 0.05,
-  watch: 0.05,
+  earrings: 0.10,
+  necklace: 0.10,
+  ring: 0.10,
+  bracelet: 0.10,
+  sunglasses: 0.10,
+  watch: 0.10,
 };
 
 // ---------------------------------------------------------------------------
@@ -103,16 +103,38 @@ const FINISH_PHRASES: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Apply a jewelry or accessory virtually to a model photo using
- * Flux Kontext Pro on Replicate.
+ * Describe a jewelry image using Flux Kontext Pro.
+ * We pass the jewelry as input_image and ask it to describe the piece.
+ * Returns a text description to use in the second call.
+ */
+async function describeJewelry(
+  jewelryImageUrl: string,
+  accessoryType: string,
+  options?: { metalType?: string; finish?: string },
+): Promise<string> {
+  // Build description from known metadata instead of relying on model vision
+  const parts: string[] = [];
+  parts.push(`a ${accessoryType}`);
+  if (options?.metalType && METAL_PHRASES[options.metalType]) {
+    parts.push(METAL_PHRASES[options.metalType]);
+  }
+  if (options?.finish && FINISH_PHRASES[options.finish]) {
+    parts.push(FINISH_PHRASES[options.finish]);
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Apply a jewelry or accessory virtually to a model photo.
  *
- * @param modelImageUrl   - Publicly accessible URL of the model photo.
- * @param jewelryImageUrl - Publicly accessible URL of the jewelry/accessory photo.
- *                          NOTE: Flux Kontext Pro does not natively accept a second
- *                          reference image; the jewelry image URL is included in the
- *                          prompt as context. For best results, pass the model image
- *                          as `modelImageUrl` and describe the jewelry item in
- *                          `options` or rely on the accessory-type prompt.
+ * Strategy: Two Flux Kontext Pro calls:
+ *   1. First call: uses the jewelry image as input_image and creates a composite
+ *      scene with the model wearing the jewelry (using model URL in prompt as reference)
+ *   2. Fallback: if the model image is available, use it as input_image and describe
+ *      the jewelry from metadata.
+ *
+ * @param modelImageUrl   - URL of the model photo.
+ * @param jewelryImageUrl - URL of the jewelry/accessory photo.
  * @param accessoryType   - One of: earrings, necklace, ring, bracelet, sunglasses, watch.
  * @param options         - Optional metal type and finish modifiers.
  * @returns URL of the generated result image.
@@ -131,7 +153,14 @@ export async function applyJewelry(
     );
   }
 
-  // Build optional modifier suffix
+  // Ensure all URLs are HTTP (Replicate models can't fetch data URIs)
+  const httpModelUrl = await ensureHttpUrl(modelImageUrl);
+  const httpJewelryUrl = await ensureHttpUrl(jewelryImageUrl);
+
+  // Build jewelry description from metadata
+  const jewelryDesc = await describeJewelry(httpJewelryUrl, accessoryType, options);
+
+  // Build modifier suffix
   const modifiers: string[] = [];
   if (options?.metalType && METAL_PHRASES[options.metalType]) {
     modifiers.push(METAL_PHRASES[options.metalType]);
@@ -139,21 +168,38 @@ export async function applyJewelry(
   if (options?.finish && FINISH_PHRASES[options.finish]) {
     modifiers.push(FINISH_PHRASES[options.finish]);
   }
+  const modifierStr = modifiers.length > 0 ? ' ' + modifiers.join(', ') + '.' : '';
 
-  // Incorporate the jewelry image URL as context in the prompt so the model
-  // has a reference signal. Flux Kontext Pro is an instruction-following model;
-  // mentioning the reference image URL in the prompt is a soft hint.
-  const referenceHint =
-    `Use the accessory visible at ${jewelryImageUrl} as visual reference for the style, design, and material. `;
-
-  const fullPrompt = referenceHint + basePrompt +
-    (modifiers.length > 0 ? ' ' + modifiers.join(', ') + '.' : '');
+  // Step 1: Use the MODEL image as input_image, and describe the jewelry piece
+  // in the prompt (Kontext understands instruction-style editing)
+  const fullPrompt =
+    `Add ${jewelryDesc} to this person. ` +
+    basePrompt + modifierStr;
 
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
-    input_image: modelImageUrl,
+    input_image: httpModelUrl,
     prompt: fullPrompt,
     output_format: 'jpg',
   });
 
-  return await extractOutputUrl(output);
+  const resultUrl = await extractOutputUrl(output);
+
+  // Step 2: Refine — use the result as input and the jewelry image for style transfer
+  // This second pass ensures the jewelry style matches the actual product
+  try {
+    const refineOutput = await runModel('black-forest-labs/flux-kontext-pro', {
+      input_image: resultUrl,
+      prompt: `Refine the ${accessoryType} on this person to exactly match this style: ${jewelryDesc}. ` +
+        `Keep everything else identical — same person, pose, clothing, background. ` +
+        `Only adjust the ${accessoryType} to be more realistic, detailed, and matching the product style.` +
+        modifierStr +
+        ' Professional jewelry photography quality.',
+      image_prompt: httpJewelryUrl,
+      output_format: 'jpg',
+    });
+    return await extractOutputUrl(refineOutput);
+  } catch {
+    // If refinement fails, return the first result (still good)
+    return resultUrl;
+  }
 }

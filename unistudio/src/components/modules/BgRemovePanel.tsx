@@ -79,6 +79,7 @@ const BG_COLOR_PRESETS = [
 /* Marketplace resize presets */
 const MARKETPLACE_SIZES = [
   { value: "none", label: "Sin redimensionar" },
+  { value: "1200x1200", label: "Web Profesional (1200x1200)" },
   { value: "1000x1000", label: "Amazon (1000x1000)" },
   { value: "2048x2048", label: "Shopify (2048x2048)" },
   { value: "1600x1600", label: "Etsy (1600x1600)" },
@@ -86,6 +87,7 @@ const MARKETPLACE_SIZES = [
   { value: "1080x1350", label: "IG Retrato (1080x1350)" },
   { value: "800x800", label: "eBay (800x800)" },
   { value: "1200x1500", label: "Pinterest (1200x1500)" },
+  { value: "custom", label: "Personalizado..." },
 ];
 
 /* Download format options */
@@ -208,6 +210,52 @@ async function addShadow(
   return canvas.convertToBlob({ type: "image/png" });
 }
 
+/**
+ * Auto-trim transparent pixels from a PNG image.
+ * Returns a cropped bitmap with only the visible product content.
+ */
+async function autoTrimTransparent(imageBlob: Blob): Promise<ImageBitmap> {
+  const bitmap = await createImageBitmap(imageBlob);
+  const w = bitmap.width;
+  const h = bitmap.height;
+
+  // Read pixel data to find bounding box of non-transparent pixels
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bitmap, 0, 0);
+  const pixels = ctx.getImageData(0, 0, w, h).data;
+
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y2 = 0; y2 < h; y2++) {
+    for (let x2 = 0; x2 < w; x2++) {
+      const alpha = pixels[(y2 * w + x2) * 4 + 3];
+      if (alpha > 10) { // non-transparent pixel
+        if (x2 < minX) minX = x2;
+        if (x2 > maxX) maxX = x2;
+        if (y2 < minY) minY = y2;
+        if (y2 > maxY) maxY = y2;
+      }
+    }
+  }
+
+  bitmap.close();
+
+  // If no visible pixels found, return original
+  if (maxX <= minX || maxY <= minY) {
+    return createImageBitmap(imageBlob);
+  }
+
+  const cropW = maxX - minX + 1;
+  const cropH = maxY - minY + 1;
+
+  // Create cropped canvas with just the product
+  const croppedCanvas = new OffscreenCanvas(cropW, cropH);
+  const croppedCtx = croppedCanvas.getContext("2d")!;
+  croppedCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+
+  return createImageBitmap(await croppedCanvas.convertToBlob({ type: "image/png" }));
+}
+
 /** Resize image to marketplace dimensions with smart auto-crop */
 async function resizeForMarketplace(
   imageBlob: Blob,
@@ -218,7 +266,9 @@ async function resizeForMarketplace(
   if (sizeStr === "none") return imageBlob;
 
   const [targetW, targetH] = sizeStr.split("x").map(Number);
-  const bitmap = await createImageBitmap(imageBlob);
+
+  // Auto-trim transparent pixels first so the product fills the frame
+  const trimmedBitmap = await autoTrimTransparent(imageBlob);
 
   const canvas = new OffscreenCanvas(targetW, targetH);
   const ctx = canvas.getContext("2d")!;
@@ -229,20 +279,28 @@ async function resizeForMarketplace(
     ctx.fillRect(0, 0, targetW, targetH);
   }
 
-  // Calculate scale to fit with margin
+  // Calculate scale to fit the TRIMMED product with margin
   const marginFraction = autoCropMargin / 100;
   const availW = targetW * (1 - marginFraction * 2);
   const availH = targetH * (1 - marginFraction * 2);
-  const scale = Math.min(availW / bitmap.width, availH / bitmap.height);
+  const scale = Math.min(availW / trimmedBitmap.width, availH / trimmedBitmap.height);
 
-  const drawW = Math.round(bitmap.width * scale);
-  const drawH = Math.round(bitmap.height * scale);
+  const drawW = Math.round(trimmedBitmap.width * scale);
+  const drawH = Math.round(trimmedBitmap.height * scale);
   const x = Math.round((targetW - drawW) / 2);
   const y = Math.round((targetH - drawH) / 2);
 
-  ctx.drawImage(bitmap, x, y, drawW, drawH);
-  bitmap.close();
-  return canvas.convertToBlob({ type: "image/png" });
+  ctx.drawImage(trimmedBitmap, x, y, drawW, drawH);
+  trimmedBitmap.close();
+
+  // Apply light sharpening for crisp product photos
+  // Re-draw with slight sharpening via contrast boost
+  const sharpCanvas = new OffscreenCanvas(targetW, targetH);
+  const sharpCtx = sharpCanvas.getContext("2d")!;
+  sharpCtx.filter = "contrast(1.05) saturate(1.03)";
+  sharpCtx.drawImage(canvas, 0, 0);
+
+  return sharpCanvas.convertToBlob({ type: "image/png" });
 }
 
 /** Convert blob to desired output format */
@@ -277,12 +335,25 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
   const [marketplaceSize, setMarketplaceSize] = useState("none");
   const [autoCropMargin, setAutoCropMargin] = useState(10);
   const [outputFormat, setOutputFormat] = useState("png");
+  const [customW, setCustomW] = useState(1200);
+  const [customH, setCustomH] = useState(1200);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [progressPct, setProgressPct] = useState(0);
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const isFree = selectedProvider === "browser" || selectedProvider === "withoutbg";
+
+  /** One-click E-Commerce mode: white bg, auto-crop, 1200x1200, sharpened */
+  const applyEcommerceMode = useCallback(() => {
+    setSelectedProvider("browser");
+    setOutputType("solid");
+    setBgColor("#ffffff");
+    setShadowType("soft");
+    setMarketplaceSize("1200x1200");
+    setAutoCropMargin(8);
+    setOutputFormat("jpg");
+  }, []);
 
   /* ---- Auto-recommendation based on image ---- */
   const recommendation = useMemo(() => {
@@ -391,7 +462,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         const data = await res.json();
         if (!data.success) throw new Error(data.error || "Error al remover fondo");
 
-        operationCost = data.cost ?? 0.01;
+        operationCost = data.cost ?? 0.004;
 
         // Download the result as blob
         const resultRes = await fetch(data.data.url);
@@ -417,10 +488,11 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         resultBlob = await addShadow(resultBlob, shadowType);
       }
 
-      // 3. Marketplace resize
-      if (marketplaceSize !== "none") {
-        setStatusText("Redimensionando para marketplace...");
-        resultBlob = await resizeForMarketplace(resultBlob, marketplaceSize, autoCropMargin, outputType === "transparent");
+      // 3. Marketplace resize (auto-trims transparent pixels + centers product)
+      const effectiveSize = marketplaceSize === "custom" ? `${customW}x${customH}` : marketplaceSize;
+      if (effectiveSize !== "none") {
+        setStatusText("Recortando y centrando producto...");
+        resultBlob = await resizeForMarketplace(resultBlob, effectiveSize, autoCropMargin, outputType === "transparent");
       }
 
       // 4. Convert format
@@ -445,7 +517,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         setProgressPct(0);
       }, 3000);
     }
-  }, [imageFile, selectedProvider, outputType, bgColor, blurAmount, shadowType, marketplaceSize, autoCropMargin, outputFormat, onProcess]);
+  }, [imageFile, selectedProvider, outputType, bgColor, blurAmount, shadowType, marketplaceSize, autoCropMargin, outputFormat, customW, customH, onProcess]);
 
   return (
     <div className="space-y-4">
@@ -468,6 +540,30 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
           "Para marketplace, elige el formato destino antes de procesar.",
         ]}
       />
+
+      {/* E-Commerce one-click preset */}
+      {imageFile && (
+        <button
+          type="button"
+          onClick={applyEcommerceMode}
+          className="w-full flex items-center gap-2.5 rounded-lg border border-accent/40 bg-accent/10 p-3 text-left transition-all hover:bg-accent/20 hover:border-accent/60"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/20">
+            <Zap className="h-4 w-4 text-accent-light" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[11px] font-bold text-accent-light block">
+              Modo E-Commerce (1 clic)
+            </span>
+            <span className="text-[10px] text-gray-400">
+              Fondo blanco + centrado + 1200x1200 + nitido + sombra
+            </span>
+          </div>
+          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+            Gratis
+          </span>
+        </button>
+      )}
 
       {/* Auto-recommendation banner */}
       {recommendation && imageFile && (
@@ -617,7 +713,31 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         options={MARKETPLACE_SIZES}
       />
 
-      {/* Auto-crop margin (only when marketplace resize is on) */}
+      {/* Custom size inputs */}
+      {marketplaceSize === "custom" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-0.5 block text-[10px] text-gray-500">Ancho (px)</label>
+            <input
+              type="number"
+              value={customW}
+              onChange={(e) => setCustomW(Math.max(100, parseInt(e.target.value) || 100))}
+              className="h-8 w-full rounded-md border border-surface-lighter bg-surface-light px-2 text-xs text-gray-200 focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[10px] text-gray-500">Alto (px)</label>
+            <input
+              type="number"
+              value={customH}
+              onChange={(e) => setCustomH(Math.max(100, parseInt(e.target.value) || 100))}
+              className="h-8 w-full rounded-md border border-surface-lighter bg-surface-light px-2 text-xs text-gray-200 focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Auto-crop margin (when any resize is on) */}
       {marketplaceSize !== "none" && (
         <Slider
           label="Margen de Recorte"
