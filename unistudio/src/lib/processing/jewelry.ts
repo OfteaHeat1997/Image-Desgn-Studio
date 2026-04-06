@@ -7,7 +7,7 @@
 // This works around Kontext's single input_image limitation.
 // =============================================================================
 
-import { runModel, extractOutputUrl } from '@/lib/api/replicate';
+import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 
 // ---------------------------------------------------------------------------
 // Cost constants (USD per call)
