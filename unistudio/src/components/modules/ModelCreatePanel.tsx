@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { User, AlertCircle, ImageIcon, Shirt } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,7 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
         const formData = new FormData();
         formData.append("file", imageFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen de prenda");
         garmentImageUrl = uploadData.data.url;
       }
@@ -149,7 +150,7 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
         setProcessingStep("Aplicando prenda al modelo (Virtual Try-On)...");
       }
 
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!data.success) throw new Error(data.error || "Error al crear modelo");
       onProcess(data.data.url, data.data.baseModelUrl, data.data.cost);

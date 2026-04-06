@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   Film,
   Instagram,
@@ -98,7 +99,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
           duration,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!data.success) throw new Error(data.error || "Error al generar caption");
 
       if (data.data?.caption) {
@@ -139,7 +140,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
         method: "POST",
         body: formData,
       });
-      const uploadData = await uploadRes.json();
+      const uploadData = await safeJson(uploadRes);
       if (!uploadData.success)
         throw new Error(uploadData.error || "Error al subir imagen");
 
@@ -156,7 +157,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
           videoProvider: provider,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!data.success)
         throw new Error(data.error || "Error al crear el anuncio");
 

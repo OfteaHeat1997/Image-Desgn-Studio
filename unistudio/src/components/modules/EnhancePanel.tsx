@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { RotateCcw, Sparkles, SlidersHorizontal } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -144,7 +145,7 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!data.success) {
         throw new Error(data.error || "Error al mejorar imagen");

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { Sun, ImageIcon } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -195,7 +196,7 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
         formData.append("params", JSON.stringify(params));
 
         const res = await fetch("/api/shadows", { method: "POST", body: formData });
-        const data = await res.json();
+        const data = await safeJson(res);
 
         if (!data.success) throw new Error(data.error || "Error al generar sombra");
         onProcess(data.data.url, undefined, 0);
@@ -203,7 +204,7 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
         const formData = new FormData();
         formData.append("file", imageFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
 
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen");
 
@@ -217,7 +218,7 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
             prompt: shadowType === "ai-relight" ? relightPrompt || undefined : kontextPrompt || undefined,
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
 
         if (!data.success) throw new Error(data.error || "Error al generar sombra IA");
         const aiCost = shadowType === "ai-relight" ? 0.04 : 0.05;

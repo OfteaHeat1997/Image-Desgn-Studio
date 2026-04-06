@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   Monitor,
   Cpu,
@@ -445,7 +446,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         const formData = new FormData();
         formData.append("file", imageFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
 
         setStatusText(`Removiendo fondo via ${selectedProvider}...`);
@@ -459,7 +460,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
             provider: selectedProvider,
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success) throw new Error(data.error || "Error al remover fondo");
 
         operationCost = data.cost ?? 0.004;

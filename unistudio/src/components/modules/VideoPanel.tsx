@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   Video,
   Wand2,
@@ -136,7 +137,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           budget: 0, // prefer free providers
         }),
       });
-      const enhanceData = await enhanceRes.json();
+      const enhanceData = await safeJson(enhanceRes);
       if (!enhanceData.success)
         throw new Error(enhanceData.error || "Error en mejora IA");
 
@@ -155,7 +156,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         method: "POST",
         body: formData,
       });
-      const uploadData = await uploadRes.json();
+      const uploadData = await safeJson(uploadRes);
       if (!uploadData.success)
         throw new Error(uploadData.error || "Error al subir imagen");
 
@@ -179,7 +180,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             language: store.language,
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success)
           throw new Error(data.error || "Error al generar avatar");
 
@@ -216,7 +217,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             mode: "auto",
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success)
           throw new Error(data.error || "Error al generar video");
 
@@ -268,7 +269,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           method: "POST",
           body: formData,
         });
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
         if (!uploadData.success)
           throw new Error(uploadData.error || "Error al subir imagen");
 
@@ -284,7 +285,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             language: store.language,
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success)
           throw new Error(data.error || "Error al generar avatar");
 
@@ -309,7 +310,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           method: "POST",
           body: formData,
         });
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
         if (!uploadData.success)
           throw new Error(uploadData.error || "Error al subir imagen");
 
@@ -333,7 +334,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             mode: store.mode,
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success)
           throw new Error(data.error || "Error al generar video");
 

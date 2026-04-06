@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   Sparkles,
   Wand2,
@@ -182,7 +183,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
           },
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!data.success) throw new Error(data.error || "Error al pedir conceptos");
 
       setConcepts(data.data.concepts);
@@ -227,7 +228,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
         const formData = new FormData();
         formData.append("file", imageFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
 
         setStatusText("La IA esta creando tu foto...");
@@ -244,7 +245,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
             aspectRatio: concept.aspectRatio,
           }),
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success) throw new Error(data.error || "Error al generar");
 
         setProgressPct(100);

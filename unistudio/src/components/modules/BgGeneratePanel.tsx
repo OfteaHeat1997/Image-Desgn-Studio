@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { Sparkles, Zap, Monitor, Cpu, Wand2, Image as ImageIcon } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -256,7 +257,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
                 },
               }),
             });
-            const promptData = await promptRes.json();
+            const promptData = await safeJson(promptRes);
             if (promptData.success) {
               optimizedPrompt = promptData.data.prompt;
               console.log("[bg-generate] Claude optimized:", optimizedPrompt);
@@ -283,7 +284,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           const text = await uploadRes.text().catch(() => "");
           throw new Error(text.startsWith("{") ? JSON.parse(text).error : `Error al subir imagen (${uploadRes.status})`);
         }
-        const uploadData = await uploadRes.json();
+        const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
 
         setStatusText("Generando fondo con IA (Replicate)...");
@@ -304,7 +305,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           const text = await res.text().catch(() => "");
           throw new Error(text.startsWith("{") ? JSON.parse(text).error : `Error del servidor (${res.status})`);
         }
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.success) throw new Error(data.error || "Error al generar el fondo");
 
         setProgressPct(100);

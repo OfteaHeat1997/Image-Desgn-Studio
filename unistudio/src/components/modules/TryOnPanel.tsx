@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { Shirt, Info, Sparkles, CheckCircle2, Circle, Upload, ImageIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -138,14 +139,14 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
       const modelFormData = new FormData();
       modelFormData.append("file", modelFile);
       const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
-      const modelUploadData = await modelUploadRes.json();
+      const modelUploadData = await safeJson(modelUploadRes);
       if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir imagen del modelo");
 
       // Step 2: Upload garment image
       const garmentFormData = new FormData();
       garmentFormData.append("file", imageFile);
       const garmentUploadRes = await fetch("/api/upload", { method: "POST", body: garmentFormData });
-      const garmentUploadData = await garmentUploadRes.json();
+      const garmentUploadData = await safeJson(garmentUploadRes);
       if (!garmentUploadData.success) throw new Error(garmentUploadData.error || "Error al subir imagen de la prenda");
 
       // Step 3: Call try-on API
@@ -162,7 +163,7 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
           provider: effectiveProvider,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!data.success) throw new Error(data.error || "Error en la generacion de prueba virtual");
 

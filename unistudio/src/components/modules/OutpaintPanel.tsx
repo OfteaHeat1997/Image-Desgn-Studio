@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   Expand,
   ArrowUp,
@@ -117,7 +118,7 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
           provider,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!data.success) throw new Error(data.error || "Error al extender imagen");
 
       setStatus("Listo!");

@@ -3,10 +3,8 @@
 import React, { useEffect } from "react";
 import { Palette, ExternalLink, Droplets, Type, ImageIcon, CheckCircle, XCircle } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils/cn";
-import { toast } from "@/hooks/use-toast";
 import { useBrandStore } from "@/stores/brand-store";
 
 /* ------------------------------------------------------------------ */

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { ArrowUpCircle, Sparkles } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
       const formData = new FormData();
       formData.append("file", imageFile);
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      const uploadData = await uploadRes.json();
+      const uploadData = await safeJson(uploadRes);
       if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen");
 
       const body: Record<string, unknown> = {
@@ -105,7 +106,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!data.success) {
         throw new Error(data.error || "Error al escalar imagen");

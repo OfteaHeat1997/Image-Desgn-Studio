@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   ShoppingBag,
   User,
@@ -252,7 +253,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         formData.append("file", imageFile);
         const res = await fetch("/api/analyze-image", { method: "POST", body: formData });
         if (!res.ok) throw new Error(`Analysis failed: ${res.status}`);
-        const json = await res.json();
+        const json = await safeJson(res);
         if (!cancelled && json.success && json.data) {
           setImageAnalysis(json.data as ImageAnalysis);
         }

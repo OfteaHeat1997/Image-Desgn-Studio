@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useId } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import {
   Layers,
   Plus,
@@ -174,7 +175,7 @@ async function uploadFile(file: File): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch("/api/upload", { method: "POST", body: form });
-  const data = await res.json();
+  const data = await safeJson(res);
   if (!data.success) throw new Error(data.error || "Error al subir imagen");
   return data.data.url as string;
 }
@@ -206,7 +207,7 @@ async function callStep(
     });
   }
 
-  const data = await res.json();
+  const data = await safeJson(res);
   if (!data.success) {
     throw new Error(data.error || `Error en paso: ${step.operation}`);
   }

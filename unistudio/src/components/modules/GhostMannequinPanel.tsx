@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
 import { Shirt, ArrowRightLeft, X } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,7 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
       const formData = new FormData();
       formData.append("file", imageFile);
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-      const uploadData = await uploadRes.json();
+      const uploadData = await safeJson(uploadRes);
       if (!uploadData.success) throw new Error(uploadData.error || "Error al subir la imagen");
 
       // Upload model image if needed
@@ -114,7 +115,7 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
         const modelFormData = new FormData();
         modelFormData.append("file", modelFile);
         const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
-        const modelUploadData = await modelUploadRes.json();
+        const modelUploadData = await safeJson(modelUploadRes);
         if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir la imagen de modelo");
         modelImageUrl = modelUploadData.data.url;
       }
@@ -131,7 +132,7 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
           category,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!data.success) throw new Error(data.error || "Error al procesar la imagen");
 
