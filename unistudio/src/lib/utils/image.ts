@@ -72,7 +72,7 @@ export function blobToFile(blob: Blob, filename: string): File {
  * (api.replicate.com/v1/files/*) require Bearer token authentication.
  */
 export function replicateHeaders(url: string): Record<string, string> {
-  if (url.includes('api.replicate.com') && process.env.REPLICATE_API_TOKEN) {
+  if (url.includes('api.replicate.com/v1/files') && process.env.REPLICATE_API_TOKEN) {
     return { Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}` };
   }
   return {};

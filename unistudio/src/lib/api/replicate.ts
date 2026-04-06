@@ -129,9 +129,11 @@ export async function ensureHttpUrl(url: string): Promise<string> {
     const file = new File([blob], `upload.${ext}`, { type: mimeType });
 
     const fileOutput = await client.files.create(file);
-    // The Replicate files API returns an object with urls.get
+    // The Replicate files API returns urls.get pointing to the metadata endpoint.
+    // Append /content to get the actual file content URL.
     if (fileOutput && fileOutput.urls && fileOutput.urls.get) {
-      return fileOutput.urls.get;
+      const baseUrl = fileOutput.urls.get.replace(/\/content$/, '');
+      return `${baseUrl}/content`;
     }
     throw new ReplicateApiError('Failed to upload file to Replicate', 'UPLOAD_FAILED');
   }
