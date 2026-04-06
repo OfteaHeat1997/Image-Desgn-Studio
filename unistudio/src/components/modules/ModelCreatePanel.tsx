@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { User, AlertCircle } from "lucide-react";
+import { User, AlertCircle, ImageIcon, Shirt } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -73,6 +73,19 @@ const EXPRESSION_OPTIONS = [
   { value: "relaxed", label: "Relajada" },
 ];
 
+const GARMENT_CATEGORY_OPTIONS = [
+  { value: "tops", label: "Superior (blusas, brasieres, tops)" },
+  { value: "bottoms", label: "Inferior (pantalones, faldas)" },
+  { value: "dresses", label: "Vestidos / Enterizos" },
+];
+
+const GARMENT_TYPE_OPTIONS = [
+  { value: "general", label: "Ropa general" },
+  { value: "lingerie", label: "Lenceria / Ropa interior" },
+  { value: "swimwear", label: "Traje de bano / Bikini" },
+  { value: "bodysuit", label: "Body / Enterizo" },
+];
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
@@ -86,14 +99,34 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
   const [expression, setExpression] = useState("neutral");
   const [hairStyle, setHairStyle] = useState("");
   const [additionalDesc, setAdditionalDesc] = useState("");
+  const [garmentCategory, setGarmentCategory] = useState("tops");
+  const [garmentType, setGarmentType] = useState("lingerie");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStep, setProcessingStep] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const hasGarment = !!imageFile;
 
   const handleGenerate = useCallback(async () => {
     setIsProcessing(true);
     setErrorMsg(null);
 
     try {
+      let garmentImageUrl: string | undefined;
+
+      // If user uploaded a garment image, upload it first
+      if (imageFile) {
+        setProcessingStep("Subiendo imagen de prenda...");
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        const uploadData = await uploadRes.json();
+        if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen de prenda");
+        garmentImageUrl = uploadData.data.url;
+      }
+
+      setProcessingStep(garmentImageUrl ? "Generando modelo base..." : "Generando modelo...");
+
       const res = await fetch("/api/model-create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -106,19 +139,31 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
           expression,
           hairStyle: hairStyle || undefined,
           customDetails: additionalDesc || undefined,
+          garmentImage: garmentImageUrl,
+          garmentCategory: garmentImageUrl ? garmentCategory : undefined,
+          garmentType: garmentImageUrl ? garmentType : undefined,
         }),
       });
+
+      if (garmentImageUrl) {
+        setProcessingStep("Aplicando prenda al modelo (Virtual Try-On)...");
+      }
+
       const data = await res.json();
 
       if (!data.success) throw new Error(data.error || "Error al crear modelo");
-      onProcess(data.data.url, undefined, data.data.cost);
+      onProcess(data.data.url, data.data.baseModelUrl, data.data.cost);
     } catch (error) {
       console.error("Model creation error:", error);
       setErrorMsg(error instanceof Error ? error.message : "Error al crear modelo");
     } finally {
       setIsProcessing(false);
+      setProcessingStep("");
     }
-  }, [gender, age, skinTone, bodyType, pose, expression, hairStyle, additionalDesc, onProcess]);
+  }, [gender, age, skinTone, bodyType, pose, expression, hairStyle, additionalDesc, imageFile, garmentCategory, garmentType, onProcess]);
+
+  // Cost depends on whether garment will be applied
+  const estimatedCost = hasGarment ? "$0.075 - $0.105" : "$0.055";
 
   return (
     <div className="space-y-5">
@@ -251,6 +296,40 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
         />
       </div>
 
+      {/* Garment image info */}
+      {hasGarment && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Shirt className="h-4 w-4 text-accent" />
+            <span className="text-xs font-medium text-accent">Prenda detectada — se aplicara al modelo</span>
+          </div>
+          <p className="text-[10px] text-gray-400">
+            La prenda de tu imagen se vestira automaticamente en el modelo generado usando Virtual Try-On.
+          </p>
+          <Select
+            label="Categoria de prenda"
+            value={garmentCategory}
+            onValueChange={setGarmentCategory}
+            options={GARMENT_CATEGORY_OPTIONS}
+          />
+          <Select
+            label="Tipo de prenda"
+            value={garmentType}
+            onValueChange={setGarmentType}
+            options={GARMENT_TYPE_OPTIONS}
+          />
+        </div>
+      )}
+
+      {!hasGarment && (
+        <div className="flex items-start gap-2 rounded-lg border border-surface-lighter bg-surface-light p-3">
+          <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+          <p className="text-[10px] text-gray-400">
+            Sube una imagen de tu prenda en el canvas para que el modelo la use automaticamente. Sin imagen, se genera solo el modelo base.
+          </p>
+        </div>
+      )}
+
       {/* Inline error card */}
       {errorMsg && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
@@ -268,7 +347,11 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
         loading={isProcessing}
         leftIcon={<User className="h-4 w-4" />}
       >
-        {isProcessing ? "Generando Modelo..." : "Generar Modelo ($0.055)"}
+        {isProcessing
+          ? processingStep || "Generando Modelo..."
+          : hasGarment
+            ? `Generar Modelo + Vestir (${estimatedCost})`
+            : "Generar Modelo ($0.055)"}
       </Button>
 
     </div>

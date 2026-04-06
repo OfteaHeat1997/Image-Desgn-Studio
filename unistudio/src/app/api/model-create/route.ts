@@ -6,11 +6,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
+import { runFashn, pollFashn } from '@/lib/api/fashn';
+import type { FashnCategory } from '@/lib/api/fashn';
 import { saveJob } from '@/lib/db/persist';
 import { saveAiModel } from '@/lib/db/queries';
 
-// Cost estimate in dollars
-const COST = 0.055;
+// Cost estimates in dollars
+const MODEL_GEN_COST = 0.055;
+const TRYON_COSTS: Record<string, number> = {
+  'idm-vton': 0.02,
+  fashn: 0.05,
+};
+
+// Garment types that prefer IDM-VTON
+const IDM_VTON_PREFERRED_TYPES = new Set([
+  'lingerie', 'swimwear', 'underwear', 'bikini', 'bodysuit', 'intimate',
+]);
 
 // ---------------------------------------------------------------------------
 // Prompt builder
@@ -88,6 +99,78 @@ function buildModelPrompt(options: ModelCreateOptions): string {
 }
 
 // ---------------------------------------------------------------------------
+// Try-on helpers (used when garment image is provided)
+// ---------------------------------------------------------------------------
+
+function toIdmVtonCategory(cat: string): string {
+  const map: Record<string, string> = {
+    tops: 'upper_body',
+    'upper-body': 'upper_body',
+    upper_body: 'upper_body',
+    bottoms: 'lower_body',
+    'lower-body': 'lower_body',
+    lower_body: 'lower_body',
+    dresses: 'dresses',
+    'one-pieces': 'dresses',
+    'full-body': 'dresses',
+  };
+  return map[cat] ?? 'upper_body';
+}
+
+function toFashnCategory(category: string): FashnCategory {
+  switch (category) {
+    case 'dresses':
+    case 'one-pieces':
+      return 'one-pieces';
+    case 'outerwear':
+    case 'tops':
+      return 'tops';
+    case 'bottoms':
+      return 'bottoms';
+    default:
+      return 'auto';
+  }
+}
+
+async function applyGarment(
+  modelImageUrl: string,
+  garmentImageUrl: string,
+  category: string,
+  garmentType?: string,
+): Promise<{ url: string; provider: string; cost: number }> {
+  const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
+
+  // For intimate/lingerie garments, always use IDM-VTON
+  if (isIntimate || !process.env.FASHN_API_KEY) {
+    const output = await runModel(
+      'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
+      {
+        human_img: modelImageUrl,
+        garm_img: garmentImageUrl,
+        category: toIdmVtonCategory(category),
+        is_checked: true,
+        is_checked_crop: false,
+        denoise_steps: 30,
+        seed: -1,
+      },
+    );
+    return { url: extractOutputUrl(output), provider: 'idm-vton', cost: TRYON_COSTS['idm-vton'] };
+  }
+
+  // FASHN when available
+  const id = await runFashn({
+    model_image: modelImageUrl,
+    garment_image: garmentImageUrl,
+    category: toFashnCategory(category),
+  });
+  const result = await pollFashn(id);
+  if (result.output && result.output.length > 0) {
+    return { url: result.output[0], provider: 'fashn', cost: TRYON_COSTS['fashn'] };
+  }
+  throw new Error('FASHN prediction completed but returned no output');
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
@@ -108,7 +191,14 @@ export async function POST(request: NextRequest) {
       ethnicity,
       height,
       customDetails,
-    } = body as ModelCreateOptions;
+      garmentImage,
+      garmentCategory,
+      garmentType,
+    } = body as ModelCreateOptions & {
+      garmentImage?: string;
+      garmentCategory?: string;
+      garmentType?: string;
+    };
 
     // Validate required fields
     if (!gender) {
@@ -148,6 +238,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // When garment provided, generate model wearing minimal clothing for better try-on
+    const promptClothing = garmentImage
+      ? 'wearing a plain white fitted tank top and neutral shorts'
+      : clothing;
+
     // Build the prompt
     const prompt = buildModelPrompt({
       gender,
@@ -159,29 +254,45 @@ export async function POST(request: NextRequest) {
       hairStyle,
       hairColor,
       background,
-      clothing,
+      clothing: promptClothing,
       ethnicity,
       height,
       customDetails,
     });
 
-    // Generate model using Flux Kontext Pro via Replicate
+    // Step 1: Generate base model using Flux Kontext Pro
     const output = await runModel('black-forest-labs/flux-kontext-pro', {
       prompt,
       aspect_ratio: '3:4',
     });
 
-    let resultUrl: string;
-    resultUrl = extractOutputUrl(output);
+    const baseModelUrl = extractOutputUrl(output);
+    let totalCost = MODEL_GEN_COST;
+
+    // Step 2: If garment image provided, apply it via Virtual Try-On
+    let finalUrl = baseModelUrl;
+    let tryonProvider: string | null = null;
+
+    if (garmentImage) {
+      const tryonResult = await applyGarment(
+        baseModelUrl,
+        garmentImage,
+        garmentCategory || 'tops',
+        garmentType,
+      );
+      finalUrl = tryonResult.url;
+      tryonProvider = tryonResult.provider;
+      totalCost += tryonResult.cost;
+    }
 
     // Save processing job
     await saveJob({
       operation: 'model-create',
-      provider: 'flux-kontext-pro',
+      provider: tryonProvider ? `flux-kontext-pro+${tryonProvider}` : 'flux-kontext-pro',
       model: 'black-forest-labs/flux-kontext-pro',
-      inputParams: { gender, ageRange, skinTone, bodyType, pose, expression, prompt },
-      outputUrl: resultUrl,
-      cost: COST,
+      inputParams: { gender, ageRange, skinTone, bodyType, pose, expression, prompt, garmentImage: !!garmentImage },
+      outputUrl: finalUrl,
+      cost: totalCost,
     });
 
     // Save to AI models library
@@ -194,16 +305,18 @@ export async function POST(request: NextRequest) {
       skinTone,
       bodyType,
       pose,
-      previewUrl: resultUrl,
-      metadata: { expression, hairStyle, hairColor, background, clothing, ethnicity, height, prompt },
+      previewUrl: finalUrl,
+      metadata: { expression, hairStyle, hairColor, background, clothing, ethnicity, height, prompt, garmentApplied: !!garmentImage },
     });
 
     return NextResponse.json({
       success: true,
       data: {
-        url: resultUrl,
+        url: finalUrl,
+        baseModelUrl: garmentImage ? baseModelUrl : undefined,
         prompt,
-        cost: COST,
+        cost: totalCost,
+        tryonProvider,
         modelId: savedModel?.id ?? null,
         options: {
           gender,
