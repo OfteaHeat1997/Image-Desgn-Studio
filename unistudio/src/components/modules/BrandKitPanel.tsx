@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Palette, ExternalLink, Droplets, Type, ImageIcon, CheckCircle, XCircle } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Badge } from "@/components/ui/badge";
@@ -40,13 +40,8 @@ function ColorSwatch({ color, label }: { color: string; label: string }) {
 export function BrandKitPanel({ imageFile, onProcess: _onProcess }: BrandKitPanelProps) {
   const brandKit = useBrandStore((s) => s.brandKit);
 
-  // Re-read from localStorage on mount so the panel reflects any changes
-  // made on the /brand-kit page (store persists across nav via Zustand).
-  useEffect(() => {
-    // Nothing to fetch — useBrandStore is a Zustand store that persists
-    // its state in memory across page navigations within the same session.
-    // Users who edited the kit on /brand-kit will see updates here.
-  }, []);
+  // useBrandStore is a Zustand store that persists its state in memory
+  // across page navigations — no fetch needed on mount.
 
   const hasLogo = Boolean(brandKit.logoUrl);
   const watermarkEnabled = brandKit.watermark?.enabled ?? false;

@@ -9,7 +9,7 @@ import { useCallback } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import { DEFAULT_FILTERS } from '@/types/editor';
 import type { ImageLayer, Tool, ExportFormat } from '@/types/editor';
-import { fileToBase64, getImageDimensions } from '@/lib/utils/image';
+import { getImageDimensions } from '@/lib/utils/image';
 import { nanoid } from 'nanoid';
 
 // -----------------------------------------------------------------------------

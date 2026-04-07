@@ -29,7 +29,6 @@ const PLATFORM_SPECS: Record<string, { aspectRatio: string; description: string 
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
   kontext: 0.05,
-  'flux-fill': 0.025,
 };
 
 export async function POST(request: NextRequest) {
@@ -85,33 +84,15 @@ export async function POST(request: NextRequest) {
       'Extend the image naturally, maintaining consistent lighting, perspective, and style. ' +
       'Fill the extended area with appropriate background content that matches the original scene.';
 
-    if (provider === 'kontext' || !provider) {
-      // Use Flux Kontext Pro via Replicate for instruction-based outpainting
-      const fullPrompt = `Extend this image to ${aspectRatio} aspect ratio. ${outpaintPrompt}`;
-      const output = await runModel('black-forest-labs/flux-kontext-pro', {
-        input_image: imageUrl,
-        prompt: fullPrompt,
-        aspect_ratio: aspectRatio,
-      });
-      resultUrl = await extractOutputUrl(output);
-    } else if (provider === 'flux-fill') {
-      // Use Flux Fill Dev via Replicate — mask-free outpainting at lower cost
-      const fillPrompt = `${outpaintPrompt} Seamlessly extended image with consistent lighting and style.`;
-      const output = await runModel('black-forest-labs/flux-fill-dev', {
-        image: imageUrl,
-        prompt: fillPrompt,
-        aspect_ratio: aspectRatio,
-      });
-      resultUrl = await extractOutputUrl(output);
-    } else {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Unsupported provider "${provider}". Use "kontext" or "flux-fill".`,
-        },
-        { status: 400 },
-      );
-    }
+    // Use Flux Kontext Pro — the only provider that supports aspect_ratio-based outpainting.
+    // (flux-fill-dev requires a mask image which we can't generate server-side)
+    const fullPrompt = `Extend this image to ${aspectRatio} aspect ratio. ${outpaintPrompt}`;
+    const output = await runModel('black-forest-labs/flux-kontext-pro', {
+      input_image: imageUrl,
+      prompt: fullPrompt,
+      aspect_ratio: aspectRatio,
+    });
+    resultUrl = await extractOutputUrl(output);
 
     await saveJob({
       operation: 'outpaint',

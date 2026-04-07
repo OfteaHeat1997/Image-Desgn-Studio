@@ -137,7 +137,7 @@ const OP_ENDPOINT: Record<string, string> = {
 /* Default params per operation */
 const OP_DEFAULT_PARAMS: Record<string, Record<string, unknown>> = {
   "bg-remove": { provider: "replicate" },
-  "bg-generate": { mode: "precise", style: "studio-white", prompt: "fondo blanco profesional para e-commerce" },
+  "bg-generate": { mode: "precise", style: "studio-white", customPrompt: "fondo blanco profesional para e-commerce" },
   "enhance": { preset: "ecommerce" },
   "shadows": { type: "drop" },
   "inpaint": { provider: "kontext", prompt: "eliminar objeto no deseado" },

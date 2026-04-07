@@ -58,7 +58,7 @@ const DEFAULT_BRAND_KIT: BrandKit = {
     imageUrl: '',
   },
   defaultBgStyle: 'studio-white',
-  defaultEnhancePreset: 'product-clean',
+  defaultEnhancePreset: 'ecommerce',
 };
 
 // -----------------------------------------------------------------------------

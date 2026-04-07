@@ -157,7 +157,7 @@ export interface OutpaintOptions {
 // Virtual Try-On
 // -----------------------------------------------------------------------------
 
-export type TryOnProvider = 'idm-vton' | 'kolors' | 'fashn';
+export type TryOnProvider = 'idm-vton' | 'fashn';
 export type GarmentCategory = 'tops' | 'bottoms' | 'one-pieces' | 'dresses' | 'outerwear' | 'full-body';
 
 export interface TryOnOptions {

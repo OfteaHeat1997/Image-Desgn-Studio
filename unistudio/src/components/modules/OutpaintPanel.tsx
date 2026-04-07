@@ -56,7 +56,7 @@ const PLATFORM_PRESETS: PlatformPreset[] = [
 
 export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
-  const [provider, setProvider] = useState<"kontext" | "flux-fill">("kontext");
+  const provider = "kontext"; // Only kontext supports aspect_ratio-based outpainting
   const [customWidth, setCustomWidth] = useState(2000);
   const [customHeight, setCustomHeight] = useState(2000);
   const [extendTop, setExtendTop] = useState(true);

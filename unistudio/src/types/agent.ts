@@ -18,7 +18,8 @@ export type AgentModule =
   | 'inpaint'
   | 'video'
   | 'ad-create'
-  | 'jewelry-tryon';
+  | 'jewelry-tryon'
+  | 'ghost-mannequin';
 
 /** Product categories for Unistyles inventory */
 export type ProductCategory =

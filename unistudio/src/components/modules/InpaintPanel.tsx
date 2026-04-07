@@ -24,6 +24,8 @@ interface InpaintPanelProps {
 
 const PROVIDER_OPTIONS = [
   { value: "kontext", label: "Kontext Pro ($0.05)" },
+  { value: "flux-fill-pro", label: "Flux Fill Pro ($0.05)" },
+  { value: "flux-fill-dev", label: "Flux Fill Dev ($0.03)" },
 ];
 
 interface QuickPreset {
