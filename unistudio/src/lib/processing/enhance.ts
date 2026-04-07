@@ -33,61 +33,61 @@ export const ENHANCE_PRESETS: Record<string, EnhancePreset> = {
     name: 'Auto',
     description: 'Balanced automatic enhancement for general product photos',
     brightness: 5,
-    contrast: 10,
+    contrast: 8,
     saturation: 5,
-    sharpness: 30,
-    exposure: 5,
+    sharpness: 15,
+    exposure: 3,
     whiteBalance: 5500,
-    noiseReduction: 15,
-    vibrance: 10,
+    noiseReduction: 5,
+    vibrance: 5,
   },
   ecommerce: {
     name: 'E-Commerce',
     description: 'Clean and bright for online marketplaces',
-    brightness: 10,
-    contrast: 15,
+    brightness: 8,
+    contrast: 10,
     saturation: 5,
-    sharpness: 40,
-    exposure: 10,
+    sharpness: 20,
+    exposure: 5,
     whiteBalance: 5500,
-    noiseReduction: 20,
+    noiseReduction: 8,
     vibrance: 5,
   },
   fashion: {
     name: 'Fashion',
     description: 'Vibrant and eye-catching for fashion products',
     brightness: 5,
-    contrast: 20,
-    saturation: 15,
-    sharpness: 35,
-    exposure: 5,
+    contrast: 15,
+    saturation: 10,
+    sharpness: 20,
+    exposure: 3,
     whiteBalance: 5200,
-    noiseReduction: 10,
-    vibrance: 20,
+    noiseReduction: 5,
+    vibrance: 10,
   },
   beauty: {
     name: 'Beauty',
     description: 'Soft and flattering for cosmetics and skincare',
-    brightness: 8,
+    brightness: 5,
     contrast: 5,
-    saturation: 10,
-    sharpness: 20,
-    exposure: 8,
+    saturation: 8,
+    sharpness: 10,
+    exposure: 5,
     whiteBalance: 5800,
-    noiseReduction: 25,
-    vibrance: 15,
+    noiseReduction: 10,
+    vibrance: 8,
   },
   luxury: {
     name: 'Luxury',
     description: 'Rich and dramatic for high-end products',
     brightness: 0,
-    contrast: 25,
-    saturation: 10,
-    sharpness: 45,
-    exposure: -5,
+    contrast: 18,
+    saturation: 8,
+    sharpness: 25,
+    exposure: -3,
     whiteBalance: 5000,
-    noiseReduction: 15,
-    vibrance: 15,
+    noiseReduction: 5,
+    vibrance: 10,
   },
   natural: {
     name: 'Natural',
@@ -104,50 +104,50 @@ export const ENHANCE_PRESETS: Record<string, EnhancePreset> = {
   'bright-airy': {
     name: 'Bright & Airy',
     description: 'Light and ethereal for lifestyle photography',
-    brightness: 20,
-    contrast: -5,
-    saturation: -5,
-    sharpness: 20,
-    exposure: 15,
+    brightness: 15,
+    contrast: -3,
+    saturation: -3,
+    sharpness: 10,
+    exposure: 10,
     whiteBalance: 6000,
-    noiseReduction: 10,
-    vibrance: 5,
+    noiseReduction: 5,
+    vibrance: 3,
   },
   'dark-moody': {
     name: 'Dark & Moody',
     description: 'Deep shadows and rich tones for dramatic effect',
-    brightness: -15,
-    contrast: 30,
-    saturation: 10,
-    sharpness: 35,
-    exposure: -10,
+    brightness: -10,
+    contrast: 20,
+    saturation: 8,
+    sharpness: 20,
+    exposure: -8,
     whiteBalance: 4500,
-    noiseReduction: 10,
-    vibrance: 10,
+    noiseReduction: 5,
+    vibrance: 5,
   },
   vintage: {
     name: 'Vintage',
     description: 'Warm retro tones with subtle fading',
     brightness: 5,
-    contrast: -10,
-    saturation: -15,
-    sharpness: 10,
-    exposure: 5,
+    contrast: -5,
+    saturation: -10,
+    sharpness: 8,
+    exposure: 3,
     whiteBalance: 6500,
-    noiseReduction: 5,
-    vibrance: -10,
+    noiseReduction: 3,
+    vibrance: -5,
   },
   'crisp-clean': {
     name: 'Crisp & Clean',
     description: 'Maximum sharpness and clarity for detail-oriented products',
-    brightness: 5,
-    contrast: 15,
-    saturation: 5,
-    sharpness: 60,
-    exposure: 5,
+    brightness: 3,
+    contrast: 10,
+    saturation: 3,
+    sharpness: 35,
+    exposure: 3,
     whiteBalance: 5500,
-    noiseReduction: 30,
-    vibrance: 10,
+    noiseReduction: 8,
+    vibrance: 5,
   },
 };
 
@@ -248,13 +248,18 @@ export async function enhanceImage(
 ): Promise<Buffer> {
   let pipeline = sharp(imageBuffer);
 
-  // 1. Noise reduction via median filter
-  // median expects an odd integer >= 3
+  // 1. Noise reduction — use gentle gaussian blur for low values,
+  // only use median filter for aggressive noise reduction (>50)
   if (options.noiseReduction > 0) {
-    const medianSize = Math.max(3, Math.round(options.noiseReduction / 20) * 2 + 1);
-    // Cap at a reasonable value
-    const clampedMedian = clamp(medianSize, 3, 9);
-    pipeline = pipeline.median(clampedMedian);
+    if (options.noiseReduction > 50) {
+      // Heavy noise: median filter (size 3 only — larger sizes cause cartoon effect)
+      pipeline = pipeline.median(3);
+    } else if (options.noiseReduction > 10) {
+      // Light-moderate noise: gentle gaussian blur preserves detail better
+      const sigma = 0.3 + (options.noiseReduction / 100) * 0.7;
+      pipeline = pipeline.blur(clamp(sigma, 0.3, 1.0));
+    }
+    // noiseReduction <= 10: skip — too subtle to matter
   }
 
   // 2. White balance via recomb matrix
@@ -303,19 +308,18 @@ export async function enhanceImage(
     );
   }
 
-  // 5. Sharpness via unsharp mask
+  // 5. Sharpness via unsharp mask (subtle — avoid cartoon halos)
   if (options.sharpness > 0) {
-    // sigma controls the radius of the gaussian blur used for unsharp masking
-    const sigma = 0.5 + (options.sharpness / 100) * 2.0;
-    // flat: threshold for flat areas (reduce noise amplification)
-    const flat = Math.max(1, 10 - (options.sharpness / 100) * 8);
-    // jagged: threshold for jagged areas (reduce halo artifacts)
-    const jagged = Math.max(1, 8 - (options.sharpness / 100) * 6);
+    // Keep sigma low to avoid harsh edges
+    const sigma = 0.5 + (options.sharpness / 100) * 1.0;
+    // Higher flat/jagged thresholds = less sharpening in smooth/edge areas
+    const flat = Math.max(3, 10 - (options.sharpness / 100) * 5);
+    const jagged = Math.max(2, 8 - (options.sharpness / 100) * 4);
 
     pipeline = pipeline.sharpen(
-      clamp(sigma, 0.5, 3.0),
-      clamp(flat, 1, 10),
-      clamp(jagged, 1, 8),
+      clamp(sigma, 0.5, 1.5),
+      clamp(flat, 3, 10),
+      clamp(jagged, 2, 8),
     );
   }
 

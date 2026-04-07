@@ -55,16 +55,16 @@ interface PresetDef {
  * NOTE: exposure here is in the -2..2 range for the slider; the lib uses -100..100.
  */
 const PRESETS: PresetDef[] = [
-  { id: "auto", name: "Auto", settings: { brightness: 5, contrast: 10, saturation: 5, sharpness: 30, noiseReduction: 15 } },
-  { id: "ecommerce", name: "E-Commerce", settings: { brightness: 10, contrast: 15, saturation: 5, sharpness: 40, noiseReduction: 20 } },
-  { id: "fashion", name: "Moda", settings: { brightness: 5, contrast: 20, saturation: 15, sharpness: 35, noiseReduction: 10 } },
-  { id: "beauty", name: "Belleza", settings: { brightness: 8, contrast: 5, saturation: 10, sharpness: 20, noiseReduction: 25 } },
-  { id: "luxury", name: "Lujo", settings: { brightness: 0, contrast: 25, saturation: 10, sharpness: 45, noiseReduction: 15 } },
-  { id: "natural", name: "Natural", settings: { brightness: 2, contrast: 5, saturation: 0, sharpness: 15, noiseReduction: 10 } },
-  { id: "bright-airy", name: "Luminoso", settings: { brightness: 20, contrast: -5, saturation: -5, sharpness: 20, exposure: 0.3, noiseReduction: 10 } },
-  { id: "dark-moody", name: "Dramatico", settings: { brightness: -15, contrast: 30, saturation: 10, sharpness: 35, noiseReduction: 10 } },
-  { id: "vintage", name: "Vintage", settings: { brightness: 5, contrast: -10, saturation: -15, sharpness: 10, noiseReduction: 5, whiteBalance: "warm" } },
-  { id: "crisp-clean", name: "Nitido", settings: { brightness: 5, contrast: 15, saturation: 5, sharpness: 60, noiseReduction: 30 } },
+  { id: "auto", name: "Auto", settings: { brightness: 5, contrast: 8, saturation: 5, sharpness: 15, noiseReduction: 5 } },
+  { id: "ecommerce", name: "E-Commerce", settings: { brightness: 8, contrast: 10, saturation: 5, sharpness: 20, noiseReduction: 8 } },
+  { id: "fashion", name: "Moda", settings: { brightness: 5, contrast: 15, saturation: 10, sharpness: 20, noiseReduction: 5 } },
+  { id: "beauty", name: "Belleza", settings: { brightness: 5, contrast: 5, saturation: 8, sharpness: 10, noiseReduction: 10 } },
+  { id: "luxury", name: "Lujo", settings: { brightness: 0, contrast: 18, saturation: 8, sharpness: 25, noiseReduction: 5 } },
+  { id: "natural", name: "Natural", settings: { brightness: 2, contrast: 5, saturation: 0, sharpness: 8, noiseReduction: 5 } },
+  { id: "bright-airy", name: "Luminoso", settings: { brightness: 15, contrast: -3, saturation: -3, sharpness: 10, exposure: 0.2, noiseReduction: 5 } },
+  { id: "dark-moody", name: "Dramatico", settings: { brightness: -10, contrast: 20, saturation: 8, sharpness: 20, noiseReduction: 5 } },
+  { id: "vintage", name: "Vintage", settings: { brightness: 5, contrast: -5, saturation: -10, sharpness: 8, noiseReduction: 3, whiteBalance: "warm" } },
+  { id: "crisp-clean", name: "Nitido", settings: { brightness: 3, contrast: 10, saturation: 3, sharpness: 35, noiseReduction: 8 } },
 ];
 
 const WHITE_BALANCE_OPTIONS = [
