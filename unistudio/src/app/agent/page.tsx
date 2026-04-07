@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Upload,
@@ -95,6 +96,16 @@ const CATEGORIES: { value: ProductCategory; label: string; emoji: string }[] = [
 /* ================================================================== */
 
 export default function AgentPage() {
+  return (
+    <Suspense>
+      <AgentPageInner />
+    </Suspense>
+  );
+}
+
+function AgentPageInner() {
+  const searchParams = useSearchParams();
+
   /* ── State ─────────────────────────────────────────────────── */
   const [step, setStep] = useState<"choose" | "upload" | "config" | "processing" | "done">("choose");
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
@@ -107,6 +118,19 @@ export default function AgentPage() {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const pipeline = useAgentPipeline();
+
+  /* ── Auto-select workflow from URL param (?type=ecommerce) ── */
+  useEffect(() => {
+    const typeParam = searchParams.get("type");
+    if (typeParam && !selectedWorkflow) {
+      const match = WORKFLOWS.find((wf) => wf.id === typeParam || wf.agentType === typeParam);
+      if (match) {
+        setSelectedWorkflow(match);
+        setCategory(match.defaultCategory);
+        setStep("upload");
+      }
+    }
+  }, [searchParams, selectedWorkflow]);
 
   /* ── Derived ───────────────────────────────────────────────── */
   const executionProgress = pipeline.execution

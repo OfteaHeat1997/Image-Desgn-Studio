@@ -787,34 +787,43 @@ function GettingStarted() {
       title: "Vendo ropa en e-commerce",
       subtitle: "Amazon, Shopify, Etsy, tu tienda online",
       icon: ShoppingBag,
-      steps: [
-        { label: "Quitar Fondo", href: "/editor?module=bg-remove", free: true },
-        { label: "Crear Modelo IA", href: "/editor?module=model-create", free: false },
-        { label: "Prueba Virtual", href: "/editor?module=tryon", free: false },
-        { label: "Sombras", href: "/editor?module=shadows", free: true },
-        { label: "Verificar", href: "/editor?module=compliance", free: true },
+      agentType: "ecommerce",
+      color: "#50C878",
+      steps: ["Quitar Fondo", "Mejorar", "Sombras", "Verificar"],
+      manualSteps: [
+        { label: "Quitar Fondo", href: "/editor?module=bg-remove" },
+        { label: "Crear Modelo IA", href: "/editor?module=model-create" },
+        { label: "Prueba Virtual", href: "/editor?module=tryon" },
+        { label: "Sombras", href: "/editor?module=shadows" },
+        { label: "Verificar", href: "/editor?module=compliance" },
       ],
     },
     {
-      title: "Necesito fotos para Instagram / redes",
+      title: "Fotos para Instagram / redes",
       subtitle: "Instagram, Facebook, Pinterest, TikTok",
       icon: Camera,
-      steps: [
-        { label: "Quitar Fondo", href: "/editor?module=bg-remove", free: true },
-        { label: "Fondos con IA", href: "/editor?module=bg-generate", free: true },
-        { label: "Director Creativo", href: "/editor?module=ai-prompt", free: false },
-        { label: "Crear Video", href: "/editor?module=video", free: false },
+      agentType: "social",
+      color: "#5B9CF6",
+      steps: ["Quitar Fondo", "Fondos IA", "Director Creativo", "Video"],
+      manualSteps: [
+        { label: "Quitar Fondo", href: "/editor?module=bg-remove" },
+        { label: "Fondos con IA", href: "/editor?module=bg-generate" },
+        { label: "Director Creativo", href: "/editor?module=ai-prompt" },
+        { label: "Crear Video", href: "/editor?module=video" },
       ],
     },
     {
-      title: "Tengo joyeria / accesorios",
+      title: "Joyeria / accesorios",
       subtitle: "Aretes, collares, anillos, relojes",
       icon: Gem,
-      steps: [
-        { label: "Quitar Fondo", href: "/editor?module=bg-remove", free: true },
-        { label: "Crear Modelo IA", href: "/editor?module=model-create", free: false },
-        { label: "Joyeria Virtual", href: "/editor?module=jewelry-tryon", free: false },
-        { label: "Sombras", href: "/editor?module=shadows", free: true },
+      agentType: "ecommerce",
+      color: "#F5A623",
+      steps: ["Quitar Fondo", "Modelo IA", "Joyeria Virtual", "Sombras"],
+      manualSteps: [
+        { label: "Quitar Fondo", href: "/editor?module=bg-remove" },
+        { label: "Crear Modelo IA", href: "/editor?module=model-create" },
+        { label: "Joyeria Virtual", href: "/editor?module=jewelry-tryon" },
+        { label: "Sombras", href: "/editor?module=shadows" },
       ],
     },
   ];
@@ -830,54 +839,79 @@ function GettingStarted() {
           </div>
           <h2 className="text-xl font-bold text-heading">No sabes por donde empezar?</h2>
         </div>
-        <p className="text-sm text-muted leading-relaxed">Elige tu situacion y sigue los pasos. Cada paso enlaza a la herramienta correcta.</p>
+        <p className="text-sm text-body leading-relaxed">Elige tu situacion. La IA hace todo automaticamente, o hazlo paso a paso.</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {scenarios.map((s) => (
           <div key={s.title}
-            className="rounded-[16px] p-6 transition-all duration-300 hover:border-accent/20"
+            className="rounded-[16px] p-6 transition-all duration-300"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border-default)",
             }}
           >
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-[10px]"
-                style={{ background: "var(--accent-dim)", border: "1px solid var(--border-accent)" }}
+                style={{ background: `${s.color}14`, border: `1px solid ${s.color}25` }}
               >
-                <s.icon className="h-5 w-5 text-accent" />
+                <s.icon className="h-5 w-5" style={{ color: s.color }} />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-heading">{s.title}</h3>
                 <p className="text-xs text-muted">{s.subtitle}</p>
               </div>
             </div>
-            {/* Numbered steps */}
-            <div className="space-y-2">
-              {s.steps.map((step, i) => (
-                <Link key={step.label} href={step.href}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 hover:bg-white/[0.03] group"
-                  style={{ border: "1px solid var(--border-default)" }}
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                    style={{ background: "var(--accent-dim)", color: "var(--accent)", border: "1px solid var(--border-accent)" }}
-                  >
-                    {i + 1}
+
+            {/* What the AI does */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {s.steps.map((label, i) => (
+                <React.Fragment key={label}>
+                  {i > 0 && <span className="text-xs text-muted self-center">→</span>}
+                  <span className="text-xs font-medium px-2 py-1 rounded-md" style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
+                    {label}
                   </span>
-                  <span className="flex-1 text-sm font-medium text-body group-hover:text-heading transition-colors">
-                    {step.label}
-                  </span>
-                  {step.free && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-                      style={{ background: "var(--success-dim)", color: "var(--success)" }}
-                    >
-                      Gratis
-                    </span>
-                  )}
-                  <ChevronRight className="h-3.5 w-3.5 text-muted group-hover:text-accent transition-colors" />
-                </Link>
+                </React.Fragment>
               ))}
             </div>
+
+            {/* Auto button — goes to AI Agent */}
+            <Link href={`/agent?type=${s.agentType}`}
+              className="flex items-center justify-center gap-2 w-full rounded-lg px-4 py-3 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 mb-3"
+              style={{
+                background: `${s.color}18`,
+                border: `1px solid ${s.color}30`,
+                color: s.color,
+              }}
+            >
+              <Wand2 className="h-4 w-4" />
+              Hacerlo Automatico con IA
+            </Link>
+
+            {/* Manual steps */}
+            <details className="group">
+              <summary className="text-xs text-muted cursor-pointer hover:text-body transition-colors list-none flex items-center gap-1.5">
+                <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+                O hazlo paso a paso manualmente
+              </summary>
+              <div className="mt-2 space-y-1.5">
+                {s.manualSteps.map((step, i) => (
+                  <Link key={step.label} href={step.href}
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 transition-all duration-200 hover:bg-white/[0.03] group"
+                    style={{ border: "1px solid var(--border-subtle)" }}
+                  >
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                      style={{ background: `${s.color}15`, color: s.color }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 text-xs font-medium text-body group-hover:text-heading transition-colors">
+                      {step.label}
+                    </span>
+                    <ChevronRight className="h-3 w-3 text-muted group-hover:text-accent transition-colors" />
+                  </Link>
+                ))}
+              </div>
+            </details>
           </div>
         ))}
       </div>
