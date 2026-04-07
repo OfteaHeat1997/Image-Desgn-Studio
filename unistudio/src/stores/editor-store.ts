@@ -95,6 +95,13 @@ export const useEditorStore = create<EditorStoreState>()((set, get) => ({
   removeLayer: (layerId) => {
     const state = get();
     state.pushHistory();
+
+    // Revoke blob URL to prevent memory leak
+    const removed = state.layers.find((l) => l.id === layerId);
+    if (removed?.src.startsWith('blob:')) {
+      URL.revokeObjectURL(removed.src);
+    }
+
     const newLayers = state.layers.filter((l) => l.id !== layerId);
     set({
       layers: newLayers,

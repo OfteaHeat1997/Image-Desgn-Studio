@@ -247,9 +247,17 @@ export function SmartEditorPanel({ imageFile, onProcess }: SmartEditorPanelProps
       const mimeType = exportFormat === "jpeg" ? "image/jpeg" : exportFormat === "webp" ? "image/webp" : "image/png";
       const quality = exportFormat === "png" ? undefined : exportQuality / 100;
       const blob = await canvas.convertToBlob({ type: mimeType, quality });
-      const url = URL.createObjectURL(blob);
 
-      onProcess(url, undefined, 0);
+      // Convert to data URL so the gallery can persist it across page refreshes
+      // (blob URLs die when the tab is closed)
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      onProcess(dataUrl, undefined, 0);
     } catch (error) {
       console.error("SmartEditor error:", error);
       setErrorMsg(error instanceof Error ? error.message : "Error al editar imagen");

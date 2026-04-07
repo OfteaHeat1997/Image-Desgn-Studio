@@ -8,9 +8,27 @@
 import { useCallback } from 'react';
 import { useEditorStore } from '@/stores/editor-store';
 import { DEFAULT_FILTERS } from '@/types/editor';
-import type { ImageLayer, Tool, ExportFormat } from '@/types/editor';
+import type { ImageLayer, LayerFilters, Tool, ExportFormat } from '@/types/editor';
 import { getImageDimensions } from '@/lib/utils/image';
 import { nanoid } from 'nanoid';
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+/** Build a CSS filter string from LayerFilters for canvas ctx.filter */
+function buildFilterString(f: LayerFilters): string {
+  const parts: string[] = [];
+  if (f.brightness !== 0) parts.push(`brightness(${1 + f.brightness / 100})`);
+  if (f.contrast !== 0) parts.push(`contrast(${1 + f.contrast / 100})`);
+  if (f.saturation !== 0) parts.push(`saturate(${1 + f.saturation / 100})`);
+  if (f.blur > 0) parts.push(`blur(${f.blur}px)`);
+  if (f.hue !== 0) parts.push(`hue-rotate(${f.hue}deg)`);
+  if (f.grayscale) parts.push('grayscale(1)');
+  if (f.sepia) parts.push('sepia(1)');
+  if (f.invert) parts.push('invert(1)');
+  return parts.length > 0 ? parts.join(' ') : 'none';
+}
 
 // -----------------------------------------------------------------------------
 // Types
@@ -156,6 +174,10 @@ export function useEditor(): UseEditorReturn {
           img.onload = () => {
             ctx.save();
             ctx.globalAlpha = layer.opacity;
+
+            // Apply layer filters (brightness, contrast, saturation, etc.)
+            const filterStr = buildFilterString(layer.filters ?? DEFAULT_FILTERS);
+            if (filterStr !== 'none') ctx.filter = filterStr;
 
             // Apply transform (position + rotation + flip)
             const cx = layer.x + layer.width / 2;

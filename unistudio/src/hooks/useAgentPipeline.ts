@@ -316,6 +316,22 @@ async function executeStep(
       return { resultUrl: data.data.url, cost: data.cost ?? 0.05, updatedCtx: {} };
     }
 
+    // ----- Ghost Mannequin -----
+    case "ghost-mannequin": {
+      const dataUrl = await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
+      const res = await fetch("/api/ghost-mannequin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: dataUrl,
+          provider: params.provider ?? "kontext",
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error ?? "ghost-mannequin failed");
+      return { resultUrl: data.data.url, cost: data.cost ?? 0.05, updatedCtx: {} };
+    }
+
     // ----- Ad Create (terminal step) -----
     case "ad-create": {
       const dataUrl = await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));

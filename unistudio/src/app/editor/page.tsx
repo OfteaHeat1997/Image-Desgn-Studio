@@ -14,6 +14,7 @@ import { ShadowsGuidePanel, type SessionResult } from "@/components/editor/Shado
 import { TryOnGuidePanel } from "@/components/editor/TryOnGuidePanel";
 import { useGalleryStore } from "@/stores/gallery-store";
 import { useEditorSessionStore } from "@/stores/editor-session-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useEditor } from "@/hooks/useEditor";
 import { ArrowRight, RotateCcw, Eye, EyeOff, ImagePlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -443,6 +444,7 @@ function EditorInner() {
   }, [editorSession]);
 
   const addToGallery = useGalleryStore((s) => s.addImage);
+  const addCost = useSettingsStore((s) => s.addCost);
 
   const handleProcess = useCallback(async (resultUrl: string, beforeImage?: string, cost?: number) => {
     setImageLoading(true);
@@ -510,6 +512,11 @@ function EditorInner() {
           operations: [selectedModule],
           project: "editor",
         });
+      }
+
+      // Track cost in settings store for global cost history
+      if (cost && cost > 0) {
+        addCost({ operation: selectedModule, provider: "browser", cost, imageId: null });
       }
 
       // Auto-save to disk (fire and forget — never blocks the UI)

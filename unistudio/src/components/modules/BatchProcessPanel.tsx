@@ -189,23 +189,11 @@ async function callStep(
   const endpoint = OP_ENDPOINT[step.operation];
   if (!endpoint) throw new Error(`Operacion desconocida: ${step.operation}`);
 
-  let res: Response;
-
-  if (step.operation === "enhance" || step.operation === "upscale") {
-    // These endpoints expect FormData with a file URL reference or formData
-    // We pass imageUrl as JSON body instead (the APIs accept both)
-    res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl, ...step.params }),
-    });
-  } else {
-    res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl, ...step.params }),
-    });
-  }
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageUrl, ...step.params }),
+  });
 
   const data = await safeJson(res);
   if (!data.success) {

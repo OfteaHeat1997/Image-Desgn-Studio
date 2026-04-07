@@ -8,9 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
-import type { FashnCategory } from '@/lib/api/fashn';
 import { saveJob } from '@/lib/db/persist';
 import { saveAiModel } from '@/lib/db/queries';
+import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
 
 // Cost estimates in dollars
 const MODEL_GEN_COST = 0.055;
@@ -133,36 +133,6 @@ function buildSafeRetryPrompt(options: ModelCreateOptions): string {
 // ---------------------------------------------------------------------------
 // Try-on helpers (used when garment image is provided)
 // ---------------------------------------------------------------------------
-
-function toIdmVtonCategory(cat: string): string {
-  const map: Record<string, string> = {
-    tops: 'upper_body',
-    'upper-body': 'upper_body',
-    upper_body: 'upper_body',
-    bottoms: 'lower_body',
-    'lower-body': 'lower_body',
-    lower_body: 'lower_body',
-    dresses: 'dresses',
-    'one-pieces': 'dresses',
-    'full-body': 'dresses',
-  };
-  return map[cat] ?? 'upper_body';
-}
-
-function toFashnCategory(category: string): FashnCategory {
-  switch (category) {
-    case 'dresses':
-    case 'one-pieces':
-      return 'one-pieces';
-    case 'outerwear':
-    case 'tops':
-      return 'tops';
-    case 'bottoms':
-      return 'bottoms';
-    default:
-      return 'auto';
-  }
-}
 
 /**
  * Prepare garment image for try-on: flatten transparency to white bg,

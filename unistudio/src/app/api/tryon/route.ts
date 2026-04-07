@@ -7,8 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
-import type { FashnCategory } from '@/lib/api/fashn';
 import { saveJob } from '@/lib/db/persist';
+import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
 
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
@@ -30,22 +30,6 @@ const IDM_VTON_PREFERRED_TYPES = new Set([
 // Provider-specific try-on functions
 // ---------------------------------------------------------------------------
 
-// Map any category format to IDM-VTON's expected values
-function toIdmVtonCategory(cat: string): string {
-  const map: Record<string, string> = {
-    tops: 'upper_body',
-    'upper-body': 'upper_body',
-    upper_body: 'upper_body',
-    bottoms: 'lower_body',
-    'lower-body': 'lower_body',
-    lower_body: 'lower_body',
-    dresses: 'dresses',
-    'one-pieces': 'dresses',
-    'full-body': 'dresses',
-  };
-  return map[cat] ?? 'upper_body';
-}
-
 async function tryOnIdmVton(
   modelImage: string,
   garmentImage: string,
@@ -64,22 +48,6 @@ async function tryOnIdmVton(
     },
   );
   return await extractOutputUrl(output);
-}
-
-// Map internal categories to FASHN categories
-function toFashnCategory(category: string): FashnCategory {
-  switch (category) {
-    case 'dresses':
-    case 'one-pieces':
-      return 'one-pieces';
-    case 'outerwear':
-    case 'tops':
-      return 'tops';
-    case 'bottoms':
-      return 'bottoms';
-    default:
-      return 'auto';
-  }
 }
 
 async function tryOnFashn(
