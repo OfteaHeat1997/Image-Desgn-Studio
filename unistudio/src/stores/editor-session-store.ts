@@ -55,18 +55,47 @@ export const useEditorSessionStore = create<EditorSessionState>()(
     }),
     {
       name: "unistudio-editor-session",
-      // Only persist image data if it's under 4MB total to avoid localStorage overflow
-      partialize: (state) => {
+      storage: {
+        getItem: (name) => {
+          const raw = localStorage.getItem(name);
+          return raw ? JSON.parse(raw) : null;
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch {
+            // QuotaExceededError — strip images and retry
+            try {
+              const fallback = {
+                ...value,
+                state: {
+                  ...value.state,
+                  currentImage: null,
+                  originalImage: null,
+                  processedImage: null,
+                },
+              };
+              localStorage.setItem(name, JSON.stringify(fallback));
+            } catch {
+              localStorage.removeItem(name);
+            }
+          }
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
+      // Only persist image data if it's under 2MB total to avoid localStorage overflow
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      partialize: (state: EditorSessionState): any => {
         const total =
           (state.currentImage?.length ?? 0) +
           (state.originalImage?.length ?? 0) +
           (state.processedImage?.length ?? 0);
-        // If over 4MB, only keep the processed result (most important)
-        if (total > 4 * 1024 * 1024) {
+        // If over 2MB, only keep the processed result (most important)
+        if (total > 2 * 1024 * 1024) {
           return {
             currentImage: null,
             originalImage: null,
-            processedImage: state.processedImage,
+            processedImage: state.processedImage?.length ?? 0 > 2 * 1024 * 1024 ? null : state.processedImage,
             filename: state.filename,
             activeModule: state.activeModule,
             sessionCost: state.sessionCost,

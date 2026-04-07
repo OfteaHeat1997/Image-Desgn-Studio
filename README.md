@@ -49,11 +49,11 @@ After starting, visit `http://localhost:3000/api/health` to verify all services 
 
 | Document | Purpose |
 |---|---|
-| **[Developer Guide](./unistudio/README.md)** | Setup, env vars, architecture, all 29 API routes, DB schema, key patterns |
-| **[Guia Completa](./GUIA-COMPLETA.md)** | Full project explanation in Spanish (beginner-friendly) |
-| **[AI Agent Analysis](./ANALYSIS-AI-AGENT-IMPROVEMENT.md)** | Deep analysis + improvement roadmap (Phase 1+2 complete) |
-| **[Inventory](./INVENTORY.md)** | Complete Unistyles product catalog (486 products, 9 categories) |
-| **[Blueprint v2](./unistudio-ultimate-blueprint-v2.md)** | Original architecture plan (historical reference — 16 modules, now 18) |
+| **[Developer Setup](./unistudio/README.md)** | Quick start, env vars, build & deploy |
+| **[Architecture & API Reference](./docs/architecture.md)** | Project structure, 29 API routes, DB schema, video system, key patterns |
+| **[Guia Completa (ES)](./docs/guia-completa.md)** | Full project explanation in Spanish (beginner-friendly) |
+| **[AI Agent Analysis](./docs/ai-agent-analysis.md)** | Deep analysis + improvement roadmap (Phase 1+2 complete) |
+| **[Product Inventory](./docs/inventory.md)** | Complete Unistyles product catalog (486 products, 9 categories) |
 
 ---
 
@@ -208,7 +208,7 @@ unistudio/
 - No inpaint mask drawing mode (Fabric.js brush)
 
 ### Future Roadmap (Phase 3-5)
-See [ANALYSIS-AI-AGENT-IMPROVEMENT.md](./ANALYSIS-AI-AGENT-IMPROVEMENT.md) for the complete roadmap:
+See [AI Agent Analysis](./docs/ai-agent-analysis.md) for the complete roadmap:
 - **Phase 3**: Before/after slider, inpaint mask mode, UX polish
 - **Phase 4**: Multi-image batch agent, brand-aware processing, learning from history
 - **Phase 5**: Timeouts, caching, rate limiting, progress streaming
