@@ -95,7 +95,7 @@ export const useEditorSessionStore = create<EditorSessionState>()(
           return {
             currentImage: null,
             originalImage: null,
-            processedImage: state.processedImage?.length ?? 0 > 2 * 1024 * 1024 ? null : state.processedImage,
+            processedImage: (state.processedImage?.length ?? 0) > 2 * 1024 * 1024 ? null : state.processedImage,
             filename: state.filename,
             activeModule: state.activeModule,
             sessionCost: state.sessionCost,

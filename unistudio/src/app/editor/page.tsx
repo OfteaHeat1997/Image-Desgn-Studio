@@ -189,7 +189,27 @@ async function toPersistentThumbnail(url: string): Promise<string> {
 async function toPersistentDataUrl(url: string): Promise<string> {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  if (url.startsWith("data:")) return url;
+  // Data URLs from enhance/API can be huge — compress them too
+  if (url.startsWith("data:")) {
+    return new Promise<string>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_W = 1200;
+        const scale = img.naturalWidth > MAX_W ? MAX_W / img.naturalWidth : 1;
+        const w = Math.round(img.naturalWidth * scale);
+        const h = Math.round(img.naturalHeight * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(url.slice(0, 500000)); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => resolve("");
+      img.src = url;
+    });
+  }
 
   return new Promise<string>((resolve, reject) => {
     const img = new Image();

@@ -63,19 +63,6 @@ function createThumbnail(dataUrl: string, maxSize = 200): Promise<string> {
   });
 }
 
-/** Fire-and-forget: generate thumbnail and update the store entry */
-function generateThumbnailAsync(id: string, resultUrl: string) {
-  createThumbnail(resultUrl).then((thumbnailUrl) => {
-    if (!thumbnailUrl) return;
-    const state = useGalleryStore.getState();
-    const idx = state.images.findIndex((img) => img.id === id);
-    if (idx === -1) return;
-    const updated = [...state.images];
-    updated[idx] = { ...updated[idx], thumbnailUrl };
-    useGalleryStore.setState({ images: updated });
-  }).catch(() => { /* ignore */ });
-}
-
 // -----------------------------------------------------------------------------
 // Safe localStorage wrapper — evicts old entries on quota error
 // -----------------------------------------------------------------------------
@@ -92,8 +79,8 @@ const safeStorage: StateStorage = {
       try {
         const parsed = JSON.parse(value);
         if (parsed?.state?.images) {
-          // Keep only the newest 20 images
-          parsed.state.images = parsed.state.images.slice(0, 20);
+          // Keep only the newest 15 images
+          parsed.state.images = parsed.state.images.slice(0, 15);
           // Strip any full-size data URLs that leaked into persistence
           parsed.state.images = parsed.state.images.map((img: GalleryImage) => ({
             ...img,
@@ -142,24 +129,38 @@ export const useGalleryStore = create<GalleryStoreState>()(
       images: [],
 
       addImage: (image) => {
-        set((state) => ({
-          images: [image, ...state.images].slice(0, 100),
-        }));
-        // Generate thumbnail async for persistence
+        // Generate thumbnail immediately before adding to avoid quota issues
         if (image.resultUrl?.startsWith("data:")) {
-          generateThumbnailAsync(image.id, image.resultUrl);
+          createThumbnail(image.resultUrl).then((thumbnailUrl) => {
+            set((state) => ({
+              images: [{ ...image, thumbnailUrl: thumbnailUrl || undefined }, ...state.images].slice(0, 30),
+            }));
+          }).catch(() => {
+            set((state) => ({
+              images: [image, ...state.images].slice(0, 30),
+            }));
+          });
+        } else {
+          set((state) => ({
+            images: [image, ...state.images].slice(0, 30),
+          }));
         }
       },
 
       addImages: (newImages) => {
-        set((state) => ({
-          images: [...newImages, ...state.images].slice(0, 100),
-        }));
-        // Generate thumbnails for all new images
-        newImages.forEach((img) => {
-          if (img.resultUrl?.startsWith("data:")) {
-            generateThumbnailAsync(img.id, img.resultUrl);
-          }
+        // Generate thumbnails for all, then add in batch
+        Promise.all(
+          newImages.map(async (img) => {
+            if (img.resultUrl?.startsWith("data:")) {
+              const thumb = await createThumbnail(img.resultUrl).catch(() => "");
+              return { ...img, thumbnailUrl: thumb || undefined };
+            }
+            return img;
+          })
+        ).then((withThumbs) => {
+          set((state) => ({
+            images: [...withThumbs, ...state.images].slice(0, 30),
+          }));
         });
       },
 
