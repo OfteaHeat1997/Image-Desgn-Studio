@@ -6,6 +6,11 @@
 - Never leave uncommitted changes at the end of a task.
 - If you've been working for a while without pushing, push immediately.
 
+## Build Rule (MANDATORY)
+- **NEVER run `next build` on init or automatically** — it may already be running (e.g. Vercel, another terminal).
+- Only run `next build` when the user explicitly asks to build.
+- If you must build, first check for a lock file: `ls unistudio/.next/lock 2>/dev/null` — if it exists, do NOT build.
+
 ## Vercel Deployment
 - After pushing to GitHub, redeploy to Vercel production: `cd unistudio && vercel --prod --yes`
 - Live URL: https://unistudio.vercel.app
