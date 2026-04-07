@@ -62,7 +62,7 @@
   --color-surface-lighter: var(--border-default);
   --color-surface-elevated: var(--bg-elevated);
   --color-surface-overlay: var(--bg-overlay);
-  --color-surface-hover: #333338;
+  --color-surface-hover: #3A3A40;
 
   /* ── Accent (gold) tokens ────────────────────────────────────── */
   --color-accent: var(--accent);

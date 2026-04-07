@@ -40,6 +40,7 @@ interface ModuleItem {
 
 interface ModuleCategory {
   name: string;
+  color: string;
   modules: ModuleItem[];
 }
 
@@ -55,15 +56,17 @@ interface ModuleSidebarProps {
 const MODULE_CATEGORIES: ModuleCategory[] = [
   {
     name: "E-COMMERCE",
+    color: "#50C878",
     modules: [
-      { id: "bg-remove", label: "1. Quitar Fondo", icon: Scissors, cost: "Gratis", description: "Fondo blanco profesional — el primer paso para cualquier foto de producto" },
-      { id: "enhance", label: "2. Mejorar Calidad", icon: Sparkles, cost: "Gratis", description: "Brillo, contraste y nitidez profesional — gratis" },
-      { id: "shadows", label: "3. Agregar Sombra", icon: Sun, cost: "Gratis", description: "Sombra suave para que el producto no flote" },
-      { id: "compliance", label: "4. Verificar", icon: CheckCircle, cost: "Gratis", description: "Verifica que la foto cumple con Amazon, Shopify, etc." },
+      { id: "bg-remove", label: "Quitar Fondo", icon: Scissors, cost: "Gratis", description: "Fondo blanco profesional — el primer paso para cualquier foto de producto" },
+      { id: "enhance", label: "Mejorar Calidad", icon: Sparkles, cost: "Gratis", description: "Brillo, contraste y nitidez profesional — gratis" },
+      { id: "shadows", label: "Agregar Sombra", icon: Sun, cost: "Gratis", description: "Sombra suave para que el producto no flote" },
+      { id: "compliance", label: "Verificar", icon: CheckCircle, cost: "Gratis", description: "Verifica que la foto cumple con Amazon, Shopify, etc." },
     ],
   },
   {
     name: "FONDOS",
+    color: "#D4B48A",
     modules: [
       { id: "bg-generate", label: "Fondos con IA", icon: ImageIcon, cost: "$0.003-$0.05", description: "Reemplaza el fondo con escenas profesionales" },
       { id: "outpaint", label: "Extender Imagen", icon: Expand, cost: "$0.05", description: "Expande los bordes para cualquier formato" },
@@ -71,6 +74,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
   },
   {
     name: "EDICION",
+    color: "#5B9CF6",
     modules: [
       { id: "inpaint", label: "Borrar y Reemplazar", icon: Eraser, cost: "$0.03-$0.05", description: "Elimina etiquetas, manchas o cambia colores" },
       { id: "upscale", label: "Aumentar Resolucion", icon: ZoomIn, cost: "$0.02-$0.05", description: "Agranda tu imagen 2x o 4x sin perder calidad" },
@@ -79,6 +83,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
   },
   {
     name: "MODELOS Y MODA",
+    color: "#F5A623",
     modules: [
       { id: "tryon", label: "Prueba Virtual", icon: Shirt, cost: "$0.02-$0.05", description: "Coloca tu prenda sobre un modelo virtual" },
       { id: "model-create", label: "Crear Modelo IA", icon: User, cost: "$0.055", description: "Genera modelos diversos sin fotografo" },
@@ -88,6 +93,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
   },
   {
     name: "VIDEO Y ADS",
+    color: "#E06BDF",
     modules: [
       { id: "video", label: "Estudio de Video", icon: Film, cost: "$0-$0.35", description: "Convierte fotos en videos para redes sociales" },
       { id: "ad-creator", label: "Crear Anuncios", icon: Megaphone, cost: "$0.04-$0.35", description: "Genera videos publicitarios por plataforma" },
@@ -96,6 +102,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
   },
   {
     name: "AUTOMATIZACION",
+    color: "#A78BFA",
     modules: [
       { id: "ai-agent", label: "Agente IA (Auto)", icon: Bot, cost: "Variable", description: "Describe lo que quieres, el agente lo hace" },
       { id: "batch", label: "Procesamiento Masivo", icon: Layers, cost: "Variable", description: "Procesa multiples imagenes automaticamente" },
@@ -109,7 +116,6 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
 /* ------------------------------------------------------------------ */
 
 export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarProps) {
-  // All categories start expanded
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const toggleCategory = (name: string) => {
@@ -117,79 +123,91 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
   };
 
   return (
-    <div className="flex flex-col h-full border-r border-surface-lighter bg-surface w-56 shrink-0">
-      {/* Header — logo links back to dashboard */}
-      <div className="flex items-center gap-2 border-b border-surface-lighter px-3 py-2.5">
-        <a href="/" className="text-sm font-bold text-gradient hover:opacity-80 transition-opacity" title="Volver al Dashboard">
+    <div className="flex flex-col h-full border-r bg-[var(--bg-surface)] w-60 shrink-0" style={{ borderColor: "var(--border-default)" }}>
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+        <a href="/" className="text-base font-bold text-gradient hover:opacity-80 transition-opacity" title="Volver al Dashboard">
           UniStudio
         </a>
-        <span className="text-[9px] text-gray-600 uppercase tracking-wider">Modulos</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Editor</span>
       </div>
 
       {/* Module list */}
-      <nav className="flex-1 overflow-y-auto py-1 no-scrollbar">
+      <nav className="flex-1 overflow-y-auto py-2 no-scrollbar">
         {MODULE_CATEGORIES.map((cat) => {
           const isCollapsed = collapsed[cat.name] ?? false;
           const hasSelected = cat.modules.some((m) => m.id === selectedModule);
 
           return (
-            <div key={cat.name} className="mb-0.5">
+            <div key={cat.name} className="mb-1">
               {/* Category header */}
               <button
                 type="button"
                 onClick={() => toggleCategory(cat.name)}
-                className={cn(
-                  "flex w-full items-center gap-1.5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest transition-colors",
-                  hasSelected && isCollapsed
-                    ? "text-accent-light"
-                    : "text-gray-500 hover:text-gray-400",
-                )}
+                className="flex w-full items-center gap-2 px-4 py-2 transition-colors hover:bg-white/[0.03]"
               >
                 {isCollapsed ? (
-                  <ChevronRight className="h-2.5 w-2.5 shrink-0" />
+                  <ChevronRight className="h-3 w-3 shrink-0" style={{ color: cat.color }} />
                 ) : (
-                  <ChevronDown className="h-2.5 w-2.5 shrink-0" />
+                  <ChevronDown className="h-3 w-3 shrink-0" style={{ color: cat.color }} />
                 )}
-                {cat.name}
+                <span
+                  className="text-[11px] font-bold uppercase tracking-widest"
+                  style={{ color: hasSelected && isCollapsed ? cat.color : "var(--text-secondary)" }}
+                >
+                  {cat.name}
+                </span>
+                <div className="flex-1 h-px ml-1" style={{ background: `${cat.color}20` }} />
               </button>
 
               {/* Modules */}
               {!isCollapsed && (
-                <div className="space-y-px px-1">
+                <div className="space-y-0.5 px-2">
                   {cat.modules.map((mod) => {
                     const Icon = mod.icon;
                     const isActive = selectedModule === mod.id;
 
                     return (
                       <button
-                          key={mod.id}
-                          type="button"
-                          title={mod.description}
-                          aria-label={`${mod.label} — ${mod.description}`}
-                          onClick={() => onModuleChange(mod.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-all group",
-                            isActive
-                              ? "bg-accent/15 text-accent-light"
-                              : "text-gray-400 hover:bg-surface-light hover:text-gray-200",
-                          )}
+                        key={mod.id}
+                        type="button"
+                        title={mod.description}
+                        aria-label={`${mod.label} — ${mod.description}`}
+                        onClick={() => onModuleChange(mod.id)}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all group",
+                          isActive
+                            ? "text-white"
+                            : "hover:bg-white/[0.04]",
+                        )}
+                        style={isActive ? {
+                          background: `${cat.color}18`,
+                          border: `1px solid ${cat.color}30`,
+                        } : {
+                          border: "1px solid transparent",
+                        }}
+                      >
+                        <Icon
+                          className="h-4 w-4 shrink-0 transition-colors"
+                          style={{ color: isActive ? cat.color : "var(--text-muted)" }}
+                        />
+                        <span className={cn(
+                          "flex-1 text-[13px] font-medium truncate transition-colors",
+                          isActive ? "text-white" : "text-[var(--text-secondary)] group-hover:text-white",
+                        )}>
+                          {mod.label}
+                        </span>
+                        <span
+                          className="shrink-0 text-[10px] font-bold"
+                          style={{
+                            color: mod.cost === "Gratis" || mod.cost.startsWith("Gratis")
+                              ? "#50C878"
+                              : "var(--text-muted)",
+                          }}
                         >
-                          <Icon className={cn(
-                            "h-3.5 w-3.5 shrink-0",
-                            isActive ? "text-accent-light" : "text-gray-500 group-hover:text-gray-400",
-                          )} />
-                          <span className="flex-1 text-[11px] font-medium truncate">
-                            {mod.label}
-                          </span>
-                          <span className={cn(
-                            "shrink-0 text-[8px] font-semibold",
-                            mod.cost === "Gratis" || mod.cost.startsWith("Gratis")
-                              ? "text-emerald-500"
-                              : "text-gray-600",
-                          )}>
-                            {mod.cost}
-                          </span>
-                        </button>
+                          {mod.cost}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -200,19 +218,21 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
       </nav>
 
       {/* Quick links */}
-      <div className="border-t border-surface-lighter p-2 space-y-1">
+      <div className="p-2 space-y-0.5" style={{ borderTop: "1px solid var(--border-default)" }}>
         <a
           href="/gallery"
-          className="flex items-center gap-2 rounded-md px-2.5 py-2 text-[11px] font-medium text-gray-400 hover:bg-surface-light hover:text-gray-200 transition-all"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "var(--text-secondary)" }}
         >
-          <ImageIcon className="h-3.5 w-3.5 text-gray-500" />
+          <ImageIcon className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
           Galeria
         </a>
         <a
           href="/batch"
-          className="flex items-center gap-2 rounded-md px-2.5 py-2 text-[11px] font-medium text-gray-400 hover:bg-surface-light hover:text-gray-200 transition-all"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "var(--text-secondary)" }}
         >
-          <Layers className="h-3.5 w-3.5 text-gray-500" />
+          <Layers className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
           Batch Masivo
         </a>
       </div>
