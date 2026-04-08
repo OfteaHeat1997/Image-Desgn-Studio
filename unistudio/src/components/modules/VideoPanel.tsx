@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { TabRoot, TabList, TabTrigger, TabContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils/cn";
+import { compressImageFile } from "@/lib/utils/compress-image";
 import { useVideoStore } from "@/stores/video-store";
 import { VIDEO_PROVIDERS, getProviderCost } from "@/lib/video/providers";
 import { AVATAR_PROVIDERS, TTS_PROVIDERS } from "@/lib/video/providers";
@@ -150,8 +151,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       store.setIsEnhancing(false);
       store.setIsProcessing(true);
 
+      const compressed = await compressImageFile(sourceImage);
       const formData = new FormData();
-      formData.append("file", sourceImage);
+      formData.append("file", compressed);
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
         body: formData,
@@ -266,8 +268,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         if (!store.script.trim())
           throw new Error("Escribe un script para el avatar");
 
+        const compressed = await compressImageFile(avatarImage);
         const formData = new FormData();
-        formData.append("file", avatarImage);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
           body: formData,
@@ -276,11 +279,13 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         if (!uploadData.success)
           throw new Error(uploadData.error || "Error al subir imagen");
 
+        const manualHttpUrl = uploadData.data.replicateUrl || uploadData.data.url;
+
         const res = await fetch("/api/avatar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            avatarImageUrl: uploadData.data.url,
+            avatarImageUrl: manualHttpUrl,
             provider: store.avatarProvider,
             script: store.script,
             ttsProvider: store.ttsProvider,
@@ -297,19 +302,20 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           id: `avatar-m-${Date.now()}`,
           name: `Avatar ${new Date().toLocaleTimeString()}`,
           category: "avatar",
-          sourceImageUrl: uploadData.data.url,
+          sourceImageUrl: manualHttpUrl,
           resultVideoUrl: data.data.videoUrl,
           provider: store.avatarProvider,
           status: "completed",
-          cost: data.data.cost ?? 0,
+          cost: data.cost ?? 0,
           createdAt: new Date().toISOString(),
-          options: { avatarImageUrl: uploadData.data.url, provider: store.avatarProvider, script: store.script, ttsProvider: store.ttsProvider, voice: store.voice, language: store.language },
+          options: { avatarImageUrl: manualHttpUrl, provider: store.avatarProvider, script: store.script, ttsProvider: store.ttsProvider, voice: store.voice, language: store.language },
         });
-        onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
+        onProcess(data.data.videoUrl, undefined, data.cost ?? 0);
       } else {
         if (!imageFile) throw new Error("Se necesita una imagen para generar video");
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
           body: formData,
@@ -317,6 +323,8 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         const uploadData = await safeJson(uploadRes);
         if (!uploadData.success)
           throw new Error(uploadData.error || "Error al subir imagen");
+
+        const manualHttpUrl = uploadData.data.replicateUrl || uploadData.data.url;
 
         const preset = getPresetById(store.selectedPreset);
         const prompt =
@@ -328,7 +336,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrl: uploadData.data.url,
+            imageUrl: manualHttpUrl,
             provider: store.selectedProvider,
             preset: store.selectedPreset,
             prompt,
@@ -347,15 +355,15 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           id: `video-m-${Date.now()}`,
           name: `${store.activeTab} ${new Date().toLocaleTimeString()}`,
           category: store.activeTab,
-          sourceImageUrl: uploadData.data.url,
+          sourceImageUrl: manualHttpUrl,
           resultVideoUrl: data.data.url,
           provider: store.selectedProvider,
           status: "completed",
-          cost: data.data.cost ?? 0,
+          cost: data.cost ?? 0,
           createdAt: new Date().toISOString(),
-          options: { imageUrl: uploadData.data.url, provider: store.selectedProvider, prompt, duration: store.duration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
+          options: { imageUrl: manualHttpUrl, provider: store.selectedProvider, prompt, duration: store.duration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
         });
-        onProcess(data.data.url, undefined, data.cost ?? data.data?.cost ?? 0);
+        onProcess(data.data.url, undefined, data.cost ?? 0);
       }
     } catch (err) {
       console.error("Video generation error:", err);
