@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, ElementType } from "react";
+import React, { useState, useCallback, ElementType, useRef, useEffect } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
 import { Gem, AlertCircle, Sparkles, Upload, User, Loader2, Package, Layers } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
@@ -146,13 +146,33 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   // The effective jewelry file: editor image takes priority, fallback to local upload
   const effectiveJewelryFile = imageFile ?? localJewelryFile;
 
+  // F-5: Track all blob URLs for cleanup on unmount
+  const blobUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    return () => { blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url)); };
+  }, []);
+
+  // F-6: Create a stable preview URL when imageFile comes from the editor (no local upload)
+  const [editorImagePreview, setEditorImagePreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!imageFile || localJewelryPreview) {
+      setEditorImagePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageFile);
+    blobUrlsRef.current.push(url);
+    setEditorImagePreview(url);
+  }, [imageFile, localJewelryPreview]);
+
   const handleJewelryUpload = useCallback((files: File[]) => {
     const file = files[0];
     if (!file) return;
     setLocalJewelryFile(file);
     setLocalJewelryPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
+      const newUrl = URL.createObjectURL(file);
+      blobUrlsRef.current.push(newUrl);
+      return newUrl;
     });
     setErrorMsg(null);
   }, []);
@@ -163,7 +183,9 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
     setModelFile(file);
     setModelImage((prev) => {
       if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
+      const newUrl = URL.createObjectURL(file);
+      blobUrlsRef.current.push(newUrl);
+      return newUrl;
     });
     setErrorMsg(null);
   }, []);
@@ -172,8 +194,8 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   const compressImage = useCallback(async (file: File, maxBytes = 800_000): Promise<File> => {
     if (file.size <= maxBytes) return file;
     const bitmap = await createImageBitmap(file);
-    // Scale down if very large
-    const maxDim = 1200;
+    // Scale down if very large — 2048 preserves fine jewelry detail (F-7)
+    const maxDim = 2048;
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
     const w = Math.round(bitmap.width * scale);
     const h = Math.round(bitmap.height * scale);
@@ -208,8 +230,8 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         jewelryFormData.append("jewelryFile", compressedJewelry);
         jewelryFormData.append("type", accessoryType);
         jewelryFormData.append("mode", outputMode);
-        if (metalType) jewelryFormData.append("metalType", metalType);
-        if (finish) jewelryFormData.append("finish", finish);
+        jewelryFormData.append("bgStyle", bgStyle); // F-2: send bgStyle
+        // F-3: metalType and finish are NOT sent for exhibidor/flotante — they alter product appearance
 
         const res = await fetch("/api/jewelry-tryon", { method: "POST", body: jewelryFormData });
         const data = await safeJson(res);
@@ -218,7 +240,14 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         totalCost += data.data?.cost ?? 0.05;
         setProgressPct(100);
         setStatusText("Listo!");
-        onProcess(data.data.url, undefined, totalCost);
+
+        // F-1: Pass jewelry image as beforeImage so ANTES shows the jewelry, not the canvas
+        let jewelryPreviewUrl: string | undefined = localJewelryPreview || undefined;
+        if (!jewelryPreviewUrl && imageFile) {
+          jewelryPreviewUrl = URL.createObjectURL(imageFile);
+          blobUrlsRef.current.push(jewelryPreviewUrl);
+        }
+        onProcess(data.data.url, jewelryPreviewUrl, totalCost);
         return;
       }
 
@@ -280,18 +309,13 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
 
       const compressedJewelry = await compressImage(effectiveJewelryFile);
 
-      // Convert model URL to compressed File
-      const blobRes = await fetch(modelImageUrl);
-      const blob = await blobRes.blob();
-      const rawFile = new File([blob], "model.jpg", { type: blob.type || "image/jpeg" });
-      const modelFileForUpload = await compressImage(rawFile);
-
       setStatusText("Aplicando accesorio con IA — esto puede tomar unos segundos...");
       setProgressPct(60);
 
       const jewelryFormData = new FormData();
       jewelryFormData.append("jewelryFile", compressedJewelry);
-      jewelryFormData.append("modelFile", modelFileForUpload);
+      // F-4: Pass model URL directly — avoids re-downloading, re-encoding, and quality loss
+      jewelryFormData.append("modelImageUrl", modelImageUrl);
       jewelryFormData.append("type", accessoryType);
       jewelryFormData.append("mode", "modelo");
       if (metalType) jewelryFormData.append("metalType", metalType);
@@ -319,7 +343,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         setProgressPct(0);
       }, 3000);
     }
-  }, [effectiveJewelryFile, modelFile, modelSource, outputMode, accessoryType, gender, skinTone, ageRange, bgStyle, metalType, finish, onProcess]);
+  }, [effectiveJewelryFile, imageFile, localJewelryPreview, modelFile, modelSource, outputMode, accessoryType, gender, skinTone, ageRange, bgStyle, metalType, finish, onProcess]);
 
   const selectedAccessory = ACCESSORY_TYPES.find((a) => a.id === accessoryType)!;
   const estimatedCost = outputMode === "modelo" && modelSource === "generate" ? "$0.105" : "$0.05";
@@ -458,6 +482,12 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             <img src={localJewelryPreview} alt="Accesorio" className="w-full aspect-[4/3] object-contain bg-black/20" />
           </div>
         )}
+        {/* F-6: Show preview when imageFile comes from the editor (no local upload) */}
+        {editorImagePreview && (
+          <div className="mt-1.5 overflow-hidden rounded-lg border border-surface-lighter">
+            <img src={editorImagePreview} alt="Accesorio" className="w-full h-32 object-contain bg-black/20" />
+          </div>
+        )}
       </div>
 
       {/* Model section — only shown in Modelo mode */}
@@ -590,28 +620,30 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         </>
       )}
 
-      {/* Metal & Finish options */}
-      <div className="space-y-3 rounded-lg border border-surface-lighter bg-surface-light/50 p-3">
-        <div className="flex items-center gap-1.5">
-          <Gem className="h-3.5 w-3.5 text-amber-400" />
-          <span className="text-[11px] font-semibold text-gray-300">Estilo de Joyeria</span>
-        </div>
+      {/* Metal & Finish options — hidden for exhibidor/flotante (irrelevant and contradicts "keep identical" instruction) */}
+      {outputMode === "modelo" && (
+        <div className="space-y-3 rounded-lg border border-surface-lighter bg-surface-light/50 p-3">
+          <div className="flex items-center gap-1.5">
+            <Gem className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-[11px] font-semibold text-gray-300">Estilo de Joyeria</span>
+          </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Select
-            value={metalType}
-            onValueChange={setMetalType}
-            options={METAL_OPTIONS}
-            label="Metal"
-          />
-          <Select
-            value={finish}
-            onValueChange={setFinish}
-            options={FINISH_OPTIONS}
-            label="Acabado"
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <Select
+              value={metalType}
+              onValueChange={setMetalType}
+              options={METAL_OPTIONS}
+              label="Metal"
+            />
+            <Select
+              value={finish}
+              onValueChange={setFinish}
+              options={FINISH_OPTIONS}
+              label="Acabado"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Progress bar */}
       {isProcessing && (

@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       const jewelryFile = formData.get('jewelryFile') as File | null;
       const modelFile = formData.get('modelFile') as File | null;
+      const modelImageUrl = formData.get('modelImageUrl') as string | null; // F-4: URL alternative
       modelImage = formData.get('modelImage') as string || '';
       type = formData.get('type') as string || '';
       mode = (formData.get('mode') as string) || 'modelo';
@@ -45,11 +46,13 @@ export async function POST(request: NextRequest) {
       const jMime = jewelryFile.type || 'image/png';
       jewelryImage = `data:${jMime};base64,${jBuffer.toString('base64')}`;
 
-      // Convert model file to data URL if provided
+      // F-4: Accept model as file upload OR as a URL (avoids re-downloading + re-encoding)
       if (modelFile) {
         const mBuffer = Buffer.from(await modelFile.arrayBuffer());
         const mMime = modelFile.type || 'image/jpeg';
         modelImage = `data:${mMime};base64,${mBuffer.toString('base64')}`;
+      } else if (modelImageUrl) {
+        modelImage = modelImageUrl; // fetchImageBuffer in jewelry.ts handles http:// URLs natively
       }
     } else {
       // ---- JSON mode (legacy, for smaller payloads) ----
