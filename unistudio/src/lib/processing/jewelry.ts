@@ -28,45 +28,45 @@ export const JEWELRY_COSTS: Record<string, number> = {
 
 const PLACEMENT_PROMPTS: Record<string, string> = {
   earrings:
-    'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'The person on the LEFT is now wearing that exact pair of earrings on both earlobes. ' +
-    'Show the full person naturally with the earrings placed correctly. ' +
-    'Copy the exact design, shape, material, color, and gemstones from the product reference. ' +
-    'Match lighting and reflections to the person\'s photo. Keep face, hair, and clothing unchanged.',
+    'This image has two halves. The RIGHT side shows the EXACT earrings product that must be used — do NOT replace or redesign it. ' +
+    'The person on the LEFT is now wearing THIS EXACT pair of earrings from the RIGHT side on both earlobes. ' +
+    'Preserve every detail of the earring: same shape, same stones, same metal, same size, same color. ' +
+    'Do NOT substitute with different earrings. Do NOT invent new jewelry. ' +
+    'Match lighting and reflections to the person\'s skin. Keep face, hair, and clothing unchanged.',
 
   necklace:
-    'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'The person on the LEFT is now wearing that exact necklace around their neck. ' +
-    'Show the full person naturally with the necklace draped correctly along the neckline. ' +
-    'Copy the exact chain style, pendant, material, and thickness from the product reference. ' +
+    'This image has two halves. The RIGHT side shows the EXACT necklace product that must be used — do NOT replace or redesign it. ' +
+    'The person on the LEFT is now wearing THIS EXACT necklace from the RIGHT side around their neck. ' +
+    'Preserve every detail: same chain style, same pendant, same length, same metal color, same thickness. ' +
+    'Do NOT substitute with a ring, bracelet, or any other jewelry. Do NOT invent new jewelry. ' +
     'Match lighting and reflections. Keep the person unchanged.',
 
   ring:
-    'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'The hand on the LEFT is now wearing that exact ring on the ring finger. ' +
-    'Show the hand naturally with the ring placed correctly. ' +
-    'Copy the exact design, gemstone, band, and metal color from the product reference. ' +
+    'This image has two halves. The RIGHT side shows the EXACT ring product that must be used — do NOT replace or redesign it. ' +
+    'The hand on the LEFT is now wearing THIS EXACT ring from the RIGHT side on the ring finger. ' +
+    'Preserve every detail: same gemstone cut, same band style, same metal color, same proportions. ' +
+    'Do NOT substitute with a necklace or other jewelry. Do NOT invent new jewelry. ' +
     'Match lighting and perspective. Keep everything else unchanged.',
 
   bracelet:
-    'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'The wrist on the LEFT is now wearing that exact bracelet. ' +
-    'Show the wrist naturally with the bracelet placed correctly. ' +
-    'Copy the exact chain style, width, clasp, and material from the product reference. ' +
+    'This image has two halves. The RIGHT side shows the EXACT bracelet product that must be used — do NOT replace or redesign it. ' +
+    'The wrist on the LEFT is now wearing THIS EXACT bracelet from the RIGHT side. ' +
+    'Preserve every detail: same chain style, same width, same clasp, same material, same color. ' +
+    'Do NOT substitute with different jewelry. Do NOT invent new jewelry. ' +
     'Match lighting and reflections. Keep everything else unchanged.',
 
   sunglasses:
-    'Look at the eyewear product photo on the RIGHT side of this image. ' +
-    'The person on the LEFT is now wearing those exact sunglasses on their face. ' +
-    'Show the full person naturally with the sunglasses placed on the nose bridge. ' +
-    'Copy the exact frame shape, color, and lens tint from the product reference. ' +
+    'This image has two halves. The RIGHT side shows the EXACT eyewear product that must be used — do NOT replace or redesign it. ' +
+    'The person on the LEFT is now wearing THESE EXACT sunglasses from the RIGHT side on their face. ' +
+    'Preserve every detail: same frame shape, same frame color, same lens tint, same temple style. ' +
+    'Do NOT substitute with different eyewear. Do NOT invent new glasses. ' +
     'Keep everything else unchanged.',
 
   watch:
-    'Look at the watch product photo on the RIGHT side of this image. ' +
-    'The wrist on the LEFT is now wearing that exact watch. ' +
-    'Show the wrist naturally with the watch placed correctly. ' +
-    'Copy the exact face design, band style, color, and material from the product reference. ' +
+    'This image has two halves. The RIGHT side shows the EXACT watch product that must be used — do NOT replace or redesign it. ' +
+    'The wrist on the LEFT is now wearing THIS EXACT watch from the RIGHT side. ' +
+    'Preserve every detail: same dial design, same case shape, same band style, same color and material. ' +
+    'Do NOT substitute with different jewelry or a different watch. Do NOT invent new jewelry. ' +
     'Match lighting and reflections. Keep everything else unchanged.',
 };
 
@@ -76,29 +76,42 @@ const PLACEMENT_PROMPTS: Record<string, string> = {
 
 const EXHIBIDOR_PROMPTS: Record<string, string> = {
   earrings:
-    'This exact jewelry piece elegantly displayed hanging from an elegant T-bar earring display stand, ' +
-    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
-    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+    'This EXACT earring from the input image, completely unchanged and unmodified, ' +
+    'elegantly displayed hanging from an elegant T-bar earring display stand. ' +
+    'Do NOT redesign, replace, or alter the earring in any way — it must be identical to the input image. ' +
+    'Professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style.',
   necklace:
-    'This exact jewelry piece elegantly displayed draped on a sleek velvet bust necklace display, ' +
-    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
-    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+    'This EXACT necklace from the input image, completely unchanged and unmodified, ' +
+    'elegantly displayed draped on a sleek velvet bust necklace display. ' +
+    'Do NOT redesign, replace, or alter the necklace in any way — it must be identical to the input image. ' +
+    'Do NOT replace it with a ring, bracelet, or any other jewelry. ' +
+    'Professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style.',
   ring:
-    'This exact jewelry piece elegantly displayed placed on a minimalist ring holder stand, ' +
-    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
-    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+    'This EXACT ring from the input image, completely unchanged and unmodified, ' +
+    'elegantly displayed placed on a minimalist ring holder stand. ' +
+    'Do NOT redesign, replace, or alter the ring in any way — it must be identical to the input image. ' +
+    'Professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style.',
   bracelet:
-    'This exact jewelry piece elegantly displayed resting on a curved bracelet display cushion, ' +
-    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
-    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+    'This EXACT bracelet from the input image, completely unchanged and unmodified, ' +
+    'elegantly displayed resting on a curved bracelet display cushion. ' +
+    'Do NOT redesign, replace, or alter the bracelet in any way — it must be identical to the input image. ' +
+    'Professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style.',
   sunglasses:
-    'This exact eyewear piece elegantly displayed placed on a clean eyewear display stand, ' +
-    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
-    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+    'This EXACT eyewear piece from the input image, completely unchanged and unmodified, ' +
+    'elegantly displayed placed on a clean eyewear display stand. ' +
+    'Do NOT redesign, replace, or alter the eyewear in any way — it must be identical to the input image. ' +
+    'Professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style.',
   watch:
-    'This exact watch elegantly displayed on a premium watch winder stand, ' +
-    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
-    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+    'This EXACT watch from the input image, completely unchanged and unmodified, ' +
+    'elegantly displayed on a premium watch winder stand. ' +
+    'Do NOT redesign, replace, or alter the watch in any way — it must be identical to the input image. ' +
+    'Professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style.',
 };
 
 // ---------------------------------------------------------------------------
@@ -106,10 +119,11 @@ const EXHIBIDOR_PROMPTS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 const FLOTANTE_PROMPT =
-  'This exact jewelry piece floating and levitating gracefully in mid-air, ' +
-  'dramatic cinematic lighting with golden highlights, dark luxury gradient background, ' +
+  'This EXACT jewelry piece from the input image, floating and levitating gracefully in mid-air. ' +
+  'The jewelry must be completely identical to the input image — do NOT modify, redesign, or replace it with different jewelry. ' +
+  'Dramatic cinematic lighting with golden highlights, dark luxury gradient background, ' +
   'magical floating effect with soft shadow below, sparkling light particles around it, ' +
-  'product photography, photorealistic, ultra high detail';
+  'product photography, photorealistic, ultra high detail.';
 
 // ---------------------------------------------------------------------------
 // Metal/finish modifier phrases
