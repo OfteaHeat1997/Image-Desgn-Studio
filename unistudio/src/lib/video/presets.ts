@@ -90,6 +90,69 @@ const PRODUCT_PRESETS: VideoPreset[] = [
     icon: 'Droplets',
     recommended: ['kling-2.6', 'minimax-hailuo'],
   },
+  // ── Fragrance ──
+  {
+    id: 'fragrance-spin',
+    name: 'Perfume 360°',
+    description: 'Rotacion elegante de frasco de perfume',
+    promptTemplate:
+      'Luxury perfume bottle performing a slow elegant 360-degree rotation on a reflective dark surface, dramatic rim lighting, particles of light, cinematic fragrance commercial',
+    category: 'product',
+    icon: 'Wind',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'fragrance-reveal',
+    name: 'Perfume Reveal',
+    description: 'Perfume emerge del humo dorado',
+    promptTemplate:
+      'Dramatic slow reveal of a perfume bottle emerging from golden mist and smoke, luxury advertising, volumetric lighting',
+    category: 'product',
+    icon: 'Flame',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  // ── Jewelry ──
+  {
+    id: 'jewelry-sparkle',
+    name: 'Joya Brillante',
+    description: 'Macro de joya con destellos de luz',
+    promptTemplate:
+      'Extreme macro close-up of jewelry piece with light reflections creating sparkle effects, slow camera orbit, dark velvet background, fine detail visible',
+    category: 'product',
+    icon: 'Star',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'jewelry-float',
+    name: 'Joya Flotante',
+    description: 'Joya flotando con luz dramatica',
+    promptTemplate:
+      'Jewelry piece floating and slowly rotating in mid-air with dramatic spotlight, particles of light, dark luxury background',
+    category: 'product',
+    icon: 'Gem',
+    recommended: ['kling-2.6', 'wan-2.5'],
+  },
+  // ── Skincare ──
+  {
+    id: 'skincare-texture',
+    name: 'Textura Crema',
+    description: 'Close-up de textura del producto',
+    promptTemplate:
+      'Close-up of skincare product with smooth cream texture being revealed, clean spa aesthetic, soft natural lighting, zen atmosphere',
+    category: 'product',
+    icon: 'Layers',
+    recommended: ['ltx-video', 'wan-2.2-fast'],
+  },
+  {
+    id: 'skincare-splash',
+    name: 'Skincare Splash',
+    description: 'Producto con gotas de agua pura',
+    promptTemplate:
+      'Skincare product with fresh water splash effect, clean pure water drops, bright fresh atmosphere, product hero shot',
+    category: 'product',
+    icon: 'Waves',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -155,6 +218,16 @@ const FASHION_PRESETS: VideoPreset[] = [
       'Elegant lingerie presentation, model posing gracefully, soft romantic lighting, tasteful and sophisticated, luxury brand photography, subtle movement',
     category: 'fashion',
     icon: 'Heart',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'lingerie-360',
+    name: 'Lenceria 360° (Frente + Espalda)',
+    description: 'Video que muestra frente y espalda de la prenda',
+    promptTemplate:
+      'Elegant lingerie showcase transitioning from front view to back view, tasteful and sophisticated, luxury brand photography, smooth camera movement revealing both sides of the garment',
+    category: 'fashion',
+    icon: 'RefreshCw',
     recommended: ['kling-2.6', 'minimax-hailuo'],
   },
 ];

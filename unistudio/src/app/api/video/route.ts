@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
           falInput = {
             image_url: httpImageUrl,
             prompt: fullPrompt,
-            duration: String(Math.min(duration, 10)),
+            duration: Math.min(duration, 10),
             resolution: '480p',
           };
         } else if (providerKey === 'kling-2.6') {
@@ -147,11 +147,12 @@ export async function POST(request: NextRequest) {
           });
           resultUrl = await extractOutputUrl(output);
         } else if (providerKey === 'wan-2.2-fast') {
-          // Wan 2.2 Fast — minimum 81 frames, max 5s
+          // Wan 2.2 Fast — 16fps, minimum 81 frames (~5s)
+          const numFrames = Math.max(81, Math.round(duration * 16));
           const output = await runModel(provider.model, {
             image: httpImageUrl,
             prompt: fullPrompt,
-            num_frames: 81,
+            num_frames: numFrames,
             guidance_scale: 5.0,
           });
           resultUrl = await extractOutputUrl(output);

@@ -12,6 +12,8 @@ import {
   X,
   Loader2,
   CheckCircle2,
+  RefreshCw,
+  Calculator,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -79,6 +81,18 @@ const AUTO_PLACEHOLDERS: Record<VideoCategory, string> = {
     "Ej: Una presentadora hablando sobre este producto, tono amigable y profesional",
 };
 
+/** Map HTTP status / error message to a friendly Spanish message */
+function friendlyError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("429") || msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("too many")) {
+    return "Servidor ocupado — espera unos segundos y reintenta.";
+  }
+  if (msg.includes("timeout") || msg.includes("timed out")) {
+    return "La generacion tardo demasiado. Prueba con menor duracion o reintenta.";
+  }
+  return msg || "Error en la generacion de video";
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
@@ -86,6 +100,7 @@ const AUTO_PLACEHOLDERS: Record<VideoCategory, string> = {
 export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
   const store = useVideoStore();
   const [avatarImageFile, setAvatarImageFile] = useState<File | null>(null);
+  const [backImageFile, setBackImageFile] = useState<File | null>(null);
 
   /* ---- Auto mode prompt ---- */
   const [autoPrompt, setAutoPrompt] = useState("");
@@ -95,6 +110,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
 
   /* ---- Track completed auto steps for UI ---- */
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+
+  /* ---- Batch cost estimator state ---- */
+  const [batchCount, setBatchCount] = useState(1);
 
   /* ---- Estimated cost ---- */
   const estimatedCost =
@@ -107,9 +125,6 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
 
   /* ---------------------------------------------------------------
    * ONE-CLICK AUTO GENERATE — full pipeline
-   * Step 1: AI enhances prompt + picks cheapest provider
-   * Step 2: Upload image
-   * Step 3: Generate video (or avatar with AI script + TTS)
    * --------------------------------------------------------------- */
   const handleAutoGenerate = useCallback(async () => {
     const isAvatar = store.activeTab === "avatar";
@@ -135,7 +150,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           description: autoPrompt,
           category: store.activeTab,
           duration: store.duration,
-          budget: 0, // prefer free providers
+          budget: 0,
         }),
       });
       const enhanceData = await safeJson(enhanceRes);
@@ -162,14 +177,12 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       if (!uploadData.success)
         throw new Error(uploadData.error || "Error al subir imagen");
 
-      // Use HTTP URL for AI models (data URLs are too large / inaccessible to providers)
       const httpImageUrl = uploadData.data.replicateUrl || uploadData.data.url;
 
       setCompletedSteps(["enhance", "upload"]);
 
       /* ── STEP 3: Generate ── */
       if (isAvatar) {
-        // Avatar: use AI-generated script
         const script = ai.script || autoPrompt;
         store.setAutoStep("Generando avatar con voz IA...");
 
@@ -205,7 +218,6 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         });
         onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
       } else {
-        // Product / Fashion video
         store.setAutoStep("Generando video...");
 
         const res = await fetch("/api/video", {
@@ -244,9 +256,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       }
     } catch (err) {
       console.error("Auto generation error:", err);
-      setError(
-        err instanceof Error ? err.message : "Error en la generacion automatica",
-      );
+      setError(friendlyError(err));
     } finally {
       store.setIsEnhancing(false);
       store.setIsProcessing(false);
@@ -367,11 +377,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       }
     } catch (err) {
       console.error("Video generation error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Error en la generacion de video",
-      );
+      setError(friendlyError(err));
     } finally {
       store.setIsProcessing(false);
     }
@@ -406,7 +412,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           "Haz clic en \"Generar Video\" — el resultado se previsualiza directamente",
         ]}
         tips={[
-          "Ken Burns (zoom/pan suave) es GRATIS — ideal para empezar sin gastar.",
+          "Ken Burns (zoom/pan suave) muestra PREVIEW — usa LTX-Video ($0.04) para MP4 descargable.",
           "Modo Auto escribe el prompt, elige el mejor proveedor y genera todo automaticamente.",
           "Para Avatar: sube una foto de rostro, escribe el texto que debe decir, y la IA genera el video con voz.",
           "Edge TTS (voz) es gratis e incluye voces en espanol latino y castellano.",
@@ -430,13 +436,32 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
           <span className="flex-1 text-xs text-red-300">{error}</span>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            className="shrink-0 text-red-400 hover:text-red-200 transition-colors"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {/* Retry button */}
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                if (store.mode === "auto") {
+                  handleAutoGenerate();
+                } else {
+                  handleGenerate();
+                }
+              }}
+              disabled={isAutoBusy || store.isProcessing}
+              className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/20 px-2 py-0.5 text-[10px] font-medium text-red-300 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Reintentar
+            </button>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-200 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -445,8 +470,8 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
          *  AUTO MODE — One-click AI pipeline
          * ══════════════════════════════════════════════════════════════ */
         <div className="space-y-4">
-          {/* Category tabs */}
-          <div className="flex items-center gap-1 rounded-lg bg-surface-light p-1">
+          {/* Category tabs — scrollable on mobile */}
+          <div className="flex items-center gap-1 overflow-x-auto rounded-lg bg-surface-light p-1 scrollbar-none">
             {(
               [
                 { key: "product" as VideoCategory, icon: ShoppingBag, label: "Producto" },
@@ -464,7 +489,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                   setCompletedSteps([]);
                 }}
                 className={cn(
-                  "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-all",
+                  "flex flex-1 min-w-[72px] items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-all",
                   store.activeTab === key
                     ? "bg-accent/15 text-accent-light shadow-sm"
                     : "text-gray-400 hover:text-gray-200",
@@ -504,7 +529,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             </p>
           </div>
 
-          {/* Live progress steps (shown while processing) */}
+          {/* Live progress steps */}
           {(isAutoBusy || completedSteps.length > 0) && (
             <div className="space-y-1.5 rounded-lg border border-surface-lighter bg-surface px-3 py-2.5">
               {autoStepLabels.map(({ key, label }, i) => {
@@ -544,7 +569,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             </div>
           )}
 
-          {/* AI Recommendation Card (shown after step 1 completes) */}
+          {/* AI Recommendation Card */}
           {store.aiEnhancement && !isAutoBusy && (
             <div className="space-y-2 rounded-lg border border-accent/40 bg-accent/5 px-3 py-3">
               <div className="flex items-center gap-1.5">
@@ -578,7 +603,6 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 {store.aiEnhancement.reasoning}
               </p>
 
-              {/* Enhanced prompt */}
               <div className="rounded-md bg-surface-light/50 px-2 py-1.5">
                 <p className="text-[9px] font-medium text-gray-500 mb-0.5">
                   Prompt usado:
@@ -588,7 +612,6 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 </p>
               </div>
 
-              {/* Script (avatar) */}
               {store.aiEnhancement.script && (
                 <div className="rounded-md bg-surface-light/50 px-2 py-1.5">
                   <p className="text-[9px] font-medium text-gray-500 mb-0.5">
@@ -634,25 +657,27 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
          *  MANUAL MODE
          * ══════════════════════════════════════════════════════════════ */
         <>
-          {/* Tab navigation */}
+          {/* Tab navigation — scrollable on small screens */}
           <TabRoot
             value={store.activeTab}
             onValueChange={(v) => store.setActiveTab(v as VideoCategory)}
           >
-            <TabList className="w-full">
-              <TabTrigger value="product" className="flex-1 gap-1">
-                <ShoppingBag className="h-3 w-3" />
-                Producto
-              </TabTrigger>
-              <TabTrigger value="fashion" className="flex-1 gap-1">
-                <Shirt className="h-3 w-3" />
-                Moda
-              </TabTrigger>
-              <TabTrigger value="avatar" className="flex-1 gap-1">
-                <UserCircle className="h-3 w-3" />
-                Avatar
-              </TabTrigger>
-            </TabList>
+            <div className="overflow-x-auto scrollbar-none">
+              <TabList className="w-full min-w-[200px]">
+                <TabTrigger value="product" className="flex-1 gap-1 whitespace-nowrap">
+                  <ShoppingBag className="h-3 w-3" />
+                  Producto
+                </TabTrigger>
+                <TabTrigger value="fashion" className="flex-1 gap-1 whitespace-nowrap">
+                  <Shirt className="h-3 w-3" />
+                  Moda
+                </TabTrigger>
+                <TabTrigger value="avatar" className="flex-1 gap-1 whitespace-nowrap">
+                  <UserCircle className="h-3 w-3" />
+                  Avatar
+                </TabTrigger>
+              </TabList>
+            </div>
 
             <TabContent value="product">
               <ProductVideoTab
@@ -669,6 +694,8 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 onPresetChange={store.setSelectedPreset}
                 customPrompt={store.customPrompt}
                 onCustomPromptChange={store.setCustomPrompt}
+                backImageFile={backImageFile}
+                onBackImageUpload={setBackImageFile}
               />
             </TabContent>
 
@@ -700,35 +727,71 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 duration={store.duration}
               />
 
-              <Select
-                label="Duracion"
-                value={String(store.duration)}
-                onValueChange={(v) => store.setDuration(parseInt(v))}
-                options={DURATION_OPTIONS}
-              />
+              {/* Duration + Aspect Ratio — stack on mobile */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Select
+                  label="Duracion"
+                  value={String(store.duration)}
+                  onValueChange={(v) => store.setDuration(parseInt(v))}
+                  options={DURATION_OPTIONS}
+                />
 
-              <Select
-                label="Aspecto"
-                value={store.aspectRatio}
-                onValueChange={store.setAspectRatio}
-                options={ASPECT_RATIO_OPTIONS}
-              />
+                <Select
+                  label="Aspecto"
+                  value={store.aspectRatio}
+                  onValueChange={store.setAspectRatio}
+                  options={ASPECT_RATIO_OPTIONS}
+                />
+              </div>
             </div>
           )}
 
-          {/* Cost estimate */}
-          <div className="rounded-lg border border-surface-lighter bg-surface px-3 py-2 text-center">
-            <span className="text-[10px] text-gray-500">
-              Costo estimado:{" "}
-              <span className="text-emerald-400 font-semibold">
-                {formatCost(estimatedCost)}
+          {/* Cost estimate + batch estimator */}
+          <div className="space-y-2">
+            <div className="rounded-lg border border-surface-lighter bg-surface px-3 py-2 text-center">
+              <span className="text-[10px] text-gray-500">
+                Costo estimado:{" "}
+                <span className="text-emerald-400 font-semibold">
+                  {formatCost(estimatedCost)}
+                </span>
+                {store.activeTab !== "avatar" && (
+                  <>
+                    {" | "}Duracion: {store.duration}s
+                  </>
+                )}
               </span>
-              {store.activeTab !== "avatar" && (
-                <>
-                  {" | "}Duracion: {store.duration}s
-                </>
-              )}
-            </span>
+            </div>
+
+            {/* Batch cost estimator */}
+            {store.activeTab !== "avatar" && (
+              <div className="rounded-lg border border-surface-lighter bg-surface/50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                  <span className="text-[10px] text-gray-500 font-medium">
+                    Estimador en lote:
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={batchCount}
+                    onChange={(e) => setBatchCount(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-14 rounded border border-surface-lighter bg-surface-light px-2 py-0.5 text-center text-[10px] text-gray-200 focus:border-accent focus:outline-none"
+                  />
+                  <span className="text-[10px] text-gray-500">
+                    productos ×{" "}
+                    <span className="text-gray-300">{formatCost(estimatedCost)}</span>
+                    {" = "}
+                    <span className="font-semibold text-emerald-400">
+                      {estimatedCost === 0
+                        ? "GRATIS"
+                        : `$${(estimatedCost * batchCount).toFixed(2)}`}
+                    </span>
+                    {" total"}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Generate button */}

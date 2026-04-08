@@ -151,7 +151,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: uploadData.data.url,
+          imageUrl: uploadData.data.replicateUrl || uploadData.data.url,
           template: selectedTemplate,
           headline,
           cta,

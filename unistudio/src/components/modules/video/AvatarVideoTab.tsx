@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Select } from "@/components/ui/select";
-import { Upload } from "lucide-react";
+import { Upload, Globe } from "lucide-react";
 import type { AvatarProviderKey, TtsProviderKey } from "@/types/video";
 import { AVATAR_PROVIDERS, TTS_PROVIDERS } from "@/lib/video/providers";
 import { formatCost } from "@/lib/video/cost";
@@ -111,6 +111,19 @@ export function AvatarVideoTab({
         onValueChange={(v) => onTtsProviderChange(v as TtsProviderKey)}
         options={ttsOptions}
       />
+
+      {/* Dutch/Papiamento notice for Curacao */}
+      <div className="flex items-start gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2">
+        <Globe className="h-3.5 w-3.5 shrink-0 text-blue-400 mt-0.5" />
+        <div>
+          <p className="text-[10px] font-semibold text-blue-300">
+            🇨🇼 Voces en Papiamento/Holandés disponibles
+          </p>
+          <p className="text-[10px] text-blue-400 mt-0.5">
+            Selecciona <span className="font-medium text-blue-200">Nederlands</span> para activar voces de Colette (femenino) y Maarten (masculino) — ideales para Curaçao.
+          </p>
+        </div>
+      </div>
 
       {/* Language */}
       <Select
