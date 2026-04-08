@@ -11,6 +11,11 @@ import { saveJob } from '@/lib/db/persist';
 const VALID_TYPES = ['earrings', 'necklace', 'ring', 'bracelet', 'sunglasses', 'watch'];
 const VALID_MODES = ['exhibidor', 'flotante', 'modelo'];
 
+// B-5: Validate that a string is a usable image URL or data URI
+function isValidImageUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
+}
+
 export async function POST(request: NextRequest) {
   try {
     let modelImage: string = '';
@@ -19,6 +24,7 @@ export async function POST(request: NextRequest) {
     let mode: string = 'modelo';
     let metalType: string | undefined;
     let finish: string | undefined;
+    let bgStyle: string | undefined;
 
     const contentType = request.headers.get('content-type') || '';
 
@@ -32,6 +38,7 @@ export async function POST(request: NextRequest) {
       mode = (formData.get('mode') as string) || 'modelo';
       metalType = (formData.get('metalType') as string) || undefined;
       finish = (formData.get('finish') as string) || undefined;
+      bgStyle = (formData.get('bgStyle') as string) || undefined;
 
       if (!jewelryFile) {
         return NextResponse.json(
@@ -60,6 +67,21 @@ export async function POST(request: NextRequest) {
       mode = body.mode || 'modelo';
       metalType = body.metalType;
       finish = body.finish;
+      bgStyle = body.bgStyle;
+
+      // B-5: Validate that provided image strings are valid URLs or data URIs
+      if (jewelryImage && !isValidImageUrl(jewelryImage)) {
+        return NextResponse.json(
+          { success: false, error: 'jewelryImage must be a valid URL (http/https) or data URI.' },
+          { status: 400 },
+        );
+      }
+      if (modelImage && !isValidImageUrl(modelImage)) {
+        return NextResponse.json(
+          { success: false, error: 'modelImage must be a valid URL (http/https) or data URI.' },
+          { status: 400 },
+        );
+      }
     }
 
     if (!jewelryImage) {
@@ -95,7 +117,8 @@ export async function POST(request: NextRequest) {
     if (mode === 'exhibidor' || mode === 'flotante') {
       resultUrl = await applyJewelryDisplay(jewelryImage, type, mode, { metalType, finish });
     } else {
-      resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish });
+      // P-4: Pass bgStyle so the modelo prompt can include background instructions
+      resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish, bgStyle });
     }
 
     await saveJob({
