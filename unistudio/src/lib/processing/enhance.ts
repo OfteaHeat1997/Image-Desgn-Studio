@@ -149,6 +149,19 @@ export const ENHANCE_PRESETS: Record<string, EnhancePreset> = {
     noiseReduction: 0,
     vibrance: 8,
   },
+  // Alias: product-clean maps to ecommerce settings (used by agent pipelines)
+  'product-clean': {
+    name: 'Producto Limpio',
+    description: 'Clean product photo for e-commerce catalogs',
+    brightness: 8,
+    contrast: 10,
+    saturation: 5,
+    sharpness: 25,
+    exposure: 5,
+    whiteBalance: 5800,
+    noiseReduction: 10,
+    vibrance: 5,
+  },
 };
 
 // ---------------------------------------------------------------------------

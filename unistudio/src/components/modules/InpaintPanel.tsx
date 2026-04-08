@@ -35,6 +35,9 @@ interface QuickPreset {
 }
 
 const QUICK_PRESETS: QuickPreset[] = [
+  { id: "remove-watermark", label: "Quitar Watermark", prompt: "Remove all watermarks, logos, copyright text, and brand markings completely. Keep the product intact." },
+  { id: "remove-logo", label: "Quitar Logo", prompt: "Remove the brand logo and any text overlay completely, reconstruct the underlying surface" },
+  { id: "remove-text", label: "Quitar Texto", prompt: "Remove all text, numbers, and written content from the image completely" },
   { id: "remove-tag", label: "Quitar Etiqueta", prompt: "Quitar la etiqueta y rellenar con la misma tela" },
   { id: "remove-wrinkles", label: "Quitar Arrugas", prompt: "Alisar arrugas y pliegues" },
   { id: "fix-stain", label: "Quitar Mancha", prompt: "Quitar la mancha y restaurar la superficie original" },
