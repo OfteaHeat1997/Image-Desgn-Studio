@@ -29,48 +29,87 @@ export const JEWELRY_COSTS: Record<string, number> = {
 const PLACEMENT_PROMPTS: Record<string, string> = {
   earrings:
     'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'Now place that EXACT pair of earrings on the person shown on the LEFT side. ' +
-    'Hang them naturally from both earlobes. ' +
-    'Copy the exact design, shape, material, color, gemstones, and every detail from the product photo. ' +
-    'The result should show ONLY the left person wearing the earrings — crop out the right reference image. ' +
-    'Match lighting and reflections to the person\'s photo. Keep face, hair, clothing unchanged.',
+    'The person on the LEFT is now wearing that exact pair of earrings on both earlobes. ' +
+    'Show the full person naturally with the earrings placed correctly. ' +
+    'Copy the exact design, shape, material, color, and gemstones from the product reference. ' +
+    'Match lighting and reflections to the person\'s photo. Keep face, hair, and clothing unchanged.',
 
   necklace:
     'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'Now place that EXACT necklace on the person shown on the LEFT side. ' +
-    'Drape it naturally around the neck following the neckline. ' +
-    'Copy the exact chain style, pendant, material, thickness, and every detail from the product photo. ' +
-    'The result should show ONLY the left person wearing the necklace — crop out the right reference. ' +
+    'The person on the LEFT is now wearing that exact necklace around their neck. ' +
+    'Show the full person naturally with the necklace draped correctly along the neckline. ' +
+    'Copy the exact chain style, pendant, material, and thickness from the product reference. ' +
     'Match lighting and reflections. Keep the person unchanged.',
 
   ring:
     'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'Now place that EXACT ring on the ring finger of the hand shown on the LEFT side. ' +
-    'Copy the exact design, gemstone, band, metal color, and every detail from the product photo. ' +
-    'The result should show ONLY the left hand with the ring — crop out the right reference. ' +
+    'The hand on the LEFT is now wearing that exact ring on the ring finger. ' +
+    'Show the hand naturally with the ring placed correctly. ' +
+    'Copy the exact design, gemstone, band, and metal color from the product reference. ' +
     'Match lighting and perspective. Keep everything else unchanged.',
 
   bracelet:
     'Look at the jewelry product photo on the RIGHT side of this image. ' +
-    'Now place that EXACT bracelet on the wrist shown on the LEFT side. ' +
-    'Copy the exact chain style, width, clasp, material, and every detail from the product photo. ' +
-    'The result should show ONLY the left wrist with the bracelet — crop out the right reference. ' +
+    'The wrist on the LEFT is now wearing that exact bracelet. ' +
+    'Show the wrist naturally with the bracelet placed correctly. ' +
+    'Copy the exact chain style, width, clasp, and material from the product reference. ' +
     'Match lighting and reflections. Keep everything else unchanged.',
 
   sunglasses:
     'Look at the eyewear product photo on the RIGHT side of this image. ' +
-    'Now place those EXACT sunglasses on the person shown on the LEFT side. ' +
-    'Copy the exact frame shape, color, lens tint, and design from the product photo. ' +
-    'The result should show ONLY the left person wearing the sunglasses — crop out the right reference. ' +
-    'Place naturally on the nose bridge. Keep everything else unchanged.',
+    'The person on the LEFT is now wearing those exact sunglasses on their face. ' +
+    'Show the full person naturally with the sunglasses placed on the nose bridge. ' +
+    'Copy the exact frame shape, color, and lens tint from the product reference. ' +
+    'Keep everything else unchanged.',
 
   watch:
     'Look at the watch product photo on the RIGHT side of this image. ' +
-    'Now place that EXACT watch on the wrist shown on the LEFT side. ' +
-    'Copy the exact face design, band style, color, material, and every detail from the product photo. ' +
-    'The result should show ONLY the left wrist with the watch — crop out the right reference. ' +
+    'The wrist on the LEFT is now wearing that exact watch. ' +
+    'Show the wrist naturally with the watch placed correctly. ' +
+    'Copy the exact face design, band style, color, and material from the product reference. ' +
     'Match lighting and reflections. Keep everything else unchanged.',
 };
+
+// ---------------------------------------------------------------------------
+// Exhibidor (display stand) prompts — per accessory type
+// ---------------------------------------------------------------------------
+
+const EXHIBIDOR_PROMPTS: Record<string, string> = {
+  earrings:
+    'This exact jewelry piece elegantly displayed hanging from an elegant T-bar earring display stand, ' +
+    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+  necklace:
+    'This exact jewelry piece elegantly displayed draped on a sleek velvet bust necklace display, ' +
+    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+  ring:
+    'This exact jewelry piece elegantly displayed placed on a minimalist ring holder stand, ' +
+    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+  bracelet:
+    'This exact jewelry piece elegantly displayed resting on a curved bracelet display cushion, ' +
+    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+  sunglasses:
+    'This exact eyewear piece elegantly displayed placed on a clean eyewear display stand, ' +
+    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+  watch:
+    'This exact watch elegantly displayed on a premium watch winder stand, ' +
+    'professional commercial photography, soft diffused studio lighting, clean white marble surface, ' +
+    'photorealistic, sharp focus, 8K detail, luxury brand advertising style',
+};
+
+// ---------------------------------------------------------------------------
+// Flotante (floating) prompt — same for all types
+// ---------------------------------------------------------------------------
+
+const FLOTANTE_PROMPT =
+  'This exact jewelry piece floating and levitating gracefully in mid-air, ' +
+  'dramatic cinematic lighting with golden highlights, dark luxury gradient background, ' +
+  'magical floating effect with soft shadow below, sparkling light particles around it, ' +
+  'product photography, photorealistic, ultra high detail';
 
 // ---------------------------------------------------------------------------
 // Metal/finish modifier phrases
@@ -224,6 +263,49 @@ export async function applyJewelry(
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
     input_image: compositeHttpUrl,
     prompt: fullPrompt,
+    output_format: 'jpg',
+  });
+
+  return await extractOutputUrl(output);
+}
+
+/**
+ * Apply a display or floating effect to a jewelry image (no model needed).
+ * Used for "exhibidor" and "flotante" modes.
+ *
+ * Sends ONLY the jewelry image to Flux Kontext Pro with a product photography prompt.
+ */
+export async function applyJewelryDisplay(
+  jewelryImageUrl: string,
+  accessoryType: string,
+  mode: 'exhibidor' | 'flotante',
+  options?: { metalType?: string; finish?: string },
+): Promise<string> {
+  let prompt: string;
+
+  if (mode === 'flotante') {
+    prompt = FLOTANTE_PROMPT;
+  } else {
+    prompt = EXHIBIDOR_PROMPTS[accessoryType] || EXHIBIDOR_PROMPTS['necklace'];
+  }
+
+  // Add metal/finish modifiers
+  const modifiers: string[] = [];
+  if (options?.metalType && METAL_PHRASES[options.metalType]) {
+    modifiers.push(METAL_PHRASES[options.metalType]);
+  }
+  if (options?.finish && FINISH_PHRASES[options.finish]) {
+    modifiers.push(FINISH_PHRASES[options.finish]);
+  }
+  if (modifiers.length > 0) {
+    prompt += ' ' + modifiers.join(' ');
+  }
+
+  const jewelryHttpUrl = await ensureHttpUrl(jewelryImageUrl);
+
+  const output = await runModel('black-forest-labs/flux-kontext-pro', {
+    input_image: jewelryHttpUrl,
+    prompt,
     output_format: 'jpg',
   });
 

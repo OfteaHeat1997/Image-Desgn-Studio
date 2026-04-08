@@ -155,9 +155,10 @@ export async function ensureHttpUrl(url: string): Promise<string> {
 export async function runModel(
   modelId: string,
   input: Record<string, any>,
-  _retries = 3,
+  _retries = 4,
 ): Promise<any> {
   const client = getClient();
+  const RETRY_DELAYS = [5000, 15000, 30000, 60000]; // 5s, 15s, 30s, 60s
 
   for (let attempt = 0; attempt <= _retries; attempt++) {
     try {
@@ -170,8 +171,7 @@ export async function runModel(
       const is429 = msg.includes('429') || msg.includes('Too Many Requests') || msg.includes('throttled');
 
       if (is429 && attempt < _retries) {
-        // Wait before retrying (exponential: 2s, 4s, 8s)
-        const delay = Math.pow(2, attempt + 1) * 1000;
+        const delay = RETRY_DELAYS[attempt] ?? 60000;
         console.log(`[replicate] 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${_retries})...`);
         await new Promise((r) => setTimeout(r, delay));
         continue;

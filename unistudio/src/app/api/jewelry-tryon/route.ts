@@ -5,16 +5,18 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { applyJewelry, JEWELRY_COSTS } from '@/lib/processing/jewelry';
+import { applyJewelry, applyJewelryDisplay, JEWELRY_COSTS } from '@/lib/processing/jewelry';
 import { saveJob } from '@/lib/db/persist';
 
 const VALID_TYPES = ['earrings', 'necklace', 'ring', 'bracelet', 'sunglasses', 'watch'];
+const VALID_MODES = ['exhibidor', 'flotante', 'modelo'];
 
 export async function POST(request: NextRequest) {
   try {
-    let modelImage: string;
+    let modelImage: string = '';
     let jewelryImage: string;
     let type: string;
+    let mode: string = 'modelo';
     let metalType: string | undefined;
     let finish: string | undefined;
 
@@ -27,6 +29,7 @@ export async function POST(request: NextRequest) {
       const modelFile = formData.get('modelFile') as File | null;
       modelImage = formData.get('modelImage') as string || '';
       type = formData.get('type') as string || '';
+      mode = (formData.get('mode') as string) || 'modelo';
       metalType = (formData.get('metalType') as string) || undefined;
       finish = (formData.get('finish') as string) || undefined;
 
@@ -54,16 +57,11 @@ export async function POST(request: NextRequest) {
       modelImage = body.modelImage || '';
       jewelryImage = body.jewelryImage || '';
       type = body.type || '';
+      mode = body.mode || 'modelo';
       metalType = body.metalType;
       finish = body.finish;
     }
 
-    if (!modelImage) {
-      return NextResponse.json(
-        { success: false, error: 'Missing modelImage.' },
-        { status: 400 },
-      );
-    }
     if (!jewelryImage) {
       return NextResponse.json(
         { success: false, error: 'Missing jewelryImage.' },
@@ -76,21 +74,41 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    if (!VALID_MODES.includes(mode)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid mode "${mode}". Use: ${VALID_MODES.join(', ')}.` },
+        { status: 400 },
+      );
+    }
+
+    // Modelo mode requires a model image
+    if (mode === 'modelo' && !modelImage) {
+      return NextResponse.json(
+        { success: false, error: 'Missing modelImage for modelo mode.' },
+        { status: 400 },
+      );
+    }
 
     const cost = JEWELRY_COSTS[type] ?? 0.05;
-    const resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish });
+    let resultUrl: string;
+
+    if (mode === 'exhibidor' || mode === 'flotante') {
+      resultUrl = await applyJewelryDisplay(jewelryImage, type, mode, { metalType, finish });
+    } else {
+      resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish });
+    }
 
     await saveJob({
       operation: 'jewelry-tryon',
       provider: 'flux-kontext-pro',
-      inputParams: { type, metalType, finish },
+      inputParams: { type, mode, metalType, finish },
       outputUrl: resultUrl,
       cost,
     });
 
     return NextResponse.json({
       success: true,
-      data: { url: resultUrl, type, cost },
+      data: { url: resultUrl, type, mode, cost },
     });
   } catch (error) {
     console.error('[API /jewelry-tryon] Error:', error);
