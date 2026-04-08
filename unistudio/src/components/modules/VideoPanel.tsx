@@ -304,8 +304,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         });
         onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
       } else {
+        if (!imageFile) throw new Error("Se necesita una imagen para generar video");
         const formData = new FormData();
-        formData.append("file", imageFile!);
+        formData.append("file", imageFile);
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
           body: formData,

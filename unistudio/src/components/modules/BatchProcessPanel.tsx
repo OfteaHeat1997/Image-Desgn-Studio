@@ -276,8 +276,9 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
     let currentImageUrl = "";
 
     try {
-      // Capture original for before/after
-      const beforeDataUrl = await fileToDataUrl(imageFile);
+      // Capture original for before/after (non-blocking — fallback to empty string)
+      let beforeDataUrl = "";
+      try { beforeDataUrl = await fileToDataUrl(imageFile); } catch { /* skip */ }
 
       // Upload image once — reuse URL for all steps
       currentImageUrl = await uploadFile(imageFile);
@@ -291,7 +292,7 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
       }
 
       setCurrentStepIdx(-1);
-      onProcess(currentImageUrl, beforeDataUrl, totalCost);
+      onProcess(currentImageUrl, beforeDataUrl || undefined, totalCost);
       toast.success(`Pipeline completado — ${enabledSteps.length} paso(s) aplicados`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
@@ -308,7 +309,7 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
   const enabledSteps = steps.filter((s) => s.enabled);
   const totalCost = totalCostOf(steps);
   const currentStepLabel =
-    currentStepIdx >= 0
+    currentStepIdx >= 0 && currentStepIdx < enabledSteps.length
       ? `Paso ${currentStepIdx + 1}/${enabledSteps.length}: ${OP_MAP[enabledSteps[currentStepIdx]?.operation]?.label ?? "..."}`
       : "";
 

@@ -142,6 +142,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   const [statusText, setStatusText] = useState<string>("");
   const [progressPct, setProgressPct] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const clearTimerRef = useRef<number>(0);
 
   // The effective jewelry file: editor image takes priority, fallback to local upload
   const effectiveJewelryFile = imageFile ?? localJewelryFile;
@@ -149,7 +150,10 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
   // F-5: Track all blob URLs for cleanup on unmount
   const blobUrlsRef = useRef<string[]>([]);
   useEffect(() => {
-    return () => { blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url)); };
+    return () => {
+      blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
   }, []);
 
   // F-6: Create a stable preview URL when imageFile comes from the editor (no local upload)
@@ -338,7 +342,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       setErrorMsg(isRateLimit ? "rate_limit" : msg);
     } finally {
       setIsProcessing(false);
-      setTimeout(() => {
+      clearTimerRef.current = window.setTimeout(() => {
         setStatusText("");
         setProgressPct(0);
       }, 3000);
