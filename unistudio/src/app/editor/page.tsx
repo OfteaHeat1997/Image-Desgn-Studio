@@ -10,13 +10,15 @@ import { Toolbar } from "@/components/editor/Toolbar";
 import { ModuleSidebar } from "@/components/editor/ModuleSidebar";
 import { LayersPanel } from "@/components/editor/LayersPanel";
 import { PropertiesPanel } from "@/components/editor/PropertiesPanel";
+import { CanvasRenderer } from "@/components/editor/CanvasRenderer";
 import { ShadowsGuidePanel, type SessionResult } from "@/components/editor/ShadowsGuidePanel";
 import { TryOnGuidePanel } from "@/components/editor/TryOnGuidePanel";
 import { useGalleryStore } from "@/stores/gallery-store";
 import { useEditorSessionStore } from "@/stores/editor-session-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useEditor } from "@/hooks/useEditor";
-import { ArrowRight, RotateCcw, Eye, EyeOff, ImagePlus } from "lucide-react";
+import { useEditorStore } from "@/stores/editor-store";
+import { ArrowRight, RotateCcw, Eye, EyeOff, ImagePlus, Layers } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ResultBanner } from "@/components/ui/result-banner";
@@ -331,7 +333,9 @@ function EditorInner() {
   const [uploadedOriginalUrl, setUploadedOriginalUrl] = useState<string | null>(null);
 
   // Connect to the layers system
-  const { addImage: addLayerImage } = useEditor();
+  const { addImage: addLayerImage, selectLayer: selectEditorLayer } = useEditor();
+  const editorLayers = useEditorStore((s) => s.layers);
+  const [showLayersCanvas, setShowLayersCanvas] = useState(false);
 
   // Session persistence — restore last working state after page refresh
   const editorSession = useEditorSessionStore();
@@ -762,20 +766,49 @@ function EditorInner() {
               </div>
             </div>
           ) : (
-            /* Single image preview */
+            /* Single image preview or Layers canvas */
             <div className="flex flex-col items-center gap-4">
-              <div
-                className="relative"
-                style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
-              >
-                <div className="checkerboard-bg rounded-lg">
-                  <img
-                    src={currentImage}
-                    alt="Current"
-                    className="max-h-[70vh] rounded-lg border border-surface-lighter object-contain"
-                  />
+              {/* Layers canvas toggle */}
+              {editorLayers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={showLayersCanvas ? "primary" : "outline"}
+                    size="sm"
+                    leftIcon={<Layers className="h-3.5 w-3.5" />}
+                    onClick={() => setShowLayersCanvas((v) => !v)}
+                  >
+                    {showLayersCanvas ? "Vista Capas" : "Ver Capas"}
+                  </Button>
+                  {showLayersCanvas && (
+                    <span className="text-[10px] text-gray-500">
+                      {editorLayers.filter((l) => l.visible).length}/{editorLayers.length} capas visibles
+                    </span>
+                  )}
                 </div>
-              </div>
+              )}
+
+              {showLayersCanvas && editorLayers.length > 0 ? (
+                /* Live layers canvas */
+                <CanvasRenderer
+                  zoom={zoom}
+                  onLayerClick={selectEditorLayer}
+                />
+              ) : (
+                /* Standard single image preview */
+                <div
+                  className="relative"
+                  style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+                >
+                  <div className="checkerboard-bg rounded-lg">
+                    <img
+                      src={currentImage}
+                      alt="Current"
+                      className="max-h-[70vh] rounded-lg border border-surface-lighter object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Button to upload a new image without reloading */}
               <Button
                 variant="outline"

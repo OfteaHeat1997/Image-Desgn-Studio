@@ -196,14 +196,14 @@ export const useEditorStore = create<EditorStoreState>()((set, get) => ({
 
   redo: () => {
     const { history, historyIndex } = get();
-    const nextIndex = historyIndex + 2; // +2 because undo decrements by 1 and we stored current at tip
+    const nextIndex = historyIndex + 1;
     if (nextIndex >= history.length) return;
 
     const entry = history[nextIndex];
     set({
       layers: entry.layers.map((l) => ({ ...l, filters: { ...l.filters } })),
       selectedLayerId: entry.selectedLayerId,
-      historyIndex: historyIndex + 1,
+      historyIndex: nextIndex,
     });
   },
 

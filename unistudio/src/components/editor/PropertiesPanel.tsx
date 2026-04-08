@@ -136,8 +136,16 @@ export function PropertiesPanel() {
     );
   }
 
+  const isLocked = selectedLayer.locked;
+
   return (
-    <div className="space-y-4 p-3">
+    <div className={cn("space-y-4 p-3", isLocked && "opacity-60 pointer-events-none")}>
+      {/* Lock warning */}
+      {isLocked && (
+        <div className="pointer-events-auto rounded-md bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5 text-center">
+          <p className="text-[10px] text-amber-400 font-medium">🔒 Capa bloqueada — desbloquea para editar</p>
+        </div>
+      )}
       {/* Position */}
       <div>
         <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-gray-500">
@@ -247,6 +255,71 @@ export function PropertiesPanel() {
             <FlipVertical2 className="mr-1 h-3.5 w-3.5" />
             Voltear V
           </Button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div>
+        <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Filtros
+        </label>
+        <div className="space-y-2">
+          <Slider
+            label="Brillo"
+            value={[selectedLayer.filters?.brightness ?? 0]}
+            onValueChange={([v]) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters, brightness: v } })}
+            min={-100} max={100} step={1}
+            formatValue={(v) => `${v > 0 ? "+" : ""}${v}`}
+          />
+          <Slider
+            label="Contraste"
+            value={[selectedLayer.filters?.contrast ?? 0]}
+            onValueChange={([v]) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters, contrast: v } })}
+            min={-100} max={100} step={1}
+            formatValue={(v) => `${v > 0 ? "+" : ""}${v}`}
+          />
+          <Slider
+            label="Saturacion"
+            value={[selectedLayer.filters?.saturation ?? 0]}
+            onValueChange={([v]) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters, saturation: v } })}
+            min={-100} max={100} step={1}
+            formatValue={(v) => `${v > 0 ? "+" : ""}${v}`}
+          />
+          <Slider
+            label="Desenfoque"
+            value={[selectedLayer.filters?.blur ?? 0]}
+            onValueChange={([v]) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters, blur: v } })}
+            min={0} max={20} step={0.5}
+            formatValue={(v) => `${v}px`}
+          />
+          <Slider
+            label="Tono"
+            value={[selectedLayer.filters?.hue ?? 0]}
+            onValueChange={([v]) => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters, hue: v } })}
+            min={-180} max={180} step={1}
+            formatValue={(v) => `${v}\u00B0`}
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {([
+            ["grayscale", "B/N"],
+            ["sepia", "Sepia"],
+            ["invert", "Invertir"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => updateLayer(selectedLayer.id, { filters: { ...selectedLayer.filters, [key]: !selectedLayer.filters?.[key] } })}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-[10px] font-medium transition-all",
+                selectedLayer.filters?.[key]
+                  ? "bg-accent/15 text-accent-light ring-1 ring-accent/50"
+                  : "bg-surface-light text-gray-500 hover:text-gray-400",
+              )}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import {
   Eye,
   EyeOff,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useEditorStore } from "@/stores/editor-store";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 import type { ImageLayer } from "@/types/editor";
 
 /* ------------------------------------------------------------------ */
@@ -29,6 +30,7 @@ interface LayerRowProps {
   onSelect: (id: string) => void;
   onToggleVisible: (id: string, visible: boolean) => void;
   onToggleLock: (id: string, locked: boolean) => void;
+  onRename: (id: string, name: string) => void;
   onMoveUp: (index: number) => void;
   onMoveDown: (index: number) => void;
   onDelete: (id: string) => void;
@@ -42,10 +44,25 @@ function LayerRow({
   onSelect,
   onToggleVisible,
   onToggleLock,
+  onRename,
   onMoveUp,
   onMoveDown,
   onDelete,
 }: LayerRowProps) {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameBuf, setRenameBuf] = useState(layer.name);
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isRenaming) renameRef.current?.select();
+  }, [isRenaming]);
+
+  const commitRename = () => {
+    const trimmed = renameBuf.trim();
+    if (trimmed && trimmed !== layer.name) onRename(layer.id, trimmed);
+    setIsRenaming(false);
+  };
+
   return (
     <div
       className={cn(
@@ -64,12 +81,12 @@ function LayerRow({
           onToggleVisible(layer.id, !layer.visible);
         }}
         className="text-gray-500 hover:text-gray-300 transition-colors"
-        aria-label={layer.visible ? "Hide layer" : "Show layer"}
+        aria-label={layer.visible ? "Ocultar capa" : "Mostrar capa"}
       >
         {layer.visible ? (
           <Eye className="h-3.5 w-3.5" />
         ) : (
-          <EyeOff className="h-3.5 w-3.5" />
+          <EyeOff className="h-3.5 w-3.5 opacity-40" />
         )}
       </button>
 
@@ -88,10 +105,33 @@ function LayerRow({
         )}
       </div>
 
-      {/* Name */}
-      <span className="flex-1 truncate text-xs text-gray-300">
-        {layer.name}
-      </span>
+      {/* Name — double-click to rename */}
+      {isRenaming ? (
+        <input
+          ref={renameRef}
+          value={renameBuf}
+          onChange={(e) => setRenameBuf(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitRename();
+            if (e.key === "Escape") { setRenameBuf(layer.name); setIsRenaming(false); }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-1 min-w-0 rounded bg-surface-light px-1 py-0.5 text-xs text-gray-200 outline-none ring-1 ring-accent/50"
+        />
+      ) : (
+        <span
+          className="flex-1 truncate text-xs text-gray-300"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setRenameBuf(layer.name);
+            setIsRenaming(true);
+          }}
+          title="Doble clic para renombrar"
+        >
+          {layer.name}
+        </span>
+      )}
 
       {/* Lock toggle */}
       <button
@@ -118,8 +158,9 @@ function LayerRow({
             e.stopPropagation();
             onMoveUp(index);
           }}
-          disabled={index === 0}
+          disabled={index === totalLayers - 1}
           className="text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
+          aria-label="Mover arriba"
         >
           <ChevronUp className="h-3 w-3" />
         </button>
@@ -129,8 +170,9 @@ function LayerRow({
             e.stopPropagation();
             onMoveDown(index);
           }}
-          disabled={index === totalLayers - 1}
+          disabled={index === 0}
           className="text-gray-500 hover:text-gray-300 disabled:opacity-30 transition-colors"
+          aria-label="Mover abajo"
         >
           <ChevronDown className="h-3 w-3" />
         </button>
@@ -170,25 +212,38 @@ export function LayersPanel() {
     [updateLayer],
   );
 
+  // In the reversed display, "up" means higher in the visual stack = higher array index
   const handleMoveUp = useCallback(
-    (index: number) => {
-      if (index > 0) reorderLayers(index, index - 1);
-    },
-    [reorderLayers],
-  );
-
-  const handleMoveDown = useCallback(
     (index: number) => {
       if (index < layers.length - 1) reorderLayers(index, index + 1);
     },
     [reorderLayers, layers.length],
   );
 
+  const handleMoveDown = useCallback(
+    (index: number) => {
+      if (index > 0) reorderLayers(index, index - 1);
+    },
+    [reorderLayers],
+  );
+
+  const handleRename = useCallback(
+    (id: string, name: string) => {
+      updateLayer(id, { name });
+    },
+    [updateLayer],
+  );
+
   const handleDelete = useCallback(
     (id: string) => {
+      const layer = layers.find((l) => l.id === id);
+      if (layer?.locked) {
+        toast.warning("La capa esta bloqueada. Desbloqueala primero.");
+        return;
+      }
       removeLayer(id);
     },
-    [removeLayer],
+    [removeLayer, layers],
   );
 
   const handleAddLayer = useCallback(() => {
@@ -247,6 +302,7 @@ export function LayersPanel() {
                 onSelect={selectLayer}
                 onToggleVisible={handleToggleVisible}
                 onToggleLock={handleToggleLock}
+                onRename={handleRename}
                 onMoveUp={handleMoveUp}
                 onMoveDown={handleMoveDown}
                 onDelete={handleDelete}
