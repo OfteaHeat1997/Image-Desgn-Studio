@@ -261,6 +261,9 @@ async function applyGarment(
 // Route handler
 // ---------------------------------------------------------------------------
 
+// AI model generation can take 1-3 minutes
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

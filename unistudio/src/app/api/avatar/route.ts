@@ -11,6 +11,9 @@ import { AVATAR_PROVIDERS, TTS_PROVIDERS } from '@/lib/video/providers';
 import { saveJob } from '@/lib/db/persist';
 import type { AvatarProviderKey, TtsProviderKey } from '@/types/video';
 
+// Avatar generation (TTS + video) can take 2-5 minutes
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

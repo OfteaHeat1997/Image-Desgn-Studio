@@ -76,6 +76,16 @@ const MODULE_PANELS: Record<
 /** Modules that can work without an uploaded image */
 const NO_IMAGE_MODULES = new Set(["model-create", "ai-prompt", "ai-agent", "jewelry-tryon"]);
 
+/** Modules whose output is a video, not an image */
+const VIDEO_MODULES = new Set(["video", "ad-creator"]);
+
+/** Check if a URL points to a video file */
+function isVideoUrl(url: string | null): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.includes(".mp4") || lower.includes(".webm") || lower.includes(".mov") || lower.includes("video");
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helper: convert any image URL to a reliable local blob URL          */
 /* ------------------------------------------------------------------ */
@@ -691,13 +701,37 @@ function EditorInner() {
             /* Loading processed image */
             <Spinner size="lg" label="Cargando resultado..." />
           ) : processedImage ? (
-            /* Before/After view */
+            /* Before/After view — or video player for video modules */
             <div className="flex w-full flex-col items-center gap-4">
               <div
                 className="w-full max-w-2xl"
                 style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
               >
-                {(selectedModule === "shadows" || selectedModule === "tryon") ? (
+                {(VIDEO_MODULES.has(selectedModule) || isVideoUrl(processedImage)) ? (
+                  /* Video result: show video player */
+                  <div className="relative rounded-xl overflow-hidden border border-surface-lighter bg-black">
+                    <video
+                      key={processedImage}
+                      src={processedImage}
+                      controls
+                      autoPlay
+                      loop
+                      playsInline
+                      className="block w-full max-h-[70vh] object-contain"
+                    />
+                    <span className="absolute top-3 left-3 z-10 rounded-md bg-accent/80 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm pointer-events-none">
+                      VIDEO
+                    </span>
+                    {/* Download video button */}
+                    <a
+                      href={processedImage}
+                      download={`${currentImageFile?.name?.replace(/\.[^.]+$/, "") ?? "video"}_${selectedModule}.mp4`}
+                      className="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-md bg-black/70 px-2.5 py-1.5 text-[10px] font-medium text-gray-200 backdrop-blur-sm hover:bg-black/90 transition-colors"
+                    >
+                      <ArrowRight className="h-3 w-3 rotate-90" /> Descargar
+                    </a>
+                  </div>
+                ) : (selectedModule === "shadows" || selectedModule === "tryon") ? (
                   /* Shadows/TryOn: toggle between ANTES/DESPUES (different dimensions) */
                   <div className="relative">
                     <div className="checkerboard-bg rounded-xl">
@@ -755,14 +789,16 @@ function EditorInner() {
                 >
                   Volver al Original
                 </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  leftIcon={<ArrowRight className="h-3.5 w-3.5" />}
-                  onClick={handleAcceptResult}
-                >
-                  Aceptar y Seguir Editando
-                </Button>
+                {!VIDEO_MODULES.has(selectedModule) && !isVideoUrl(processedImage) && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<ArrowRight className="h-3.5 w-3.5" />}
+                    onClick={handleAcceptResult}
+                  >
+                    Aceptar y Seguir Editando
+                  </Button>
+                )}
               </div>
             </div>
           ) : (

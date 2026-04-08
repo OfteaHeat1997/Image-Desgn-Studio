@@ -11,6 +11,9 @@ import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { getPresetById } from '@/lib/video/presets';
 import type { VideoProviderKey, VideoCategory, VideoMode } from '@/types/video';
 
+// Video generation can take 2-5 minutes depending on provider
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
