@@ -303,7 +303,7 @@ export default function BrandKitPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Kit de Marca</h1>
           <p className="mt-1 text-sm text-gray-400">
@@ -315,7 +315,7 @@ export default function BrandKitPage() {
             Restablecer
           </Button>
           <Button variant="primary" size="sm" leftIcon={<Save className="h-3.5 w-3.5" />} loading={isSaving} onClick={handleSave}>
-            Guardar Kit de Marca
+            Guardar
           </Button>
         </div>
       </div>
