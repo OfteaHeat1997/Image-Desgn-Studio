@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { cn } from "@/lib/utils/cn";
+import { compressImageFile } from "@/lib/utils/compress-image";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -169,8 +170,9 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
 
     try {
       if (shadowType === "drop" || shadowType === "contact" || shadowType === "reflection") {
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
 
         const params: Record<string, unknown> = { type: shadowType };
 
@@ -201,8 +203,9 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
         if (!data.success) throw new Error(data.error || "Error al generar sombra");
         onProcess(data.data.url, undefined, 0);
       } else {
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await safeJson(uploadRes);
 

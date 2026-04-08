@@ -19,6 +19,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
+import { compressImageFile } from "@/lib/utils/compress-image";
 import { AD_TEMPLATES, getRecommendedDuration } from "@/lib/processing/ad-compose";
 import { calculateVideoCost, formatCost } from "@/lib/video/cost";
 import { VideoPreview } from "./video/VideoPreview";
@@ -134,8 +135,9 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
 
     try {
       // Upload image
+      const compressed = await compressImageFile(imageFile);
       const formData = new FormData();
-      formData.append("file", imageFile);
+      formData.append("file", compressed);
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
         body: formData,

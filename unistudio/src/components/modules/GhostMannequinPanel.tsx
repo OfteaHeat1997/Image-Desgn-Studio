@@ -7,6 +7,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
 import { cn } from "@/lib/utils/cn";
+import { compressImageFile } from "@/lib/utils/compress-image";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -102,8 +103,9 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
 
     try {
       // Upload garment image
+      const compressed = await compressImageFile(imageFile);
       const formData = new FormData();
-      formData.append("file", imageFile);
+      formData.append("file", compressed);
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
       const uploadData = await safeJson(uploadRes);
       if (!uploadData.success) throw new Error(uploadData.error || "Error al subir la imagen");
@@ -112,8 +114,9 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
       let modelImageUrl: string | undefined;
       if (selectedOp.needsModel && modelFile) {
         setStatusText("Subiendo foto de modelo...");
+        const compressedModel = await compressImageFile(modelFile);
         const modelFormData = new FormData();
-        modelFormData.append("file", modelFile);
+        modelFormData.append("file", compressedModel);
         const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
         const modelUploadData = await safeJson(modelUploadRes);
         if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir la imagen de modelo");

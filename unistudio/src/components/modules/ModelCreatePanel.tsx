@@ -7,6 +7,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
+import { compressImageFile } from "@/lib/utils/compress-image";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -123,8 +124,9 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
       // If user uploaded a garment image, upload it first
       if (imageFile) {
         setProcessingStep("Subiendo imagen de prenda...");
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen de prenda");

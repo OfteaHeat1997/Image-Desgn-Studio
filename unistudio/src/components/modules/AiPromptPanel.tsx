@@ -22,6 +22,7 @@ import {
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
+import { compressImageFile } from "@/lib/utils/compress-image";
 import { removeBgBrowser } from "@/lib/processing/bg-remove-browser";
 
 /* ------------------------------------------------------------------ */
@@ -225,8 +226,9 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
         setStatusText("Subiendo imagen...");
         setProgressPct(20);
 
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");

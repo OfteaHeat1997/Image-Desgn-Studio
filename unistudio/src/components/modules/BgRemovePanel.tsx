@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
+import { compressImageFile } from "@/lib/utils/compress-image";
 import {
   Monitor,
   Cpu,
@@ -429,8 +430,9 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         setStatusText("Subiendo imagen...");
         setProgressPct(10);
 
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
@@ -516,8 +518,9 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         setStatusText("Subiendo imagen...");
         setProgressPct(20);
 
+        const compressed = await compressImageFile(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await safeJson(uploadRes);
         if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
