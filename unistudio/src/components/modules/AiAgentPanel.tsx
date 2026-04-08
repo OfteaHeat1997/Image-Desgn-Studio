@@ -254,6 +254,36 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
+  // Compress image client-side to stay under Vercel 4.5MB limit
+  const compressImage = useCallback(async (file: File, maxSizeKB = 3000): Promise<File> => {
+    if (file.size <= maxSizeKB * 1024) return file;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 2048 / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              resolve(new File([blob], file.name, { type: "image/jpeg" }));
+            } else {
+              resolve(file);
+            }
+          },
+          "image/jpeg",
+          0.8,
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   // Analyze image automatically when user uploads one
   useEffect(() => {
     if (!imageFile) {
@@ -267,8 +297,9 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
 
     const analyze = async () => {
       try {
+        const compressed = await compressImage(imageFile);
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", compressed);
         const res = await fetch("/api/analyze-image", { method: "POST", body: formData });
         if (!res.ok) throw new Error(`Analysis failed: ${res.status}`);
         const json = await safeJson(res);
