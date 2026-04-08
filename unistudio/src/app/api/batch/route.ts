@@ -116,6 +116,18 @@ async function processStep(
     body: JSON.stringify(requestBody),
   });
 
+  if (!response.ok) {
+    let errorMessage: string;
+    try {
+      const errorBody = await response.json();
+      errorMessage = errorBody.error || `Step "${operation}" failed with HTTP ${response.status}`;
+    } catch {
+      const text = await response.text().catch(() => '');
+      errorMessage = text || `Step "${operation}" failed with HTTP ${response.status}`;
+    }
+    throw new Error(errorMessage);
+  }
+
   const result = await response.json();
 
   if (!result.success) {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -262,6 +262,15 @@ export default function BatchPage() {
   const [overallProgress, setOverallProgress] = useState(0);
   const addToGallery = useGalleryStore((s) => s.addImage);
 
+  // Track all preview blob URLs so we can revoke them on clear and unmount
+  const previewUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    return () => {
+      previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      previewUrlsRef.current = [];
+    };
+  }, []);
+
   /* ---- Auto Mode state ---- */
   const [inventory, setInventory] = useState<InventoryCategory[]>([]);
   const [inventoryTotal, setInventoryTotal] = useState(0);
@@ -289,12 +298,16 @@ export default function BatchPage() {
   /* ---- Image upload ---- */
 
   const handleDrop = useCallback((files: File[]) => {
-    const newImages: UploadedImage[] = files.map((f, i) => ({
-      id: `img-${Date.now()}-${i}`,
-      file: f,
-      preview: URL.createObjectURL(f),
-      status: "pending" as const,
-    }));
+    const newImages: UploadedImage[] = files.map((f, i) => {
+      const preview = URL.createObjectURL(f);
+      previewUrlsRef.current.push(preview);
+      return {
+        id: `img-${Date.now()}-${i}`,
+        file: f,
+        preview,
+        status: "pending" as const,
+      };
+    });
     setImages((prev) => [...prev, ...newImages]);
   }, []);
 
@@ -531,6 +544,8 @@ export default function BatchPage() {
           }
           wmCtx.restore();
           const wmOutBlob = await wmCanvas.convertToBlob({ type: "image/png" });
+          // Revoke previous intermediate blob URL (if any) before replacing
+          if (currentImageUrl.startsWith("blob:")) URL.revokeObjectURL(currentImageUrl);
           currentImageUrl = URL.createObjectURL(wmOutBlob);
           break;
         }
@@ -549,6 +564,9 @@ export default function BatchPage() {
 
     setLoadingCategory(cat.id);
     setAutoProcessing(cat.id);
+    // Revoke any existing preview blob URLs before clearing the image list
+    previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    previewUrlsRef.current = [];
     setImages([]);
     setAutoBatchIndex(0);
     setAutoBatchTotal(cat.imageCount);
@@ -593,10 +611,12 @@ export default function BatchPage() {
           const res = await fetch(img.dataUrl);
           const blob = await res.blob();
           const file = new File([blob], img.filename, { type: blob.type });
+          const preview = URL.createObjectURL(blob);
+          previewUrlsRef.current.push(preview);
           batchImages.push({
             id: `auto-${Date.now()}-${globalIndex}`,
             file,
-            preview: URL.createObjectURL(blob),
+            preview,
             status: "pending",
           });
           globalIndex++;

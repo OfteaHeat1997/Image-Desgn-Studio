@@ -101,6 +101,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      ...(replicateUrl === null && {
+        warning: 'Replicate file upload failed; AI model operations may not work for this image.',
+      }),
       data: {
         // Primary URL: data URL (works everywhere — local processing + display)
         url: dataUrl,

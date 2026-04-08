@@ -349,9 +349,13 @@ function EditorInner() {
     if (s.currentImage) {
       setCurrentImage(s.currentImage);
       setOriginalImage(s.originalImage);
+      // Track any blob URLs that may have been persisted from older sessions
+      if (s.currentImage.startsWith("blob:")) blobUrlsRef.current.push(s.currentImage);
+      if (s.originalImage?.startsWith("blob:")) blobUrlsRef.current.push(s.originalImage);
     }
     if (s.processedImage) {
       setProcessedImage(s.processedImage);
+      if (s.processedImage.startsWith("blob:")) blobUrlsRef.current.push(s.processedImage);
     }
     const restoreUrl = s.currentImage || s.processedImage;
     if (s.filename && restoreUrl) {
@@ -369,6 +373,7 @@ function EditorInner() {
     if (imageUrlParam) {
       setCurrentImage(imageUrlParam);
       setOriginalImage(imageUrlParam);
+      if (imageUrlParam.startsWith("blob:")) blobUrlsRef.current.push(imageUrlParam);
       fetch(imageUrlParam)
         .then((r) => r.blob())
         .then((blob) => setCurrentImageFile(new File([blob], "gallery-image.jpg", { type: blob.type || "image/jpeg" })))
@@ -381,6 +386,9 @@ function EditorInner() {
   const trackBlobUrl = useCallback((url: string) => {
     if (url.startsWith("blob:")) blobUrlsRef.current.push(url);
   }, []);
+
+  // Counter ref for race-condition guard on rapid image drops
+  const dropCounterRef = useRef(0);
 
   // Revoke all tracked blob URLs on unmount to free memory
   useEffect(() => {
@@ -395,6 +403,7 @@ function EditorInner() {
   const handleImageDrop = useCallback((files: File[]) => {
     const file = files[0];
     if (!file) return;
+    const dropId = ++dropCounterRef.current;
     setCurrentImageFile(file);
     const url = URL.createObjectURL(file);
     trackBlobUrl(url);
@@ -411,7 +420,8 @@ function EditorInner() {
         formData.append("file", file);
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const data = await res.json();
-        if (data.success) {
+        // Guard: only apply if this is still the latest drop (prevents stale upload overwriting newer image)
+        if (data.success && dropId === dropCounterRef.current) {
           setUploadedOriginalUrl(data.data.url);
           // Persist to session so upload survives refresh
           editorSession.saveSession({

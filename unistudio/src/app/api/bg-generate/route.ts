@@ -54,6 +54,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!BACKGROUND_PRESETS[style] && !customPrompt) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Unknown style "${style}" and no "customPrompt" provided. Use one of: ${Object.keys(BACKGROUND_PRESETS).join(', ')}.`,
+        },
+        { status: 400 },
+      );
+    }
+
     let resultUrl: string;
     const cost = MODE_COSTS[mode] ?? 0;
 
