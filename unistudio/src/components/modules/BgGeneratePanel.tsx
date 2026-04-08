@@ -294,7 +294,9 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrl: uploadData.data.url,
+            // Prefer the Replicate URL (already uploaded, no size issues).
+            // Fall back to data URL only if Replicate upload failed during /api/upload.
+            imageUrl: uploadData.data.replicateUrl || uploadData.data.url,
             mode: apiMode,
             style: selectedPreset,
             customPrompt: optimizedPrompt,
@@ -311,7 +313,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
         setProgressPct(100);
         setStatusText("Listo!");
         const modeCost = apiMode === "fast" ? 0.003 : 0.05;
-        onProcess(data.data.url, undefined, data.data.cost ?? modeCost);
+        onProcess(data.data.url, undefined, data.cost ?? modeCost);
       }
     } catch (error) {
       console.error("BG generation error:", error);
