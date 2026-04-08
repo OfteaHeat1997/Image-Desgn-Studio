@@ -114,7 +114,8 @@ async function scaleUpImage(file: File, minW: number, minH: number): Promise<str
   const outH   = Math.ceil(img.height * scale);
 
   const canvas = new OffscreenCanvas(outW, outH);
-  const ctx    = canvas.getContext("2d")!;
+  const ctx    = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.drawImage(img, 0, 0, outW, outH);
 
   const mime    = file.type === "image/jpeg" ? "image/jpeg" : "image/png";
@@ -127,7 +128,8 @@ async function scaleUpImage(file: File, minW: number, minH: number): Promise<str
 async function compressImage(file: File): Promise<string> {
   const img    = await loadImageFromFile(file);
   const canvas = new OffscreenCanvas(img.width, img.height);
-  const ctx    = canvas.getContext("2d")!;
+  const ctx    = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.drawImage(img, 0, 0);
   const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.80 });
   return URL.createObjectURL(blob);
@@ -137,7 +139,8 @@ async function compressImage(file: File): Promise<string> {
 async function convertToJpeg(file: File): Promise<string> {
   const img    = await loadImageFromFile(file);
   const canvas = new OffscreenCanvas(img.width, img.height);
-  const ctx    = canvas.getContext("2d")!;
+  const ctx    = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, img.width, img.height);
   ctx.drawImage(img, 0, 0);
@@ -182,7 +185,8 @@ async function applyAllFixes(file: File, results: PlatformResult[]): Promise<str
     const outW   = Math.ceil(img.width  * scale);
     const outH   = Math.ceil(img.height * scale);
     const canvas = new OffscreenCanvas(outW, outH);
-    const ctx    = canvas.getContext("2d")!;
+    const ctx    = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context unavailable");
     ctx.drawImage(img, 0, 0, outW, outH);
     const mime = currentFile.type === "image/jpeg" ? "image/jpeg" : "image/png";
     const blob = await canvas.convertToBlob({ type: mime, quality: mime === "image/jpeg" ? 0.92 : undefined });
@@ -193,7 +197,8 @@ async function applyAllFixes(file: File, results: PlatformResult[]): Promise<str
   if (needConvert || needCompress) {
     const img    = await loadImageFromFile(currentFile);
     const canvas = new OffscreenCanvas(img.width, img.height);
-    const ctx    = canvas.getContext("2d")!;
+    const ctx    = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context unavailable");
     if (needConvert) {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, img.width, img.height);
@@ -207,7 +212,8 @@ async function applyAllFixes(file: File, results: PlatformResult[]): Promise<str
   // Only scale was applied — produce final blob URL.
   const img    = await loadImageFromFile(currentFile);
   const canvas = new OffscreenCanvas(img.width, img.height);
-  const ctx    = canvas.getContext("2d")!;
+  const ctx    = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.drawImage(img, 0, 0);
   const mime = currentFile.type === "image/jpeg" ? "image/jpeg" : "image/png";
   const blob = await canvas.convertToBlob({ type: mime, quality: mime === "image/jpeg" ? 0.92 : undefined });
@@ -349,8 +355,7 @@ export function CompliancePanel({ imageFile, onProcess }: CompliancePanelProps) 
       setInlineError(null);
 
       try {
-        const rules     = PLATFORM_RULES[platformName] ?? { minWidth: 500, minHeight: 500, maxSizeMB: 10, formats: ["image/jpeg", "image/png"] };
-        const beforeUrl = URL.createObjectURL(imageFile);
+        const rules = PLATFORM_RULES[platformName] ?? { minWidth: 500, minHeight: 500, maxSizeMB: 10, formats: ["image/jpeg", "image/png"] };
         let resultUrl: string;
 
         switch (issue.rule) {
@@ -370,6 +375,8 @@ export function CompliancePanel({ imageFile, onProcess }: CompliancePanelProps) 
             return;
         }
 
+        // Create beforeUrl only after we know we have a resultUrl (avoids leak on early return)
+        const beforeUrl = URL.createObjectURL(imageFile);
         onProcess(resultUrl, beforeUrl, 0);
 
         // Optimistically remove the resolved issue.

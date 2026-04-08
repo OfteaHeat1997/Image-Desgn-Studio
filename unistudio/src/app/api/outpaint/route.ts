@@ -64,6 +64,15 @@ export async function POST(request: NextRequest) {
       aspectRatio = spec.aspectRatio;
       platformDescription = spec.description;
     } else if (targetAspectRatio) {
+      if (!/^\d+(\.\d+)?:\d+(\.\d+)?$/.test(targetAspectRatio)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid "targetAspectRatio" format. Expected "W:H" (e.g. "16:9", "1:1", "1.91:1").',
+          },
+          { status: 400 },
+        );
+      }
       aspectRatio = targetAspectRatio;
     } else {
       return NextResponse.json(

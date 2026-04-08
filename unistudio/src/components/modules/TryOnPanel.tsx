@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
 import { Shirt, Info, Sparkles, CheckCircle2, Circle, Upload, ImageIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
@@ -97,6 +97,14 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Track model image blob URL for cleanup on unmount
+  const modelImageUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    return () => {
+      if (modelImageUrlRef.current) URL.revokeObjectURL(modelImageUrlRef.current);
+    };
+  }, []);
+
   const isLingerieOrSwimwear = garmentType === "lingerie" || garmentType === "swimwear";
 
   // Determine step completion
@@ -125,7 +133,9 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
     setModelFile(file);
     setModelImage((prev) => {
       if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
+      const next = URL.createObjectURL(file);
+      modelImageUrlRef.current = next;
+      return next;
     });
   }, []);
 

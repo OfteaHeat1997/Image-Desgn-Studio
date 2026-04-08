@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
 import {
   Monitor,
@@ -134,7 +134,8 @@ function QualityStars({ count }: { count: number }) {
 async function applySolidBg(transparentBlob: Blob, color: string): Promise<Blob> {
   const img = await createImageBitmap(transparentBlob);
   const canvas = new OffscreenCanvas(img.width, img.height);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0);
@@ -345,6 +346,14 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const isFree = selectedProvider === "browser" || selectedProvider === "withoutbg";
 
+  // Track the last result blob URL so we can revoke it on replacement and unmount
+  const lastResultUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    return () => {
+      if (lastResultUrlRef.current) URL.revokeObjectURL(lastResultUrlRef.current);
+    };
+  }, []);
+
   /** One-click E-Commerce mode: white bg, auto-crop, 1200x1200, sharpened */
   const applyEcommerceMode = useCallback(() => {
     setSelectedProvider("browser");
@@ -504,7 +513,9 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
 
       setProgressPct(100);
       setStatusText("Listo!");
+      if (lastResultUrlRef.current) URL.revokeObjectURL(lastResultUrlRef.current);
       const url = URL.createObjectURL(resultBlob);
+      lastResultUrlRef.current = url;
       onProcess(url, undefined, operationCost);
     } catch (error) {
       console.error("BG removal error:", error);

@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         : presetConfig.prompt;
       negativePrompt = presetConfig.negativePrompt;
     } else {
-      prompt = rawPrompt;
+      prompt = rawPrompt ?? '';
       if (!prompt) {
         return NextResponse.json(
           { success: false, error: 'Missing "prompt" or valid "preset".' },
