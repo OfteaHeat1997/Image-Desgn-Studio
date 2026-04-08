@@ -318,9 +318,9 @@ function EditorInner() {
   }, [originalImage]);
 
   const handleRedo = useCallback(() => {
-    const nextIdx = imageHistoryIndexRef.current + 2;
+    const nextIdx = imageHistoryIndexRef.current + 1;
     if (nextIdx >= imageHistoryRef.current.length) return;
-    imageHistoryIndexRef.current++;
+    imageHistoryIndexRef.current = nextIdx;
     const snap = imageHistoryRef.current[nextIdx];
     setCurrentImage(snap.currentImage);
     setProcessedImage(snap.processedImage);
