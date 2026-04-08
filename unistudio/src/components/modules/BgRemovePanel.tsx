@@ -10,6 +10,7 @@ import {
   Scissors,
   Sparkles,
   Zap,
+  Gem,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -339,12 +340,13 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
   const [outputFormat, setOutputFormat] = useState("png");
   const [customW, setCustomW] = useState(1200);
   const [customH, setCustomH] = useState(1200);
+  const [isolateProduct, setIsolateProduct] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [progressPct, setProgressPct] = useState(0);
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const isFree = selectedProvider === "browser" || selectedProvider === "withoutbg";
+  const isFree = !isolateProduct && (selectedProvider === "browser" || selectedProvider === "withoutbg");
 
   // Track the last result blob URL so we can revoke it on replacement and unmount
   const lastResultUrlRef = useRef<string | null>(null);
@@ -421,7 +423,69 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
     try {
       let resultBlob: Blob;
 
-      if (selectedProvider === "browser") {
+      if (isolateProduct) {
+        // ---- AISLAR PRODUCTO: Kontext Pro → bg-remove ----
+        // Step 1: Upload original image
+        setStatusText("Subiendo imagen...");
+        setProgressPct(10);
+
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        const uploadData = await safeJson(uploadRes);
+        if (!uploadData.success) throw new Error(uploadData.error || "Error al subir");
+
+        // Step 2: Flux Kontext Pro removes the person, keeps only jewelry
+        setStatusText("Paso 1/2: Aislando producto con IA (Kontext Pro)...");
+        setProgressPct(25);
+
+        const kontextRes = await fetch("/api/inpaint", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: uploadData.data.url,
+            provider: "kontext",
+            prompt:
+              "Remove the person or model wearing this jewelry completely. " +
+              "Keep ONLY the jewelry piece itself (bracelet, necklace, ring, earring, or accessory). " +
+              "Place the jewelry on a plain white background, centered and clearly visible. " +
+              "Professional product photography style. No hands, arms, neck, or body parts.",
+          }),
+        });
+        const kontextData = await safeJson(kontextRes);
+        if (!kontextData.success) throw new Error(kontextData.error || "Error en Kontext Pro");
+        operationCost += kontextData.data?.cost ?? 0.05;
+
+        // Step 3: Upload Kontext result, then bg-remove to clean up background
+        setStatusText("Paso 2/2: Limpiando fondo con IA...");
+        setProgressPct(60);
+
+        const kontextBlobRes = await fetch(kontextData.data.url);
+        const kontextBlob = await kontextBlobRes.blob();
+        const kontextFile = new File([kontextBlob], "kontext-result.png", { type: "image/png" });
+
+        const uploadForm2 = new FormData();
+        uploadForm2.append("file", kontextFile);
+        const uploadRes2 = await fetch("/api/upload", { method: "POST", body: uploadForm2 });
+        const uploadData2 = await safeJson(uploadRes2);
+        if (!uploadData2.success) throw new Error(uploadData2.error || "Error al subir resultado");
+
+        const bgRes = await fetch("/api/bg-remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: uploadData2.data.url,
+            provider: "replicate",
+          }),
+        });
+        const bgData = await safeJson(bgRes);
+        if (!bgData.success) throw new Error(bgData.error || "Error al remover fondo");
+        operationCost += bgData.cost ?? 0.01;
+
+        const finalRes = await fetch(bgData.data.url);
+        resultBlob = await finalRes.blob();
+        setProgressPct(78);
+      } else if (selectedProvider === "browser") {
         // ---- FREE: Browser processing ----
         setStatusText("Cargando modelo IA (primera vez ~40MB)...");
         setProgressPct(5);
@@ -529,7 +593,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         setProgressPct(0);
       }, 3000);
     }
-  }, [imageFile, selectedProvider, outputType, bgColor, blurAmount, shadowType, marketplaceSize, autoCropMargin, outputFormat, customW, customH, onProcess]);
+  }, [imageFile, selectedProvider, isolateProduct, outputType, bgColor, blurAmount, shadowType, marketplaceSize, autoCropMargin, outputFormat, customW, customH, onProcess]);
 
   return (
     <div className="space-y-4">
@@ -577,6 +641,61 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
             Gratis
           </span>
         </button>
+      )}
+
+      {/* Aislar Producto toggle */}
+      {imageFile && (
+        <button
+          type="button"
+          onClick={() => setIsolateProduct((v) => !v)}
+          className={cn(
+            "w-full flex items-center gap-2.5 rounded-lg border p-3 text-left transition-all",
+            isolateProduct
+              ? "border-violet-500/60 bg-violet-500/15 hover:bg-violet-500/20"
+              : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+          )}
+        >
+          <div className={cn(
+            "flex h-8 w-8 items-center justify-center rounded-lg shrink-0",
+            isolateProduct ? "bg-violet-500/30" : "bg-surface-lighter",
+          )}>
+            <Gem className={cn("h-4 w-4", isolateProduct ? "text-violet-300" : "text-gray-500")} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className={cn(
+              "text-[11px] font-bold block",
+              isolateProduct ? "text-violet-200" : "text-gray-300",
+            )}>
+              Aislar Producto (Joyeria)
+            </span>
+            <span className="text-[10px] text-gray-400">
+              Extrae solo la joya/accesorio de una foto con modelo — elimina la persona
+            </span>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-[9px] font-bold",
+              isolateProduct
+                ? "bg-violet-500/20 text-violet-300"
+                : "bg-surface-lighter text-gray-500",
+            )}>
+              {isolateProduct ? "ACTIVO" : "~$0.06"}
+            </span>
+          </div>
+        </button>
+      )}
+
+      {/* Aislar Producto info banner when active */}
+      {imageFile && isolateProduct && (
+        <div className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 p-3">
+          <Gem className="h-4 w-4 text-violet-400 shrink-0 mt-0.5" />
+          <div className="text-[10px] text-gray-300 leading-relaxed">
+            <span className="font-semibold text-violet-300 block mb-0.5">Modo Aislamiento Activo</span>
+            Paso 1: Flux Kontext Pro elimina la persona, deja solo la joya.<br />
+            Paso 2: Rembg limpia el fondo → PNG transparente.<br />
+            <span className="text-gray-500">Costo estimado: ~$0.06 por imagen</span>
+          </div>
+        </div>
       )}
 
       {/* Auto-recommendation banner */}
@@ -788,17 +907,25 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
       {/* Action button */}
       <Button
         variant="primary"
-        className="w-full"
+        className={cn("w-full", isolateProduct && "bg-violet-600 hover:bg-violet-500")}
         onClick={handleProcess}
         disabled={!imageFile || isProcessing}
         loading={isProcessing}
       >
-        {isProcessing ? "Removiendo Fondo..." : "Remover Fondo"}
+        {isProcessing
+          ? isolateProduct ? "Aislando Producto..." : "Removiendo Fondo..."
+          : isolateProduct ? "Aislar Producto" : "Remover Fondo"}
       </Button>
 
       {/* Cost indicator */}
       <p className="text-center text-[10px] text-gray-500">
-        {isFree ? (
+        {isolateProduct ? (
+          <>
+            Costo estimado:{" "}
+            <span className="text-violet-400">~$0.06</span>
+            {" "}(Kontext Pro + Rembg)
+          </>
+        ) : isFree ? (
           <span className="font-semibold text-emerald-400">
             GRATIS — se procesa {selectedProvider === "browser" ? "en tu navegador" : "en Docker local"}
           </span>
