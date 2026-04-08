@@ -614,17 +614,17 @@ function EditorInner() {
         onRedo={handleRedo}
       />
 
-      {/* Main workspace */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Module Navigation Sidebar */}
+      {/* Main workspace — column on mobile, row on desktop */}
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+        {/* Module Navigation Sidebar — hidden on mobile (use toolbar dropdown instead) */}
         <ModuleSidebar
           selectedModule={selectedModule}
           onModuleChange={handleModuleChange}
         />
 
-        {/* Left Sidebar - Module Panel */}
-        <aside className="flex w-72 shrink-0 flex-col border-r border-surface-lighter bg-surface">
-          <div className="flex-1 overflow-y-auto p-4 no-scrollbar space-y-4">
+        {/* Left Sidebar - Module Panel: full-width on mobile, fixed-width on desktop */}
+        <aside className="flex w-full shrink-0 flex-col border-b border-surface-lighter bg-surface md:w-72 md:border-b-0 md:border-r">
+          <div className="max-h-48 overflow-y-auto p-3 no-scrollbar space-y-4 md:max-h-none md:flex-1 md:p-4">
             {/* Result banner after processing */}
             <ResultBanner
               visible={!!processedImage}
@@ -657,7 +657,7 @@ function EditorInner() {
         </aside>
 
         {/* Center Canvas */}
-        <div className="flex flex-1 flex-col items-center justify-center overflow-auto bg-surface-overlay p-6">
+        <div className="flex flex-1 flex-col items-center justify-center overflow-auto bg-surface-overlay p-3 md:p-6">
           {!currentImage ? (
             /* Upload dropzone */
             <div className="w-full max-w-lg">
@@ -732,7 +732,7 @@ function EditorInner() {
               </div>
 
               {/* Action buttons below */}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -778,8 +778,8 @@ function EditorInner() {
             </div>
           )}
 
-          {/* Floating Cost Tracker */}
-          <div className="fixed bottom-4 right-80 z-20 flex items-center gap-2 rounded-full border border-surface-lighter bg-surface-light px-4 py-2 shadow-lg">
+          {/* Floating Cost Tracker — hidden on mobile (cost shown in toolbar) */}
+          <div className="hidden md:flex fixed bottom-4 right-80 z-20 items-center gap-2 rounded-full border border-surface-lighter bg-surface-light px-4 py-2 shadow-lg">
             <div className="h-2 w-2 rounded-full bg-emerald-400" />
             <span className="text-xs text-gray-400">Sesion:</span>
             <span className="text-sm font-semibold text-emerald-400">
@@ -788,8 +788,8 @@ function EditorInner() {
           </div>
         </div>
 
-        {/* Right Sidebar - Contextual */}
-        <aside className="flex w-64 shrink-0 flex-col border-l border-surface-lighter bg-surface">
+        {/* Right Sidebar - Contextual — hidden on mobile */}
+        <aside className="hidden md:flex w-64 shrink-0 flex-col border-l border-surface-lighter bg-surface">
           <div className="flex-1 overflow-y-auto no-scrollbar">
             {selectedModule === "shadows" ? (
               <ShadowsGuidePanel

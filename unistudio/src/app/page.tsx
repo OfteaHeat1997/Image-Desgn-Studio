@@ -605,7 +605,7 @@ function Hero() {
       <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-0">
 
         {/* ── Left: Copy ──────────────────────────────────────── */}
-        <div className="flex flex-col justify-center px-10 py-16 md:px-14 md:py-20 lg:py-24">
+        <div className="flex flex-col justify-center px-4 py-8 sm:px-8 sm:py-12 md:px-10 md:py-16 lg:px-14 lg:py-24">
           {/* Logo */}
           <div className="flex items-center gap-3.5 mb-10">
             <div className="flex h-11 w-11 items-center justify-center rounded-[11px]"
@@ -661,7 +661,7 @@ function Hero() {
           </div>
 
           {/* Stats row */}
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-4 md:gap-6">
             {[
               { value: "18", label: "herramientas" },
               { value: "6", label: "gratis" },

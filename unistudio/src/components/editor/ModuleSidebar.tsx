@@ -123,7 +123,7 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
   };
 
   return (
-    <div className="flex flex-col h-full border-r bg-[var(--bg-surface)] w-60 shrink-0" style={{ borderColor: "var(--border-default)" }}>
+    <div className="hidden md:flex flex-col h-full border-r bg-[var(--bg-surface)] w-60 shrink-0" style={{ borderColor: "var(--border-default)" }}>
       {/* Header */}
       <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
         <a href="/" className="text-base font-bold text-gradient hover:opacity-80 transition-opacity" title="Volver al Dashboard">

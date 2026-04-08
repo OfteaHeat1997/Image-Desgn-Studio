@@ -157,6 +157,21 @@ export function Toolbar({
   return (
     <>
       <div className="flex h-12 items-center gap-1 border-b border-surface-lighter bg-surface px-3">
+        {/* Mobile module selector — only visible on small screens */}
+        <div className="flex md:hidden flex-1 min-w-0 mr-1">
+          <select
+            value={selectedModule}
+            onChange={(e) => onModuleChange(e.target.value)}
+            className="w-full rounded-lg border border-surface-lighter bg-surface-light px-2 py-1.5 text-xs font-medium text-gray-200 focus:outline-none focus:border-accent"
+          >
+            {MODULE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value} className="bg-gray-900">
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Undo / Redo — controls image processing history */}
         <Button
           variant="ghost"
@@ -177,36 +192,37 @@ export function Toolbar({
           <Redo2 className="h-4 w-4" />
         </Button>
 
-        <Separator />
-
-        {/* Zoom controls */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onZoomOut}
-          aria-label="Zoom out"
-        >
-          <ZoomOut className="h-4 w-4" />
-        </Button>
-        <span className="mx-1 min-w-[3rem] text-center text-xs tabular-nums text-gray-400">
-          {zoom}%
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onZoomIn}
-          aria-label="Zoom in"
-        >
-          <ZoomIn className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onFitToScreen}
-          aria-label="Fit to screen"
-        >
-          <Maximize className="h-4 w-4" />
-        </Button>
+        {/* Zoom controls — hidden on mobile (use pinch-to-zoom) */}
+        <div className="hidden md:contents">
+          <Separator />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onZoomOut}
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="mx-1 min-w-[3rem] text-center text-xs tabular-nums text-gray-400">
+            {zoom}%
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onZoomIn}
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onFitToScreen}
+            aria-label="Fit to screen"
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
+        </div>
 
         <Separator />
 
@@ -230,7 +246,8 @@ export function Toolbar({
           leftIcon={<Download className="h-3.5 w-3.5" />}
           onClick={() => setShowExportModal(true)}
         >
-          Exportar
+          <span className="hidden sm:inline">Exportar</span>
+          <span className="sm:hidden">↓</span>
         </Button>
       </div>
 
