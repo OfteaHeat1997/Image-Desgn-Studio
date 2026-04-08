@@ -55,16 +55,16 @@ interface PresetDef {
  * NOTE: exposure here is in the -2..2 range for the slider; the lib uses -100..100.
  */
 const PRESETS: PresetDef[] = [
-  { id: "auto", name: "Auto", settings: { brightness: 8, contrast: 12, saturation: 8, sharpness: 25 } },
-  { id: "ecommerce", name: "E-Commerce", settings: { brightness: 12, contrast: 15, saturation: 8, sharpness: 30 } },
-  { id: "fashion", name: "Moda", settings: { brightness: 8, contrast: 18, saturation: 15, sharpness: 25 } },
-  { id: "beauty", name: "Belleza", settings: { brightness: 8, contrast: 8, saturation: 10, sharpness: 15 } },
-  { id: "luxury", name: "Lujo", settings: { brightness: 0, contrast: 22, saturation: 12, sharpness: 30 } },
-  { id: "natural", name: "Natural", settings: { brightness: 2, contrast: 5, saturation: 0, sharpness: 10 } },
-  { id: "bright-airy", name: "Luminoso", settings: { brightness: 18, contrast: -5, saturation: -5, sharpness: 15, exposure: 0.25 } },
-  { id: "dark-moody", name: "Dramatico", settings: { brightness: -12, contrast: 25, saturation: 10, sharpness: 25 } },
-  { id: "vintage", name: "Vintage", settings: { brightness: 5, contrast: -8, saturation: -12, sharpness: 10, whiteBalance: "warm" } },
-  { id: "crisp-clean", name: "Nitido", settings: { brightness: 5, contrast: 12, saturation: 5, sharpness: 45 } },
+  { id: "auto", name: "Auto", settings: { brightness: 15, contrast: 18, saturation: 12, sharpness: 35 } },
+  { id: "ecommerce", name: "E-Commerce", settings: { brightness: 18, contrast: 22, saturation: 10, sharpness: 40 } },
+  { id: "product-clean", name: "Producto", settings: { brightness: 15, contrast: 20, saturation: 8, sharpness: 35, noiseReduction: 15 } },
+  { id: "fashion", name: "Moda", settings: { brightness: 12, contrast: 25, saturation: 20, sharpness: 30 } },
+  { id: "beauty", name: "Belleza", settings: { brightness: 12, contrast: 12, saturation: 15, sharpness: 20 } },
+  { id: "luxury", name: "Lujo", settings: { brightness: 5, contrast: 30, saturation: 15, sharpness: 40 } },
+  { id: "natural", name: "Natural", settings: { brightness: 5, contrast: 8, saturation: 3, sharpness: 15 } },
+  { id: "bright-airy", name: "Luminoso", settings: { brightness: 25, contrast: -5, saturation: -5, sharpness: 20, exposure: 0.4 } },
+  { id: "dark-moody", name: "Dramatico", settings: { brightness: -15, contrast: 35, saturation: 15, sharpness: 30 } },
+  { id: "crisp-clean", name: "Nitido", settings: { brightness: 8, contrast: 18, saturation: 8, sharpness: 55 } },
 ];
 
 const WHITE_BALANCE_OPTIONS = [
@@ -112,14 +112,38 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  /** Compress large images to stay under Vercel 4.5MB limit */
+  const compressFile = useCallback(async (file: File): Promise<File> => {
+    if (file.size <= 3 * 1024 * 1024) return file;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 2048 / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => resolve(blob ? new File([blob], file.name, { type: "image/jpeg" }) : file),
+          "image/jpeg", 0.85,
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   const handleApply = useCallback(async () => {
     if (!imageFile) return;
     setIsProcessing(true);
     setErrorMsg(null);
 
     try {
+      const compressed = await compressFile(imageFile);
       const formData = new FormData();
-      formData.append("file", imageFile);
+      formData.append("file", compressed);
 
       // Send settings as JSON options
       const wbKelvin = WB_KELVIN[settings.whiteBalance];
@@ -158,7 +182,7 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
     } finally {
       setIsProcessing(false);
     }
-  }, [imageFile, settings, activePreset, onProcess]);
+  }, [imageFile, settings, activePreset, onProcess, compressFile]);
 
   return (
     <div className="space-y-5">
