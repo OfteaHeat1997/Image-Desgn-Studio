@@ -247,7 +247,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             expression: "confident",
             hairStyle: gender === "male" ? "short clean cut" : "natural elegant updo showing ears and neck",
             background: bgStyle,
-            customDetails: `${pose}, ${bgPrompt}, NOT wearing any jewelry or accessories, bare skin ready for jewelry placement, 8K ultra-detailed, luxury brand campaign quality`,
+            customDetails: `${accessoryType === 'earrings' ? 'both ears fully visible, hair strictly behind ears, earlobes completely exposed, ' : ''}${pose}, ${bgPrompt}, NOT wearing any jewelry or accessories, bare skin ready for jewelry placement, 8K ultra-detailed, luxury brand campaign quality`,
           }),
         });
         const modelData = await safeJson(modelRes);
