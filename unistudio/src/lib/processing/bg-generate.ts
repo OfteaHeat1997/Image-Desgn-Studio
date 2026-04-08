@@ -245,7 +245,7 @@ export async function generateBgPrecise(
 
   // Try Flux Kontext Pro first
   try {
-    const fullPrompt = `Change only the background to: ${bgPrompt}. Keep the product/subject EXACTLY the same. Do not modify, distort, or alter the main subject in any way.`;
+    const fullPrompt = `CRITICAL PRODUCT PRESERVATION: Keep this EXACT product completely unchanged. Do NOT modify, redesign, replace, alter, or reimagine the product in any way. Every detail — shape, colors, labels, text, packaging, logo, texture — must remain pixel-perfect identical to the input image. The product is the ONLY element that must be preserved exactly as-is. ONLY change the background/environment around the product to: ${bgPrompt}. Do NOT alter the product shape, color, label, packaging, or any detail whatsoever.`;
 
     const output = await runModel('black-forest-labs/flux-kontext-pro', {
       input_image: imageUrl,
@@ -411,24 +411,78 @@ export async function generateBgCreative(
 // ---------------------------------------------------------------------------
 
 /**
- * Fast background generation using Flux Schnell.
- * Best for previews and quick iterations.
+ * Fast background generation using Flux Schnell + composite approach.
+ * When an imageUrl is provided, removes the background first, then generates
+ * a new background and composites the original product on top to guarantee
+ * the product is never altered. Falls back to pure generation if no image.
  *
  * @param prompt      - Full prompt for the background/scene.
  * @param aspectRatio - Target aspect ratio. Defaults to '1:1'.
+ * @param imageUrl    - Optional product image URL. When provided, the product is composited onto the new background.
  * @returns URL of the generated image.
  */
 export async function generateBgFast(
   prompt: string,
   aspectRatio: string = '1:1',
+  imageUrl?: string,
 ): Promise<string> {
+  // Generate the background with Flux Schnell
   const output = await runModel('black-forest-labs/flux-schnell', {
     prompt,
     aspect_ratio: aspectRatio,
     num_outputs: 1,
   });
+  const bgUrl = await extractOutputUrl(output);
 
-  return await extractOutputUrl(output);
+  // If no product image, return background-only (preview mode)
+  if (!imageUrl) return bgUrl;
+
+  // Composite approach: remove bg from product, then composite onto new background
+  // This guarantees the product is NEVER altered — we use the original product pixels
+  try {
+    const transparentUrl = await removeBgReplicate(imageUrl);
+    const { replicateHeaders } = await import('@/lib/utils/image');
+
+    const [transparentRes, bgRes] = await Promise.all([
+      fetch(transparentUrl, { headers: replicateHeaders(transparentUrl) }),
+      fetch(bgUrl, { headers: replicateHeaders(bgUrl) }),
+    ]);
+    if (!transparentRes.ok) throw new Error(`Failed to download transparent product: ${transparentRes.status}`);
+    if (!bgRes.ok) throw new Error(`Failed to download generated background: ${bgRes.status}`);
+
+    const [transparentBuffer, bgBuffer] = await Promise.all([
+      transparentRes.arrayBuffer().then(Buffer.from),
+      bgRes.arrayBuffer().then(Buffer.from),
+    ]);
+
+    const canvas = aspectRatioToCanvas(aspectRatio, 1024);
+    const productMaxW = Math.round(canvas.width * 0.80);
+    const productMaxH = Math.round(canvas.height * 0.85);
+
+    const resizedProduct = await sharp(transparentBuffer)
+      .resize(productMaxW, productMaxH, { fit: 'inside', withoutEnlargement: false })
+      .png()
+      .toBuffer();
+
+    const prodMeta = await sharp(resizedProduct).metadata();
+    const prodW = prodMeta.width || productMaxW;
+    const prodH = prodMeta.height || productMaxH;
+    const left = Math.round((canvas.width - prodW) / 2);
+    const top = Math.round((canvas.height - prodH) / 2);
+
+    const resizedBg = await sharp(bgBuffer).resize(canvas.width, canvas.height, { fit: 'cover' }).png().toBuffer();
+
+    const resultBuffer = await sharp(resizedBg)
+      .composite([{ input: resizedProduct, left, top }])
+      .png()
+      .toBuffer();
+
+    return `data:image/png;base64,${resultBuffer.toString('base64')}`;
+  } catch (err) {
+    // If composite fails, return background-only rather than crashing
+    console.warn('[bg-generate] Fast mode composite failed, returning background only:', err);
+    return bgUrl;
+  }
 }
 
 // ---------------------------------------------------------------------------

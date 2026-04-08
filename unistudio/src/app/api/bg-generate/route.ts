@@ -105,7 +105,8 @@ export async function POST(request: NextRequest) {
       case 'fast': {
         const preset = BACKGROUND_PRESETS[style];
         const prompt = customPrompt || preset?.prompt || style;
-        resultUrl = await generateBgFast(prompt, aspectRatio);
+        // Pass httpImageUrl so the product is composited onto the generated background
+        resultUrl = await generateBgFast(prompt, aspectRatio, httpImageUrl);
         break;
       }
 
