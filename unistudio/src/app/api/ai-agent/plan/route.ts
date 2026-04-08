@@ -660,10 +660,16 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 - video: Generate video. Providers: "kenburns" ($0), "ltx-video" ($0.04), "wan-2.2-fast" ($0.05). Params: {provider, prompt, category}
 - ad-create: Format as ad. Templates: instagram-reel, tiktok, facebook-ad, youtube-short, instagram-story, pinterest-pin. Params: {template}
 
-## 3 Agent Types
+## 4 Agent Types
 1. ecommerce: Product photos for web store. Goal: white bg, uniform, HD. Typical: bg-remove → enhance → shadows → outpaint
-2. modelo: Extract garment → create AI model → try-on. Goal: copyright-free model photos. Typical: bg-remove → model-create → tryon → enhance
+2. modelo: Extract garment → create AI model → try-on. Goal: copyright-free model photos. ALWAYS start with bg-remove first to isolate the garment. NEVER start with bg-generate. Typical: bg-remove → model-create → tryon → enhance
 3. social: Content for social media. Goal: engaging visuals/videos. Varies by content type.
+4. catalogo: DO NOT plan this — always use fallback template.
+
+## CRITICAL RULES
+- For "modelo" agent: the FIRST step MUST ALWAYS be "bg-remove" to isolate the garment from the original photo. NEVER use bg-generate as first step.
+- bg-generate means ADD/CREATE a new background. bg-remove means REMOVE the existing background. These are OPPOSITE operations.
+- For lingerie/clothing: bg-remove isolates the garment, then model-create generates a new model, then tryon puts the garment on the model.
 
 ## Budget Tiers
 - free: Only use $0 modules (browser bg-remove, enhance, programmatic shadows, kenburns video)
@@ -704,13 +710,14 @@ ${req.preferences ? `- Model preferences: ${JSON.stringify(req.preferences)}` : 
 ${req.imageCount ? `- Images: ${req.imageCount}` : ""}
 ${analysisContext}
 
-IMPORTANT RULES for image analysis:
-1. If background is "complex", "colored", or anything other than "transparent"/"white": ALWAYS add "bg-remove" as the FIRST image processing step. The agent CANNOT work properly with complex backgrounds.
-2. If watermark is detected, add "inpaint" step BEFORE bg-remove with params: {prompt: "Remove watermark, logo, and text overlay completely", provider: "kontext"}.
-3. If image is already transparent or white background for e-commerce: skip bg-remove.
-4. If lighting or color is bad, add an "enhance" step early in the pipeline.
-5. If resolution is low, add "upscale" as the LAST step.
-6. For modelo/tryon pipelines: bg-remove is MANDATORY to isolate the garment, even if background looks simple.
+CRITICAL RULES:
+1. For "modelo" agent: FIRST step MUST be "bg-remove" (remove background) to isolate the garment. NEVER use "bg-generate" as first step. bg-generate ADDS a background, bg-remove REMOVES it — they are OPPOSITE.
+2. The flow for modelo is ALWAYS: bg-remove → model-create → tryon → enhance. Never change this order.
+3. If watermark detected AND budget allows: add "inpaint" BEFORE bg-remove.
+4. For ecommerce: bg-remove first, then enhance, shadows, outpaint.
+5. If lighting or color is bad, add an "enhance" step.
+6. If resolution is low, add "upscale" as the LAST step.
+7. NEVER put bg-generate as the first step for any pipeline. Always remove the original background first.
 
 Return JSON: {"id","name","description","agentType","steps":[{"id","module","label","params","estimatedCost","reasoning"}],"totalEstimatedCost","estimatedDuration"}`;
 
@@ -827,13 +834,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try Claude Haiku first, fallback to templates
-    let plan = await planWithClaude(body);
-    let method: "ai" | "fallback" = "ai";
+    // Catalogo always uses template (complex multi-step pipeline, Claude can't plan it correctly)
+    // Other agents try Claude Haiku first, fallback to templates
+    let plan: AgentPlan | null = null;
+    let method: "ai" | "fallback" = "fallback";
 
-    if (!plan) {
+    if (body.agentType === "catalogo") {
       plan = buildFallbackPlan(body);
-      method = "fallback";
+    } else {
+      plan = await planWithClaude(body);
+      if (plan) {
+        method = "ai";
+      } else {
+        plan = buildFallbackPlan(body);
+      }
     }
 
     const response: AgentPlanResponse = {
