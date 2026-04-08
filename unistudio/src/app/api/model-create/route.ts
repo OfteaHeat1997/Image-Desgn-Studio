@@ -92,8 +92,22 @@ function buildModelPrompt(options: ModelCreateOptions): string {
     parts.push(`with ${hairDesc}`);
   }
 
-  // Pose and expression
-  parts.push(`in a ${options.pose} pose`);
+  // Pose and expression — map pose IDs to detailed descriptions
+  const POSE_PROMPTS: Record<string, string> = {
+    standing: 'standing naturally facing the camera, full frontal view',
+    'back-view': 'standing with back turned to the camera, showing the back of the outfit, looking slightly over shoulder',
+    'side-left': 'standing in left profile view, side angle showing the silhouette',
+    'side-right': 'standing in right profile view, side angle showing the silhouette',
+    'three-quarter': 'in a three-quarter view angle, body slightly turned',
+    walking: 'walking confidently towards camera, mid-stride',
+    sitting: 'sitting gracefully on a stool',
+    dynamic: 'in a dynamic energetic pose with movement',
+    casual: 'in a relaxed casual pose, natural and effortless',
+    'arms-up': 'standing with one arm raised above head, showing full torso and underarm area',
+    'hands-hips': 'standing confidently with hands on hips, power pose',
+  };
+  const poseDesc = POSE_PROMPTS[options.pose] || `in a ${options.pose} pose`;
+  parts.push(poseDesc);
   parts.push(`with a ${options.expression} expression`);
 
   // Clothing — always specify something appropriate
@@ -127,7 +141,21 @@ function buildModelPrompt(options: ModelCreateOptions): string {
 function buildSafeRetryPrompt(options: ModelCreateOptions): string {
   const genderWord = options.gender === 'female' ? 'woman' : options.gender === 'male' ? 'man' : 'person';
   const skinDesc = SKIN_TONE_MAP[options.skinTone] || options.skinTone;
-  return `E-commerce catalog photo of a professional ${genderWord} model with ${skinDesc}, ${options.pose} pose, ${options.expression} expression, wearing a casual business outfit, clean white studio background, commercial product photography, high resolution, SFW.`;
+  const SAFE_POSE_MAP: Record<string, string> = {
+    standing: 'standing facing camera',
+    'back-view': 'standing with back to camera, looking over shoulder',
+    'side-left': 'left profile view',
+    'side-right': 'right profile view',
+    'three-quarter': 'three-quarter angle view',
+    walking: 'walking pose',
+    sitting: 'sitting on stool',
+    dynamic: 'dynamic pose',
+    casual: 'casual relaxed pose',
+    'arms-up': 'standing with arm raised',
+    'hands-hips': 'hands on hips pose',
+  };
+  const poseDesc = SAFE_POSE_MAP[options.pose] || options.pose;
+  return `E-commerce catalog photo of a professional ${genderWord} model with ${skinDesc}, ${poseDesc}, ${options.expression} expression, wearing a casual business outfit, clean white studio background, commercial product photography, high resolution, SFW.`;
 }
 
 // ---------------------------------------------------------------------------

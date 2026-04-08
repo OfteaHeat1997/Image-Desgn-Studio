@@ -55,6 +55,10 @@ interface StepContext {
   modelUrl: string | null;
   /** Original input file for FormData APIs */
   inputFile: File;
+  /** Catalog mode: stores results per angle (front, back, side, lifestyle) */
+  catalogResults: Record<string, string>;
+  /** Current catalog angle being processed */
+  currentAngle: string | null;
 }
 
 async function executeStep(
@@ -332,6 +336,31 @@ async function executeStep(
       return { resultUrl: data.data.url, cost: data.cost ?? 0.05, updatedCtx: {} };
     }
 
+    // ----- Infographic overlay (free, server-side sharp) -----
+    case "infographic": {
+      // In catalog mode, use the result from a specific angle
+      const useResultAngle = params._useResult as string | undefined;
+      const baseUrl = (useResultAngle && ctx.catalogResults[useResultAngle])
+        ? ctx.catalogResults[useResultAngle]
+        : ctx.currentUrl;
+      const dataUrl = await fileToDataUrl(await urlToFile(baseUrl, "input.png"));
+      const res = await fetch("/api/infographic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: dataUrl,
+          features: params.features ?? [],
+          style: params.style ?? "light",
+          accentColor: params.accentColor ?? "#C5A47E",
+          width: params.width ?? 1200,
+          height: params.height ?? 1500,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error ?? "infographic failed");
+      return { resultUrl: data.data.url, cost: 0, updatedCtx: {} };
+    }
+
     // ----- Ad Create (terminal step) -----
     case "ad-create": {
       const dataUrl = await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
@@ -551,6 +580,8 @@ export function useAgentPipeline() {
       garmentUrl: null,
       modelUrl: null,
       inputFile: imageFile,
+      catalogResults: {},
+      currentAngle: null,
     };
 
     // Find parallel groups
@@ -587,13 +618,23 @@ export function useAgentPipeline() {
             throw new Error(validation.warning ?? "Validacion de calidad fallida");
           }
 
+          const catalogAngle = step.params._catalogAngle as string | undefined;
+
           if (step.module === "model-create") {
             ctx.modelUrl = result.resultUrl;
+            if (catalogAngle) ctx.currentAngle = catalogAngle;
+          } else if (step.module === "infographic" && step.params._useResult) {
+            // Infographic doesn't change the main flow
           } else {
             ctx.currentUrl = result.resultUrl;
           }
           if (result.updatedCtx.garmentUrl) ctx.garmentUrl = result.updatedCtx.garmentUrl;
           if (result.updatedCtx.modelUrl) ctx.modelUrl = result.updatedCtx.modelUrl;
+
+          // Track catalog results by angle
+          if (catalogAngle && step.module === "tryon") {
+            ctx.catalogResults[catalogAngle] = result.resultUrl;
+          }
 
           exec.steps[i] = {
             ...exec.steps[i],
@@ -723,6 +764,8 @@ export function useAgentPipeline() {
       garmentUrl: null,
       modelUrl: null,
       inputFile: imageFile,
+      catalogResults: {},
+      currentAngle: null,
     };
 
     // Replay context from completed steps
@@ -730,13 +773,18 @@ export function useAgentPipeline() {
       const stepExec = exec.steps[i];
       if (stepExec.status === "completed" && stepExec.resultUrl) {
         const stepModule = agentPlan.steps[i].module;
+        const catalogAngle = agentPlan.steps[i].params._catalogAngle as string | undefined;
         if (stepModule === "model-create") {
           ctx.modelUrl = stepExec.resultUrl;
+          if (catalogAngle) ctx.currentAngle = catalogAngle;
         } else {
           ctx.currentUrl = stepExec.resultUrl;
         }
         if (stepModule === "bg-remove") {
           ctx.garmentUrl = stepExec.resultUrl;
+        }
+        if (catalogAngle && stepModule === "tryon") {
+          ctx.catalogResults[catalogAngle] = stepExec.resultUrl;
         }
       }
     }

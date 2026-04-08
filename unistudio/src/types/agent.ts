@@ -2,8 +2,8 @@
 // AI Agent Types - UniStudio
 // =============================================================================
 
-/** The 3 AI agents */
-export type AgentType = 'ecommerce' | 'modelo' | 'social';
+/** The 4 AI agents */
+export type AgentType = 'ecommerce' | 'modelo' | 'social' | 'catalogo';
 
 /** Modules the agent can orchestrate */
 export type AgentModule =
@@ -19,7 +19,8 @@ export type AgentModule =
   | 'video'
   | 'ad-create'
   | 'jewelry-tryon'
-  | 'ghost-mannequin';
+  | 'ghost-mannequin'
+  | 'infographic';
 
 /** Product categories for Unistyles inventory */
 export type ProductCategory =

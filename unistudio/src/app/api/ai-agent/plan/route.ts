@@ -309,6 +309,193 @@ function getSocialPipeline(
   return steps;
 }
 
+// ---------------------------------------------------------------------------
+// Catálogo pipeline — generates Leonisa-style multi-angle product photo set
+// ---------------------------------------------------------------------------
+
+function getCatalogoPipeline(
+  category: ProductCategory,
+  budget: BudgetTier,
+  prefs?: AgentPlanRequest["preferences"],
+): PipelineStep[] {
+  const gender = prefs?.gender ?? "female";
+  const ageRange = prefs?.ageRange ?? "25-35";
+  const skinTone = prefs?.skinTone ?? "medium";
+  const bodyType = prefs?.bodyType ?? "curvy";
+
+  const steps: PipelineStep[] = [];
+
+  // Step 1: Remove background to isolate garment
+  steps.push(
+    makeStep(
+      "bg-remove",
+      "Aislar producto (quitar fondo)",
+      { provider: "browser" },
+      0,
+      "Removemos el fondo original para aislar la prenda.",
+    ),
+  );
+
+  // Step 2: Front view — model facing camera
+  steps.push(
+    makeStep(
+      "model-create",
+      "Foto 1: Modelo vista frontal",
+      {
+        gender, ageRange, skinTone, bodyType,
+        pose: "standing",
+        expression: "smile",
+        hairStyle: "long wavy hair",
+        background: "studio white",
+        _catalogAngle: "front",
+      },
+      budget === "free" ? 0 : 0.055,
+      "Generamos modelo de frente — foto principal del catalogo.",
+    ),
+  );
+
+  steps.push(
+    makeStep(
+      "tryon",
+      "Vestir modelo (frontal)",
+      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "front" },
+      budget === "free" ? 0 : 0.02,
+      "Aplicamos la prenda al modelo en vista frontal.",
+    ),
+  );
+
+  // Step 3: Back view — model showing back
+  steps.push(
+    makeStep(
+      "model-create",
+      "Foto 2: Modelo vista espalda",
+      {
+        gender, ageRange, skinTone, bodyType,
+        pose: "back-view",
+        expression: "neutral",
+        hairStyle: "long wavy hair pulled to side",
+        background: "studio white",
+        _catalogAngle: "back",
+      },
+      budget === "free" ? 0 : 0.055,
+      "Generamos modelo de espalda — muestra cobertura trasera.",
+    ),
+  );
+
+  steps.push(
+    makeStep(
+      "tryon",
+      "Vestir modelo (espalda)",
+      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "back" },
+      budget === "free" ? 0 : 0.02,
+      "Aplicamos la prenda al modelo en vista trasera.",
+    ),
+  );
+
+  // Step 4: Side/3-4 view
+  steps.push(
+    makeStep(
+      "model-create",
+      "Foto 3: Modelo vista lateral",
+      {
+        gender, ageRange, skinTone, bodyType,
+        pose: "three-quarter",
+        expression: "confident",
+        hairStyle: "long wavy hair",
+        background: "studio white",
+        _catalogAngle: "side",
+      },
+      budget === "free" ? 0 : 0.055,
+      "Generamos modelo en vista 3/4 — muestra silueta lateral.",
+    ),
+  );
+
+  steps.push(
+    makeStep(
+      "tryon",
+      "Vestir modelo (lateral)",
+      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "side" },
+      budget === "free" ? 0 : 0.02,
+      "Aplicamos la prenda al modelo en vista lateral.",
+    ),
+  );
+
+  // Step 5: Lifestyle — relaxed, natural pose
+  steps.push(
+    makeStep(
+      "model-create",
+      "Foto 4: Modelo pose lifestyle",
+      {
+        gender, ageRange, skinTone, bodyType,
+        pose: "casual",
+        expression: "relaxed",
+        hairStyle: "long wavy hair, natural look",
+        background: "studio white",
+        _catalogAngle: "lifestyle",
+      },
+      budget === "free" ? 0 : 0.055,
+      "Generamos modelo en pose relajada — foto lifestyle del catalogo.",
+    ),
+  );
+
+  steps.push(
+    makeStep(
+      "tryon",
+      "Vestir modelo (lifestyle)",
+      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "lifestyle" },
+      budget === "free" ? 0 : 0.02,
+      "Aplicamos la prenda al modelo en pose lifestyle.",
+    ),
+  );
+
+  // Step 6: Infographic — front detail with text overlay
+  if (budget !== "free") {
+    steps.push(
+      makeStep(
+        "infographic",
+        "Foto 5: Infografia frontal con features",
+        {
+          features: [
+            { title: "Alto", subtitle: "CUBRIMIENTO", position: "center-left" },
+            { title: "Soporte", subtitle: "REFORZADO", position: "bottom-left" },
+          ],
+          style: "light",
+          _catalogAngle: "info-front",
+          _useResult: "front", // Use the front try-on result as base
+        },
+        0,
+        "Agregamos texto de caracteristicas sobre foto frontal — estilo Leonisa.",
+      ),
+    );
+
+    // Step 7: Infographic — back detail with text overlay
+    steps.push(
+      makeStep(
+        "infographic",
+        "Foto 6: Infografia espalda con features",
+        {
+          features: [
+            { title: "Espalda", subtitle: "SUAVIZANTE", position: "center-left" },
+            { title: "Broches", subtitle: "4 NIVELES DE AJUSTE", position: "bottom-left" },
+          ],
+          style: "light",
+          _catalogAngle: "info-back",
+          _useResult: "back", // Use the back try-on result as base
+        },
+        0,
+        "Agregamos texto de caracteristicas sobre foto trasera — estilo Leonisa.",
+      ),
+    );
+  }
+
+  // Free budget: filter out paid steps
+  if (budget === "free") {
+    return steps.filter((s) => s.estimatedCost === 0);
+  }
+
+  return steps;
+}
+
 function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
   const budget = req.budget ?? "economic";
   const analysis = req.imageAnalysis;
@@ -331,6 +518,11 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       steps = getSocialPipeline(req.productCategory, budget, req.contentType);
       name = "Agente Redes Sociales";
       description = `Contenido para redes: ${req.contentType ?? "hero"} con ${req.productCategory}.`;
+      break;
+    case "catalogo":
+      steps = getCatalogoPipeline(req.productCategory, budget, req.preferences);
+      name = "Agente Catalogo Completo";
+      description = `Set completo de fotos de catalogo: frontal, espalda, lateral, lifestyle + infografias. Estilo Leonisa.`;
       break;
     default:
       steps = getEcommercePipeline(req.productCategory, budget);
@@ -554,7 +746,7 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
     const validModules = new Set([
       "bg-remove", "bg-generate", "enhance", "shadows", "outpaint",
       "upscale", "tryon", "model-create", "inpaint", "video",
-      "ad-create", "jewelry-tryon",
+      "ad-create", "jewelry-tryon", "infographic",
     ]);
     const invalidSteps = plan.steps.filter((s) => !validModules.has(s.module));
     if (invalidSteps.length > 0) {
@@ -607,7 +799,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate agent type
-    const validAgents: AgentType[] = ["ecommerce", "modelo", "social"];
+    const validAgents: AgentType[] = ["ecommerce", "modelo", "social", "catalogo"];
     if (!validAgents.includes(body.agentType)) {
       return NextResponse.json(
         { success: false, data: null, cost: 0, error: `Invalid agentType: ${body.agentType}` },

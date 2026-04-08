@@ -58,12 +58,17 @@ interface PoseDef {
 }
 
 const POSES: PoseDef[] = [
-  { id: "standing", name: "De Pie", icon: "||" },
+  { id: "standing", name: "Frontal", icon: "||" },
+  { id: "back-view", name: "Espalda", icon: ")(", },
+  { id: "side-left", name: "Lateral Izq", icon: "|>" },
+  { id: "side-right", name: "Lateral Der", icon: "<|" },
   { id: "three-quarter", name: "Vista 3/4", icon: "/|" },
   { id: "walking", name: "Caminando", icon: "/\\" },
   { id: "sitting", name: "Sentado/a", icon: "_|" },
   { id: "dynamic", name: "Dinamica", icon: "^/" },
   { id: "casual", name: "Casual", icon: "~|" },
+  { id: "arms-up", name: "Brazos Arriba", icon: "^|^" },
+  { id: "hands-hips", name: "Manos Cadera", icon: ">{<" },
 ];
 
 const EXPRESSION_OPTIONS = [
@@ -246,7 +251,7 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
         <label className="mb-2 block text-xs font-medium text-gray-400">
           Pose
         </label>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {POSES.map((p) => (
             <button
               key={p.id}

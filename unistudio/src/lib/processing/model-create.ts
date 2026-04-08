@@ -37,7 +37,7 @@ export const MODEL_OPTIONS: Record<string, ModelOptionSet> = {
   },
   pose: {
     label: 'Pose',
-    values: ['standing', 'sitting', 'walking', 'dynamic', 'three-quarter', 'casual'],
+    values: ['standing', 'back-view', 'side-left', 'side-right', 'three-quarter', 'walking', 'sitting', 'dynamic', 'casual', 'arms-up', 'hands-hips'],
   },
   expression: {
     label: 'Expression',
@@ -83,12 +83,17 @@ function bodyTypeToDescription(bodyType: string): string {
 
 function poseToDescription(pose: string): string {
   const map: Record<string, string> = {
-    standing: 'standing naturally with good posture',
-    sitting: 'sitting comfortably on a chair or stool',
+    standing: 'standing naturally facing the camera, full frontal view',
+    'back-view': 'standing with back turned to camera, showing the back, looking slightly over shoulder',
+    'side-left': 'standing in left profile view, side angle showing silhouette',
+    'side-right': 'standing in right profile view, side angle showing silhouette',
+    'three-quarter': 'in a three-quarter view pose, body slightly turned',
     walking: 'walking confidently, mid-stride',
+    sitting: 'sitting comfortably on a chair or stool',
     dynamic: 'in a dynamic energetic pose',
-    'three-quarter': 'in a three-quarter view pose',
     casual: 'in a relaxed casual pose',
+    'arms-up': 'standing with one arm raised above head, showing torso',
+    'hands-hips': 'standing with hands on hips, power pose',
   };
   return map[pose] || pose;
 }

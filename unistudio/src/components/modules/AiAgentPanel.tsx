@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Trash2,
   Plus,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -79,6 +80,12 @@ const AGENTS: { type: AgentType; label: string; icon: React.ReactNode; desc: str
     icon: <Share2 className="h-4 w-4" />,
     desc: "Videos, banners y ads para redes",
   },
+  {
+    type: "catalogo",
+    label: "Catalogo",
+    icon: <LayoutGrid className="h-4 w-4" />,
+    desc: "Set completo: 4 angulos + 2 infografias (estilo Leonisa)",
+  },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -111,11 +118,13 @@ const BUDGET_OPTIONS: { value: BudgetTier; label: string; desc: string }[] = [
 
 /** Free tier warnings per agent type */
 const FREE_TIER_WARNINGS: Record<AgentType, string | null> = {
-  ecommerce: null, // Free ecommerce works fine (bg-remove + enhance + shadows)
+  ecommerce: null,
   modelo:
     "El modo Gratis solo puede quitar fondo y mejorar la imagen. Para generar un modelo IA y vestirlo necesitas minimo el plan Economico.",
   social:
     "El modo Gratis solo genera videos Ken Burns basicos. Para fondos creativos, videos IA y anuncios usa el plan Economico.",
+  catalogo:
+    "El modo Gratis no puede generar modelos ni infografias. Necesitas minimo el plan Economico para el catalogo completo.",
 };
 
 const GENDER_OPTIONS = [
@@ -139,10 +148,16 @@ const BODY_TYPE_OPTIONS = [
 ];
 
 const POSE_OPTIONS = [
-  { value: "standing", label: "De pie" },
+  { value: "standing", label: "Frontal (de pie)" },
+  { value: "back-view", label: "Espalda" },
+  { value: "side-left", label: "Lateral izquierda" },
+  { value: "three-quarter", label: "Vista 3/4" },
   { value: "sitting", label: "Sentado" },
   { value: "walking", label: "Caminando" },
   { value: "dynamic", label: "Dinamico" },
+  { value: "casual", label: "Casual" },
+  { value: "arms-up", label: "Brazos arriba" },
+  { value: "hands-hips", label: "Manos en cadera" },
 ];
 
 const AGE_OPTIONS = [
@@ -165,6 +180,8 @@ const MODULE_ICONS: Record<string, string> = {
   inpaint: "🖌️",
   video: "🎬",
   "ad-create": "📱",
+  infographic: "📋",
+  "ghost-mannequin": "👻",
 };
 
 /** Modules available for "add step" in plan editor */
@@ -181,6 +198,7 @@ const ADDABLE_MODULES: { module: AgentModule; label: string; cost: number }[] = 
   { module: "jewelry-tryon", label: "Try-On joyeria", cost: 0.05 },
   { module: "video", label: "Generar video", cost: 0.05 },
   { module: "ad-create", label: "Crear anuncio", cost: 0 },
+  { module: "infographic", label: "Infografia con texto", cost: 0 },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -304,7 +322,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
       imageCount: 1,
       budget,
       contentType: agentType === "social" ? contentType : undefined,
-      preferences: agentType === "modelo" ? { gender, skinTone, bodyType, pose, ageRange } : undefined,
+      preferences: (agentType === "modelo" || agentType === "catalogo") ? { gender, skinTone, bodyType, pose, ageRange } : undefined,
       imageAnalysis: imageAnalysis ?? undefined,
     };
 
@@ -495,7 +513,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         )}
 
         {/* Modelo preferences */}
-        {agentType === "modelo" && (
+        {(agentType === "modelo" || agentType === "catalogo") && (
           <>
             <SectionLabel>Modelo IA</SectionLabel>
             <div className="grid grid-cols-2 gap-2">
@@ -541,9 +559,11 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           placeholder={
             agentType === "ecommerce"
               ? "Ej: Brasier encaje negro, tienda online Unistyles"
-              : agentType === "modelo"
-                ? "Ej: Modelo latina, ambiente de playa tropical"
-                : "Ej: Promo de San Valentin, reel de 15 segundos"
+              : agentType === "catalogo"
+                ? "Ej: Brasier push-up, catalogo estilo Leonisa, 4 angulos"
+                : agentType === "modelo"
+                  ? "Ej: Modelo latina, ambiente de playa tropical"
+                  : "Ej: Promo de San Valentin, reel de 15 segundos"
           }
           className="h-16 w-full resize-none rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 focus:border-accent/50 focus:outline-none"
         />
@@ -1271,8 +1291,83 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           })}
         </div>
 
+        {/* Catalog grid — show all generated angles in a product-page grid */}
+        {plan.agentType === "catalogo" && (() => {
+          const ANGLE_LABELS: Record<string, string> = {
+            front: "Frontal",
+            back: "Espalda",
+            side: "Lateral 3/4",
+            lifestyle: "Lifestyle",
+            "info-front": "Infografia Frontal",
+            "info-back": "Infografia Espalda",
+          };
+          const catalogSteps = completedSteps
+            .map((se) => {
+              const def = plan.steps.find((s) => s.id === se.stepId);
+              const angle = def?.params?._catalogAngle as string | undefined;
+              return { ...se, angle, module: def?.module };
+            })
+            .filter((se) => se.angle && (se.module === "tryon" || se.module === "infographic"));
+
+          return catalogSteps.length > 0 ? (
+            <>
+              <SectionLabel>Catalogo Completo — Estilo Leonisa</SectionLabel>
+              <div className="grid grid-cols-2 gap-2">
+                {catalogSteps.map((se) => (
+                  <button
+                    key={se.stepId}
+                    type="button"
+                    onClick={() => {
+                      setPreviewStepUrl(se.resultUrl);
+                      setPreviewStepInputUrl(null);
+                      setPreviewStepLabel(ANGLE_LABELS[se.angle!] ?? se.angle!);
+                      setPreviewShowBefore(false);
+                    }}
+                    className="group relative rounded-lg border border-surface-lighter overflow-hidden hover:border-accent/50 transition-colors"
+                  >
+                    <img
+                      src={se.resultUrl!}
+                      alt={ANGLE_LABELS[se.angle!] ?? se.angle!}
+                      className="w-full aspect-[4/5] object-cover"
+                    />
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
+                      <span className="text-[10px] font-bold text-white">
+                        {ANGLE_LABELS[se.angle!] ?? se.angle!}
+                      </span>
+                    </div>
+                    <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ZoomIn className="h-4 w-4 text-white drop-shadow-lg" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Download all catalog photos */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                leftIcon={<Download className="h-3.5 w-3.5" />}
+                onClick={() => {
+                  catalogSteps.forEach((se, idx) => {
+                    const a = document.createElement("a");
+                    a.href = se.resultUrl!;
+                    a.download = `catalogo-${se.angle ?? idx}-${Date.now()}.jpg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  });
+                  toast.success(`${catalogSteps.length} fotos descargadas`);
+                }}
+              >
+                Descargar Catalogo Completo ({catalogSteps.length} fotos)
+              </Button>
+            </>
+          ) : null;
+        })()}
+
         {/* Final result — Before (original) vs After (final) */}
-        {finalResultUrl && (
+        {finalResultUrl && plan.agentType !== "catalogo" && (
           <>
             <SectionLabel>Resultado Final — Antes vs Despues</SectionLabel>
             <div className="overflow-hidden rounded-xl border border-accent/30">
