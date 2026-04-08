@@ -313,6 +313,18 @@ function getSocialPipeline(
 // Catálogo pipeline — generates Leonisa-style multi-angle product photo set
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Catálogo pipeline — generates Leonisa-style multi-angle product photo set
+//
+// FLOW (matches Leonisa workflow):
+// 1. Inpaint: remove watermark/copyright from original Leonisa photo
+// 2. BG-Remove: remove the Leonisa model → isolate JUST the bra/garment
+// 3. For each angle (front, back, side, lifestyle):
+//    a. Model-Create: generate NEW AI model in that pose (white bg)
+//    b. Try-On: put the isolated garment on the new model
+// 4. Infographics: add text/arrows overlay on front + back results
+// ---------------------------------------------------------------------------
+
 function getCatalogoPipeline(
   category: ProductCategory,
   budget: BudgetTier,
@@ -322,25 +334,37 @@ function getCatalogoPipeline(
   const ageRange = prefs?.ageRange ?? "25-35";
   const skinTone = prefs?.skinTone ?? "medium";
   const bodyType = prefs?.bodyType ?? "curvy";
+  const garmentCat = category === "lingerie" ? "one-pieces" : "tops";
 
   const steps: PipelineStep[] = [];
 
-  // Step 1: Remove background to isolate garment
+  // PASO 1: Quitar watermark/copyright de la foto original Leonisa
   steps.push(
     makeStep(
-      "bg-remove",
-      "Aislar producto (quitar fondo)",
-      { provider: "browser" },
-      0,
-      "Removemos el fondo original para aislar la prenda.",
+      "inpaint",
+      "Quitar watermark y copyright",
+      { prompt: "Remove all watermarks, logos, copyright text, and brand markings completely. Keep the product and model intact.", provider: "kontext" },
+      budget === "free" ? 0 : 0.05,
+      "Removemos marcas de agua, logos y texto de copyright de la foto original.",
     ),
   );
 
-  // Step 2: Front view — model facing camera
+  // PASO 2: Quitar la modelo de Leonisa → aislar solo el bra/producto
+  steps.push(
+    makeStep(
+      "bg-remove",
+      "Aislar producto (quitar modelo original)",
+      { provider: "browser" },
+      0,
+      "Removemos la modelo original de Leonisa y el fondo. Queda solo el bra/prenda aislada.",
+    ),
+  );
+
+  // PASO 3: Crear modelo IA nueva + vestirla — VISTA FRONTAL
   steps.push(
     makeStep(
       "model-create",
-      "Foto 1: Modelo vista frontal",
+      "Crear modelo IA — vista frontal",
       {
         gender, ageRange, skinTone, bodyType,
         pose: "standing",
@@ -349,8 +373,8 @@ function getCatalogoPipeline(
         background: "studio white",
         _catalogAngle: "front",
       },
-      budget === "free" ? 0 : 0.055,
-      "Generamos modelo de frente — foto principal del catalogo.",
+      0.055,
+      "Generamos modelo nueva de frente — foto principal del catalogo.",
     ),
   );
 
@@ -358,27 +382,27 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (frontal)",
-      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "front" },
-      budget === "free" ? 0 : 0.02,
-      "Aplicamos la prenda al modelo en vista frontal.",
+      { provider: "idm-vton", category: garmentCat, _catalogAngle: "front" },
+      0.02,
+      "Ponemos el bra aislado en la modelo nueva — vista frontal.",
     ),
   );
 
-  // Step 3: Back view — model showing back
+  // PASO 4: Crear modelo IA + vestirla — VISTA ESPALDA
   steps.push(
     makeStep(
       "model-create",
-      "Foto 2: Modelo vista espalda",
+      "Crear modelo IA — vista espalda",
       {
         gender, ageRange, skinTone, bodyType,
         pose: "back-view",
         expression: "neutral",
-        hairStyle: "long wavy hair pulled to side",
+        hairStyle: "long wavy hair pulled to one side",
         background: "studio white",
         _catalogAngle: "back",
       },
-      budget === "free" ? 0 : 0.055,
-      "Generamos modelo de espalda — muestra cobertura trasera.",
+      0.055,
+      "Generamos modelo de espalda — muestra cobertura y broches traseros.",
     ),
   );
 
@@ -386,17 +410,17 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (espalda)",
-      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "back" },
-      budget === "free" ? 0 : 0.02,
-      "Aplicamos la prenda al modelo en vista trasera.",
+      { provider: "idm-vton", category: garmentCat, _catalogAngle: "back" },
+      0.02,
+      "Ponemos el bra en la modelo — vista trasera.",
     ),
   );
 
-  // Step 4: Side/3-4 view
+  // PASO 5: Crear modelo IA + vestirla — VISTA LATERAL 3/4
   steps.push(
     makeStep(
       "model-create",
-      "Foto 3: Modelo vista lateral",
+      "Crear modelo IA — vista lateral",
       {
         gender, ageRange, skinTone, bodyType,
         pose: "three-quarter",
@@ -405,8 +429,8 @@ function getCatalogoPipeline(
         background: "studio white",
         _catalogAngle: "side",
       },
-      budget === "free" ? 0 : 0.055,
-      "Generamos modelo en vista 3/4 — muestra silueta lateral.",
+      0.055,
+      "Generamos modelo en vista 3/4 — muestra silueta y ajuste lateral.",
     ),
   );
 
@@ -414,17 +438,17 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (lateral)",
-      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "side" },
-      budget === "free" ? 0 : 0.02,
-      "Aplicamos la prenda al modelo en vista lateral.",
+      { provider: "idm-vton", category: garmentCat, _catalogAngle: "side" },
+      0.02,
+      "Ponemos el bra en la modelo — vista lateral.",
     ),
   );
 
-  // Step 5: Lifestyle — relaxed, natural pose
+  // PASO 6: Crear modelo IA + vestirla — POSE LIFESTYLE
   steps.push(
     makeStep(
       "model-create",
-      "Foto 4: Modelo pose lifestyle",
+      "Crear modelo IA — pose lifestyle",
       {
         gender, ageRange, skinTone, bodyType,
         pose: "casual",
@@ -433,8 +457,8 @@ function getCatalogoPipeline(
         background: "studio white",
         _catalogAngle: "lifestyle",
       },
-      budget === "free" ? 0 : 0.055,
-      "Generamos modelo en pose relajada — foto lifestyle del catalogo.",
+      0.055,
+      "Generamos modelo en pose relajada — foto lifestyle natural.",
     ),
   );
 
@@ -442,53 +466,50 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (lifestyle)",
-      { provider: "idm-vton", category: category === "lingerie" ? "one-pieces" : "tops", _catalogAngle: "lifestyle" },
-      budget === "free" ? 0 : 0.02,
-      "Aplicamos la prenda al modelo en pose lifestyle.",
+      { provider: "idm-vton", category: garmentCat, _catalogAngle: "lifestyle" },
+      0.02,
+      "Ponemos el bra en la modelo — pose lifestyle.",
     ),
   );
 
-  // Step 6: Infographic — front detail with text overlay
-  if (budget !== "free") {
-    steps.push(
-      makeStep(
-        "infographic",
-        "Foto 5: Infografia frontal con features",
-        {
-          features: [
-            { title: "Alto", subtitle: "CUBRIMIENTO", position: "center-left" },
-            { title: "Soporte", subtitle: "REFORZADO", position: "bottom-left" },
-          ],
-          style: "light",
-          _catalogAngle: "info-front",
-          _useResult: "front", // Use the front try-on result as base
-        },
-        0,
-        "Agregamos texto de caracteristicas sobre foto frontal — estilo Leonisa.",
-      ),
-    );
+  // PASO 7: Infografías con texto (estilo Leonisa "discover")
+  steps.push(
+    makeStep(
+      "infographic",
+      "Infografia frontal con features",
+      {
+        features: [
+          { title: "Alto", subtitle: "CUBRIMIENTO", position: "center-left" },
+          { title: "Soporte", subtitle: "REFORZADO", position: "bottom-left" },
+        ],
+        style: "light",
+        _catalogAngle: "info-front",
+        _useResult: "front",
+      },
+      0,
+      "Agregamos texto de caracteristicas sobre la foto frontal — estilo Leonisa.",
+    ),
+  );
 
-    // Step 7: Infographic — back detail with text overlay
-    steps.push(
-      makeStep(
-        "infographic",
-        "Foto 6: Infografia espalda con features",
-        {
-          features: [
-            { title: "Espalda", subtitle: "SUAVIZANTE", position: "center-left" },
-            { title: "Broches", subtitle: "4 NIVELES DE AJUSTE", position: "bottom-left" },
-          ],
-          style: "light",
-          _catalogAngle: "info-back",
-          _useResult: "back", // Use the back try-on result as base
-        },
-        0,
-        "Agregamos texto de caracteristicas sobre foto trasera — estilo Leonisa.",
-      ),
-    );
-  }
+  steps.push(
+    makeStep(
+      "infographic",
+      "Infografia espalda con features",
+      {
+        features: [
+          { title: "Espalda", subtitle: "SUAVIZANTE", position: "center-left" },
+          { title: "Broches", subtitle: "4 NIVELES DE AJUSTE", position: "bottom-left" },
+        ],
+        style: "light",
+        _catalogAngle: "info-back",
+        _useResult: "back",
+      },
+      0,
+      "Agregamos texto de caracteristicas sobre la foto trasera — estilo Leonisa.",
+    ),
+  );
 
-  // Free budget: filter out paid steps
+  // Free budget: can't do any of this (needs model-create + tryon)
   if (budget === "free") {
     return steps.filter((s) => s.estimatedCost === 0);
   }
@@ -759,7 +780,8 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
 
     // Validate budget constraints on Claude's output
     const totalCost = plan.steps.reduce((sum, s) => sum + (s.estimatedCost ?? 0), 0);
-    const budgetLimit = req.budget === "free" ? 0 : req.budget === "economic" ? 0.20 : Infinity;
+    // Catalog needs more budget (~$0.35) so we allow up to $0.50 for economic
+    const budgetLimit = req.budget === "free" ? 0 : req.budget === "economic" ? 0.50 : Infinity;
     if (totalCost > budgetLimit) {
       console.error(
         `[ai-agent/plan] Claude plan cost $${totalCost.toFixed(3)} exceeds ${req.budget} budget limit $${budgetLimit}`,
