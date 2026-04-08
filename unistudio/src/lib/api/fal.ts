@@ -194,8 +194,9 @@ export async function runFal(
     }
 
     if (status.status === 'FAILED') {
+      const lastLog = status.logs?.slice(-1)[0]?.message ?? '';
       throw new FalApiError(
-        `fal.ai job failed: ${queue.request_id}`,
+        `fal.ai job failed (${queue.request_id})${lastLog ? `: ${lastLog}` : ''}`,
         'JOB_FAILED',
       );
     }
@@ -208,6 +209,72 @@ export async function runFal(
     'POLL_TIMEOUT',
   );
 }
+
+// ---------------------------------------------------------------------------
+// File upload — convert data URLs to fal.ai storage HTTP URLs
+// ---------------------------------------------------------------------------
+
+const FAL_STORAGE_URL = 'https://fal.ai/api/storage/upload/url';
+
+/**
+ * Upload a Buffer to fal.ai storage and return a public HTTP URL.
+ */
+export async function uploadToFalStorage(
+  buffer: Buffer,
+  contentType: string,
+  fileName: string = 'upload.bin',
+): Promise<string> {
+  const url = `${FAL_STORAGE_URL}?file_name=${encodeURIComponent(fileName)}&content_type=${encodeURIComponent(contentType)}`;
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Key ${getApiKey()}`,
+      'Content-Type': contentType,
+    },
+    body: buffer,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => 'unknown');
+    throw new FalApiError(
+      `fal.ai storage upload failed (${response.status}): ${text}`,
+      'UPLOAD_FAILED',
+    );
+  }
+
+  const data = await response.json();
+  const resultUrl = data.url ?? data.file_url ?? data.access_url;
+  if (!resultUrl) {
+    throw new FalApiError('fal.ai storage upload returned no URL', 'UPLOAD_FAILED');
+  }
+  return resultUrl;
+}
+
+/**
+ * Ensure a URL is an HTTP URL accessible by fal.ai models.
+ * If the URL is a data URI, uploads it to fal.ai storage first.
+ */
+export async function ensureFalHttpUrl(url: string): Promise<string> {
+  if (!url) throw new FalApiError('Empty URL provided', 'INVALID_URL');
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+  if (url.startsWith('data:')) {
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) throw new FalApiError('Invalid data URI format', 'INVALID_DATA_URI');
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    const ext = mimeType.split('/')[1]?.replace('+xml', '') ?? 'bin';
+    return uploadToFalStorage(buffer, mimeType, `upload.${ext}`);
+  }
+
+  throw new FalApiError(`Unsupported URL scheme: ${url.slice(0, 30)}...`, 'INVALID_URL');
+}
+
+// ---------------------------------------------------------------------------
+// Output extraction
+// ---------------------------------------------------------------------------
 
 /**
  * Extract a video URL from fal.ai output.

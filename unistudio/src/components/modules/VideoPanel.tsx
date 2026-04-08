@@ -160,6 +160,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       if (!uploadData.success)
         throw new Error(uploadData.error || "Error al subir imagen");
 
+      // Use HTTP URL for AI models (data URLs are too large / inaccessible to providers)
+      const httpImageUrl = uploadData.data.replicateUrl || uploadData.data.url;
+
       setCompletedSteps(["enhance", "upload"]);
 
       /* ── STEP 3: Generate ── */
@@ -172,7 +175,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            avatarImageUrl: uploadData.data.url,
+            avatarImageUrl: httpImageUrl,
             provider: ai.recommendedProvider,
             script,
             ttsProvider: store.ttsProvider || "edge-tts",
@@ -190,13 +193,13 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           id: `avatar-${Date.now()}`,
           name: `Avatar ${new Date().toLocaleTimeString()}`,
           category: "avatar",
-          sourceImageUrl: uploadData.data.url,
+          sourceImageUrl: httpImageUrl,
           resultVideoUrl: data.data.videoUrl,
           provider: ai.recommendedProvider,
           status: "completed",
-          cost: data.data.cost ?? 0,
+          cost: data.cost ?? 0,
           createdAt: new Date().toISOString(),
-          options: { avatarImageUrl: uploadData.data.url, provider: ai.recommendedProvider as AvatarProviderKey, script: ai.script || autoPrompt, ttsProvider: (store.ttsProvider || "edge-tts") as TtsProviderKey, voice: store.voice, language: store.language },
+          options: { avatarImageUrl: httpImageUrl, provider: ai.recommendedProvider as AvatarProviderKey, script: ai.script || autoPrompt, ttsProvider: (store.ttsProvider || "edge-tts") as TtsProviderKey, voice: store.voice, language: store.language },
         });
         onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
       } else {
@@ -207,7 +210,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrl: uploadData.data.url,
+            imageUrl: httpImageUrl,
             provider: ai.recommendedProvider,
             preset: store.selectedPreset,
             prompt: ai.enhancedPrompt,
@@ -227,15 +230,15 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           id: `video-${Date.now()}`,
           name: `${store.activeTab} ${new Date().toLocaleTimeString()}`,
           category: store.activeTab,
-          sourceImageUrl: uploadData.data.url,
+          sourceImageUrl: httpImageUrl,
           resultVideoUrl: data.data.url,
           provider: ai.recommendedProvider,
           status: "completed",
-          cost: data.data.cost ?? 0,
+          cost: data.cost ?? 0,
           createdAt: new Date().toISOString(),
-          options: { imageUrl: uploadData.data.url, provider: ai.recommendedProvider as VideoProviderKey, prompt: ai.enhancedPrompt, duration: ai.recommendedDuration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
+          options: { imageUrl: httpImageUrl, provider: ai.recommendedProvider as VideoProviderKey, prompt: ai.enhancedPrompt, duration: ai.recommendedDuration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
         });
-        onProcess(data.data.url, undefined, data.cost ?? data.data?.cost ?? 0);
+        onProcess(data.data.url, undefined, data.cost ?? 0);
       }
     } catch (err) {
       console.error("Auto generation error:", err);

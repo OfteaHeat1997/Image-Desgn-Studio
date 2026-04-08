@@ -73,15 +73,38 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
     setErrorMsg(null);
   }, []);
 
+  /** Compress large images to stay under Vercel 4.5MB limit */
+  const compressFile = useCallback(async (file: File): Promise<File> => {
+    if (file.size <= 3 * 1024 * 1024) return file;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const s = Math.min(1, 2048 / Math.max(img.width, img.height));
+        canvas.width = Math.round(img.width * s);
+        canvas.height = Math.round(img.height * s);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(file); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => resolve(blob ? new File([blob], file.name, { type: "image/jpeg" }) : file),
+          "image/jpeg", 0.85,
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   const handleApply = useCallback(async () => {
     if (!imageFile) return;
     setIsProcessing(true);
     setErrorMsg(null);
 
     try {
-      // Upload via /api/upload (handles compression for large images)
+      const compressed = await compressFile(imageFile);
       const formData = new FormData();
-      formData.append("file", imageFile);
+      formData.append("file", compressed);
       const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
       const uploadData = await safeJson(uploadRes);
       if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen");
@@ -122,7 +145,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
     } finally {
       setIsProcessing(false);
     }
-  }, [imageFile, provider, scale, faceEnhance, prompt, estimatedCost, onProcess]);
+  }, [imageFile, provider, scale, faceEnhance, prompt, estimatedCost, onProcess, compressFile]);
 
   return (
     <div className="space-y-5">

@@ -4,8 +4,8 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { runModel, extractOutputUrl } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl } from '@/lib/api/fal';
+import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
+import { runFal, extractFalVideoUrl, ensureFalHttpUrl } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { getPresetById } from '@/lib/video/presets';
@@ -84,43 +84,47 @@ export async function POST(request: NextRequest) {
     let resultUrl: string;
     const cost = getProviderCost(provider, duration);
 
+    // Convert data URLs to HTTP URLs so AI providers can access them.
+    let httpImageUrl = imageUrl;
+    if (imageUrl.startsWith('data:')) {
+      if (provider.backend === 'fal') {
+        httpImageUrl = await ensureFalHttpUrl(imageUrl);
+      } else if (provider.backend === 'replicate') {
+        httpImageUrl = await ensureHttpUrl(imageUrl);
+      }
+    }
+
     switch (provider.backend) {
       case 'fal': {
-        // fal.ai providers — each has different input parameter names
         let falInput: Record<string, unknown>;
 
         if (providerKey === 'ltx-video') {
-          // LTX-Video: image_url, prompt (no duration/aspect_ratio)
           falInput = {
-            image_url: imageUrl,
+            image_url: httpImageUrl,
             prompt: fullPrompt,
           };
         } else if (providerKey === 'wan-2.5') {
-          // Wan 2.5: image_url, prompt, duration (string "5"/"10"), resolution
           falInput = {
-            image_url: imageUrl,
+            image_url: httpImageUrl,
             prompt: fullPrompt,
             duration: String(Math.min(duration, 10)),
             resolution: '480p',
           };
         } else if (providerKey === 'kling-2.6') {
-          // Kling 2.6: start_image_url (NOT image_url!), prompt, duration (string)
           falInput = {
-            start_image_url: imageUrl,
+            start_image_url: httpImageUrl,
             prompt: fullPrompt,
             duration: String(Math.min(duration, 10)),
           };
         } else if (providerKey === 'minimax-hailuo') {
-          // Minimax: image_url, prompt (no duration)
           falInput = {
-            image_url: imageUrl,
+            image_url: httpImageUrl,
             prompt: fullPrompt,
             prompt_optimizer: true,
           };
         } else {
-          // Generic fallback
           falInput = {
-            image_url: imageUrl,
+            image_url: httpImageUrl,
             prompt: fullPrompt,
           };
         }
@@ -132,27 +136,25 @@ export async function POST(request: NextRequest) {
 
       case 'replicate': {
         if (providerKey === 'wan-2.1') {
-          // Wan 2.1 via wavespeedai — supports aspect_ratio + num_frames (81=~3s, 161=~6s)
-          const wan21Frames = duration >= 6 ? 161 : 81;
+          // Wan 2.1 — uses aspect_ratio, no num_frames
           const output = await runModel(provider.model, {
-            image: imageUrl,
+            image: httpImageUrl,
             prompt: fullPrompt,
             aspect_ratio: aspectRatio === '9:16' ? '9:16' : '16:9',
-            num_frames: wan21Frames,
           });
           resultUrl = await extractOutputUrl(output);
         } else if (providerKey === 'wan-2.2-fast') {
-          // Wan 2.2 Fast via wan-video (minimum 81 frames required)
+          // Wan 2.2 Fast — minimum 81 frames, max 5s
           const output = await runModel(provider.model, {
-            image: imageUrl,
+            image: httpImageUrl,
             prompt: fullPrompt,
-            num_frames: duration >= 10 ? 161 : 81,
+            num_frames: 81,
             guidance_scale: 5.0,
           });
           resultUrl = await extractOutputUrl(output);
         } else {
           const output = await runModel(provider.model, {
-            image: imageUrl,
+            image: httpImageUrl,
             prompt: fullPrompt,
           });
           resultUrl = await extractOutputUrl(output);

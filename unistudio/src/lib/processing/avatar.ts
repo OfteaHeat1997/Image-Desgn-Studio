@@ -4,8 +4,8 @@
 // Replicate / fal.ai — all pay-per-use.
 // =============================================================================
 
-import { runModel, extractOutputUrl } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl } from '@/lib/api/fal';
+import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
+import { runFal, extractFalVideoUrl, ensureFalHttpUrl } from '@/lib/api/fal';
 import type { AvatarProviderKey, AvatarGenerateResult } from '@/types/video';
 import { AVATAR_PROVIDERS } from '@/lib/video/providers';
 
@@ -165,24 +165,34 @@ export async function generateAvatar(
   const providerConfig = AVATAR_PROVIDERS[provider];
   if (!providerConfig) throw new Error(`Unknown avatar provider: ${provider}`);
 
+  // Convert data URLs (from TTS / upload) to HTTP URLs for the target backend.
+  // TTS returns base64 data URLs; AI models need HTTP URLs.
+  const isFal = providerConfig.backend === 'fal';
+  const httpImageUrl = imageUrl.startsWith('data:')
+    ? (isFal ? await ensureFalHttpUrl(imageUrl) : await ensureHttpUrl(imageUrl))
+    : imageUrl;
+  const httpAudioUrl = audioUrl.startsWith('data:')
+    ? (isFal ? await ensureFalHttpUrl(audioUrl) : await ensureHttpUrl(audioUrl))
+    : audioUrl;
+
   const startTime = Date.now();
   let videoUrl: string;
 
   switch (provider) {
     case 'sadtalker':
-      videoUrl = await generateSadTalker(imageUrl, audioUrl);
+      videoUrl = await generateSadTalker(httpImageUrl, httpAudioUrl);
       break;
     case 'wav2lip':
-      videoUrl = await generateWav2Lip(imageUrl, audioUrl);
+      videoUrl = await generateWav2Lip(httpImageUrl, httpAudioUrl);
       break;
     case 'musetalk':
-      videoUrl = await generateMuseTalk(imageUrl, audioUrl);
+      videoUrl = await generateMuseTalk(httpImageUrl, httpAudioUrl);
       break;
     case 'liveportrait':
-      videoUrl = await generateLivePortrait(imageUrl, audioUrl);
+      videoUrl = await generateLivePortrait(httpImageUrl, httpAudioUrl);
       break;
     case 'hedra-free':
-      videoUrl = await generateHedra(imageUrl, audioUrl, script ?? '');
+      videoUrl = await generateHedra(httpImageUrl, httpAudioUrl, script ?? '');
       break;
     default:
       throw new Error(`Unsupported avatar provider: ${provider}`);
