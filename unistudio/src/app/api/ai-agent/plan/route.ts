@@ -311,18 +311,14 @@ function getSocialPipeline(
 
 // ---------------------------------------------------------------------------
 // Catálogo pipeline — generates Leonisa-style multi-angle product photo set
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Catálogo pipeline — generates Leonisa-style multi-angle product photo set
 //
-// FLOW (matches Leonisa workflow):
-// 1. Inpaint: remove watermark/copyright from original Leonisa photo
-// 2. BG-Remove: remove the Leonisa model → isolate JUST the bra/garment
-// 3. For each angle (front, back, side, lifestyle):
+// FLOW:
+// 1. BG-Remove: remove the Leonisa model + background → isolate JUST the bra
+//    (watermark gets removed automatically since it's on the model/background)
+// 2. For each angle (front, back, side, lifestyle):
 //    a. Model-Create: generate NEW AI model in that pose (white bg)
-//    b. Try-On: put the isolated garment on the new model
-// 4. Infographics: add text/arrows overlay on front + back results
+//    b. Try-On: put the isolated bra on the new model
+// 3. Infographics: add text/arrows overlay on front + back results
 // ---------------------------------------------------------------------------
 
 function getCatalogoPipeline(
@@ -338,25 +334,15 @@ function getCatalogoPipeline(
 
   const steps: PipelineStep[] = [];
 
-  // PASO 1: Quitar watermark/copyright de la foto original Leonisa
-  steps.push(
-    makeStep(
-      "inpaint",
-      "Quitar watermark y copyright",
-      { prompt: "Remove all watermarks, logos, copyright text, and brand markings completely. Keep the product and model intact.", provider: "kontext" },
-      budget === "free" ? 0 : 0.05,
-      "Removemos marcas de agua, logos y texto de copyright de la foto original.",
-    ),
-  );
-
-  // PASO 2: Quitar la modelo de Leonisa → aislar solo el bra/producto
+  // PASO 1: Quitar modelo Leonisa + fondo → aislar solo el bra
+  // El watermark se va automaticamente porque esta sobre la modelo/fondo
   steps.push(
     makeStep(
       "bg-remove",
-      "Aislar producto (quitar modelo original)",
+      "Quitar modelo Leonisa — aislar solo el bra",
       { provider: "browser" },
       0,
-      "Removemos la modelo original de Leonisa y el fondo. Queda solo el bra/prenda aislada.",
+      "Removemos la modelo original y el fondo. Queda solo el bra aislado (sin copyright).",
     ),
   );
 
