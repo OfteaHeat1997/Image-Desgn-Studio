@@ -232,7 +232,7 @@ export async function uploadToFalStorage(
       Authorization: `Key ${getApiKey()}`,
       'Content-Type': contentType,
     },
-    body: buffer,
+    body: new Uint8Array(buffer),
   });
 
   if (!response.ok) {
