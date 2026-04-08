@@ -51,8 +51,50 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+/**
+ * Convert a URL to a data URL string.
+ * For HTTP URLs (like replicate.delivery), passes the URL directly — no client fetch needed.
+ * For blob/data URLs, reads them locally.
+ */
+async function urlToDataUrl(url: string): Promise<string> {
+  // HTTP URLs can't be fetched client-side due to CORS — return as-is for server APIs
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  // blob: or data: URLs — read locally
+  if (url.startsWith("data:")) return url;
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const file = new File([blob], "image.png", { type: blob.type || "image/png" });
+  return fileToDataUrl(file);
+}
+
 /** Convert a URL (blob/data/http) to a File for FormData APIs */
 async function urlToFile(url: string, filename: string): Promise<File> {
+  // For HTTP URLs, download via our server proxy to avoid CORS
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    try {
+      const proxyRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const proxyData = await proxyRes.json();
+      if (proxyData.success && proxyData.data?.dataUrl) {
+        const fetchRes = await fetch(proxyData.data.dataUrl);
+        const blob = await fetchRes.blob();
+        return new File([blob], filename, { type: blob.type || "image/png" });
+      }
+    } catch { /* fall through */ }
+    // Fallback: try direct fetch (might work for some CDNs)
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return new File([blob], filename, { type: blob.type || "image/png" });
+    } catch {
+      throw new Error(`No se pudo descargar la imagen: ${url.slice(0, 60)}...`);
+    }
+  }
   const res = await fetch(url);
   const blob = await res.blob();
   return new File([blob], filename, { type: blob.type || "image/png" });
@@ -132,8 +174,22 @@ async function executeStep(
       return { resultUrl: data.data.url, cost: data.cost ?? 0.05, updatedCtx: {} };
     }
 
-    // ----- Enhance (FormData API) -----
+    // ----- Enhance (FormData or JSON depending on URL type) -----
     case "enhance": {
+      // If URL is HTTP (e.g. replicate), send as JSON to avoid CORS
+      if (ctx.currentUrl.startsWith("http")) {
+        const res = await fetch("/api/enhance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: ctx.currentUrl,
+            preset: (params.preset as string) ?? "product-clean",
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error ?? "enhance failed");
+        return { resultUrl: data.data.url, cost: 0, updatedCtx: {} };
+      }
       const file = await urlToFile(ctx.currentUrl, "input.png");
       const formData = new FormData();
       formData.append("file", file);
@@ -487,25 +543,9 @@ async function validateStepResult(
     }
   }
 
-  // For HTTP URLs, do a HEAD check
+  // For HTTP URLs, trust them — HEAD checks fail due to CORS on CDNs like replicate.delivery
   if (resultUrl.startsWith("http")) {
-    try {
-      const res = await fetch(resultUrl, { method: "HEAD" });
-      if (!res.ok) {
-        return { valid: false, warning: `URL no accesible (${res.status})` };
-      }
-      const contentType = res.headers.get("content-type") ?? "";
-      if (!contentType.startsWith("image/") && !contentType.startsWith("video/")) {
-        return { valid: false, warning: `Tipo inesperado: ${contentType}` };
-      }
-      const contentLength = parseInt(res.headers.get("content-length") ?? "0", 10);
-      if (contentLength > 0 && contentLength < 100) {
-        return { valid: false, warning: `Resultado sospechosamente pequeno (${contentLength} bytes)` };
-      }
-    } catch {
-      // HEAD might fail on some CDNs — not a hard failure
-      return { valid: true, warning: "No se pudo validar la URL del resultado" };
-    }
+    return { valid: true };
   }
 
   return { valid: true };
