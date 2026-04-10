@@ -214,7 +214,7 @@ export function ShadowsGuidePanel({
                     className="h-full w-full object-cover"
                   />
                 </div>
-                <span className="mt-1 block text-center text-[9px] text-gray-500 truncate">
+                <span className="mt-1 block text-center text-[10px] text-gray-500 truncate">
                   {SHADOW_LABELS[result.label] ?? result.label}
                 </span>
               </div>
@@ -249,7 +249,7 @@ export function ShadowsGuidePanel({
                   }`}
                 >
                   <span className="block text-[10px] font-semibold">{fmt.label}</span>
-                  <span className="block text-[8px] text-gray-500 mt-0.5 leading-tight">
+                  <span className="block text-[10px] text-gray-500 mt-0.5 leading-tight">
                     {fmt.desc}
                   </span>
                 </button>

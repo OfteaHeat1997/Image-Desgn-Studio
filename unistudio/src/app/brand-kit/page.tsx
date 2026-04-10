@@ -563,7 +563,7 @@ export default function BrandKitPage() {
                     className="h-8 w-8 rounded-lg border border-surface-lighter"
                     style={{ backgroundColor: color }}
                   />
-                  <span className="text-[9px] text-gray-500 capitalize">{key}</span>
+                  <span className="text-[10px] text-gray-500 capitalize">{key}</span>
                 </div>
               ))}
             </div>

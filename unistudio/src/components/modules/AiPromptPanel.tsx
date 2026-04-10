@@ -371,7 +371,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
 
       {/* Cost note for asking */}
       {!concepts.length && (
-        <p className="text-center text-[9px] text-gray-600">
+        <p className="text-center text-[10px] text-gray-600">
           Pedir ideas: <span className="text-emerald-400">~$0.003</span> (Claude IA) — Crear foto gratis o con Replicate
         </p>
       )}
@@ -398,7 +398,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
           {/* Method badge */}
           <div className="text-center">
             <span className={cn(
-              "inline-block rounded-full px-2 py-0.5 text-[9px] font-medium",
+              "inline-block rounded-full px-2 py-0.5 text-[10px] font-medium",
               aiMethod === "claude"
                 ? "bg-accent/15 text-accent-light"
                 : "bg-blue-500/15 text-blue-400",
@@ -424,7 +424,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <h4 className="text-xs font-semibold text-gray-200">{concept.title}</h4>
                   <span className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold",
+                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold",
                     concept.isFree
                       ? "bg-emerald-500/20 text-emerald-400"
                       : "bg-amber-500/20 text-amber-400",
@@ -440,18 +440,18 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
 
                 {/* Meta info */}
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="rounded bg-surface px-1.5 py-0.5 text-[9px] text-gray-500">
+                  <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-gray-500">
                     {concept.aspectRatio}
                   </span>
-                  <span className="rounded bg-surface px-1.5 py-0.5 text-[9px] text-gray-500">
+                  <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-gray-500">
                     {concept.mood}
                   </span>
                   {concept.isFree ? (
-                    <span className="flex items-center gap-1 text-[9px] text-emerald-400">
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-400">
                       <Monitor className="h-2.5 w-2.5" /> Navegador
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-[9px] text-amber-400">
+                    <span className="flex items-center gap-1 text-[10px] text-amber-400">
                       <Cpu className="h-2.5 w-2.5" /> Replicate
                     </span>
                   )}
@@ -464,7 +464,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
                       className="h-4 w-4 rounded border border-gray-600"
                       style={{ background: concept.bgColor }}
                     />
-                    <span className="text-[9px] text-gray-500">Color: {concept.bgColor}</span>
+                    <span className="text-[10px] text-gray-500">Color: {concept.bgColor}</span>
                   </div>
                 )}
 
@@ -517,7 +517,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
       {!isGenerating && !isThinking && (
         <div className="rounded-lg border border-surface-lighter bg-surface p-3 space-y-1">
           <p className="text-[10px] font-semibold text-gray-400 text-center">Costos estimados</p>
-          <div className="grid grid-cols-2 gap-2 text-[9px]">
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
             <div className="flex justify-between">
               <span className="text-gray-500">Pedir ideas (Claude)</span>
               <span className="text-emerald-400">~$0.003</span>

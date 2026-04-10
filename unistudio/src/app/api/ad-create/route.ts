@@ -10,9 +10,20 @@ import { buildAdPrompt, AD_TEMPLATES, getRecommendedDuration } from '@/lib/proce
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { runFal, extractFalVideoUrl } from '@/lib/api/fal';
+import { checkOrigin, checkRateLimit, getClientIp } from '@/lib/utils/rate-limit';
 import type { AdFormat, VideoProviderKey } from '@/types/video';
 
 export async function POST(request: NextRequest) {
+  // Auth check
+  if (!checkOrigin(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Rate limit: 10 requests/hour
+  const ip = getClientIp(request);
+  if (!checkRateLimit(ip, 10)) {
+    return NextResponse.json({ success: false, error: 'Demasiadas solicitudes. Intenta en una hora.' }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
     const {
@@ -126,7 +137,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Ad creation failed.',
+        error: 'Error procesando la solicitud. Intenta de nuevo.',
       },
       { status: 500 },
     );

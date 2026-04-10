@@ -372,7 +372,7 @@ function TestChecklist() {
                     {item.test}
                   </span>
                   {item.needsApi && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
                       API Key
                     </span>
                   )}

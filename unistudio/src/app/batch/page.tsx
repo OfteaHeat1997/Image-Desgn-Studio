@@ -925,7 +925,7 @@ export default function BatchPage() {
                             alt="Original"
                             className="h-full w-full object-cover"
                           />
-                          <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-gray-300 uppercase">Antes</span>
+                          <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-gray-300 uppercase">Antes</span>
                         </div>
                         <div className="relative aspect-square">
                           <img
@@ -933,7 +933,7 @@ export default function BatchPage() {
                             alt="Resultado"
                             className="h-full w-full object-cover"
                           />
-                          <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[8px] font-bold text-white uppercase">Despues</span>
+                          <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">Despues</span>
                         </div>
                       </div>
                       {/* File info + download */}
@@ -942,7 +942,7 @@ export default function BatchPage() {
                         <a
                           href={img.resultUrl || img.preview}
                           download={`processed-${img.file.name}`}
-                          className="flex items-center gap-1 rounded bg-accent/20 px-2 py-0.5 text-[9px] font-medium text-accent-light hover:bg-accent/30 transition-colors"
+                          className="flex items-center gap-1 rounded bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-light hover:bg-accent/30 transition-colors"
                         >
                           <Download className="h-3 w-3" /> Descargar
                         </a>

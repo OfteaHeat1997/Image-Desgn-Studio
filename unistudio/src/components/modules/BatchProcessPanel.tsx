@@ -452,7 +452,7 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
                   )}
                 >
                   {/* Step index */}
-                  <span className="text-[9px] font-mono text-gray-600 w-4 shrink-0">
+                  <span className="text-[10px] font-mono text-gray-600 w-4 shrink-0">
                     {idx + 1}
                   </span>
 

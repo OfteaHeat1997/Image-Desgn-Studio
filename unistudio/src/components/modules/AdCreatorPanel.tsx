@@ -53,10 +53,13 @@ const TEMPLATE_ICONS: Record<string, React.ElementType> = {
 /* ------------------------------------------------------------------ */
 
 const PROVIDER_OPTIONS = [
+  { value: "kenburns", label: "Ken Burns · GRATIS (vista previa)" },
   { value: "ltx-video", label: "LTX-Video · $0.04 (borrador)" },
+  { value: "wan-2.1", label: "Wan 2.1 · $0.04 (estandar)" },
   { value: "wan-2.2-fast", label: "Wan 2.2 Fast · $0.05 (estandar)" },
-  { value: "kling-2.6", label: "Kling 2.6 · $0.35 (premium)" },
-  { value: "kenburns", label: "Ken Burns · GRATIS (simple)" },
+  { value: "wan-2.5", label: "Wan 2.5 · $0.05/seg (estandar)" },
+  { value: "kling-2.6", label: "Kling 2.6 · $0.07/seg (premium)" },
+  { value: "minimax-hailuo", label: "Minimax Hailuo · $0.08/seg (premium)" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -243,7 +246,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
                   <span className="block text-[10px] font-medium text-gray-300">
                     {t.name}
                   </span>
-                  <span className="block text-[8px] text-gray-500">
+                  <span className="block text-[10px] text-gray-500">
                     {t.aspectRatio}
                   </span>
                 </div>
@@ -257,19 +260,19 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
       <div className="rounded-lg border border-surface-lighter bg-surface-light/50 px-3 py-2">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <p className="text-[9px] text-gray-500">Dimensiones</p>
+            <p className="text-[10px] text-gray-500">Dimensiones</p>
             <p className="text-[10px] font-medium text-gray-300">
               {template.width}x{template.height}
             </p>
           </div>
           <div>
-            <p className="text-[9px] text-gray-500">Aspecto</p>
+            <p className="text-[10px] text-gray-500">Aspecto</p>
             <p className="text-[10px] font-medium text-gray-300">
               {template.aspectRatio}
             </p>
           </div>
           <div>
-            <p className="text-[9px] text-gray-500">Duracion max</p>
+            <p className="text-[10px] text-gray-500">Duracion max</p>
             <p className="text-[10px] font-medium text-gray-300">
               {template.maxDuration}s
             </p>

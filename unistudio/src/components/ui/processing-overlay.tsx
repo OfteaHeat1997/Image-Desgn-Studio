@@ -54,7 +54,7 @@ export function ProcessingOverlay({
               style={{ width: `${Math.min(progress, 100)}%` }}
             />
           </div>
-          <p className="text-right text-[9px] tabular-nums text-gray-500">
+          <p className="text-right text-[10px] tabular-nums text-gray-500">
             {Math.round(progress)}%
           </p>
         </div>

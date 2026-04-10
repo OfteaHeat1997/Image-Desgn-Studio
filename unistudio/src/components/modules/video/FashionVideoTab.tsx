@@ -114,7 +114,7 @@ export function FashionVideoTab({
 
           <div className="flex items-start gap-1.5">
             <Info className="h-3 w-3 shrink-0 text-gray-500 mt-0.5" />
-            <p className="text-[9px] text-gray-500">
+            <p className="text-[10px] text-gray-500">
               El video usara ambas imagenes con una transicion suave: frente (2s) → espalda (2s). Recomendado: Kling 2.6 para mejor calidad.
             </p>
           </div>

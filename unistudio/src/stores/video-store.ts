@@ -79,7 +79,12 @@ export const useVideoStore = create<VideoStoreState>()(
         voice: state.voice,
         duration: state.duration,
         aspectRatio: state.aspectRatio,
-        projects: state.projects,
+        // Strip data URLs before persisting to avoid localStorage quota crashes
+        projects: state.projects.map((p) => ({
+          ...p,
+          sourceImageUrl: p.sourceImageUrl?.startsWith('data:') ? '' : p.sourceImageUrl,
+          resultVideoUrl: p.resultVideoUrl?.startsWith('data:') ? '' : p.resultVideoUrl,
+        })),
       }),
     },
   ),

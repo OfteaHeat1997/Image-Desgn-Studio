@@ -640,7 +640,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
               Fondo blanco + centrado + 1200x1200 + nitido + sombra
             </span>
           </div>
-          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
             Gratis
           </span>
         </button>
@@ -677,7 +677,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className={cn(
-              "rounded-full px-2 py-0.5 text-[9px] font-bold",
+              "rounded-full px-2 py-0.5 text-[10px] font-bold",
               isolateProduct
                 ? "bg-violet-500/20 text-violet-300"
                 : "bg-surface-lighter text-gray-500",
@@ -721,7 +721,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
                 Recomendacion Automatica
               </span>
               <span className={cn(
-                "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
+                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
                 recommendation.provider === "browser"
                   ? "bg-emerald-500/20 text-emerald-400"
                   : "bg-amber-500/20 text-amber-400",
@@ -766,7 +766,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
             >
               <div className="flex w-full items-center justify-between">
                 <provider.icon className="h-3.5 w-3.5 text-gray-400" />
-                <span className="text-[9px] font-semibold text-emerald-400">
+                <span className="text-[10px] font-semibold text-emerald-400">
                   {provider.cost}
                 </span>
               </div>

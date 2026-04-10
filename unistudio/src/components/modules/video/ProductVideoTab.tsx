@@ -72,7 +72,7 @@ export function ProductVideoTab({
           if (groupPresets.length === 0) return null;
           return (
             <div key={group.label}>
-              <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-gray-500">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                 {group.label}
               </p>
               <div className="grid grid-cols-2 gap-1.5">

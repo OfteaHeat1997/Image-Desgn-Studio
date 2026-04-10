@@ -642,7 +642,7 @@ export function CompliancePanel({ imageFile, onProcess }: CompliancePanelProps) 
                             disabled={btnBusy}
                             onClick={() => handleAutoFix(result.platform, issue)}
                             className={cn(
-                              "shrink-0 rounded-md bg-accent/10 px-2 py-0.5 text-[9px] font-medium text-accent-light transition-colors",
+                              "shrink-0 rounded-md bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent-light transition-colors",
                               btnBusy
                                 ? "cursor-not-allowed opacity-50"
                                 : "hover:bg-accent/20",

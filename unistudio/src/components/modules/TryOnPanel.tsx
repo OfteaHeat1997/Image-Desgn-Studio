@@ -354,7 +354,7 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
                       <span className="text-[10px] text-gray-500 ml-1">{gt.desc}</span>
                     </div>
                     {gt.badge && (
-                      <span className="shrink-0 rounded bg-blue-500/15 px-1.5 py-0.5 text-[8px] font-bold text-blue-400">
+                      <span className="shrink-0 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-bold text-blue-400">
                         {gt.badge}
                       </span>
                     )}
@@ -434,7 +434,7 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
                             {prov.name}
                           </span>
                           {prov.badge && (
-                            <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[8px] font-bold text-accent-light">{prov.badge}</span>
+                            <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-accent-light">{prov.badge}</span>
                           )}
                         </div>
                         <span className="block text-[10px] text-gray-500 mt-0.5">{prov.desc}</span>

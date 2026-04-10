@@ -381,7 +381,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           <p className="text-[11px] font-semibold text-gray-200">
             {isFree ? "Navegador (Gratis)" : "Replicate API (Pago)"}
           </p>
-          <p className="text-[9px] text-gray-500">
+          <p className="text-[10px] text-gray-500">
             {isFree
               ? "Se procesa en tu PC — sin costo, sin limite"
               : `Costo estimado: ~${apiMode === "fast" ? "$0.003" : "$0.05"} por imagen`}
@@ -419,13 +419,13 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
                 <div className="flex w-full items-center justify-between">
                   <span className="text-[11px] font-medium text-gray-200">{opt.label}</span>
                   <span className={cn(
-                    "text-[9px] font-semibold",
+                    "text-[10px] font-semibold",
                     opt.value === "fast" ? "text-emerald-400" : "text-amber-400",
                   )}>
                     {opt.cost}
                   </span>
                 </div>
-                <span className="text-[9px] text-gray-500">{opt.description}</span>
+                <span className="text-[10px] text-gray-500">{opt.description}</span>
               </button>
             ))}
           </div>
@@ -448,7 +448,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
                     {category}
                   </p>
                   {catIsFree && (
-                    <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[8px] font-bold text-emerald-400">
+                    <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
                       GRATIS
                     </span>
                   )}
@@ -474,7 +474,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
                           border: p.color ? `1px solid ${p.color === "#FFFFFF" ? "#ccc" : "transparent"}` : undefined,
                         }}
                       />
-                      <span className="text-[9px] text-gray-400 leading-tight text-center">
+                      <span className="text-[10px] text-gray-400 leading-tight text-center">
                         {p.name}
                       </span>
                     </button>
@@ -494,7 +494,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
             Fondo Personalizado con IA
           </label>
         </div>
-        <p className="text-[9px] text-gray-500">
+        <p className="text-[10px] text-gray-500">
           Describe el fondo que quieres en espanol — Claude IA lo optimiza y genera automaticamente.
         </p>
         <textarea
@@ -505,7 +505,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
           className="w-full rounded-lg border border-accent/30 bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors resize-none"
         />
         {customPrompt && (
-          <p className="text-[9px] text-amber-400">
+          <p className="text-[10px] text-amber-400">
             Usa Replicate API (~$0.05) + Claude IA (~$0.002) para crear tu fondo unico.
           </p>
         )}

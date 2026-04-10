@@ -105,7 +105,7 @@ async function generateHedra(
 ): Promise<string> {
   const apiKey = process.env.HEDRA_API_KEY;
   if (!apiKey) {
-    throw new Error('HEDRA_API_KEY not configured. Use SadTalker or Wav2Lip instead.');
+    throw new Error('El proveedor de avatar seleccionado no está disponible.');
   }
 
   // Hedra API: upload audio, then create character video
@@ -185,9 +185,15 @@ export async function generateAvatar(
     case 'wav2lip':
       videoUrl = await generateWav2Lip(httpImageUrl, httpAudioUrl);
       break;
-    case 'musetalk':
+    case 'musetalk': {
+      // MuseTalk requires a video input, not a static image
+      const isImageInput = /\.(jpg|jpeg|png|webp|gif|avif)(\?|$)/i.test(httpImageUrl) || httpImageUrl.startsWith('data:image/');
+      if (isImageInput) {
+        throw new Error('MuseTalk requiere un video como entrada. Usa SadTalker o Wav2Lip.');
+      }
       videoUrl = await generateMuseTalk(httpImageUrl, httpAudioUrl);
       break;
+    }
     case 'liveportrait':
       videoUrl = await generateLivePortrait(httpImageUrl, httpAudioUrl);
       break;

@@ -124,7 +124,7 @@ export function EmptyState({ module }: EmptyStateProps) {
           <p className="text-[11px] font-medium text-accent-light/80">
             Sube una imagen para comenzar
           </p>
-          <p className="text-[9px] text-gray-500">
+          <p className="text-[10px] text-gray-500">
             Arrastra al area central o haz clic para seleccionar
           </p>
         </div>

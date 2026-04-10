@@ -99,7 +99,7 @@ function LayerRow({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-[8px] text-gray-600">
+          <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-600">
             IMG
           </div>
         )}

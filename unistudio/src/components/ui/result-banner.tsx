@@ -63,7 +63,7 @@ export function ResultBanner({
       {/* Suggestions */}
       {onNavigate && suggestions.length > 0 && (
         <div>
-          <p className="text-[9px] text-gray-500 uppercase tracking-wider font-semibold mb-1.5">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-1.5">
             Que hacer ahora
           </p>
           <div className="flex flex-wrap gap-1.5">

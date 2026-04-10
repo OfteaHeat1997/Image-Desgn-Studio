@@ -418,7 +418,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             >
               <Icon className={cn("h-4 w-4", outputMode === id ? "text-accent-light" : "text-gray-500")} />
               <span className={cn("text-[10px] font-semibold", outputMode === id ? "text-accent-light" : "text-gray-300")}>{name}</span>
-              <span className="text-[9px] text-gray-500">{description}</span>
+              <span className="text-[10px] text-gray-500">{description}</span>
             </button>
           ))}
         </div>
@@ -458,15 +458,15 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
             <span className="text-lg">{selectedAccessory.emoji}</span>
             <div className="flex-1 min-w-0">
               <p className="text-[11px] text-gray-300 truncate">{effectiveJewelryFile.name}</p>
-              <p className="text-[9px] text-gray-500">{(effectiveJewelryFile.size / 1024).toFixed(0)}KB</p>
+              <p className="text-[10px] text-gray-500">{(effectiveJewelryFile.size / 1024).toFixed(0)}KB</p>
             </div>
-            <span className="text-[9px] text-emerald-400 font-semibold">Listo</span>
+            <span className="text-[10px] text-emerald-400 font-semibold">Listo</span>
             {/* Allow changing if it was a local upload */}
             {!imageFile && localJewelryFile && (
               <button
                 type="button"
                 onClick={() => { setLocalJewelryFile(null); setLocalJewelryPreview(null); }}
-                className="text-[9px] text-gray-500 hover:text-gray-300"
+                className="text-[10px] text-gray-500 hover:text-gray-300"
               >
                 Cambiar
               </button>
@@ -516,7 +516,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
                   <p className={cn("text-[11px] font-semibold", modelSource === "generate" ? "text-accent-light" : "text-gray-300")}>
                     Generar IA
                   </p>
-                  <p className="text-[9px] text-gray-500">Automatico</p>
+                  <p className="text-[10px] text-gray-500">Automatico</p>
                 </div>
               </button>
               <button
@@ -534,7 +534,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
                   <p className={cn("text-[11px] font-semibold", modelSource === "upload" ? "text-accent-light" : "text-gray-300")}>
                     Subir Foto
                   </p>
-                  <p className="text-[9px] text-gray-500">Manual</p>
+                  <p className="text-[10px] text-gray-500">Manual</p>
                 </div>
               </button>
             </div>
@@ -590,7 +590,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
                 label="Estilo de Fondo"
               />
 
-              <p className="text-[9px] text-gray-500">
+              <p className="text-[10px] text-gray-500">
                 Se generara un modelo {gender === "male" ? "masculino" : "femenino"} con pose ideal para {selectedAccessory.name.toLowerCase()}.
               </p>
             </div>
@@ -669,12 +669,12 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
           <span className="text-[11px] text-emerald-400 font-semibold">{estimatedCost}</span>
         </div>
         {outputMode === "modelo" && modelSource === "generate" && (
-          <p className="text-[9px] text-gray-600 mt-0.5">
+          <p className="text-[10px] text-gray-600 mt-0.5">
             Incluye generacion de modelo ($0.055) + prueba de joyeria ($0.05)
           </p>
         )}
         {(outputMode === "exhibidor" || outputMode === "flotante") && (
-          <p className="text-[9px] text-gray-600 mt-0.5">
+          <p className="text-[10px] text-gray-600 mt-0.5">
             Solo procesamiento de imagen — no requiere modelo
           </p>
         )}
