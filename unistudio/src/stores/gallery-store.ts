@@ -161,6 +161,11 @@ export const useGalleryStore = create<GalleryStoreState>()(
           set((state) => ({
             images: [...withThumbs, ...state.images].slice(0, 30),
           }));
+        }).catch(() => {
+          // Fallback: add images without thumbnails rather than losing them
+          set((state) => ({
+            images: [...newImages, ...state.images].slice(0, 30),
+          }));
         });
       },
 

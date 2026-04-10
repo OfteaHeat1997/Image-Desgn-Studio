@@ -264,10 +264,14 @@ export default function BatchPage() {
 
   // Track all preview blob URLs so we can revoke them on clear and unmount
   const previewUrlsRef = useRef<string[]>([]);
+  // Track result blob URLs (e.g. from watermark step) for the same reason
+  const resultUrlsRef = useRef<string[]>([]);
   useEffect(() => {
     return () => {
       previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
       previewUrlsRef.current = [];
+      resultUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      resultUrlsRef.current = [];
     };
   }, []);
 
@@ -564,9 +568,11 @@ export default function BatchPage() {
 
     setLoadingCategory(cat.id);
     setAutoProcessing(cat.id);
-    // Revoke any existing preview blob URLs before clearing the image list
+    // Revoke any existing preview and result blob URLs before clearing the image list
     previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
     previewUrlsRef.current = [];
+    resultUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    resultUrlsRef.current = [];
     setImages([]);
     setAutoBatchIndex(0);
     setAutoBatchTotal(cat.imageCount);
@@ -676,6 +682,8 @@ export default function BatchPage() {
 
       try {
         const result = await processOneImage(images[i], steps);
+        // Track blob result URLs (e.g. from watermark step) for cleanup
+        if (result.resultUrl.startsWith("blob:")) resultUrlsRef.current.push(result.resultUrl);
         setImages((prev) => prev.map((img, idx) =>
           idx === i ? { ...img, status: "done" as const, resultUrl: result.resultUrl, originalUrl: images[i].preview } : img,
         ));
