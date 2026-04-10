@@ -409,7 +409,7 @@ async function executeStep(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: dataUrl,
-          provider: params.provider ?? "kontext",
+          operation: (params.operation as string) ?? "remove-mannequin",
         }),
       });
       const data = await res.json();
