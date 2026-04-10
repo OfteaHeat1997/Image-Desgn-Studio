@@ -1,4 +1,4 @@
-# 📋 Guía de Testing — UniStudio
+si bo# 📋 Guía de Testing — UniStudio
 ## Fecha: 10 de Abril, 2026
 
 ---

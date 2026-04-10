@@ -1,0 +1,156 @@
+// =============================================================================
+// Prisma Schema - UniStudio
+// Local PostgreSQL, no auth — single-user personal tool.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// Projects
+// -----------------------------------------------------------------------------
+
+model Project {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  thumbnailUrl String?  @map("thumbnail_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  images Image[]
+
+  @@map("projects")
+}
+
+// -----------------------------------------------------------------------------
+// Images
+// -----------------------------------------------------------------------------
+
+model Image {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  originalUrl  String   @map("original_url")
+  processedUrl String?  @map("processed_url")
+  filename     String
+  width        Int
+  height       Int
+  fileSize     Int      @map("file_size")
+  mimeType     String   @map("mime_type")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  processingJobs ProcessingJob[]
+
+  @@map("images")
+}
+
+// -----------------------------------------------------------------------------
+// Processing Jobs
+// -----------------------------------------------------------------------------
+
+model ProcessingJob {
+  id             String   @id @default(uuid())
+  imageId        String?  @map("image_id")
+  operation      String
+  provider       String
+  model          String?
+  status         String   @default("pending")
+  inputParams    Json     @default("{}") @map("input_params")
+  outputUrl      String?  @map("output_url")
+  error          String?
+  cost           Float    @default(0)
+  processingTime Float?   @map("processing_time")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  image Image? @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@map("processing_jobs")
+}
+
+// -----------------------------------------------------------------------------
+// Brand Kits
+// -----------------------------------------------------------------------------
+
+model BrandKit {
+  id                   String   @id @default(uuid())
+  name                 String
+  colors               Json
+  fonts                Json
+  logoUrl              String?  @map("logo_url")
+  watermark            Json?
+  defaultBgStyle       String?  @map("default_bg_style")
+  defaultEnhancePreset String?  @map("default_enhance_preset")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("brand_kits")
+}
+
+// -----------------------------------------------------------------------------
+// AI Models
+// -----------------------------------------------------------------------------
+
+model AiModel {
+  id         String   @id @default(uuid())
+  name       String
+  provider   String
+  modelId    String   @map("model_id")
+  gender     String
+  ageRange   String   @map("age_range")
+  skinTone   String   @map("skin_tone")
+  bodyType   String   @map("body_type")
+  pose       String
+  previewUrl String?  @map("preview_url")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("ai_models")
+}
+
+// -----------------------------------------------------------------------------
+// Video Projects
+// -----------------------------------------------------------------------------
+
+model VideoProject {
+  id              String   @id @default(uuid())
+  name            String
+  category        String   // product, fashion, avatar, ad
+  sourceImageUrl  String   @map("source_image_url")
+  resultVideoUrl  String?  @map("result_video_url")
+  provider        String   // provider key
+  status          String   @default("pending") // pending/processing/completed/failed
+  cost            Float    @default(0)
+  duration        Float?   // video duration in seconds
+  aspectRatio     String?  @map("aspect_ratio")
+  inputParams     Json     @default("{}") @map("input_params")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("video_projects")
+}
+
+// -----------------------------------------------------------------------------
+// Prompt Templates
+// -----------------------------------------------------------------------------
+
+model PromptTemplate {
+  id             String   @id @default(uuid())
+  category       String
+  name           String
+  prompt         String
+  negativePrompt String?  @map("negative_prompt")
+  previewUrl     String?  @map("preview_url")
+  isPublic       Boolean  @default(false) @map("is_public")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("prompt_templates")
+}

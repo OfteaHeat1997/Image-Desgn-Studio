@@ -1,0 +1,346 @@
+"use client";
+
+import React, { useState, useCallback } from "react";
+import { safeJson } from "@/lib/utils/safe-json";
+import {
+  Expand,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Clock,
+} from "lucide-react";
+import { ModuleHeader } from "@/components/ui/module-header";
+import { ErrorCard } from "@/components/ui/error-card";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils/cn";
+import { useProcessingState } from "@/hooks/useProcessingState";
+import { uploadImage } from "@/lib/utils/upload";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                               */
+/* ------------------------------------------------------------------ */
+
+interface OutpaintPanelProps {
+  imageFile: File | null;
+  onProcess: (result: string, beforeImage?: string, cost?: number) => void;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                           */
+/* ------------------------------------------------------------------ */
+
+interface PlatformPreset {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  ratio: string;
+}
+
+const PLATFORM_PRESETS: PlatformPreset[] = [
+  { id: "amazon", name: "Amazon", width: 2000, height: 2000, ratio: "1:1" },
+  { id: "shopify", name: "Shopify", width: 2048, height: 2048, ratio: "1:1" },
+  { id: "instagram", name: "IG Feed", width: 1080, height: 1080, ratio: "1:1" },
+  { id: "instagram-story", name: "IG Story", width: 1080, height: 1920, ratio: "9:16" },
+  { id: "tiktok", name: "TikTok", width: 1080, height: 1920, ratio: "9:16" },
+  { id: "facebook", name: "Facebook", width: 1200, height: 628, ratio: "1.91:1" },
+  { id: "pinterest", name: "Pinterest", width: 1000, height: 1500, ratio: "2:3" },
+  { id: "etsy", name: "Etsy", width: 2000, height: 1500, ratio: "4:3" },
+  { id: "ebay", name: "eBay", width: 1600, height: 1600, ratio: "1:1" },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                           */
+/* ------------------------------------------------------------------ */
+
+export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const provider = "kontext"; // Only kontext supports aspect_ratio-based outpainting
+  const [customWidth, setCustomWidth] = useState(2000);
+  const [customHeight, setCustomHeight] = useState(2000);
+  const [extendTop, setExtendTop] = useState(true);
+  const [extendBottom, setExtendBottom] = useState(true);
+  const [extendLeft, setExtendLeft] = useState(true);
+  const [extendRight, setExtendRight] = useState(true);
+  const [bgPrompt, setBgPrompt] = useState("");
+  const { isProcessing, errorMsg, statusText, clearError, run } = useProcessingState();
+
+  const handlePresetSelect = useCallback((preset: PlatformPreset) => {
+    setSelectedPreset(preset.id);
+    setCustomWidth(preset.width);
+    setCustomHeight(preset.height);
+  }, []);
+
+  const handleApply = useCallback(async () => {
+    if (!imageFile) return;
+    const w = Math.max(100, customWidth);
+    const h = Math.max(100, customHeight);
+
+    await run(async (setStatus) => {
+      setStatus("Subiendo imagen...");
+      const imageUrl = await uploadImage(imageFile);
+
+      setStatus("Extendiendo imagen con IA... (30-90 seg)");
+
+      // Snap to nearest standard aspect ratio (Replicate models only accept standard ratios)
+      const STANDARD_RATIOS = [
+        { r: 1/1, label: "1:1" }, { r: 4/3, label: "4:3" }, { r: 3/4, label: "3:4" },
+        { r: 16/9, label: "16:9" }, { r: 9/16, label: "9:16" }, { r: 3/2, label: "3:2" },
+        { r: 2/3, label: "2:3" }, { r: 4/5, label: "4:5" }, { r: 5/4, label: "5:4" },
+        { r: 21/9, label: "21:9" }, { r: 9/21, label: "9:21" },
+      ];
+      const actual = w / h;
+      const closest = STANDARD_RATIOS.reduce((best, cur) =>
+        Math.abs(cur.r - actual) < Math.abs(best.r - actual) ? cur : best
+      );
+      const targetAspectRatio = closest.label;
+      const platformId = selectedPreset || undefined;
+
+      const dirs: string[] = [];
+      if (extendTop) dirs.push("top");
+      if (extendBottom) dirs.push("bottom");
+      if (extendLeft) dirs.push("left");
+      if (extendRight) dirs.push("right");
+      const directionHint = dirs.length > 0 && dirs.length < 4
+        ? `Extend the image toward the ${dirs.join(", ")} side${dirs.length > 1 ? "s" : ""}. `
+        : "";
+      const fullPrompt = directionHint + (bgPrompt || "");
+
+      const res = await fetch("/api/outpaint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl,
+          platform: platformId,
+          targetAspectRatio,
+          prompt: fullPrompt || undefined,
+          provider,
+        }),
+      });
+      const data = await safeJson(res);
+      if (!data.success) throw new Error(data.error || "Error al extender imagen");
+
+      setStatus("Listo!");
+      onProcess(data.data.url, undefined, data.data.cost ?? 0.05);
+    });
+  }, [imageFile, customWidth, customHeight, selectedPreset, bgPrompt, extendTop, extendBottom, extendLeft, extendRight, provider, onProcess, run]);
+
+  const activeDirections = [extendTop, extendBottom, extendLeft, extendRight].filter(Boolean).length;
+  const estimatedCost = activeDirections > 0 ? 0.05 : 0;
+
+  return (
+    <div className="space-y-5">
+      <ModuleHeader
+        icon={<Expand className="h-4 w-4" />}
+        title="Extender Imagen"
+        description="Tu foto es cuadrada pero necesitas formato vertical para Instagram Stories? O horizontal para un banner? Este modulo extiende los bordes de tu imagen con IA — genera contenido nuevo que se ve natural, no estirado."
+        whyNeeded="Cada plataforma pide un formato diferente: Amazon 1:1, Instagram Stories 9:16, Pinterest 2:3, banner web 16:9. En vez de recortar tu producto (perdiendo partes), la IA genera los bordes faltantes. Asi tu producto se ve completo en todas las plataformas."
+        costLabel="$0.05/img"
+        steps={[
+          "Sube tu imagen al area central del editor",
+          "Elige la plataforma destino (Amazon, Instagram, Pinterest, etc.) — el tamanio se ajusta solo",
+          "O define tu propio tamanio personalizado con las flechas de direccion",
+          "Haz clic en \"Extender Imagen\" y la IA rellena los bordes con contenido natural",
+        ]}
+        tips={[
+          "Elige la plataforma primero — el sistema sabe exactamente que tamanio necesita cada una.",
+          "La IA genera contenido coherente (no estira pixeles) — el resultado se ve natural.",
+          "Ideal para reutilizar una sola foto de producto en todas tus redes sociales.",
+          "Funciona mejor con fondos simples (blanco, solido) — fondos complejos pueden verse raros en los bordes.",
+        ]}
+      />
+
+      {/* Provider info */}
+      <div className="rounded-lg border border-surface-lighter bg-surface-light p-2.5 text-center">
+        <span className="text-[11px] font-semibold text-gray-200">Flux Kontext Pro</span>
+        <span className="mx-2 text-[9px] text-gray-500">•</span>
+        <span className="text-[9px] text-emerald-400">$0.05 por imagen</span>
+      </div>
+
+      {/* Platform presets grid */}
+      <div>
+        <label className="mb-2 block text-xs font-medium text-gray-400">
+          Formatos por Plataforma
+        </label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {PLATFORM_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => handlePresetSelect(preset)}
+              className={cn(
+                "flex flex-col items-center rounded-lg border p-2 text-center transition-all",
+                selectedPreset === preset.id
+                  ? "border-accent bg-accent/10"
+                  : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+              )}
+            >
+              <span className="text-[10px] font-semibold text-gray-200">
+                {preset.name}
+              </span>
+              <span className="text-[9px] text-gray-500">
+                {preset.width}x{preset.height}
+              </span>
+              <span className="text-[9px] text-gray-500">{preset.ratio}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom size */}
+      <div>
+        <label className="mb-2 block text-xs font-medium text-gray-400">
+          Tamanio Personalizado
+        </label>
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <label className="mb-1 block text-[10px] text-gray-500">Ancho</label>
+            <input
+              type="number"
+              value={customWidth}
+              onChange={(e) => {
+                setCustomWidth(Math.max(0, parseInt(e.target.value) || 0));
+                setSelectedPreset(null);
+              }}
+              min={100}
+              className="h-9 w-full rounded-lg border border-surface-lighter bg-surface-light px-3 text-xs text-gray-200 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors"
+            />
+          </div>
+          <span className="mt-5 text-xs text-gray-500">x</span>
+          <div className="flex-1">
+            <label className="mb-1 block text-[10px] text-gray-500">Alto</label>
+            <input
+              type="number"
+              value={customHeight}
+              onChange={(e) => {
+                setCustomHeight(Math.max(0, parseInt(e.target.value) || 0));
+                setSelectedPreset(null);
+              }}
+              min={100}
+              className="h-9 w-full rounded-lg border border-surface-lighter bg-surface-light px-3 text-xs text-gray-200 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Direction toggles */}
+      <div>
+        <label className="mb-2 block text-xs font-medium text-gray-400">
+          Direcciones de Extension
+        </label>
+        <div className="flex flex-col items-center gap-1">
+          {/* Top */}
+          <button
+            type="button"
+            onClick={() => setExtendTop(!extendTop)}
+            className={cn(
+              "flex items-center gap-1 rounded-md border px-4 py-1.5 text-[10px] font-medium transition-all",
+              extendTop
+                ? "border-accent bg-accent/10 text-accent-light"
+                : "border-surface-lighter bg-surface-light text-gray-500",
+            )}
+          >
+            <ArrowUp className="h-3 w-3" /> Arriba
+          </button>
+
+          {/* Middle row */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setExtendLeft(!extendLeft)}
+              className={cn(
+                "flex items-center gap-1 rounded-md border px-3 py-1.5 text-[10px] font-medium transition-all",
+                extendLeft
+                  ? "border-accent bg-accent/10 text-accent-light"
+                  : "border-surface-lighter bg-surface-light text-gray-500",
+              )}
+            >
+              <ArrowLeft className="h-3 w-3" /> Izq.
+            </button>
+
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-surface-lighter bg-surface">
+              <div className="h-6 w-6 rounded bg-surface-lighter" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setExtendRight(!extendRight)}
+              className={cn(
+                "flex items-center gap-1 rounded-md border px-3 py-1.5 text-[10px] font-medium transition-all",
+                extendRight
+                  ? "border-accent bg-accent/10 text-accent-light"
+                  : "border-surface-lighter bg-surface-light text-gray-500",
+              )}
+            >
+              Der. <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+
+          {/* Bottom */}
+          <button
+            type="button"
+            onClick={() => setExtendBottom(!extendBottom)}
+            className={cn(
+              "flex items-center gap-1 rounded-md border px-4 py-1.5 text-[10px] font-medium transition-all",
+              extendBottom
+                ? "border-accent bg-accent/10 text-accent-light"
+                : "border-surface-lighter bg-surface-light text-gray-500",
+            )}
+          >
+            <ArrowDown className="h-3 w-3" /> Abajo
+          </button>
+        </div>
+      </div>
+
+      {/* Background continuation prompt */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-gray-400">
+          Descripcion del Fondo
+        </label>
+        <textarea
+          value={bgPrompt}
+          onChange={(e) => setBgPrompt(e.target.value)}
+          placeholder="ej. Continuar con superficie de marmol blanco y luz suave..."
+          rows={3}
+          className="w-full rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors resize-none"
+        />
+      </div>
+
+      {/* Cost estimate */}
+      <div className="rounded-lg border border-surface-lighter bg-surface px-3 py-2 text-center">
+        <span className="text-[10px] text-gray-500">
+          Destino: {customWidth}x{customHeight} | Costo:{" "}
+          <span className="text-emerald-400 font-semibold">
+            ~${estimatedCost.toFixed(2)}
+          </span>
+        </span>
+      </div>
+
+      {/* Status text */}
+      {isProcessing && statusText && (
+        <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2">
+          <Clock className="h-3.5 w-3.5 text-accent-light animate-pulse" />
+          <p className="text-[11px] text-accent-light">{statusText}</p>
+        </div>
+      )}
+
+      {/* Error card */}
+      <ErrorCard message={errorMsg} onDismiss={clearError} />
+
+      {/* Apply button */}
+      <Button
+        variant="primary"
+        className="w-full"
+        onClick={handleApply}
+        disabled={!imageFile || isProcessing || activeDirections === 0}
+        loading={isProcessing}
+        leftIcon={<Expand className="h-4 w-4" />}
+      >
+        {isProcessing ? "Extendiendo..." : "Extender Imagen"}
+      </Button>
+    </div>
+  );
+}
+
+export default OutpaintPanel;
