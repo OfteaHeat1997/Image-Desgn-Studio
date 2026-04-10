@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   Save,
@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   Palette as PaletteIcon,
   Eye,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -142,35 +143,44 @@ const INITIAL_STATE: BrandKitState = {
 export default function BrandKitPage() {
   const [state, setState] = useState<BrandKitState>(INITIAL_STATE);
   const [isSaving, setIsSaving] = useState(false);
-  const updateBrandKit = useBrandStore((s) => s.updateBrandKit);
+  const hasInitialized = useRef(false);
 
-  // Load saved brand kit from database on mount
+  const { fetchBrandKit, isLoading: isApiLoading, isApiAvailable, updateBrandKit } = useBrandStore(
+    (s) => ({
+      fetchBrandKit: s.fetchBrandKit,
+      isLoading: s.isLoading,
+      isApiAvailable: s.isApiAvailable,
+      updateBrandKit: s.updateBrandKit,
+    }),
+  );
+
+  // Load brand kit from API on mount → populates Zustand store (+ localStorage)
   useEffect(() => {
-    fetch("/api/brand-kit")
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && json.data) {
-          const d = json.data;
-          setState((prev) => ({
-            ...prev,
-            colors: d.colors ?? prev.colors,
-            fonts: d.fonts ?? prev.fonts,
-            logoUrl: d.logo_url ?? prev.logoUrl,
-            watermark: d.watermark
-              ? {
-                  enabled: d.watermark.enabled ?? false,
-                  position: d.watermark.position ?? "bottom-right",
-                  opacity: d.watermark.opacity ?? 30,
-                  size: d.watermark.size ?? 15,
-                }
-              : prev.watermark,
-            defaultBgStyle: d.default_bg_style ?? prev.defaultBgStyle,
-            defaultEnhancePreset: d.default_enhance_preset ?? prev.defaultEnhancePreset,
-            defaultShadowType: d.default_shadow_type ?? prev.defaultShadowType,
-          }));
-        }
-      })
-      .catch(() => {});
+    fetchBrandKit().then(() => {
+      if (hasInitialized.current) return;
+      hasInitialized.current = true;
+      const kit = useBrandStore.getState().brandKit;
+      const apiOk = useBrandStore.getState().isApiAvailable;
+      if (apiOk) {
+        setState((prev) => ({
+          ...prev,
+          colors: kit.colors,
+          fonts: kit.fonts,
+          logoUrl: kit.logoUrl || null,
+          watermark: {
+            enabled: kit.watermark?.enabled ?? false,
+            position: (kit.watermark?.position as WatermarkPosition) ?? "bottom-right",
+            // Store uses 0-1 scale; local edit state uses 0-100
+            opacity: Math.round((kit.watermark?.opacity ?? 0.3) * 100),
+            size: kit.watermark?.size ?? 15,
+          },
+          defaultBgStyle: kit.defaultBgStyle || prev.defaultBgStyle,
+          defaultEnhancePreset: kit.defaultEnhancePreset || prev.defaultEnhancePreset,
+        }));
+      }
+      // If API unavailable, keep INITIAL_STATE — user can still edit and save to localStorage
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ---- Updaters ---- */
@@ -214,8 +224,26 @@ export default function BrandKitPage() {
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
+
+    // Always sync to Zustand (persisted to localStorage) regardless of API status
+    const storeUpdate = {
+      colors: state.colors,
+      fonts: state.fonts,
+      logoUrl: state.logoUrl || "",
+      watermark: {
+        enabled: state.watermark.enabled,
+        position: state.watermark.position,
+        opacity: state.watermark.opacity / 100,
+        size: state.watermark.size,
+        imageUrl: state.logoUrl || "",
+      },
+      defaultBgStyle: state.defaultBgStyle,
+      defaultEnhancePreset: state.defaultEnhancePreset,
+    };
+    updateBrandKit(storeUpdate);
+
     try {
-      await fetch("/api/brand-kit", {
+      const res = await fetch("/api/brand-kit", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -237,33 +265,37 @@ export default function BrandKitPage() {
           default_shadow_type: state.defaultShadowType,
         }),
       });
-      // Sync to Zustand store so other components can access brand kit
-      updateBrandKit({
-        colors: state.colors,
-        fonts: state.fonts,
-        logoUrl: state.logoUrl || "",
-        watermark: {
-          enabled: state.watermark.enabled,
-          position: state.watermark.position,
-          opacity: state.watermark.opacity / 100,
-          size: state.watermark.size,
-          imageUrl: state.logoUrl || "",
-        },
-        defaultBgStyle: state.defaultBgStyle,
-        defaultEnhancePreset: state.defaultEnhancePreset,
-      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast.success("Kit de marca guardado correctamente");
     } catch (e) {
-      console.error("Failed to save brand kit:", e);
-      toast.error("Error al guardar el kit de marca");
+      console.error("Failed to save brand kit to API:", e);
+      // Saved to localStorage via Zustand — notify user of partial save
+      toast.success("Kit de marca guardado localmente (base de datos no disponible)");
     } finally {
       setIsSaving(false);
     }
-  }, [state]);
+  }, [state, updateBrandKit]);
 
   const handleReset = useCallback(async () => {
     setState(INITIAL_STATE);
-    // Persist the reset defaults to the database so they survive page refresh
+    hasInitialized.current = true; // prevent re-init from store after reset
+
+    const resetStoreUpdate = {
+      colors: INITIAL_STATE.colors,
+      fonts: INITIAL_STATE.fonts,
+      logoUrl: "",
+      watermark: {
+        enabled: false,
+        position: INITIAL_STATE.watermark.position,
+        opacity: INITIAL_STATE.watermark.opacity / 100,
+        size: INITIAL_STATE.watermark.size,
+        imageUrl: "",
+      },
+      defaultBgStyle: INITIAL_STATE.defaultBgStyle,
+      defaultEnhancePreset: INITIAL_STATE.defaultEnhancePreset,
+    };
+    updateBrandKit(resetStoreUpdate);
+
     try {
       await fetch("/api/brand-kit", {
         method: "PUT",
@@ -279,24 +311,10 @@ export default function BrandKitPage() {
           default_shadow_type: INITIAL_STATE.defaultShadowType,
         }),
       });
-      updateBrandKit({
-        colors: INITIAL_STATE.colors,
-        fonts: INITIAL_STATE.fonts,
-        logoUrl: "",
-        watermark: {
-          enabled: false,
-          position: INITIAL_STATE.watermark.position,
-          opacity: INITIAL_STATE.watermark.opacity / 100,
-          size: INITIAL_STATE.watermark.size,
-          imageUrl: "",
-        },
-        defaultBgStyle: INITIAL_STATE.defaultBgStyle,
-        defaultEnhancePreset: INITIAL_STATE.defaultEnhancePreset,
-      });
       toast.success("Kit de marca restablecido");
     } catch (e) {
-      console.error("Failed to reset brand kit:", e);
-      toast.error("Error al restablecer el kit de marca");
+      console.error("Failed to reset brand kit in API:", e);
+      toast.success("Kit de marca restablecido localmente");
     }
   }, [updateBrandKit]);
 
@@ -309,6 +327,17 @@ export default function BrandKitPage() {
           <p className="mt-1 text-sm text-gray-400">
             Define la identidad de tu marca para fotografia de producto consistente.
           </p>
+          {isApiLoading && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Cargando configuracion guardada…
+            </p>
+          )}
+          {!isApiLoading && !isApiAvailable && (
+            <p className="mt-1 text-xs text-amber-500">
+              Base de datos no disponible — los cambios se guardan localmente.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" leftIcon={<RotateCcw className="h-3.5 w-3.5" />} onClick={handleReset}>
