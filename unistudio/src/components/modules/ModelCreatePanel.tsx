@@ -267,7 +267,7 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
               )}
             >
               <span className="font-mono text-sm text-gray-400">{p.icon}</span>
-              <span className="text-[9px] text-gray-400">{p.name}</span>
+              <span className="text-[10px] text-gray-400">{p.name}</span>
             </button>
           ))}
         </div>

@@ -150,7 +150,6 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           description: autoPrompt,
           category: store.activeTab,
           duration: store.duration,
-          budget: 0,
         }),
       });
       const enhanceData = await safeJson(enhanceRes);
@@ -502,6 +501,34 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             ))}
           </div>
 
+          {/* Avatar image upload — shown when avatar tab is active in auto mode */}
+          {store.activeTab === "avatar" && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-400">
+                Imagen del Avatar
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-surface-lighter bg-surface-light p-3 transition-colors hover:border-accent/50">
+                <UserCircle className="h-4 w-4 text-gray-500" />
+                <span className="text-xs text-gray-400">
+                  {avatarImageFile ? avatarImageFile.name : "Subir foto del presentador (opcional)"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={isAutoBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setAvatarImageFile(file);
+                  }}
+                  className="hidden"
+                />
+              </label>
+              <p className="mt-1 text-[10px] text-gray-500">
+                O usa la imagen del canvas principal como avatar
+              </p>
+            </div>
+          )}
+
           {/* Description textarea */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-400">
@@ -577,7 +604,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 <span className="text-[11px] font-semibold text-accent">
                   Resultado IA
                 </span>
-                <span className="ml-auto rounded-full bg-accent/15 px-2 py-0.5 text-[9px] font-medium text-accent">
+                <span className="ml-auto rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">
                   {store.aiEnhancement.method === "claude" ? "Claude" : "Local"}
                 </span>
               </div>
@@ -604,7 +631,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
               </p>
 
               <div className="rounded-md bg-surface-light/50 px-2 py-1.5">
-                <p className="text-[9px] font-medium text-gray-500 mb-0.5">
+                <p className="text-[10px] font-medium text-gray-500 mb-0.5">
                   Prompt usado:
                 </p>
                 <p className="text-[10px] text-gray-300 line-clamp-3">
@@ -614,7 +641,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
 
               {store.aiEnhancement.script && (
                 <div className="rounded-md bg-surface-light/50 px-2 py-1.5">
-                  <p className="text-[9px] font-medium text-gray-500 mb-0.5">
+                  <p className="text-[10px] font-medium text-gray-500 mb-0.5">
                     Script generado:
                   </p>
                   <p className="text-[10px] text-gray-300">
@@ -643,7 +670,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             variant="primary"
             className="w-full"
             onClick={handleAutoGenerate}
-            disabled={!imageFile || isAutoBusy || !autoPrompt.trim()}
+            disabled={!(imageFile || avatarImageFile) || isAutoBusy || !autoPrompt.trim()}
             loading={isAutoBusy}
             leftIcon={<Wand2 className="h-4 w-4" />}
           >

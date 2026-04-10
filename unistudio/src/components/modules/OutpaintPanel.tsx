@@ -154,8 +154,8 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
       {/* Provider info */}
       <div className="rounded-lg border border-surface-lighter bg-surface-light p-2.5 text-center">
         <span className="text-[11px] font-semibold text-gray-200">Flux Kontext Pro</span>
-        <span className="mx-2 text-[9px] text-gray-500">•</span>
-        <span className="text-[9px] text-emerald-400">$0.05 por imagen</span>
+        <span className="mx-2 text-[10px] text-gray-500">•</span>
+        <span className="text-[10px] text-emerald-400">$0.05 por imagen</span>
       </div>
 
       {/* Platform presets grid */}
@@ -179,10 +179,10 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
               <span className="text-[10px] font-semibold text-gray-200">
                 {preset.name}
               </span>
-              <span className="text-[9px] text-gray-500">
+              <span className="text-[10px] text-gray-500">
                 {preset.width}x{preset.height}
               </span>
-              <span className="text-[9px] text-gray-500">{preset.ratio}</span>
+              <span className="text-[10px] text-gray-500">{preset.ratio}</span>
             </button>
           ))}
         </div>

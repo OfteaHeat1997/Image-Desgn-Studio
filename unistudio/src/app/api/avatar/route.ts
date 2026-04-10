@@ -9,12 +9,23 @@ import { generateAvatar } from '@/lib/processing/avatar';
 import { generateTts } from '@/lib/video/tts';
 import { AVATAR_PROVIDERS, TTS_PROVIDERS } from '@/lib/video/providers';
 import { saveJob } from '@/lib/db/persist';
+import { checkOrigin, checkRateLimit, getClientIp } from '@/lib/utils/rate-limit';
 import type { AvatarProviderKey, TtsProviderKey } from '@/types/video';
 
 // Avatar generation (TTS + video) can take 2-5 minutes
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
+  // Auth check
+  if (!checkOrigin(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Rate limit: 5 requests/hour
+  const ip = getClientIp(request);
+  if (!checkRateLimit(ip, 5)) {
+    return NextResponse.json({ success: false, error: 'Demasiadas solicitudes. Intenta en una hora.' }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
     const {
@@ -103,7 +114,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Avatar generation failed.',
+        error: 'Error procesando la solicitud. Intenta de nuevo.',
       },
       { status: 500 },
     );

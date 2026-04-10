@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Download, AlertCircle } from "lucide-react";
 
 interface VideoPreviewProps {
   videoUrl: string | null;
+  aspectRatio?: string;
 }
 
 // Detect if the URL is an image (Ken Burns returns original image URL)
@@ -16,12 +17,14 @@ function isImageUrl(url: string): boolean {
   );
 }
 
-export function VideoPreview({ videoUrl }: VideoPreviewProps) {
+export function VideoPreview({ videoUrl, aspectRatio }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [loadError, setLoadError] = useState(false);
 
   if (!videoUrl) return null;
 
   const isKenBurns = isImageUrl(videoUrl);
+  const videoAspectRatio = aspectRatio?.replace(':', '/') ?? '16/9';
 
   const handleDownload = () => {
     const a = document.createElement("a");
@@ -79,16 +82,31 @@ export function VideoPreview({ videoUrl }: VideoPreviewProps) {
         </div>
       ) : (
         /* Real video file */
-        <div className="relative aspect-video overflow-hidden rounded-lg border border-surface-lighter bg-surface-light">
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="h-full w-full object-contain"
-            controls
-            autoPlay
-            loop
-            muted
-          />
+        <div
+          className="relative overflow-hidden rounded-lg border border-surface-lighter bg-surface-light"
+          style={{ aspectRatio: videoAspectRatio }}
+        >
+          {loadError ? (
+            <div className="flex h-full items-center justify-center px-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                <p className="text-xs text-red-300">
+                  No se pudo reproducir el video. Intenta descargar el archivo.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              className="h-full w-full object-contain"
+              controls
+              autoPlay
+              loop
+              muted
+              onError={() => setLoadError(true)}
+            />
+          )}
         </div>
       )}
     </div>

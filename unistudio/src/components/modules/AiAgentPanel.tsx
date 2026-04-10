@@ -649,8 +649,8 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                 className="w-full aspect-[4/3] object-contain bg-black/20"
               />
               <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
-                <p className="text-[9px] text-gray-300 truncate">{imageFile.name}</p>
-                <p className="text-[9px] text-gray-500">
+                <p className="text-[10px] text-gray-300 truncate">{imageFile.name}</p>
+                <p className="text-[10px] text-gray-500">
                   {imageAnalysis
                     ? `${imageAnalysis.width}x${imageAnalysis.height} · ${imageAnalysis.format.toUpperCase()} · ${imageAnalysis.aspectRatio}`
                     : `${(imageFile.size / 1024).toFixed(0)}KB`}
@@ -660,7 +660,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
               {isAnalyzing && (
                 <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/60 rounded-full px-2 py-1">
                   <Loader2 className="h-3 w-3 animate-spin text-accent-light" />
-                  <span className="text-[9px] text-gray-300">Analizando...</span>
+                  <span className="text-[10px] text-gray-300">Analizando...</span>
                 </div>
               )}
             </div>
@@ -679,7 +679,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                     </div>
                     <ul className="space-y-0.5 pl-4">
                       {imageAnalysis.warnings.map((w, i) => (
-                        <li key={i} className="text-[9px] text-amber-200/80 list-disc">{w}</li>
+                        <li key={i} className="text-[10px] text-amber-200/80 list-disc">{w}</li>
                       ))}
                     </ul>
                   </div>
@@ -688,38 +688,38 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                 {/* Quick info chips */}
                 <div className="flex flex-wrap gap-1">
                   {imageAnalysis.hasWatermark && (
-                    <span className="text-[8px] bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded border border-red-500/30">
+                    <span className="text-[10px] bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded border border-red-500/30">
                       Marca de agua
                     </span>
                   )}
                   {imageAnalysis.isLowResolution && (
-                    <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
                       Baja resolucion
                     </span>
                   )}
                   {imageAnalysis.lightingQuality !== "good" && (
-                    <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
                       {imageAnalysis.lightingQuality === "dark" ? "Oscura" :
                        imageAnalysis.lightingQuality === "overexposed" ? "Sobreexpuesta" : "Luz desigual"}
                     </span>
                   )}
                   {imageAnalysis.backgroundType === "white" && (
-                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
                       Fondo blanco
                     </span>
                   )}
                   {imageAnalysis.backgroundType === "transparent" && (
-                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
                       Transparente
                     </span>
                   )}
                   {imageAnalysis.backgroundType === "complex" && (
-                    <span className="text-[8px] bg-gray-500/20 text-gray-300 px-1.5 py-0.5 rounded border border-gray-500/30">
+                    <span className="text-[10px] bg-gray-500/20 text-gray-300 px-1.5 py-0.5 rounded border border-gray-500/30">
                       Fondo complejo
                     </span>
                   )}
                   {imageAnalysis.warnings.length === 0 && imageAnalysis.lightingQuality === "good" && (
-                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">
                       Imagen lista
                     </span>
                   )}
@@ -729,7 +729,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                 {imageAnalysis.minBudgetNeeded !== "free" && budget === "free" && (
                   <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
                     <Info className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
-                    <p className="text-[9px] text-amber-200/80">
+                    <p className="text-[10px] text-amber-200/80">
                       Esta imagen necesita minimo presupuesto <strong className="text-amber-300">
                       {imageAnalysis.minBudgetNeeded === "economic" ? "Economico" : "Premium"}</strong> para
                       {imageAnalysis.hasWatermark ? " remover marca de agua" :
@@ -881,8 +881,8 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                   >
                     <span className="text-xs shrink-0">{MODULE_ICONS[m.module] ?? "⚙️"}</span>
                     <div className="min-w-0">
-                      <p className="text-[9px] text-gray-300 truncate">{m.label}</p>
-                      <p className="text-[8px] text-gray-500">
+                      <p className="text-[10px] text-gray-300 truncate">{m.label}</p>
+                      <p className="text-[10px] text-gray-500">
                         {m.cost > 0 ? `$${m.cost.toFixed(3)}` : "Gratis"}
                       </p>
                     </div>
@@ -1043,7 +1043,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                   {isCompleted && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
                   {isFailed && <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />}
                   {stepExec.status === "pending" && (
-                    <span className="flex h-3.5 w-3.5 items-center justify-center text-[9px] text-gray-600 shrink-0">
+                    <span className="flex h-3.5 w-3.5 items-center justify-center text-[10px] text-gray-600 shrink-0">
                       {i + 1}
                     </span>
                   )}
@@ -1054,12 +1054,12 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
 
                   {/* Cost */}
                   {isCompleted && stepExec.actualCost > 0 && (
-                    <span className="text-[9px] tabular-nums text-emerald-400 shrink-0">
+                    <span className="text-[10px] tabular-nums text-emerald-400 shrink-0">
                       ${stepExec.actualCost.toFixed(3)}
                     </span>
                   )}
                   {isCompleted && stepExec.actualCost === 0 && (
-                    <span className="text-[9px] text-emerald-400/60 shrink-0">Gratis</span>
+                    <span className="text-[10px] text-emerald-400/60 shrink-0">Gratis</span>
                   )}
                 </div>
 
@@ -1075,7 +1075,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                           alt={`Antes: ${step.label}`}
                           className="w-full aspect-square object-contain"
                         />
-                        <span className="absolute top-1 left-1 text-[8px] bg-red-500/80 text-white px-1.5 py-0.5 rounded font-semibold">
+                        <span className="absolute top-1 left-1 text-[10px] bg-red-500/80 text-white px-1.5 py-0.5 rounded font-semibold">
                           ANTES
                         </span>
                       </div>
@@ -1086,7 +1086,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                           alt={`Despues: ${step.label}`}
                           className="w-full aspect-square object-contain"
                         />
-                        <span className="absolute top-1 left-1 text-[8px] bg-emerald-500/80 text-white px-1.5 py-0.5 rounded font-semibold">
+                        <span className="absolute top-1 left-1 text-[10px] bg-emerald-500/80 text-white px-1.5 py-0.5 rounded font-semibold">
                           DESPUES
                         </span>
                       </div>
@@ -1100,7 +1100,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                         setPreviewStepLabel(step.label);
                         setPreviewShowBefore(false);
                       }}
-                      className="flex w-full items-center justify-center gap-1 py-1.5 text-[9px] text-gray-500 hover:text-accent-light transition-colors"
+                      className="flex w-full items-center justify-center gap-1 py-1.5 text-[10px] text-gray-500 hover:text-accent-light transition-colors"
                     >
                       <ZoomIn className="h-3 w-3" />
                       Ver ampliado — Paso {i + 1} de {plan.steps.length}
@@ -1269,10 +1269,10 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                     {stepDef?.label ?? `Paso ${i + 1}`}
                   </span>
                   {stepExec.actualCost > 0 && (
-                    <span className="text-[9px] tabular-nums text-emerald-400">${stepExec.actualCost.toFixed(3)}</span>
+                    <span className="text-[10px] tabular-nums text-emerald-400">${stepExec.actualCost.toFixed(3)}</span>
                   )}
                   {stepExec.actualCost === 0 && (
-                    <span className="text-[9px] text-emerald-400/60">Gratis</span>
+                    <span className="text-[10px] text-emerald-400/60">Gratis</span>
                   )}
                 </div>
                 {/* Before/After side by side */}
@@ -1416,7 +1416,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                       Original
                     </div>
                   )}
-                  <span className="absolute top-2 left-2 text-[9px] bg-red-500/80 text-white px-2 py-0.5 rounded font-bold">
+                  <span className="absolute top-2 left-2 text-[10px] bg-red-500/80 text-white px-2 py-0.5 rounded font-bold">
                     ORIGINAL
                   </span>
                 </div>
@@ -1427,7 +1427,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                     alt="Resultado final"
                     className="w-full aspect-[4/3] object-contain"
                   />
-                  <span className="absolute top-2 left-2 text-[9px] bg-emerald-500/80 text-white px-2 py-0.5 rounded font-bold">
+                  <span className="absolute top-2 left-2 text-[10px] bg-emerald-500/80 text-white px-2 py-0.5 rounded font-bold">
                     FINAL
                   </span>
                 </div>

@@ -37,7 +37,7 @@ export function VideoModeToggle({ mode, onModeChange }: VideoModeToggleProps) {
         Auto
         <span
           className={cn(
-            "ml-1 inline-flex items-center rounded-sm px-1 py-px text-[8px] font-bold leading-none",
+            "ml-1 inline-flex items-center rounded-sm px-1 py-px text-[10px] font-bold leading-none",
             mode === "auto"
               ? "bg-accent/25 text-accent"
               : "bg-gray-600/30 text-gray-500",

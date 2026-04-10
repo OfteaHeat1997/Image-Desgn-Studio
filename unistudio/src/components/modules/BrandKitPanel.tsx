@@ -28,7 +28,7 @@ function ColorSwatch({ color, label }: { color: string; label: string }) {
         style={{ backgroundColor: color }}
         title={`${label}: ${color}`}
       />
-      <span className="text-[9px] text-gray-500 text-center leading-none">{label}</span>
+      <span className="text-[10px] text-gray-500 text-center leading-none">{label}</span>
     </div>
   );
 }

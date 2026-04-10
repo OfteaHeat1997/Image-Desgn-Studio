@@ -853,8 +853,8 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-[10px] font-semibold" style={{ color: feature.color }}>{f.label}</span>
                       </div>
-                      <div className="text-[9px] font-mono text-[#55555A] mb-0.5">{f.path}</div>
-                      <div className="text-[9px] text-[#8A8A90]">{f.purpose}</div>
+                      <div className="text-[10px] font-mono text-[#55555A] mb-0.5">{f.path}</div>
+                      <div className="text-[10px] text-[#8A8A90]">{f.purpose}</div>
                     </div>
                   ))}
                 </div>
@@ -1026,7 +1026,7 @@ export default function WorkflowsPage() {
                             }}
                           >
                             <span
-                              className="text-[9px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
+                              className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
                               style={{ background: `${StepFeature?.color || wf.color}25`, color: StepFeature?.color || wf.color }}
                             >
                               {i + 1}
@@ -1034,7 +1034,7 @@ export default function WorkflowsPage() {
                             <StepIcon className="h-3.5 w-3.5" style={{ color: StepFeature?.color || wf.color }} />
                             <div>
                               <div className="text-[11px] font-medium text-[#F5F5F5]">{step.label}</div>
-                              <div className="text-[9px]" style={{ color: step.cost === "Gratis" ? "#50C878" : "#8A8A90" }}>
+                              <div className="text-[10px]" style={{ color: step.cost === "Gratis" ? "#50C878" : "#8A8A90" }}>
                                 {step.cost}
                               </div>
                             </div>

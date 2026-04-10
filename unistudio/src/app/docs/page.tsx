@@ -747,7 +747,7 @@ function FileTreeItem({ entry, depth = 0 }: { entry: FileEntry; depth?: number }
               <Link
                 href={entry.editorLink}
                 onClick={(e) => e.stopPropagation()}
-                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: `${color}20`, color, border: `1px solid ${color}30` }}
               >
                 Abrir
@@ -758,7 +758,7 @@ function FileTreeItem({ entry, depth = 0 }: { entry: FileEntry; depth?: number }
             {entry.description}
           </p>
           {entry.editHint && (
-            <p className="text-[9px] mt-1 leading-relaxed" style={{ color: "#F5A623" }}>
+            <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "#F5A623" }}>
               Editar: {entry.editHint}
             </p>
           )}

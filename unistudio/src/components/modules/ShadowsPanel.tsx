@@ -452,7 +452,7 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
                 )}
               >
                 <span className="block text-[10px] font-medium">{preset.name}</span>
-                <span className="block text-[9px] text-gray-500 mt-0.5">{preset.desc}</span>
+                <span className="block text-[10px] text-gray-500 mt-0.5">{preset.desc}</span>
               </button>
             ))}
           </div>
