@@ -9,22 +9,12 @@ import { runFal, extractFalVideoUrl, ensureFalHttpUrl } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { getPresetById } from '@/lib/video/presets';
-import { checkOrigin, checkRateLimit, getClientIp } from '@/lib/utils/rate-limit';
 import type { VideoProviderKey, VideoCategory, VideoMode } from '@/types/video';
 
 // Video generation can take 2-5 minutes depending on provider
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  if (!checkOrigin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  // Rate limit: 10 requests/hour
-  const ip = getClientIp(request);
-  if (!checkRateLimit(ip, 10)) {
-    return NextResponse.json({ success: false, error: 'Demasiadas solicitudes. Intenta en una hora.' }, { status: 429 });
-  }
 
   try {
     const body = await request.json();

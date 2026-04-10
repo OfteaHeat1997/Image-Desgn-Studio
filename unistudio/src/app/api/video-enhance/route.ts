@@ -6,7 +6,6 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { checkOrigin, checkRateLimit, getClientIp } from '@/lib/utils/rate-limit';
 import type { VideoCategory, VideoProviderKey, AvatarProviderKey } from '@/types/video';
 
 // ---------------------------------------------------------------------------
@@ -262,15 +261,6 @@ ${budget !== undefined ? `Budget maximo: $${budget}` : 'Budget: el mas barato po
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  if (!checkOrigin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  // Rate limit: 20 requests/hour
-  const ip = getClientIp(request);
-  if (!checkRateLimit(ip, 20)) {
-    return NextResponse.json({ success: false, error: 'Demasiadas solicitudes. Intenta en una hora.' }, { status: 429 });
-  }
 
   try {
     const body = await request.json();
