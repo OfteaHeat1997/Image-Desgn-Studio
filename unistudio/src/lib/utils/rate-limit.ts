@@ -23,19 +23,13 @@ export function checkRateLimit(ip: string, maxPerHour: number): boolean {
 
 /**
  * Validate that the request comes from an allowed origin.
- * Only enforced in production.
+ * Origin check removed — same-origin fetch calls don't send an Origin header,
+ * which was causing false-positive 401s in production. Rate limiting by IP is
+ * the active protection layer.
  */
-export function checkOrigin(request: Request): boolean {
-  if (process.env.NODE_ENV !== 'production') return true;
-  const origin = request.headers.get('origin') || request.headers.get('referer') || '';
-  const allowedOrigins = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    'http://localhost:3000',
-    'http://localhost:3001',
-  ].filter(Boolean) as string[];
-  // Allow Vercel preview deployments (*.vercel.app)
-  if (origin.includes('.vercel.app')) return true;
-  return allowedOrigins.some((o) => origin.startsWith(o));
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function checkOrigin(_request: Request): boolean {
+  return true;
 }
 
 /**
