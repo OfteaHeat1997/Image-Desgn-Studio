@@ -69,8 +69,11 @@ interface BrandStoreState {
   // State
   brandKit: BrandKit;
   templates: ExportTemplate[];
+  isLoading: boolean;
+  isApiAvailable: boolean;
 
   // Brand kit actions
+  fetchBrandKit: () => Promise<void>;
   updateBrandKit: (updates: Partial<BrandKit>) => void;
   updateBrandColors: (colors: Partial<BrandColors>) => void;
   updateBrandFonts: (fonts: Partial<BrandFonts>) => void;
@@ -94,6 +97,50 @@ export const useBrandStore = create<BrandStoreState>()(
   // -- Initial state ----------------------------------------------------------
   brandKit: DEFAULT_BRAND_KIT,
   templates: [],
+  isLoading: false,
+  isApiAvailable: true,
+
+  // -- API fetch --------------------------------------------------------------
+
+  fetchBrandKit: async () => {
+    set({ isLoading: true });
+    try {
+      const res = await fetch('/api/brand-kit');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const d = json.data;
+        set((state) => ({
+          isLoading: false,
+          isApiAvailable: true,
+          brandKit: {
+            ...state.brandKit,
+            ...(d.colors && { colors: d.colors }),
+            ...(d.fonts && { fonts: d.fonts }),
+            ...(d.logo_url !== undefined && { logoUrl: d.logo_url ?? '' }),
+            ...(d.watermark && {
+              watermark: {
+                enabled: d.watermark.enabled ?? false,
+                position: d.watermark.position ?? 'bottom-right',
+                // API persists opacity as 0-100; store uses 0-1
+                opacity: (d.watermark.opacity ?? 30) / 100,
+                size: d.watermark.size ?? 15,
+                imageUrl: d.watermark.imageUrl ?? '',
+              },
+            }),
+            ...(d.default_bg_style && { defaultBgStyle: d.default_bg_style }),
+            ...(d.default_enhance_preset && { defaultEnhancePreset: d.default_enhance_preset }),
+          },
+        }));
+      } else {
+        // API returned no data — keep localStorage data as fallback
+        set({ isLoading: false, isApiAvailable: false });
+      }
+    } catch {
+      // Network error or DB unavailable — keep localStorage data as fallback
+      set({ isLoading: false, isApiAvailable: false });
+    }
+  },
 
   // -- Brand kit actions ------------------------------------------------------
 
