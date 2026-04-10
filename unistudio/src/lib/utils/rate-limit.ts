@@ -33,6 +33,8 @@ export function checkOrigin(request: Request): boolean {
     'http://localhost:3000',
     'http://localhost:3001',
   ].filter(Boolean) as string[];
+  // Allow Vercel preview deployments (*.vercel.app)
+  if (origin.includes('.vercel.app')) return true;
   return allowedOrigins.some((o) => origin.startsWith(o));
 }
 
