@@ -37,10 +37,12 @@ export function AvatarVideoTab({
   avatarImageFile,
   onAvatarImageUpload,
 }: AvatarVideoTabProps) {
-  const avatarOptions = Object.values(AVATAR_PROVIDERS).map((p) => ({
-    value: p.key,
-    label: `${p.name} · ${formatCost(p.costPerVideo)}`,
-  }));
+  const avatarOptions = Object.values(AVATAR_PROVIDERS)
+    .filter((p) => p.key !== 'musetalk') // MuseTalk requires video input, not static images
+    .map((p) => ({
+      value: p.key,
+      label: `${p.name} · ${formatCost(p.costPerVideo)}`,
+    }));
 
   const ttsOptions = Object.values(TTS_PROVIDERS).map((p) => ({
     value: p.key,
