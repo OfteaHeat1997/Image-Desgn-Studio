@@ -82,11 +82,15 @@ async function smartTryOn(
 
   // Prefer FASHN when API key is configured (highest quality for non-intimate)
   if (process.env.FASHN_API_KEY) {
-    const url = await tryOnFashn(modelImage, garmentImage, category);
-    return { url, provider: 'fashn' };
+    try {
+      const url = await tryOnFashn(modelImage, garmentImage, category);
+      return { url, provider: 'fashn' };
+    } catch (err) {
+      console.warn('[tryon] FASHN failed, falling back to IDM-VTON:', err instanceof Error ? err.message : err);
+    }
   }
 
-  // Default to IDM-VTON
+  // Default to IDM-VTON (also fallback if FASHN fails)
   const url = await tryOnIdmVton(modelImage, garmentImage, category);
   return { url, provider: 'idm-vton' };
 }

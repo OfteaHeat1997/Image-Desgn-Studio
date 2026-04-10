@@ -11,8 +11,20 @@ import path from "path";
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 const MAX_IMAGES_PER_REQUEST = 10;
 
+// Allowed base paths — only these Windows roots may be loaded
+const ALLOWED_WIN_ROOTS = [
+  "C:\\Users\\maria\\Desktop\\Unistyles Projects\\",
+];
+
 function toWslPath(winPath: string): string {
   return winPath.replace(/^([A-Z]):\\/, (_, drive: string) => `/mnt/${drive.toLowerCase()}/`).replace(/\\/g, "/");
+}
+
+/** Returns true only if the folder is under an allowed root (prevents path traversal) */
+function isAllowedFolder(folder: string): boolean {
+  // Reject any path containing traversal sequences
+  if (folder.includes("..") || folder.includes("%2e") || folder.includes("%2E")) return false;
+  return ALLOWED_WIN_ROOTS.some((root) => folder.startsWith(root));
 }
 
 export async function POST(request: NextRequest) {
@@ -26,6 +38,10 @@ export async function POST(request: NextRequest) {
 
     if (!folder) {
       return NextResponse.json({ success: false, error: "folder is required" }, { status: 400 });
+    }
+
+    if (!isAllowedFolder(folder)) {
+      return NextResponse.json({ success: false, error: "Folder not permitted." }, { status: 403 });
     }
 
     const wslPath = toWslPath(folder);
