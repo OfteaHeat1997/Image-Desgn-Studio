@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 interface ProcessingState {
   /** Whether a processing operation is running */
@@ -39,12 +39,21 @@ export function useProcessingState(): ProcessingState {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear pending timer on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const clearError = useCallback(() => setErrorMsg(null), []);
   const setError = useCallback((msg: string) => setErrorMsg(msg), []);
 
   const run = useCallback(
     async (fn: (setStatus: (status: string) => void) => Promise<void>) => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
       setIsProcessing(true);
       setErrorMsg(null);
       setStatusText("Iniciando...");
@@ -59,7 +68,7 @@ export function useProcessingState(): ProcessingState {
       } finally {
         setIsProcessing(false);
         // Clear status text after a short delay
-        setTimeout(() => setStatusText(""), 3000);
+        timerRef.current = setTimeout(() => setStatusText(""), 3000);
       }
     },
     [],

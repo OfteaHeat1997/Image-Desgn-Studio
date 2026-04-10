@@ -342,6 +342,8 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       setErrorMsg(isRateLimit ? "rate_limit" : msg);
     } finally {
       setIsProcessing(false);
+      // Always clear previous timer before setting a new one to prevent stacking
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
       clearTimerRef.current = window.setTimeout(() => {
         setStatusText("");
         setProgressPct(0);

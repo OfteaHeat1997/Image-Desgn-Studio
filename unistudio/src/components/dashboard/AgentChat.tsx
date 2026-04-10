@@ -118,6 +118,16 @@ export function AgentChat() {
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup blob URL and pending timer on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      if (msgTimerRef.current !== null) clearTimeout(msgTimerRef.current);
+    };
+  }, []);
 
   /* ── Auto-scroll on new messages / execution updates ───────── */
   useEffect(() => {
@@ -138,14 +148,18 @@ export function AgentChat() {
   /* ── Upload Image ──────────────────────────────────────────── */
   const handleImage = useCallback(
     (file: File) => {
+      // Revoke previous blob URL before creating a new one
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       const url = URL.createObjectURL(file);
+      previewUrlRef.current = url;
       setImageFile(file);
       setImagePreview(url);
       setPhase("uploaded");
 
       addMsg({ role: "user", imageUrl: url, fileName: file.name });
 
-      setTimeout(() => {
+      if (msgTimerRef.current !== null) clearTimeout(msgTimerRef.current);
+      msgTimerRef.current = setTimeout(() => {
         addMsg({
           role: "agent",
           text: "Imagen recibida! Elige tu agente, tipo de producto, y haz click en Crear Plan.",
@@ -280,7 +294,8 @@ export function AgentChat() {
   /* ── Reset Session ─────────────────────────────────────────── */
   const handleReset = useCallback(() => {
     pipeline.reset();
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
     setImageFile(null);
     setImagePreview(null);
     setSelectedAgent("ecommerce");

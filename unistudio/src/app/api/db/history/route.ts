@@ -16,7 +16,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(Number(searchParams.get('limit') || 100), 500);
+    const rawLimit = Number(searchParams.get('limit') || 100);
+    if (isNaN(rawLimit) || rawLimit < 1) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid "limit" parameter. Must be a positive number.' },
+        { status: 400 },
+      );
+    }
+    const limit = Math.min(rawLimit, 500);
     const operation = searchParams.get('operation'); // optional filter
 
     const where = operation ? { operation } : {};

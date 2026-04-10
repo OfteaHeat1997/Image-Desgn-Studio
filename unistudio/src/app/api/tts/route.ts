@@ -49,6 +49,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (typeof speed !== 'number' || speed < 0.5 || speed > 2.0) {
+      return NextResponse.json(
+        { success: false, error: '"speed" debe ser un numero entre 0.5 y 2.0.' },
+        { status: 400 },
+      );
+    }
+
     const result = await generateTts(text, provider, voice, language, speed);
 
     return NextResponse.json({

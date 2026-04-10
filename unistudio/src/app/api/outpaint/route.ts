@@ -73,6 +73,19 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
+      // Validate numeric bounds to prevent absurd values crashing the GPU
+      const [wStr, hStr] = targetAspectRatio.split(':');
+      const w = parseFloat(wStr);
+      const h = parseFloat(hStr);
+      if (w <= 0 || h <= 0 || w > 100 || h > 100) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Aspect ratio components must be between 0.1 and 100 (e.g. "16:9", "1.91:1").',
+          },
+          { status: 400 },
+        );
+      }
       aspectRatio = targetAspectRatio;
     } else {
       return NextResponse.json(

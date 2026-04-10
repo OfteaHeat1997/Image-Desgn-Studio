@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (scale !== 2 && scale !== 4) {
+      return NextResponse.json(
+        { success: false, error: '"scale" must be 2 or 4.' },
+        { status: 400 },
+      );
+    }
+
     let resultUrl: string;
     const cost = PROVIDER_COSTS[provider] ?? 0;
 

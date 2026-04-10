@@ -41,6 +41,15 @@ function getCachedImage(src: string): HTMLImageElement | null {
   return null;
 }
 
+/** Evict cache entries whose src is no longer used by any layer */
+function evictStaleCacheEntries(activeSrcs: Set<string>) {
+  for (const key of imageCache.keys()) {
+    if (!activeSrcs.has(key)) {
+      imageCache.delete(key);
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                            */
 /* ------------------------------------------------------------------ */
@@ -133,6 +142,12 @@ export function CanvasRenderer({ zoom, className, onLayerClick }: CanvasRenderer
       ctx.restore();
     }
   }, [layers, canvasWidth, canvasHeight, selectedLayerId]);
+
+  /* ---- Evict stale image cache entries when layers change ---- */
+  useEffect(() => {
+    const activeSrcs = new Set(layers.map((l) => l.src).filter(Boolean));
+    evictStaleCacheEntries(activeSrcs);
+  }, [layers]);
 
   /* ---- Animation loop to catch image loads ---- */
   useEffect(() => {

@@ -79,9 +79,12 @@ const INVENTORY_FOLDERS: {
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
+function toWslPath(winPath: string): string {
+  return winPath.replace(/^([A-Z]):\\/, (_, drive: string) => `/mnt/${drive.toLowerCase()}/`).replace(/\\/g, "/");
+}
+
 function scanFolder(dirPath: string): { files: string[]; count: number } {
-  // Convert Windows paths to WSL paths
-  const wslPath = dirPath.replace(/^([A-Z]):\\/, (_, drive: string) => `/mnt/${drive.toLowerCase()}/`).replace(/\\/g, "/");
+  const wslPath = toWslPath(dirPath);
 
   try {
     if (!fs.existsSync(wslPath)) return { files: [], count: 0 };
