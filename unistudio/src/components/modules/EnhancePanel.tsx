@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -179,7 +180,9 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
       onProcess(data.data.url, undefined, 0);
     } catch (error) {
       console.error("Enhancement error:", error);
-      setErrorMsg(error instanceof Error ? error.message : "Error al mejorar imagen");
+      const msg = error instanceof Error ? error.message : "Error al mejorar imagen";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }

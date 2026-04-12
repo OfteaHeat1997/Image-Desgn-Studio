@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { cn } from "@/lib/utils/cn";
 import { compressImageFile } from "@/lib/utils/compress-image";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -229,7 +230,9 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
       }
     } catch (error) {
       console.error("Shadow error:", error);
-      setErrorMsg(error instanceof Error ? error.message : "Error al generar sombra");
+      const msg = error instanceof Error ? error.message : "Error al generar sombra";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }

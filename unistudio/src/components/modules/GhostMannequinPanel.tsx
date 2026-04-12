@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
 import { cn } from "@/lib/utils/cn";
 import { compressImageFile } from "@/lib/utils/compress-image";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -143,9 +144,9 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
       onProcess(data.data.url, uploadData.data.url, data.cost ?? data.data?.cost ?? 0.05);
     } catch (error) {
       console.error("Ghost mannequin error:", error);
-      setErrorMsg(
-        error instanceof Error ? error.message : "Error inesperado al procesar la imagen."
-      );
+      const msg = error instanceof Error ? error.message : "Error inesperado al procesar la imagen.";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
       setStatusText("");

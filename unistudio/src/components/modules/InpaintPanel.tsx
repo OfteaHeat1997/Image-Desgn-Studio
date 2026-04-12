@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import { compressImageFile } from "@/lib/utils/compress-image";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -104,7 +105,9 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
     } catch (error) {
       console.error("Inpaint error:", error);
       setStatusText("");
-      setErrorMsg(error instanceof Error ? error.message : "Error al editar imagen");
+      const msg = error instanceof Error ? error.message : "Error al editar imagen";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
       setTimeout(() => setStatusText(""), 3000);

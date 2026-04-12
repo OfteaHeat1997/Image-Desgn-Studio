@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
 import { safeJson } from "@/lib/utils/safe-json";
 import {
   Film,
@@ -155,7 +156,9 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
       }
     } catch (err) {
       console.error("Caption generation error:", err);
-      setError(err instanceof Error ? err.message : "Error al generar caption");
+      const errMsg = err instanceof Error ? err.message : "Error al generar caption";
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsGeneratingCaption(false);
     }
@@ -210,9 +213,9 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
       onProcess(data.data.videoUrl, undefined, data.cost ?? data.data?.cost ?? 0);
     } catch (err) {
       console.error("Ad creation error:", err);
-      setError(
-        err instanceof Error ? err.message : "Error al crear el anuncio",
-      );
+      const adErrMsg = err instanceof Error ? err.message : "Error al crear el anuncio";
+      setError(adErrMsg);
+      toast.error(adErrMsg);
     } finally {
       setIsProcessing(false);
     }

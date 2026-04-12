@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import { compressImageFile } from "@/lib/utils/compress-image";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -165,9 +166,12 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
       console.error("Model creation error:", error);
       const msg = error instanceof Error ? error.message : "Error al crear modelo";
       if (msg.includes("flagged as sensitive") || msg.includes("E005")) {
-        setErrorMsg("El filtro de contenido bloqueo la generacion. Intenta cambiar el tipo de cuerpo o la pose. El sistema reintenta automaticamente con un prompt mas seguro.");
+        const sensitiveMsg = "El filtro de contenido bloqueo la generacion. Intenta cambiar el tipo de cuerpo o la pose. El sistema reintenta automaticamente con un prompt mas seguro.";
+        setErrorMsg(sensitiveMsg);
+        toast.error(sensitiveMsg);
       } else {
         setErrorMsg(msg);
+        toast.error(msg);
       }
     } finally {
       setIsProcessing(false);

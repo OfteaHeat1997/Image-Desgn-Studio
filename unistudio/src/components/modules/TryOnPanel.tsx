@@ -7,6 +7,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -184,7 +185,9 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
       onProcess(data.data.url, modelUploadData.data.url, cost);
     } catch (error) {
       console.error("Try-on error:", error);
-      setErrorMsg(error instanceof Error ? error.message : "Error en la generacion de prueba virtual");
+      const msg = error instanceof Error ? error.message : "Error en la generacion de prueba virtual";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }
