@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
           const output = await runModel(provider.model, {
             image: httpImageUrl,
             prompt: fullPrompt,
+            negative_prompt: 'duplicate, split screen, double image, morphing, distorted, blurry, low quality, watermark, deformed',
             aspect_ratio: aspectRatio === '9:16' ? '9:16' : '16:9',
           });
           resultUrl = await extractOutputUrl(output);
@@ -160,8 +161,9 @@ export async function POST(request: NextRequest) {
           const output = await runModel(provider.model, {
             image: httpImageUrl,
             prompt: fullPrompt,
+            negative_prompt: 'duplicate, split screen, double image, morphing, distorted, blurry, low quality, watermark, text overlay, deformed',
             num_frames: numFrames,
-            guidance_scale: 5.0,
+            guidance_scale: 3.0,
           });
           resultUrl = await extractOutputUrl(output);
         } else {
