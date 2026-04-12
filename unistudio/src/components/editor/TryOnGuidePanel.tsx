@@ -5,6 +5,7 @@ import { CheckCircle2, Circle, Download, Image as ImageIcon, Info } from "lucide
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import type { SessionResult } from "@/components/editor/ShadowsGuidePanel";
+import { proxyFetch } from "@/lib/utils/image";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -84,7 +85,7 @@ export function TryOnGuidePanel({
     if (!processedImageUrl) return;
 
     try {
-      const res = await fetch(processedImageUrl);
+      const res = await proxyFetch(processedImageUrl);
       const blob = await res.blob();
 
       let finalBlob = blob;

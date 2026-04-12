@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { proxyFetch } from "@/lib/utils/image";
 import type {
   AgentPlan,
   AgentPlanRequest,
@@ -57,13 +58,10 @@ async function fileToDataUrl(file: File): Promise<string> {
  * For blob/data URLs, reads them locally.
  */
 async function urlToDataUrl(url: string): Promise<string> {
-  // HTTP URLs can't be fetched client-side due to CORS — return as-is for server APIs
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url;
-  }
-  // blob: or data: URLs — read locally
+  // data: URLs — return as-is
   if (url.startsWith("data:")) return url;
-  const res = await fetch(url);
+  // For any URL (including api.replicate.com), use proxyFetch to avoid CORS
+  const res = await proxyFetch(url);
   const blob = await res.blob();
   const file = new File([blob], "image.png", { type: blob.type || "image/png" });
   return fileToDataUrl(file);
@@ -71,31 +69,8 @@ async function urlToDataUrl(url: string): Promise<string> {
 
 /** Convert a URL (blob/data/http) to a File for FormData APIs */
 async function urlToFile(url: string, filename: string): Promise<File> {
-  // For HTTP URLs, download via our server proxy to avoid CORS
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    try {
-      const proxyRes = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const proxyData = await proxyRes.json();
-      if (proxyData.success && proxyData.data?.dataUrl) {
-        const fetchRes = await fetch(proxyData.data.dataUrl);
-        const blob = await fetchRes.blob();
-        return new File([blob], filename, { type: blob.type || "image/png" });
-      }
-    } catch { /* fall through */ }
-    // Fallback: try direct fetch (might work for some CDNs)
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      return new File([blob], filename, { type: blob.type || "image/png" });
-    } catch {
-      throw new Error(`No se pudo descargar la imagen: ${url.slice(0, 60)}...`);
-    }
-  }
-  const res = await fetch(url);
+  // Use proxyFetch — routes api.replicate.com URLs through our server to avoid CORS
+  const res = await proxyFetch(url);
   const blob = await res.blob();
   return new File([blob], filename, { type: blob.type || "image/png" });
 }
@@ -529,7 +504,7 @@ async function validateStepResult(
   // For blob: or data: URLs, check they're not empty
   if (resultUrl.startsWith("blob:") || resultUrl.startsWith("data:")) {
     try {
-      const res = await fetch(resultUrl);
+      const res = await proxyFetch(resultUrl);
       const blob = await res.blob();
       if (blob.size < 100) {
         return { valid: false, warning: `Resultado vacio o corrupto (${blob.size} bytes)` };

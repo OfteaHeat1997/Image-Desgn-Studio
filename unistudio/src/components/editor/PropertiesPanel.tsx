@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { useEditorStore } from "@/stores/editor-store";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { proxyFetch } from "@/lib/utils/image";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                           */
@@ -70,7 +71,7 @@ export function PropertiesPanel() {
     }
     setIsExporting(true);
     try {
-      const response = await fetch(selectedLayer.src);
+      const response = await proxyFetch(selectedLayer.src);
       const blob = await response.blob();
       const mimeType = exportFormat === "jpg" ? "image/jpeg" : `image/${exportFormat}`;
 

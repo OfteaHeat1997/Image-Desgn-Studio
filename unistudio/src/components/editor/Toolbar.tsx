@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { proxyFetch } from "@/lib/utils/image";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -100,8 +101,8 @@ export function Toolbar({
 
     setIsExporting(true);
     try {
-      // Fetch the image as blob
-      const response = await fetch(imageUrl);
+      // Fetch the image as blob (proxy for api.replicate.com URLs to avoid CORS)
+      const response = await proxyFetch(imageUrl);
       const blob = await response.blob();
 
       // If format conversion is needed (jpg/webp), use canvas

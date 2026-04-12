@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
 import { compressImageFile } from "@/lib/utils/compress-image";
+import { proxyFetch } from "@/lib/utils/image";
 import {
   Monitor,
   Cpu,
@@ -462,7 +463,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         setStatusText("Paso 2/2: Limpiando fondo con IA...");
         setProgressPct(60);
 
-        const kontextBlobRes = await fetch(kontextData.data.url);
+        const kontextBlobRes = await proxyFetch(kontextData.data.url);
         const kontextBlob = await kontextBlobRes.blob();
         const kontextFile = new File([kontextBlob], "kontext-result.png", { type: "image/png" });
 
@@ -484,7 +485,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         if (!bgData.success) throw new Error(bgData.error || "Error al remover fondo");
         operationCost += bgData.cost ?? 0.01;
 
-        const finalRes = await fetch(bgData.data.url);
+        const finalRes = await proxyFetch(bgData.data.url);
         resultBlob = await finalRes.blob();
         setProgressPct(78);
       } else if (selectedProvider === "browser") {
@@ -542,7 +543,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         operationCost = data.cost ?? 0.004;
 
         // Download the result as blob
-        const resultRes = await fetch(data.data.url);
+        const resultRes = await proxyFetch(data.data.url);
         resultBlob = await resultRes.blob();
       }
 

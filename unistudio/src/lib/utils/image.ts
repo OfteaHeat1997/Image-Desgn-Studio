@@ -9,6 +9,22 @@
 // -----------------------------------------------------------------------------
 
 /**
+ * Safe client-side fetch that routes api.replicate.com/v1/files/* URLs through
+ * the /api/proxy-image server route (which adds the required Bearer auth header).
+ * All other URLs are fetched directly.
+ */
+export async function proxyFetch(url: string): Promise<Response> {
+  if (url.includes('api.replicate.com')) {
+    return fetch('/api/proxy-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+  }
+  return fetch(url);
+}
+
+/**
  * Convert a File object to a base64 data URL string.
  *
  * @param file - The File to convert.

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { CheckCircle2, Circle, Download, Image as ImageIcon, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { proxyFetch } from "@/lib/utils/image";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -95,7 +96,7 @@ export function ShadowsGuidePanel({
     if (!processedImageUrl) return;
 
     try {
-      const res = await fetch(processedImageUrl);
+      const res = await proxyFetch(processedImageUrl);
       const blob = await res.blob();
 
       let finalBlob = blob;
