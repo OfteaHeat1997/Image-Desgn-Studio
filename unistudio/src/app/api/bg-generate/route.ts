@@ -13,6 +13,7 @@ import {
 } from '@/lib/processing/bg-generate';
 import { ensureHttpUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 
 // Cost estimates in dollars per generation
 const MODE_COSTS: Record<string, number> = {
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { url: resultUrl, mode, style },
+      data: { url: proxyReplicateUrl(resultUrl), mode, style },
       cost,
     });
   } catch (error) {

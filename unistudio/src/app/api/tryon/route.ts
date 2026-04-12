@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
 
 // Cost estimates in dollars
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        url: resultUrl,
+        url: proxyReplicateUrl(resultUrl),
         provider: usedProvider,
         category,
         garmentType: garmentType || null,

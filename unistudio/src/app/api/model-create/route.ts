@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 import { saveAiModel } from '@/lib/db/queries';
 import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
 
@@ -422,8 +423,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        url: finalUrl,
-        baseModelUrl: garmentImage ? baseModelUrl : undefined,
+        url: proxyReplicateUrl(finalUrl),
+        baseModelUrl: garmentImage ? proxyReplicateUrl(baseModelUrl) : undefined,
         prompt: usedPrompt,
         cost: totalCost,
         tryonProvider,

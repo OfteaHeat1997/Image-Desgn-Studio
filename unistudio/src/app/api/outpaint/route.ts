@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 
 // Platform aspect ratio specifications
 const PLATFORM_SPECS: Record<string, { aspectRatio: string; description: string }> = {
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        url: resultUrl,
+        url: proxyReplicateUrl(resultUrl),
         aspectRatio,
         platform: platform || null,
         platformDescription: platformDescription || null,

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { applyJewelry, applyJewelryDisplay, JEWELRY_COSTS } from '@/lib/processing/jewelry';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 
 const VALID_TYPES = ['earrings', 'necklace', 'ring', 'bracelet', 'sunglasses', 'watch'];
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { url: resultUrl, type, mode, cost },
+      data: { url: proxyReplicateUrl(resultUrl), type, mode, cost },
     });
   } catch (error) {
     console.error('[API /jewelry-tryon] Error:', error);

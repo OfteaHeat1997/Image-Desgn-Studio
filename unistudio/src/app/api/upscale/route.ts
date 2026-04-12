@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 import sharp from 'sharp';
 
 // Real-ESRGAN GPU limit is ~2,096,704 pixels. Use 2M as safe max.
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { url: resultUrl, provider, scale },
+      data: { url: proxyReplicateUrl(resultUrl), provider, scale },
       cost,
     });
   } catch (error) {

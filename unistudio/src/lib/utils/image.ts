@@ -9,6 +9,21 @@
 // -----------------------------------------------------------------------------
 
 /**
+ * Convert a Replicate file URL to a proxied URL that bypasses CORS.
+ * api.replicate.com/v1/files/* URLs require Bearer auth and block browser requests.
+ * Returns the original URL unchanged for non-Replicate URLs (data:, blob:, etc).
+ *
+ * Use this in API routes before returning URLs to the client:
+ *   return NextResponse.json({ data: { url: proxyReplicateUrl(resultUrl) } });
+ */
+export function proxyReplicateUrl(url: string): string {
+  if (url?.includes('api.replicate.com/v1/files/')) {
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
+/**
  * Safe client-side fetch that routes api.replicate.com/v1/files/* URLs through
  * the /api/proxy-image server route (which adds the required Bearer auth header).
  * All other URLs are fetched directly.

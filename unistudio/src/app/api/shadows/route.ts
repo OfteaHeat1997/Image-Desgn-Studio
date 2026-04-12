@@ -10,6 +10,7 @@ import { addDropShadow, addContactShadow, addReflection, relightIcLight, relight
 import { urlToBuffer, bufferToDataUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler } from '@/lib/api/route-helpers';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 
 async function compressIfNeeded(buf: Buffer): Promise<{ buffer: Buffer; mime: string }> {
   if (buf.length <= 3 * 1024 * 1024) return { buffer: buf, mime: 'image/png' };
@@ -200,7 +201,7 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
 
   return NextResponse.json({
     success: true,
-    data: { url: resultUrl, type: shadowType },
+    data: { url: proxyReplicateUrl(resultUrl), type: shadowType },
     cost,
   });
 });

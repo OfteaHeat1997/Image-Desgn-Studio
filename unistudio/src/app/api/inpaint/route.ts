@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 
 // Inpainting presets with specialized prompts
 const INPAINT_PRESETS: Record<string, { prompt: string; negativePrompt: string }> = {
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        url: resultUrl,
+        url: proxyReplicateUrl(resultUrl),
         provider,
         preset: preset || null,
         cost,

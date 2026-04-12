@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl, ensureHttpUrl, ReplicateApiError } from '@/lib/api/replicate';
 import { runFal, extractFalVideoUrl, ensureFalHttpUrl, FalApiError } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { getPresetById } from '@/lib/video/presets';
 import type { VideoProviderKey, VideoCategory, VideoMode } from '@/types/video';
@@ -227,7 +228,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        url: resultUrl,
+        url: proxyReplicateUrl(resultUrl),
         provider: providerKey,
         duration,
         aspectRatio,

@@ -11,6 +11,7 @@ import {
 import { isWithoutBgHealthy } from '@/lib/api/withoutbg';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
   replicate: 0.01,
@@ -84,7 +85,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
 
   return NextResponse.json({
     success: true,
-    data: { url: resultUrl, provider },
+    data: { url: proxyReplicateUrl(resultUrl), provider },
     cost,
   });
 });

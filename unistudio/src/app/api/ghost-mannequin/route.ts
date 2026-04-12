@@ -12,6 +12,7 @@ import {
   GHOST_MANNEQUIN_COSTS,
 } from '@/lib/processing/ghost-mannequin';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 
 export const POST = withApiErrorHandler('ghost-mannequin', async (request: NextRequest) => {
   const body = await request.json();
@@ -72,7 +73,7 @@ export const POST = withApiErrorHandler('ghost-mannequin', async (request: NextR
 
   return NextResponse.json({
     success: true,
-    data: { url: resultUrl, operation, cost },
+    data: { url: proxyReplicateUrl(resultUrl), operation, cost },
     cost,
   });
 });

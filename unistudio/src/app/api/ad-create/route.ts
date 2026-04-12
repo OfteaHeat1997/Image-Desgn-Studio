@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { saveJob } from '@/lib/db/persist';
+import { proxyReplicateUrl } from '@/lib/utils/image';
 import { buildAdPrompt, AD_TEMPLATES, getRecommendedDuration } from '@/lib/processing/ad-compose';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        videoUrl: resultUrl,
+        videoUrl: proxyReplicateUrl(resultUrl),
         template,
         aspectRatio: adTemplate.aspectRatio,
         duration,
