@@ -91,6 +91,8 @@ interface QuickTemplate {
   id: string;
   name: string;
   description: string;
+  result: string;
+  time: string;
   cost: string;
   categoryBadge: string;
   preset: string;
@@ -104,7 +106,9 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: "qt-fragrance",
     name: "Perfume Premium",
-    description: "Rotación 360° con luz dramática",
+    description: "Rotación 360° con barrido de luz dorada",
+    result: "Frasco girando en superficie negra con reflejos y partículas de luz",
+    time: "~60-90s",
     cost: "$0.35",
     categoryBadge: "Fragancias",
     preset: "fragrance-luxury-spin",
@@ -116,7 +120,9 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: "qt-jewelry",
     name: "Joya con Brillo",
-    description: "Barrido de luz sobre acero inoxidable",
+    description: "Haz de luz revelando el metal pulido",
+    result: "Luz cruzando la joya y creando destellos y reflejos dramáticos",
+    time: "~60-90s",
     cost: "$0.35",
     categoryBadge: "Joyería",
     preset: "jewelry-light-sweep",
@@ -128,7 +134,9 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: "qt-skincare",
     name: "Skincare Frescura",
-    description: "Gotas de agua sobre el producto",
+    description: "Gotas de agua rodando sobre el producto",
+    result: "Agua en slow motion sobre el producto con brillo y frescura",
+    time: "~20-40s",
     cost: "$0.05",
     categoryBadge: "Skincare",
     preset: "skincare-water-fresh",
@@ -140,7 +148,9 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: "qt-lingerie-flow",
     name: "Tela en Movimiento",
-    description: "Lencería con movimiento sutil y romántico",
+    description: "Seda y encaje fluyendo en cámara lenta",
+    result: "Tela delicada ondulando con luz romántica lateral visible",
+    time: "~60-90s",
     cost: "$0.35",
     categoryBadge: "Lencería",
     preset: "lingerie-fabric-flow",
@@ -152,7 +162,9 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: "qt-product-360",
     name: "Rotación 360°",
-    description: "Producto en turntable profesional",
+    description: "Tu producto girando en turntable profesional",
+    result: "Producto rotando 360° sobre fondo neutro con iluminación de estudio",
+    time: "~20-40s",
     cost: "$0.05",
     categoryBadge: "General",
     preset: "product-rotate",
@@ -164,7 +176,9 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: "qt-reveal",
     name: "Reveal Dramático",
-    description: "Producto con efecto cinematográfico",
+    description: "Producto emergiendo de la oscuridad con spotlight",
+    result: "Luz de teatro iluminando el producto desde la sombra total",
+    time: "~90-180s",
     cost: "$0.48",
     categoryBadge: "Premium",
     preset: "product-reveal",
@@ -174,6 +188,17 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
     tab: "product",
   },
 ];
+
+// ── Estimated generation time per provider ──
+const PROVIDER_EST_TIME: Record<string, string> = {
+  kenburns: "~2 segundos",
+  "ltx-video": "~30-60 segundos",
+  "wan-2.1": "~30-60 segundos",
+  "wan-2.2-fast": "~20-40 segundos",
+  "wan-2.5": "~45-90 segundos",
+  "kling-2.6": "~60-120 segundos",
+  "minimax-hailuo": "~90-180 segundos",
+};
 
 /** Map HTTP status / error message to a friendly Spanish message */
 function friendlyError(err: unknown): string {
@@ -817,12 +842,18 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                       {tpl.cost}
                     </span>
                   </div>
-                  <p className="text-[9px] text-gray-500 leading-tight mb-1">
+                  <p className="text-[9px] text-gray-400 leading-tight mb-1">
                     {tpl.description}
                   </p>
-                  <span className="rounded-full bg-surface-lighter px-1.5 py-0.5 text-[9px] text-gray-500">
-                    {tpl.categoryBadge}
-                  </span>
+                  <p className="text-[9px] text-gray-600 leading-tight mb-1.5 italic">
+                    {tpl.result}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-full bg-surface-lighter px-1.5 py-0.5 text-[9px] text-gray-500">
+                      {tpl.categoryBadge}
+                    </span>
+                    <span className="text-[9px] text-gray-600">⏱ {tpl.time}</span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -901,6 +932,39 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
               />
             </TabContent>
           </TabRoot>
+
+          {/* ── Qué Esperar ── */}
+          {store.activeTab !== "avatar" && (() => {
+            const preset = getPresetById(store.selectedPreset);
+            const bestFor = preset?.description?.includes("Ideal para")
+              ? preset.description.split("Ideal para")[1].replace(/\.$/, "").trim()
+              : null;
+            const estTime = PROVIDER_EST_TIME[store.selectedProvider] ?? "~30-90 segundos";
+            return (
+              <div className="rounded-lg border border-surface-lighter bg-surface/60 px-3 py-2.5 space-y-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                  Qué esperar
+                </p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <span className="text-[10px] text-gray-500">
+                    ⏱️ <span className="text-gray-300">{estTime}</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    📐 <span className="text-gray-300">1280×720 HD</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    💰 <span className="font-semibold text-emerald-400">{formatCost(estimatedCost)}</span>
+                    {" · "}{store.duration}s
+                  </span>
+                  {bestFor && (
+                    <span className="text-[10px] text-gray-500 col-span-2">
+                      🎯 <span className="text-gray-400">{bestFor}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Provider, Duration, Aspect Ratio (for product/fashion/hero, not avatar) */}
           {store.activeTab !== "avatar" && (
