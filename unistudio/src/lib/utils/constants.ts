@@ -25,6 +25,16 @@ export const SUPPORTED_FORMATS = [
 ] as const;
 
 // -----------------------------------------------------------------------------
+// AI Model IDs — update these when new model versions are released
+// -----------------------------------------------------------------------------
+
+/** Claude Haiku — used for planning, analysis, cheap tasks */
+export const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001';
+
+/** Claude Sonnet — used for creative prompts, complex reasoning */
+export const CLAUDE_SONNET = 'claude-sonnet-4-20250514';
+
+// -----------------------------------------------------------------------------
 // API Cost Map (USD per operation)
 // Keys are formatted as "{operation}:{provider}" or "{operation}:{model}"
 // -----------------------------------------------------------------------------

@@ -8,6 +8,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { CLAUDE_SONNET } from '@/lib/utils/constants';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -177,7 +178,7 @@ Return JSON: { "prompt": "...", "negativePrompt": "..." }`;
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_SONNET,
       max_tokens: 1024,
       messages: [{ role: 'user', content: userMessage }],
       system: systemPrompt,
@@ -289,7 +290,7 @@ Devuelve SOLO el JSON array, sin texto adicional.`;
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_SONNET,
       max_tokens: 2048,
       messages: [{ role: 'user', content: userMessage }],
       system: systemPrompt,

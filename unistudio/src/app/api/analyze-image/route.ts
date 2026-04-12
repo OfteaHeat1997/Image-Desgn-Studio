@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import type { ImageAnalysis, AgentModule, BudgetTier } from "@/types/agent";
+import { CLAUDE_HAIKU } from "@/lib/utils/constants";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -149,7 +150,7 @@ async function analyzeWithVision(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: CLAUDE_HAIKU,
         max_tokens: 512,
         messages: [
           {

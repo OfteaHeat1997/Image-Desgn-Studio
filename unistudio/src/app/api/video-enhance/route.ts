@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { VideoCategory, VideoProviderKey, AvatarProviderKey } from '@/types/video';
+import { CLAUDE_HAIKU } from '@/lib/utils/constants';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -210,7 +211,7 @@ ${budget !== undefined ? `Budget maximo: $${budget}` : 'Budget: el mas barato po
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: CLAUDE_HAIKU,
       max_tokens: 1024,
       messages: [{ role: 'user', content: userMessage }],
       system: systemPrompt,

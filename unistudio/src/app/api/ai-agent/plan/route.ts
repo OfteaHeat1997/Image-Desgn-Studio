@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { CLAUDE_HAIKU } from "@/lib/utils/constants";
 import type {
   AgentPlanRequest,
   AgentPlanResponse,
@@ -729,7 +730,7 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: CLAUDE_HAIKU,
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
