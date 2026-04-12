@@ -401,11 +401,18 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const handleRetry = useCallback(async (index: number) => {
     if (!plan || !imageFile) return;
     setPhase("executing");
-    // FIX: retryFromStep returns the final execution state directly,
-    // so we check the returned value instead of the stale React state
-    const result = await pipeline.retryFromStep(plan, imageFile, index);
-    if (result?.status === "completed") {
-      setPhase("results");
+    try {
+      const result = await pipeline.retryFromStep(plan, imageFile, index);
+      if (result?.status === "completed") {
+        setPhase("results");
+      } else {
+        const failedStep = result?.steps.find((s) => s.status === "failed");
+        toast.error(failedStep?.error || "Error al reintentar el paso");
+        setPhase("executing"); // stay on executing so user can see which step failed
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al reintentar");
+      setPhase("executing");
     }
   }, [plan, imageFile, pipeline]);
 

@@ -207,5 +207,21 @@ export const useBrandStore = create<BrandStoreState>()(
     return get().templates.filter((t) => t.platform === platform);
   },
 }),
-  { name: 'unistudio-brand-kit' },
+  {
+    name: 'unistudio-brand-kit',
+    partialize: (state) => ({
+      brandKit: {
+        ...state.brandKit,
+        // Don't persist large base64 images — they'll be re-fetched from API or re-uploaded
+        logoUrl: state.brandKit.logoUrl?.startsWith('data:') ? '' : state.brandKit.logoUrl,
+        watermark: {
+          ...state.brandKit.watermark,
+          imageUrl: state.brandKit.watermark.imageUrl?.startsWith('data:') ? '' : state.brandKit.watermark.imageUrl,
+        },
+      },
+      templates: state.templates,
+      // Don't persist transient state
+      // isLoading, isApiAvailable are excluded
+    }),
+  },
 ));

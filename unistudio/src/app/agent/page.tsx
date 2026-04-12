@@ -202,9 +202,18 @@ function AgentPageInner() {
       setError(null);
       setStep("processing");
 
-      const result = await pipeline.retryFromStep(pipeline.plan, imageFile, index);
-      if (result?.status === "completed") {
-        setStep("done");
+      try {
+        const result = await pipeline.retryFromStep(pipeline.plan, imageFile, index);
+        if (result?.status === "completed") {
+          setStep("done");
+        } else {
+          const failedStep = result?.steps.find((s) => s.status === "failed");
+          setError(failedStep?.error || "Error al reintentar el paso");
+          setStep("config");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al reintentar");
+        setStep("config");
       }
     },
     [pipeline, imageFile],
