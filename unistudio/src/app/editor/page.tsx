@@ -521,7 +521,11 @@ function EditorInner() {
 
       // Convert to compressed thumbnails for persistent gallery storage
       // (blob URLs die on refresh — data URL thumbnails survive in localStorage)
-      const persistentResult = await toPersistentThumbnail(localUrl).catch(() => "");
+      // For video results (HTTP URLs to .mp4), skip thumbnail conversion — store URL directly
+      const isVideoResult = selectedModule === "video" || selectedModule === "ad-creator";
+      const persistentResult = isVideoResult
+        ? localUrl
+        : await toPersistentThumbnail(localUrl).catch(() => "");
       const persistentOriginal = await toPersistentThumbnail(
         localBefore ?? uploadedOriginalUrl ?? currentImage ?? ""
       ).catch(() => "");

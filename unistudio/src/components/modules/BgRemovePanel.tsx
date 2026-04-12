@@ -158,7 +158,8 @@ async function applyBlurBg(
     createImageBitmap(transparentBlob),
   ]);
   const canvas = new OffscreenCanvas(origBitmap.width, origBitmap.height);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.filter = `blur(${blurAmount}px)`;
   ctx.drawImage(origBitmap, 0, 0);
   ctx.filter = "none";
@@ -180,7 +181,8 @@ async function addShadow(
   const w = bitmap.width;
   const h = bitmap.height + padding;
   const canvas = new OffscreenCanvas(w, h);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
 
   // Transparent background
   ctx.clearRect(0, 0, w, h);
@@ -227,7 +229,8 @@ async function autoTrimTransparent(imageBlob: Blob): Promise<ImageBitmap> {
 
   // Read pixel data to find bounding box of non-transparent pixels
   const canvas = new OffscreenCanvas(w, h);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   ctx.drawImage(bitmap, 0, 0);
   const pixels = ctx.getImageData(0, 0, w, h).data;
 
@@ -256,7 +259,8 @@ async function autoTrimTransparent(imageBlob: Blob): Promise<ImageBitmap> {
 
   // Create cropped canvas with just the product
   const croppedCanvas = new OffscreenCanvas(cropW, cropH);
-  const croppedCtx = croppedCanvas.getContext("2d")!;
+  const croppedCtx = croppedCanvas.getContext("2d");
+  if (!croppedCtx) throw new Error("Canvas context unavailable");
   croppedCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
 
   return createImageBitmap(await croppedCanvas.convertToBlob({ type: "image/png" }));
@@ -277,7 +281,8 @@ async function resizeForMarketplace(
   const trimmedBitmap = await autoTrimTransparent(imageBlob);
 
   const canvas = new OffscreenCanvas(targetW, targetH);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
 
   // Only fill white background if NOT transparent mode
   if (!keepTransparent) {
@@ -302,7 +307,8 @@ async function resizeForMarketplace(
   // Apply light sharpening for crisp product photos
   // Re-draw with slight sharpening via contrast boost
   const sharpCanvas = new OffscreenCanvas(targetW, targetH);
-  const sharpCtx = sharpCanvas.getContext("2d")!;
+  const sharpCtx = sharpCanvas.getContext("2d");
+  if (!sharpCtx) throw new Error("Canvas context unavailable");
   sharpCtx.filter = "contrast(1.05) saturate(1.03)";
   sharpCtx.drawImage(canvas, 0, 0);
 
@@ -317,7 +323,8 @@ async function convertFormat(
   if (format === "png") return imageBlob;
   const bitmap = await createImageBitmap(imageBlob);
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context unavailable");
   if (format === "jpg") {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);

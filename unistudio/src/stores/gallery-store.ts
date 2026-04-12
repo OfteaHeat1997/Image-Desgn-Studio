@@ -148,24 +148,23 @@ export const useGalleryStore = create<GalleryStoreState>()(
       },
 
       addImages: (newImages) => {
-        // Generate thumbnails for all, then add in batch
-        Promise.all(
-          newImages.map(async (img) => {
-            if (img.resultUrl?.startsWith("data:")) {
-              const thumb = await createThumbnail(img.resultUrl).catch(() => "");
-              return { ...img, thumbnailUrl: thumb || undefined };
-            }
-            return img;
-          })
-        ).then((withThumbs) => {
-          set((state) => ({
-            images: [...withThumbs, ...state.images].slice(0, 30),
-          }));
-        }).catch(() => {
-          // Fallback: add images without thumbnails rather than losing them
-          set((state) => ({
-            images: [...newImages, ...state.images].slice(0, 30),
-          }));
+        // Add images immediately so they appear in gallery right away
+        set((state) => ({
+          images: [...newImages, ...state.images].slice(0, 30),
+        }));
+        // Then generate thumbnails async and update entries
+        newImages.forEach((img) => {
+          if (img.resultUrl?.startsWith("data:")) {
+            createThumbnail(img.resultUrl).then((thumb) => {
+              if (thumb) {
+                set((state) => ({
+                  images: state.images.map((i) =>
+                    i.id === img.id ? { ...i, thumbnailUrl: thumb } : i
+                  ),
+                }));
+              }
+            }).catch(() => { /* thumbnail is optional */ });
+          }
         });
       },
 

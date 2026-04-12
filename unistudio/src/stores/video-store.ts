@@ -69,6 +69,17 @@ export const useVideoStore = create<VideoStoreState>()(
     }),
     {
       name: 'unistudio-video-store',
+      storage: {
+        getItem: (name) => {
+          try { const v = localStorage.getItem(name); return v ? JSON.parse(v) : null; }
+          catch { return null; }
+        },
+        setItem: (name, value) => {
+          try { localStorage.setItem(name, JSON.stringify(value)); }
+          catch { /* QuotaExceededError — silently drop, preferences not critical */ }
+        },
+        removeItem: (name) => { try { localStorage.removeItem(name); } catch {} },
+      },
       partialize: (state) => ({
         mode: state.mode,
         activeTab: state.activeTab,
