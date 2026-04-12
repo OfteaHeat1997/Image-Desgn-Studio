@@ -4,8 +4,8 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl, ensureFalHttpUrl } from '@/lib/api/fal';
+import { runModel, extractOutputUrl, ensureHttpUrl, ReplicateApiError } from '@/lib/api/replicate';
+import { runFal, extractFalVideoUrl, ensureFalHttpUrl, FalApiError } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { getPresetById } from '@/lib/video/presets';
@@ -81,6 +81,22 @@ export async function POST(request: NextRequest) {
           error: `Unknown provider "${providerKey}". Available: ${Object.keys(VIDEO_PROVIDERS).join(', ')}`,
         },
         { status: 400 },
+      );
+    }
+
+    // Pre-flight API key check — fail fast with 503 instead of crashing inside the provider call
+    if (provider.backend === 'replicate' && !process.env.REPLICATE_API_TOKEN?.trim()) {
+      console.error('[API /video] REPLICATE_API_TOKEN is not set');
+      return NextResponse.json(
+        { success: false, error: 'El servicio de video (Replicate) no está configurado. Contacta al administrador.' },
+        { status: 503 },
+      );
+    }
+    if (provider.backend === 'fal' && !(process.env.FAL_KEY ?? process.env.FAL_API_KEY)?.trim()) {
+      console.error('[API /video] FAL_KEY is not set');
+      return NextResponse.json(
+        { success: false, error: 'El servicio de video (fal.ai) no está configurado. Contacta al administrador.' },
+        { status: 503 },
       );
     }
 
@@ -222,12 +238,42 @@ export async function POST(request: NextRequest) {
       cost,
     });
   } catch (error) {
-    console.error('[API /video] Error:', error);
+    // Always log the full error with stack for server-side debugging
+    console.error('[API /video] Unhandled error:', error instanceof Error ? error.stack ?? error.message : error);
+
+    // Missing API key → 503 Service Unavailable
+    if (
+      (error instanceof ReplicateApiError || error instanceof FalApiError) &&
+      (error as { code?: string }).code === 'AUTH_MISSING'
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Servicio de video no configurado. Contacta al administrador.' },
+        { status: 503 },
+      );
+    }
+
+    // Rate limit → 429
+    if (
+      (error instanceof ReplicateApiError || error instanceof FalApiError) &&
+      (error as { code?: string }).code === 'RATE_LIMITED'
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Límite de solicitudes alcanzado. Espera un momento e intenta de nuevo.' },
+        { status: 429 },
+      );
+    }
+
+    // Provider-side error (model failed, timeout, bad output) → 502 Bad Gateway
+    if (error instanceof ReplicateApiError || error instanceof FalApiError) {
+      return NextResponse.json(
+        { success: false, error: `El proveedor de video falló: ${(error as Error).message}` },
+        { status: 502 },
+      );
+    }
+
+    // Unexpected server crash → 500
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Error procesando la solicitud. Intenta de nuevo.',
-      },
+      { success: false, error: 'Error procesando la solicitud. Intenta de nuevo.' },
       { status: 500 },
     );
   }
