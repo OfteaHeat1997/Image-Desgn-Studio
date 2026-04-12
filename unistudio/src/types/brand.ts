@@ -48,6 +48,7 @@ export interface BrandKit {
   watermark: WatermarkConfig;
   defaultBgStyle: string;          // e.g. 'studio-white', 'brand-gradient'
   defaultEnhancePreset: string;    // e.g. 'product-clean', 'warm-lifestyle'
+  defaultShadowType?: string;      // e.g. 'contact', 'drop', 'reflection'
 }
 
 // -----------------------------------------------------------------------------

@@ -129,21 +129,21 @@ export const useGalleryStore = create<GalleryStoreState>()(
       images: [],
 
       addImage: (image) => {
-        // Generate thumbnail immediately before adding to avoid quota issues
+        // Add image immediately so it appears in gallery right away
+        set((state) => ({
+          images: [image, ...state.images].slice(0, 30),
+        }));
+        // Then generate thumbnail async and update the entry
         if (image.resultUrl?.startsWith("data:")) {
           createThumbnail(image.resultUrl).then((thumbnailUrl) => {
-            set((state) => ({
-              images: [{ ...image, thumbnailUrl: thumbnailUrl || undefined }, ...state.images].slice(0, 30),
-            }));
-          }).catch(() => {
-            set((state) => ({
-              images: [image, ...state.images].slice(0, 30),
-            }));
-          });
-        } else {
-          set((state) => ({
-            images: [image, ...state.images].slice(0, 30),
-          }));
+            if (thumbnailUrl) {
+              set((state) => ({
+                images: state.images.map((img) =>
+                  img.id === image.id ? { ...img, thumbnailUrl } : img
+                ),
+              }));
+            }
+          }).catch(() => { /* thumbnail is optional — image already added */ });
         }
       },
 

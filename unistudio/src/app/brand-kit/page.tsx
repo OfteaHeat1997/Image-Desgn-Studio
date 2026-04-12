@@ -239,6 +239,7 @@ export default function BrandKitPage() {
       },
       defaultBgStyle: state.defaultBgStyle,
       defaultEnhancePreset: state.defaultEnhancePreset,
+      defaultShadowType: state.defaultShadowType,
     };
     updateBrandKit(storeUpdate);
 

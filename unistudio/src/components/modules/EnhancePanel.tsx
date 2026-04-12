@@ -118,6 +118,7 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
+        URL.revokeObjectURL(img.src);
         const canvas = document.createElement("canvas");
         const scale = Math.min(1, 2048 / Math.max(img.width, img.height));
         canvas.width = Math.round(img.width * scale);
@@ -130,7 +131,7 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
           "image/jpeg", 0.85,
         );
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => { URL.revokeObjectURL(img.src); resolve(file); };
       img.src = URL.createObjectURL(file);
     });
   }, []);

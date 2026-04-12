@@ -22,6 +22,7 @@ async function compressIfNeeded(file: File, maxSizeKB = 3000): Promise<File> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
+      URL.revokeObjectURL(img.src);
       const canvas = document.createElement("canvas");
       const scale = Math.min(1, 2048 / Math.max(img.width, img.height));
       canvas.width = Math.round(img.width * scale);
@@ -35,8 +36,9 @@ async function compressIfNeeded(file: File, maxSizeKB = 3000): Promise<File> {
         0.85,
       );
     };
-    img.onerror = () => resolve(file);
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => { URL.revokeObjectURL(img.src); resolve(file); };
+    const blobUrl = URL.createObjectURL(file);
+    img.src = blobUrl;
   });
 }
 

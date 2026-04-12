@@ -79,6 +79,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
+        URL.revokeObjectURL(img.src);
         const canvas = document.createElement("canvas");
         // Keep higher resolution for upscale — only downscale if truly huge
         const maxDim = 4096;
@@ -93,7 +94,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
           "image/jpeg", 0.92,
         );
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => { URL.revokeObjectURL(img.src); resolve(file); };
       img.src = URL.createObjectURL(file);
     });
   }, []);

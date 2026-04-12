@@ -50,6 +50,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate script length
+    if (script && script.length > 2000) {
+      return NextResponse.json(
+        { success: false, error: 'El script no puede superar 2000 caracteres.' },
+        { status: 400 },
+      );
+    }
+
+    // Validate avatar provider
+    if (!AVATAR_PROVIDERS[provider]) {
+      return NextResponse.json(
+        { success: false, error: `Proveedor "${provider}" no soportado. Disponibles: ${Object.keys(AVATAR_PROVIDERS).join(', ')}` },
+        { status: 400 },
+      );
+    }
+
+    // Validate TTS provider
+    if (!TTS_PROVIDERS[ttsProvider]) {
+      return NextResponse.json(
+        { success: false, error: `Proveedor TTS "${ttsProvider}" no soportado. Disponibles: ${Object.keys(TTS_PROVIDERS).join(', ')}` },
+        { status: 400 },
+      );
+    }
+
     // Step 1: Generate audio from text (or use provided audio)
     let audioUrl = providedAudioUrl;
     let ttsCost = 0;
