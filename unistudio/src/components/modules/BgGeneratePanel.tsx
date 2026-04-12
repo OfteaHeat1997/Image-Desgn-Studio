@@ -7,6 +7,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 import { removeBgBrowser } from "@/lib/processing/bg-remove-browser";
 
 /* ------------------------------------------------------------------ */
@@ -319,6 +320,7 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
       console.error("BG generation error:", error);
       setStatusText("");
       setErrorMsg(error instanceof Error ? error.message : "Error al generar el fondo");
+      toast.error(error instanceof Error ? error.message : "Error al generar el fondo");
     } finally {
       setIsProcessing(false);
       setTimeout(() => {

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { TabRoot, TabList, TabTrigger, TabContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 import { compressImageFile } from "@/lib/utils/compress-image";
 import { useVideoStore } from "@/stores/video-store";
 import { VIDEO_PROVIDERS, getProviderCost } from "@/lib/video/providers";
@@ -353,6 +354,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
     } catch (err) {
       console.error("Auto generation error:", err);
       setError(friendlyError(err));
+      toast.error(friendlyError(err));
     } finally {
       store.setIsEnhancing(false);
       store.setIsProcessing(false);
@@ -474,6 +476,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
     } catch (err) {
       console.error("Video generation error:", err);
       setError(friendlyError(err));
+      toast.error(friendlyError(err));
     } finally {
       store.setIsProcessing(false);
     }

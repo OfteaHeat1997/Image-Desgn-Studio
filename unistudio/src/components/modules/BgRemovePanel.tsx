@@ -22,6 +22,7 @@ import { Select } from "@/components/ui/select";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { TabRoot, TabList, TabTrigger, TabContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -590,6 +591,7 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
       const msg = error instanceof Error ? error.message : "Error desconocido";
       setStatusText("");
       setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
       setTimeout(() => {

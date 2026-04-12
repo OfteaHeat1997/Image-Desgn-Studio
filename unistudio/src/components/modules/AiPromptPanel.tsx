@@ -22,6 +22,7 @@ import {
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 import { compressImageFile } from "@/lib/utils/compress-image";
 import { removeBgBrowser } from "@/lib/processing/bg-remove-browser";
 
@@ -192,6 +193,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
     } catch (error) {
       console.error("Creative director error:", error);
       setErrorMsg(error instanceof Error ? error.message : "Error al generar conceptos");
+      toast.error(error instanceof Error ? error.message : "Error al generar conceptos");
     } finally {
       setIsThinking(false);
     }
@@ -258,6 +260,7 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
       console.error("Generation error:", error);
       setStatusText("");
       setErrorMsg(error instanceof Error ? error.message : "Error al crear la foto");
+      toast.error(error instanceof Error ? error.message : "Error al crear la foto");
     } finally {
       setIsGenerating(false);
       setGeneratingConceptId(null);

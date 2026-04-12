@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -340,6 +341,7 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
       const msg = error instanceof Error ? error.message : "Error en prueba de joyeria.";
       const isRateLimit = msg.includes('429') || msg.includes('RATE_LIMITED') || msg.includes('throttled') || msg.includes('Too Many');
       setErrorMsg(isRateLimit ? "rate_limit" : msg);
+      toast.error(isRateLimit ? "rate_limit" : msg);
     } finally {
       setIsProcessing(false);
       // Always clear previous timer before setting a new one to prevent stacking

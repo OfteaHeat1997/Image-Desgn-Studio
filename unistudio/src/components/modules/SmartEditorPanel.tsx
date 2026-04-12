@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -261,6 +262,7 @@ export function SmartEditorPanel({ imageFile, onProcess }: SmartEditorPanelProps
     } catch (error) {
       console.error("SmartEditor error:", error);
       setErrorMsg(error instanceof Error ? error.message : "Error al editar imagen");
+      toast.error(error instanceof Error ? error.message : "Error al editar imagen");
     } finally {
       setIsProcessing(false);
     }
