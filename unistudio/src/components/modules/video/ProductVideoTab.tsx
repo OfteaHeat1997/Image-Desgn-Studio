@@ -198,14 +198,19 @@ export function ProductVideoTab({
                     >
                       <Icon
                         className={cn(
-                          "h-4 w-4 shrink-0",
+                          "h-4 w-4 shrink-0 mt-0.5",
                           selectedPreset === preset.id
                             ? "text-accent-light"
                             : "text-gray-500",
                         )}
                       />
-                      <span className="text-[10px] font-medium text-gray-300 leading-tight">
-                        {preset.name}
+                      <span className="min-w-0">
+                        <span className="block text-[10px] font-medium text-gray-300 leading-tight">
+                          {preset.name}
+                        </span>
+                        <span className="mt-0.5 block text-[9px] leading-tight text-gray-500 line-clamp-2">
+                          {preset.description}
+                        </span>
                       </span>
                     </button>
                   );
