@@ -112,11 +112,13 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        const output = await runModel('black-forest-labs/flux-fill-pro', {
+        const fillProInput: Record<string, unknown> = {
           image: imageUrl,
           mask: maskUrl,
           prompt,
-        });
+        };
+        if (negativePrompt) fillProInput.negative_prompt = negativePrompt;
+        const output = await runModel('black-forest-labs/flux-fill-pro', fillProInput);
         resultUrl = await extractOutputUrl(output);
         break;
       }
@@ -128,11 +130,13 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        const output = await runModel('black-forest-labs/flux-fill-dev', {
+        const fillDevInput: Record<string, unknown> = {
           image: imageUrl,
           mask: maskUrl,
           prompt,
-        });
+        };
+        if (negativePrompt) fillDevInput.negative_prompt = negativePrompt;
+        const output = await runModel('black-forest-labs/flux-fill-dev', fillDevInput);
         resultUrl = await extractOutputUrl(output);
         break;
       }

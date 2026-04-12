@@ -510,7 +510,8 @@ function AgentPageInner() {
             {/* Steps list */}
             <div className="space-y-2">
               {pipeline.plan?.steps.map((pStep, i) => {
-                const exec = pipeline.execution!.steps[i];
+                const exec = pipeline.execution?.steps[i];
+                if (!exec) return null;
                 return (
                   <div
                     key={pStep.id}
@@ -551,10 +552,10 @@ function AgentPageInner() {
                           "text-muted",
                         )}
                       >
-                        {pStep.label}
+                        {pStep.label ?? "Paso"}
                       </span>
                       {exec.status === "running" && (
-                        <p className="text-[11px] text-accent/60 mt-0.5">{pStep.reasoning}</p>
+                        <p className="text-[11px] text-accent/60 mt-0.5">{pStep.reasoning ?? ""}</p>
                       )}
                       {exec.status === "failed" && exec.error && (
                         <p className="text-[11px] text-red-400/80 mt-0.5">{exec.error}</p>

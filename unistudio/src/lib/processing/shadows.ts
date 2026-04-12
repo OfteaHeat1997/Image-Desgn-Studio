@@ -332,7 +332,6 @@ export async function relightKontext(
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
     input_image: imageUrl,
     prompt: lightingPrompt + ' Keep the product exactly the same, only change the lighting and shadows.',
-    output_format: 'png',
   });
   return await extractOutputUrl(output);
 }

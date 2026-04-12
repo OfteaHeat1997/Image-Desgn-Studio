@@ -300,7 +300,6 @@ export async function applyJewelry(
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
     input_image: compositeHttpUrl,
     prompt: fullPrompt,
-    output_format: 'jpg',
     aspect_ratio: '1:1',
   });
 

@@ -683,7 +683,7 @@ export default function BatchPage() {
       try {
         const result = await processOneImage(images[i], steps);
         // Track blob result URLs (e.g. from watermark step) for cleanup
-        if (result.resultUrl.startsWith("blob:")) resultUrlsRef.current.push(result.resultUrl);
+        if (result.resultUrl?.startsWith("blob:")) resultUrlsRef.current.push(result.resultUrl);
         setImages((prev) => prev.map((img, idx) =>
           idx === i ? { ...img, status: "done" as const, resultUrl: result.resultUrl, originalUrl: images[i].preview } : img,
         ));
