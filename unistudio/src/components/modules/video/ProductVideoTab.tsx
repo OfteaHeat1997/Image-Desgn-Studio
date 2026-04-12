@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   RotateCw,
   ZoomIn,
@@ -16,6 +16,7 @@ import {
   Gem,
   Layers,
   Waves,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { PRODUCT_PRESETS } from "@/lib/video/presets";
@@ -35,14 +36,91 @@ const PRESET_ICONS: Record<string, React.ElementType> = {
   Gem,
   Layers,
   Waves,
+  User,
 };
 
 // Group presets for display
 const PRESET_GROUPS = [
-  { label: "General", ids: ["product-rotate", "product-zoom", "camera-orbit", "product-reveal", "product-unboxing", "product-lifestyle", "product-float", "product-splash"] },
-  { label: "Perfumeria", ids: ["fragrance-spin", "fragrance-reveal"] },
-  { label: "Joyeria", ids: ["jewelry-sparkle", "jewelry-float"] },
-  { label: "Skincare", ids: ["skincare-texture", "skincare-splash"] },
+  {
+    label: "General",
+    ids: [
+      "product-rotate",
+      "product-zoom",
+      "camera-orbit",
+      "product-reveal",
+      "product-unboxing",
+      "product-lifestyle",
+      "product-float",
+      "product-splash",
+    ],
+  },
+  {
+    label: "Perfumeria",
+    ids: [
+      "fragrance-spin",
+      "fragrance-reveal",
+      "fragrance-luxury-spin",
+      "fragrance-mist",
+      "fragrance-gift-reveal",
+    ],
+  },
+  {
+    label: "Joyeria",
+    ids: [
+      "jewelry-sparkle",
+      "jewelry-float",
+      "jewelry-light-sweep",
+      "jewelry-chain-drop",
+      "jewelry-on-model",
+    ],
+  },
+  {
+    label: "Skincare",
+    ids: [
+      "skincare-texture",
+      "skincare-splash",
+      "skincare-application",
+      "skincare-water-fresh",
+      "skincare-ingredients",
+    ],
+  },
+];
+
+// Fragrance preset IDs that should show brand selector
+const FRAGRANCE_PRESET_IDS = new Set([
+  "fragrance-spin",
+  "fragrance-reveal",
+  "fragrance-luxury-spin",
+  "fragrance-mist",
+  "fragrance-gift-reveal",
+]);
+
+const FRAGRANCE_BRANDS = [
+  {
+    id: "esika",
+    label: "Esika",
+    modifier: ", bold gold accents, confident modern aesthetic, Esika beauty brand",
+  },
+  {
+    id: "cyzone",
+    label: "Cyzone",
+    modifier: ", young colorful energetic, vibrant youthful style, Cyzone cosmetics",
+  },
+  {
+    id: "yanbal",
+    label: "Yanbal",
+    modifier: ", elegant white premium, sophisticated luxury, Yanbal beauty",
+  },
+  {
+    id: "lbel",
+    label: "L'Bel",
+    modifier: ", French luxury sophisticated, haute couture aesthetic, L'Bel Paris",
+  },
+  {
+    id: "avon",
+    label: "Avon",
+    modifier: ", accessible warm friendly, classic beauty, Avon cosmetics",
+  },
 ];
 
 interface ProductVideoTabProps {
@@ -58,6 +136,34 @@ export function ProductVideoTab({
   customPrompt,
   onCustomPromptChange,
 }: ProductVideoTabProps) {
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+
+  const isFragrancePreset = FRAGRANCE_PRESET_IDS.has(selectedPreset);
+
+  const handlePresetChange = (presetId: string) => {
+    onPresetChange(presetId);
+    // Clear brand when switching away from fragrance
+    if (!FRAGRANCE_PRESET_IDS.has(presetId)) {
+      setSelectedBrand(null);
+    }
+  };
+
+  const handleBrandSelect = (brandId: string) => {
+    const brand = FRAGRANCE_BRANDS.find((b) => b.id === brandId);
+    if (!brand) return;
+
+    if (selectedBrand === brandId) {
+      // Deselect
+      setSelectedBrand(null);
+      onCustomPromptChange("");
+    } else {
+      setSelectedBrand(brandId);
+      const preset = PRODUCT_PRESETS.find((p) => p.id === selectedPreset);
+      const basePrompt = preset?.promptTemplate ?? "";
+      onCustomPromptChange(basePrompt + brand.modifier);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Preset grid grouped by category */}
@@ -82,7 +188,7 @@ export function ProductVideoTab({
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => onPresetChange(preset.id)}
+                      onClick={() => handlePresetChange(preset.id)}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border p-2.5 text-left transition-all",
                         selectedPreset === preset.id
@@ -109,6 +215,37 @@ export function ProductVideoTab({
           );
         })}
       </div>
+
+      {/* Brand selector — shown when a fragrance preset is active */}
+      {isFragrancePreset && (
+        <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-3 space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-400">
+            Marca de Fragancia
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {FRAGRANCE_BRANDS.map((brand) => (
+              <button
+                key={brand.id}
+                type="button"
+                onClick={() => handleBrandSelect(brand.id)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all",
+                  selectedBrand === brand.id
+                    ? "border-purple-400 bg-purple-500/20 text-purple-300"
+                    : "border-surface-lighter bg-surface-light text-gray-400 hover:border-purple-400/50 hover:text-gray-200",
+                )}
+              >
+                {brand.label}
+              </button>
+            ))}
+          </div>
+          {selectedBrand && (
+            <p className="text-[10px] text-purple-400/80">
+              Estilo {FRAGRANCE_BRANDS.find((b) => b.id === selectedBrand)?.label} aplicado al prompt
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Custom prompt */}
       <div>

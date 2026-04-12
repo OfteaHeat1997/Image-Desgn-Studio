@@ -53,13 +53,52 @@ const TEMPLATE_ICONS: Record<string, React.ElementType> = {
 /* ------------------------------------------------------------------ */
 
 const PROVIDER_OPTIONS = [
-  { value: "kenburns", label: "Ken Burns · GRATIS (vista previa)" },
-  { value: "ltx-video", label: "LTX-Video · $0.04 (borrador)" },
-  { value: "wan-2.1", label: "Wan 2.1 · $0.04 (estandar)" },
-  { value: "wan-2.2-fast", label: "Wan 2.2 Fast · $0.05 (estandar)" },
-  { value: "wan-2.5", label: "Wan 2.5 · $0.05/seg (estandar)" },
-  { value: "kling-2.6", label: "Kling 2.6 · $0.07/seg (premium)" },
-  { value: "minimax-hailuo", label: "Minimax Hailuo · $0.08/seg (premium)" },
+  { value: "kenburns", label: "Animación Gratis (sin IA)" },
+  { value: "ltx-video", label: "Básico — Rápido y económico ($0.04)" },
+  { value: "wan-2.1", label: "Estándar — Buena calidad ($0.04)" },
+  { value: "wan-2.2-fast", label: "Estándar Plus — Rápido ($0.05)" },
+  { value: "wan-2.5", label: "Avanzado — Alta calidad ($0.05/s)" },
+  { value: "kling-2.6", label: "Premium — Calidad cinematográfica ($0.07/s)" },
+  { value: "minimax-hailuo", label: "Ultra — Máxima calidad ($0.08/s)" },
+];
+
+// ── Seasonal Campaign Templates ──
+const SEASONAL_CAMPAIGNS = [
+  {
+    id: "campaign-valentines",
+    name: "San Valentín",
+    icon: "❤️",
+    headline: "El regalo perfecto para el amor",
+    promptModifier: "romantic reds, rose petals, heart elements, gift reveal, Valentine's Day atmosphere",
+  },
+  {
+    id: "campaign-mothers-day",
+    name: "Día de la Madre",
+    icon: "🌸",
+    headline: "Para la mujer más especial",
+    promptModifier: "warm gold, flowers, emotional elegant gift, Mother's Day celebration",
+  },
+  {
+    id: "campaign-black-friday",
+    name: "Black Friday",
+    icon: "🖤",
+    headline: "Oferta especial — Tiempo limitado",
+    promptModifier: "dynamic energy, bold dramatic lighting, price reveal, Black Friday sale atmosphere",
+  },
+  {
+    id: "campaign-christmas",
+    name: "Navidad",
+    icon: "🎄",
+    headline: "El mejor regalo de Navidad",
+    promptModifier: "warm golden lights, snow bokeh, gift box, cozy Christmas atmosphere",
+  },
+  {
+    id: "campaign-womens-day",
+    name: "Día de la Mujer",
+    icon: "💜",
+    headline: "Celebra tu poder y elegancia",
+    promptModifier: "empowering bold colors, confident energy, Women's Day celebration, inspiring",
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -74,6 +113,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
   const [provider, setProvider] = useState<VideoProviderKey>("wan-2.2-fast");
   const [isProcessing, setIsProcessing] = useState(false);
   const [videoResult, setVideoResult] = useState<string | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
 
   /* ---- Inline error ---- */
   const [error, setError] = useState<string | null>(null);
@@ -278,6 +318,51 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Seasonal Campaign Templates */}
+      <div>
+        <label className="mb-2 block text-xs font-medium text-gray-400">
+          Campaña Estacional (opcional)
+        </label>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {SEASONAL_CAMPAIGNS.map((campaign) => (
+            <button
+              key={campaign.id}
+              type="button"
+              onClick={() => {
+                if (selectedCampaign === campaign.id) {
+                  // Deselect
+                  setSelectedCampaign(null);
+                  setHeadline("");
+                } else {
+                  setSelectedCampaign(campaign.id);
+                  setHeadline(campaign.headline);
+                  setDescription(campaign.promptModifier);
+                }
+              }}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border p-2 text-left transition-all",
+                selectedCampaign === campaign.id
+                  ? "border-accent bg-accent/10"
+                  : "border-surface-lighter bg-surface-light hover:border-surface-hover",
+              )}
+            >
+              <span className="text-base leading-none">{campaign.icon}</span>
+              <span className={cn(
+                "text-[10px] font-medium leading-tight",
+                selectedCampaign === campaign.id ? "text-accent-light" : "text-gray-300",
+              )}>
+                {campaign.name}
+              </span>
+            </button>
+          ))}
+        </div>
+        {selectedCampaign && (
+          <p className="mt-1.5 text-[10px] text-accent/70">
+            Titular y descripcion pre-llenados con la campana seleccionada
+          </p>
+        )}
       </div>
 
       {/* Headline */}

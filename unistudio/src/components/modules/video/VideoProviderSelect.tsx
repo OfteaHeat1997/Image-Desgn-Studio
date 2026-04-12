@@ -3,8 +3,18 @@
 import React from "react";
 import { Select } from "@/components/ui/select";
 import type { VideoProviderKey, VideoCategory } from "@/types/video";
-import { VIDEO_PROVIDERS, getProvidersForCategory, getProviderCost } from "@/lib/video/providers";
-import { formatCost } from "@/lib/video/cost";
+import { VIDEO_PROVIDERS, getProvidersForCategory } from "@/lib/video/providers";
+
+// Spanish display names for each provider
+const PROVIDER_SPANISH_NAMES: Record<VideoProviderKey, string> = {
+  kenburns: "Animación Gratis (sin IA)",
+  "ltx-video": "Básico — Rápido y económico ($0.04)",
+  "wan-2.1": "Estándar — Buena calidad ($0.04)",
+  "wan-2.2-fast": "Estándar Plus — Rápido ($0.05)",
+  "wan-2.5": "Avanzado — Alta calidad ($0.05/s)",
+  "kling-2.6": "Premium — Calidad cinematográfica ($0.07/s)",
+  "minimax-hailuo": "Ultra — Máxima calidad ($0.08/s)",
+};
 
 interface VideoProviderSelectProps {
   category: VideoCategory;
@@ -17,24 +27,13 @@ export function VideoProviderSelect({
   category,
   value,
   onChange,
-  duration,
 }: VideoProviderSelectProps) {
   const providers = getProvidersForCategory(category);
 
-  const options = providers.map((p) => {
-    const cost = getProviderCost(p, duration);
-    const costStr = formatCost(cost);
-    const qualityLabel =
-      p.quality === "draft"
-        ? "borrador"
-        : p.quality === "standard"
-          ? "standard"
-          : "premium";
-    return {
-      value: p.key,
-      label: `${p.name} · ${costStr} (${qualityLabel})`,
-    };
-  });
+  const options = providers.map((p) => ({
+    value: p.key,
+    label: PROVIDER_SPANISH_NAMES[p.key] ?? p.name,
+  }));
 
   // If current value isn't in this category, select first option
   const currentProvider = VIDEO_PROVIDERS[value];

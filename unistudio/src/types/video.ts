@@ -6,7 +6,7 @@
 // Video Categories & Modes
 // -----------------------------------------------------------------------------
 
-export type VideoCategory = 'product' | 'fashion' | 'avatar';
+export type VideoCategory = 'product' | 'fashion' | 'avatar' | 'hero';
 export type VideoMode = 'manual' | 'auto';
 
 // -----------------------------------------------------------------------------

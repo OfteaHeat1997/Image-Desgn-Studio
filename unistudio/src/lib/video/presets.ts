@@ -111,6 +111,36 @@ const PRODUCT_PRESETS: VideoPreset[] = [
     icon: 'Flame',
     recommended: ['kling-2.6', 'minimax-hailuo'],
   },
+  {
+    id: 'fragrance-luxury-spin',
+    name: 'Giro de Lujo',
+    description: 'Rotacion premium con luz espectacular',
+    promptTemplate:
+      'Luxury perfume bottle performing slow elegant 360-degree rotation on polished black reflective surface, dramatic rim lighting creating specular highlights on glass, golden light sweep, particles of light floating, cinematic fragrance commercial',
+    category: 'product',
+    icon: 'Orbit',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'fragrance-mist',
+    name: 'Efecto Bruma',
+    description: 'Perfume con niebla eterea y particulas',
+    promptTemplate:
+      'Perfume bottle with ethereal mist and spray particles rising and floating around it, dramatic backlight through the mist, luxury fragrance advertising, dark moody atmosphere, volumetric lighting',
+    category: 'product',
+    icon: 'Cloud',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'fragrance-gift-reveal',
+    name: 'Revelacion de Regalo',
+    description: 'Caja elegante abriendo para revelar perfume',
+    promptTemplate:
+      'Elegant gift box slowly opening to reveal a luxury perfume bottle nestled in velvet tissue paper, warm spotlight, anticipation reveal moment, premium unboxing experience',
+    category: 'product',
+    icon: 'PackageOpen',
+    recommended: ['kling-2.6', 'wan-2.5'],
+  },
   // ── Jewelry ──
   {
     id: 'jewelry-sparkle',
@@ -130,6 +160,36 @@ const PRODUCT_PRESETS: VideoPreset[] = [
       'Jewelry piece floating and slowly rotating in mid-air with dramatic spotlight, particles of light, dark luxury background',
     category: 'product',
     icon: 'Gem',
+    recommended: ['kling-2.6', 'wan-2.5'],
+  },
+  {
+    id: 'jewelry-light-sweep',
+    name: 'Barrido de Luz',
+    description: 'Luz dramatica revelando el brillo del metal',
+    promptTemplate:
+      'Dramatic directional light sweep slowly crossing polished stainless steel jewelry surface, revealing metallic sheen and reflections, dark background, macro jewelry photography',
+    category: 'product',
+    icon: 'Sparkles',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'jewelry-chain-drop',
+    name: 'Caida de Cadena',
+    description: 'Cadena de acero cayendo en camara lenta',
+    promptTemplate:
+      'Stainless steel chain dropping and landing gracefully in slow motion onto dark velvet surface, satisfying metallic sound moment, jewelry commercial',
+    category: 'product',
+    icon: 'Droplets',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'jewelry-on-model',
+    name: 'En Modelo',
+    description: 'Joya puesta en persona con movimiento natural',
+    promptTemplate:
+      'Close-up of person wearing this jewelry piece, natural subtle movement, soft lighting on skin, jewelry detail clearly visible, lifestyle jewelry photography',
+    category: 'product',
+    icon: 'User',
     recommended: ['kling-2.6', 'wan-2.5'],
   },
   // ── Skincare ──
@@ -152,6 +212,36 @@ const PRODUCT_PRESETS: VideoPreset[] = [
     category: 'product',
     icon: 'Waves',
     recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'skincare-application',
+    name: 'Textura en Piel',
+    description: 'Crema aplicada en piel radiante',
+    promptTemplate:
+      'Close-up of skincare cream being smoothly applied on glowing healthy skin, satisfying smooth texture, soft natural lighting, clean beauty aesthetic',
+    category: 'product',
+    icon: 'Layers',
+    recommended: ['kling-2.6', 'wan-2.5'],
+  },
+  {
+    id: 'skincare-water-fresh',
+    name: 'Efecto Frescura',
+    description: 'Producto con salpicaduras de agua fresca',
+    promptTemplate:
+      'Skincare product with fresh water droplets splashing and rolling on surface, clean pure water, bright fresh atmosphere, product hero shot, spa aesthetic',
+    category: 'product',
+    icon: 'Waves',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'skincare-ingredients',
+    name: 'Ingrediente Estrella',
+    description: 'Producto rodeado de ingredientes naturales',
+    promptTemplate:
+      'Skincare product surrounded by natural ingredients floating gently, eucalyptus leaves, citrus slices, flower petals, soft natural light, organic beauty',
+    category: 'product',
+    icon: 'Sparkles',
+    recommended: ['kling-2.6', 'wan-2.5'],
   },
 ];
 
@@ -228,6 +318,26 @@ const FASHION_PRESETS: VideoPreset[] = [
       'Elegant lingerie showcase transitioning from front view to back view, tasteful and sophisticated, luxury brand photography, smooth camera movement revealing both sides of the garment',
     category: 'fashion',
     icon: 'RefreshCw',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'lingerie-fabric-flow',
+    name: 'Movimiento de Tela',
+    description: 'Tela delicada fluyendo en camara lenta',
+    promptTemplate:
+      'Delicate lingerie fabric flowing and draping in slow motion, soft romantic lighting, silk and lace texture visible, intimate fashion photography, elegant and sensual',
+    category: 'fashion',
+    icon: 'Wind',
+    recommended: ['kling-2.6', 'minimax-hailuo'],
+  },
+  {
+    id: 'lingerie-lifestyle',
+    name: 'Estilo de Vida',
+    description: 'Modelo en escena natural y confiada',
+    promptTemplate:
+      'Woman in lingerie in natural comfortable movement in elegant bedroom setting, warm soft morning light, confident and comfortable lifestyle, tasteful editorial',
+    category: 'fashion',
+    icon: 'Heart',
     recommended: ['kling-2.6', 'minimax-hailuo'],
   },
 ];

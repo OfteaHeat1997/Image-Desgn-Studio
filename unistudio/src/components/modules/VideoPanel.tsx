@@ -8,12 +8,14 @@ import {
   ShoppingBag,
   Shirt,
   UserCircle,
+  Monitor,
   Sparkles,
   X,
   Loader2,
   CheckCircle2,
   RefreshCw,
   Calculator,
+  Zap,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ import { VideoPreview } from "./video/VideoPreview";
 import { ProductVideoTab } from "./video/ProductVideoTab";
 import { FashionVideoTab } from "./video/FashionVideoTab";
 import { AvatarVideoTab } from "./video/AvatarVideoTab";
+import { HeroVideoTab } from "./video/HeroVideoTab";
 
 import type {
   VideoCategory,
@@ -79,7 +82,98 @@ const AUTO_PLACEHOLDERS: Record<VideoCategory, string> = {
     "Ej: Video de moda mostrando esta prenda con movimiento elegante de tela",
   avatar:
     "Ej: Una presentadora hablando sobre este producto, tono amigable y profesional",
+  hero:
+    "Ej: Video hero para la pagina principal mostrando nuestra nueva coleccion de lenceria Leonisa",
 };
+
+// ── Quick Template Gallery ──
+interface QuickTemplate {
+  id: string;
+  name: string;
+  description: string;
+  cost: string;
+  categoryBadge: string;
+  preset: string;
+  provider: VideoProviderKey;
+  duration: number;
+  aspectRatio: string;
+  tab: VideoCategory;
+}
+
+const QUICK_TEMPLATES: QuickTemplate[] = [
+  {
+    id: "qt-fragrance",
+    name: "Perfume Premium",
+    description: "Rotación 360° con luz dramática",
+    cost: "$0.35",
+    categoryBadge: "Fragancias",
+    preset: "fragrance-luxury-spin",
+    provider: "kling-2.6",
+    duration: 5,
+    aspectRatio: "1:1",
+    tab: "product",
+  },
+  {
+    id: "qt-jewelry",
+    name: "Joya con Brillo",
+    description: "Barrido de luz sobre acero inoxidable",
+    cost: "$0.35",
+    categoryBadge: "Joyería",
+    preset: "jewelry-light-sweep",
+    provider: "kling-2.6",
+    duration: 5,
+    aspectRatio: "1:1",
+    tab: "product",
+  },
+  {
+    id: "qt-skincare",
+    name: "Skincare Frescura",
+    description: "Gotas de agua sobre el producto",
+    cost: "$0.05",
+    categoryBadge: "Skincare",
+    preset: "skincare-water-fresh",
+    provider: "wan-2.2-fast",
+    duration: 5,
+    aspectRatio: "1:1",
+    tab: "product",
+  },
+  {
+    id: "qt-lingerie-flow",
+    name: "Tela en Movimiento",
+    description: "Lencería con movimiento sutil y romántico",
+    cost: "$0.35",
+    categoryBadge: "Lencería",
+    preset: "lingerie-fabric-flow",
+    provider: "kling-2.6",
+    duration: 5,
+    aspectRatio: "9:16",
+    tab: "fashion",
+  },
+  {
+    id: "qt-product-360",
+    name: "Rotación 360°",
+    description: "Producto en turntable profesional",
+    cost: "$0.05",
+    categoryBadge: "General",
+    preset: "product-rotate",
+    provider: "wan-2.2-fast",
+    duration: 5,
+    aspectRatio: "1:1",
+    tab: "product",
+  },
+  {
+    id: "qt-reveal",
+    name: "Reveal Dramático",
+    description: "Producto con efecto cinematográfico",
+    cost: "$0.48",
+    categoryBadge: "Premium",
+    preset: "product-reveal",
+    provider: "minimax-hailuo",
+    duration: 6,
+    aspectRatio: "16:9",
+    tab: "product",
+  },
+];
 
 /** Map HTTP status / error message to a friendly Spanish message */
 function friendlyError(err: unknown): string {
@@ -123,6 +217,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
   /* ---- Is auto mode busy? ---- */
   const isAutoBusy = store.isEnhancing || store.isProcessing;
 
+  /* ---- Resolve API category (hero → product) ---- */
+  const apiCategory = store.activeTab === "hero" ? "product" : store.activeTab;
+
   /* ---------------------------------------------------------------
    * ONE-CLICK AUTO GENERATE — full pipeline
    * --------------------------------------------------------------- */
@@ -148,7 +245,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           description: autoPrompt,
-          category: store.activeTab,
+          category: apiCategory,
           duration: store.duration,
         }),
       });
@@ -229,7 +326,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             prompt: ai.enhancedPrompt,
             duration: ai.recommendedDuration,
             aspectRatio: store.aspectRatio,
-            category: store.activeTab,
+            category: apiCategory,
             mode: "auto",
           }),
         });
@@ -242,14 +339,14 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         store.addProject({
           id: `video-${Date.now()}`,
           name: `${store.activeTab} ${new Date().toLocaleTimeString()}`,
-          category: store.activeTab,
+          category: apiCategory,
           sourceImageUrl: httpImageUrl,
           resultVideoUrl: data.data.url,
           provider: ai.recommendedProvider,
           status: "completed",
           cost: data.cost ?? 0,
           createdAt: new Date().toISOString(),
-          options: { imageUrl: httpImageUrl, provider: ai.recommendedProvider as VideoProviderKey, prompt: ai.enhancedPrompt, duration: ai.recommendedDuration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
+          options: { imageUrl: httpImageUrl, provider: ai.recommendedProvider as VideoProviderKey, prompt: ai.enhancedPrompt, duration: ai.recommendedDuration, aspectRatio: store.aspectRatio, category: apiCategory, mode: store.mode },
         });
         onProcess(data.data.url, undefined, data.cost ?? 0);
       }
@@ -261,7 +358,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
       store.setIsProcessing(false);
       store.setAutoStep(null);
     }
-  }, [imageFile, avatarImageFile, store, autoPrompt, onProcess]);
+  }, [imageFile, avatarImageFile, store, autoPrompt, onProcess, apiCategory]);
 
   /* ---- Manual mode generate handler ---- */
   const handleGenerate = useCallback(async () => {
@@ -351,7 +448,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             prompt,
             duration: store.duration,
             aspectRatio: store.aspectRatio,
-            category: store.activeTab,
+            category: apiCategory,
             mode: store.mode,
           }),
         });
@@ -363,14 +460,14 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         store.addProject({
           id: `video-m-${Date.now()}`,
           name: `${store.activeTab} ${new Date().toLocaleTimeString()}`,
-          category: store.activeTab,
+          category: apiCategory,
           sourceImageUrl: manualHttpUrl,
           resultVideoUrl: data.data.url,
           provider: store.selectedProvider,
           status: "completed",
           cost: data.cost ?? 0,
           createdAt: new Date().toISOString(),
-          options: { imageUrl: manualHttpUrl, provider: store.selectedProvider, prompt, duration: store.duration, aspectRatio: store.aspectRatio, category: store.activeTab, mode: store.mode },
+          options: { imageUrl: manualHttpUrl, provider: store.selectedProvider, prompt, duration: store.duration, aspectRatio: store.aspectRatio, category: apiCategory, mode: store.mode },
         });
         onProcess(data.data.url, undefined, data.cost ?? 0);
       }
@@ -380,7 +477,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
     } finally {
       store.setIsProcessing(false);
     }
-  }, [imageFile, avatarImageFile, store, onProcess]);
+  }, [imageFile, avatarImageFile, store, onProcess, apiCategory]);
 
   /* ---- Step labels for progress display ---- */
   const autoStepLabels = store.activeTab === "avatar"
@@ -395,26 +492,37 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         { key: "generate", label: "Generando video" },
       ];
 
+  /* ---- Apply a Quick Template ---- */
+  const applyQuickTemplate = (tpl: QuickTemplate) => {
+    store.setActiveTab(tpl.tab);
+    store.setSelectedPreset(tpl.preset);
+    store.setSelectedProvider(tpl.provider);
+    store.setDuration(tpl.duration);
+    store.setAspectRatio(tpl.aspectRatio);
+    store.setCustomPrompt("");
+    setError(null);
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <ModuleHeader
         icon={<Video className="h-4 w-4" />}
         title="Video Studio"
-        description="Convierte tus fotos de producto en videos profesionales para TikTok, Instagram Reels y YouTube Shorts. Elige entre 3 modos: Producto (el producto se mueve/gira), Moda (modelo caminando con tu ropa), o Avatar (una persona hablando sobre tu producto con voz IA)."
+        description="Convierte tus fotos de producto en videos profesionales para TikTok, Instagram Reels y YouTube Shorts. Elige entre 4 modos: Producto (el producto se mueve/gira), Moda (modelo caminando con tu ropa), Avatar (una persona hablando sobre tu producto con voz IA), o Hero (video para tu pagina web)."
         whyNeeded="Los videos tienen 5x mas engagement que las fotos estaticas en redes sociales. TikTok e Instagram priorizan videos en sus algoritmos. Un video corto de 5-15 segundos de tu producto puede generar mas ventas que 10 fotos."
         costLabel="Desde gratis"
         steps={[
           "Sube tu imagen de producto al area central del editor",
-          "Elige la pestana: Producto, Moda o Avatar",
+          "Elige la pestana: Producto, Moda, Avatar o Hero de Pagina",
           "Modo Auto: un clic genera todo. Modo Manual: elige proveedor, duracion y estilo",
           "Haz clic en \"Generar Video\" — el resultado se previsualiza directamente",
         ]}
         tips={[
-          "Ken Burns (zoom/pan suave) muestra PREVIEW — usa LTX-Video ($0.04) para MP4 descargable.",
+          "Animacion Gratis (sin IA) muestra PREVIEW — usa Basico ($0.04) para MP4 descargable.",
           "Modo Auto escribe el prompt, elige el mejor proveedor y genera todo automaticamente.",
           "Para Avatar: sube una foto de rostro, escribe el texto que debe decir, y la IA genera el video con voz.",
-          "Edge TTS (voz) es gratis e incluye voces en espanol latino y castellano.",
+          "Voz IA Gratis incluye voces en espanol latino y castellano.",
           "Videos de 5-10 segundos funcionan mejor en TikTok e Instagram Reels.",
         ]}
       />
@@ -476,6 +584,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 { key: "product" as VideoCategory, icon: ShoppingBag, label: "Producto" },
                 { key: "fashion" as VideoCategory, icon: Shirt, label: "Moda" },
                 { key: "avatar" as VideoCategory, icon: UserCircle, label: "Avatar" },
+                { key: "hero" as VideoCategory, icon: Monitor, label: "Hero" },
               ] as const
             ).map(({ key, icon: Icon, label }) => (
               <button
@@ -488,7 +597,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                   setCompletedSteps([]);
                 }}
                 className={cn(
-                  "flex flex-1 min-w-[72px] items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-all",
+                  "flex flex-1 min-w-[60px] items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-all",
                   store.activeTab === key
                     ? "bg-accent/15 text-accent-light shadow-sm"
                     : "text-gray-400 hover:text-gray-200",
@@ -660,7 +769,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 <span className="text-emerald-400 font-semibold">
                   Proveedores GRATIS
                 </span>
-                {" "}(Ken Burns, Hedra, Edge TTS)
+                {" "}(Animacion Gratis, Hedra, Voz IA Gratis)
               </span>
             </div>
           )}
@@ -684,13 +793,48 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
          *  MANUAL MODE
          * ══════════════════════════════════════════════════════════════ */
         <>
+          {/* ── Plantillas Rápidas ── */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Zap className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-xs font-semibold text-gray-300">
+                Plantillas Rápidas
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {QUICK_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => applyQuickTemplate(tpl)}
+                  className="group rounded-lg border border-surface-lighter bg-surface-light p-2.5 text-left transition-all hover:border-accent/50 hover:bg-accent/5"
+                >
+                  <div className="flex items-start justify-between gap-1 mb-1">
+                    <span className="text-[10px] font-semibold text-gray-200 leading-tight group-hover:text-accent-light transition-colors">
+                      {tpl.name}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
+                      {tpl.cost}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-gray-500 leading-tight mb-1">
+                    {tpl.description}
+                  </p>
+                  <span className="rounded-full bg-surface-lighter px-1.5 py-0.5 text-[9px] text-gray-500">
+                    {tpl.categoryBadge}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Tab navigation — scrollable on small screens */}
           <TabRoot
             value={store.activeTab}
             onValueChange={(v) => store.setActiveTab(v as VideoCategory)}
           >
             <div className="overflow-x-auto scrollbar-none">
-              <TabList className="w-full min-w-[200px]">
+              <TabList className="w-full min-w-[260px]">
                 <TabTrigger value="product" className="flex-1 gap-1 whitespace-nowrap">
                   <ShoppingBag className="h-3 w-3" />
                   Producto
@@ -702,6 +846,10 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 <TabTrigger value="avatar" className="flex-1 gap-1 whitespace-nowrap">
                   <UserCircle className="h-3 w-3" />
                   Avatar
+                </TabTrigger>
+                <TabTrigger value="hero" className="flex-1 gap-1 whitespace-nowrap">
+                  <Monitor className="h-3 w-3" />
+                  Hero
                 </TabTrigger>
               </TabList>
             </div>
@@ -742,9 +890,19 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 onAvatarImageUpload={setAvatarImageFile}
               />
             </TabContent>
+
+            <TabContent value="hero">
+              <HeroVideoTab
+                customPrompt={store.customPrompt}
+                onCustomPromptChange={store.setCustomPrompt}
+                onDurationChange={store.setDuration}
+                onAspectRatioChange={store.setAspectRatio}
+                videoResult={store.videoResult}
+              />
+            </TabContent>
           </TabRoot>
 
-          {/* Provider, Duration, Aspect Ratio (for product/fashion) */}
+          {/* Provider, Duration, Aspect Ratio (for product/fashion/hero, not avatar) */}
           {store.activeTab !== "avatar" && (
             <div className="space-y-3 border-t border-surface-lighter pt-3">
               <VideoProviderSelect
@@ -754,22 +912,24 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 duration={store.duration}
               />
 
-              {/* Duration + Aspect Ratio — stack on mobile */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Select
-                  label="Duracion"
-                  value={String(store.duration)}
-                  onValueChange={(v) => store.setDuration(parseInt(v))}
-                  options={DURATION_OPTIONS}
-                />
+              {/* Duration + Aspect Ratio — hidden for hero (managed by HeroVideoTab) */}
+              {store.activeTab !== "hero" && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Select
+                    label="Duracion"
+                    value={String(store.duration)}
+                    onValueChange={(v) => store.setDuration(parseInt(v))}
+                    options={DURATION_OPTIONS}
+                  />
 
-                <Select
-                  label="Aspecto"
-                  value={store.aspectRatio}
-                  onValueChange={store.setAspectRatio}
-                  options={ASPECT_RATIO_OPTIONS}
-                />
-              </div>
+                  <Select
+                    label="Aspecto"
+                    value={store.aspectRatio}
+                    onValueChange={store.setAspectRatio}
+                    options={ASPECT_RATIO_OPTIONS}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -781,7 +941,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
                 <span className="text-emerald-400 font-semibold">
                   {formatCost(estimatedCost)}
                 </span>
-                {store.activeTab !== "avatar" && (
+                {store.activeTab !== "avatar" && store.activeTab !== "hero" && (
                   <>
                     {" | "}Duracion: {store.duration}s
                   </>
@@ -839,7 +999,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
               ? "Generando Video..."
               : store.activeTab === "avatar"
                 ? "Generar Avatar Video"
-                : "Generar Video"}
+                : store.activeTab === "hero"
+                  ? "Generar Video Hero"
+                  : "Generar Video"}
           </Button>
         </>
       )}
