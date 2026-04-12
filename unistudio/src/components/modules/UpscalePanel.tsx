@@ -73,14 +73,16 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
     setErrorMsg(null);
   }, []);
 
-  /** Compress large images to stay under Vercel 4.5MB limit */
+  /** Compress large images to stay under Vercel 4.5MB limit — but keep max resolution for upscale */
   const compressFile = useCallback(async (file: File): Promise<File> => {
-    if (file.size <= 3 * 1024 * 1024) return file;
+    if (file.size <= 4 * 1024 * 1024) return file;
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const s = Math.min(1, 2048 / Math.max(img.width, img.height));
+        // Keep higher resolution for upscale — only downscale if truly huge
+        const maxDim = 4096;
+        const s = Math.min(1, maxDim / Math.max(img.width, img.height));
         canvas.width = Math.round(img.width * s);
         canvas.height = Math.round(img.height * s);
         const ctx = canvas.getContext("2d");
@@ -88,7 +90,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(
           (blob) => resolve(blob ? new File([blob], file.name, { type: "image/jpeg" }) : file),
-          "image/jpeg", 0.85,
+          "image/jpeg", 0.92,
         );
       };
       img.onerror = () => resolve(file);
@@ -110,7 +112,7 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
       if (!uploadData.success) throw new Error(uploadData.error || "Error al subir imagen");
 
       const body: Record<string, unknown> = {
-        imageUrl: uploadData.data.url,
+        imageUrl: uploadData.data.replicateUrl || uploadData.data.url,
         provider,
         scale,
       };

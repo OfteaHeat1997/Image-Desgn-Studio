@@ -115,11 +115,12 @@ export async function POST(request: NextRequest) {
 
       case 'clarity': {
         // Clarity upscaler via Replicate (prompt-guided)
+        // resemblance=0.85 keeps output faithful to original; creativity=0.25 avoids hallucination
         const input: Record<string, string | number | boolean> = {
           image: imageUrl,
           scale_factor: scale,
-          resemblance: 0.6,
-          creativity: 0.35,
+          resemblance: 0.85,
+          creativity: 0.25,
           output_format: 'png',
         };
         if (prompt) {
