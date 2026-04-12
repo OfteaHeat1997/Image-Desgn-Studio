@@ -5,7 +5,6 @@ import { Select } from "@/components/ui/select";
 import { Upload, Globe } from "lucide-react";
 import type { AvatarProviderKey, TtsProviderKey } from "@/types/video";
 import { AVATAR_PROVIDERS, TTS_PROVIDERS } from "@/lib/video/providers";
-import { formatCost } from "@/lib/video/cost";
 import { TTS_LANGUAGES, getVoicesForLanguage } from "@/lib/video/tts-voices";
 
 interface AvatarVideoTabProps {
@@ -37,16 +36,29 @@ export function AvatarVideoTab({
   avatarImageFile,
   onAvatarImageUpload,
 }: AvatarVideoTabProps) {
+  const AVATAR_SPANISH_NAMES: Record<string, string> = {
+    wav2lip: "Avatar Básico",
+    musetalk: "Avatar Pro — Movimiento natural",
+    sadtalker: "Avatar 3D — Expresiones",
+    liveportrait: "Avatar Premium — Ultra realista",
+    "hedra-free": "Avatar Gratis (22/mes)",
+  };
+
+  const TTS_SPANISH_NAMES: Record<string, string> = {
+    "edge-tts": "Voz IA Gratis",
+    "google-tts": "Google Cloud TTS",
+  };
+
   const avatarOptions = Object.values(AVATAR_PROVIDERS)
     .filter((p) => p.key !== 'musetalk') // MuseTalk requires video input, not static images
     .map((p) => ({
       value: p.key,
-      label: `${p.name} · ${formatCost(p.costPerVideo)}`,
+      label: AVATAR_SPANISH_NAMES[p.key] ?? p.name,
     }));
 
   const ttsOptions = Object.values(TTS_PROVIDERS).map((p) => ({
     value: p.key,
-    label: `${p.name} · ${formatCost(p.costPerRequest)}`,
+    label: TTS_SPANISH_NAMES[p.key] ?? p.name,
   }));
 
   const languageOptions = TTS_LANGUAGES.map((l) => ({

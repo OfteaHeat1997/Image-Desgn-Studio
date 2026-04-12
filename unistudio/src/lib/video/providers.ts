@@ -27,8 +27,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 15,
     supportedAspectRatios: ['16:9', '9:16', '1:1', '4:3'],
     quality: 'draft',
-    categories: ['product', 'fashion'],
-    description: 'Zoom/pan simple gratis (client-side)',
+    categories: ['product', 'fashion', 'hero'],
+    description: 'Animación Gratis (sin IA)',
   },
   'ltx-video': {
     key: 'ltx-video',
@@ -39,8 +39,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 5,
     supportedAspectRatios: ['16:9', '9:16', '1:1'],
     quality: 'draft',
-    categories: ['product'],
-    description: 'Previews ultra-baratos ($0.04/video)',
+    categories: ['product', 'hero'],
+    description: 'Básico — Rápido y económico ($0.04)',
   },
   'wan-2.2-fast': {
     key: 'wan-2.2-fast',
@@ -51,8 +51,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 5,
     supportedAspectRatios: ['16:9', '9:16', '1:1'],
     quality: 'standard',
-    categories: ['product', 'fashion'],
-    description: 'Videos de producto rapidos ($0.05)',
+    categories: ['product', 'fashion', 'hero'],
+    description: 'Estándar Plus — Rápido ($0.05)',
   },
   'wan-2.5': {
     key: 'wan-2.5',
@@ -63,8 +63,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 10,
     supportedAspectRatios: ['16:9', '9:16', '1:1'],
     quality: 'standard',
-    categories: ['product', 'fashion'],
-    description: 'Videos standard ($0.05/seg)',
+    categories: ['product', 'fashion', 'hero'],
+    description: 'Avanzado — Alta calidad ($0.05/s)',
   },
   'wan-2.1': {
     key: 'wan-2.1',
@@ -75,8 +75,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 10,
     supportedAspectRatios: ['16:9'],
     quality: 'standard',
-    categories: ['product'],
-    description: 'Videos de producto clasico ($0.04)',
+    categories: ['product', 'hero'],
+    description: 'Estándar — Buena calidad ($0.04)',
   },
   'kling-2.6': {
     key: 'kling-2.6',
@@ -87,8 +87,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 10,
     supportedAspectRatios: ['16:9', '9:16', '1:1'],
     quality: 'premium',
-    categories: ['product', 'fashion'],
-    description: 'Mejor calidad producto/moda ($0.07/seg)',
+    categories: ['product', 'fashion', 'hero'],
+    description: 'Premium — Calidad cinematográfica ($0.07/s)',
   },
   'minimax-hailuo': {
     key: 'minimax-hailuo',
@@ -99,8 +99,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     maxDuration: 6,
     supportedAspectRatios: ['16:9', '9:16', '1:1'],
     quality: 'premium',
-    categories: ['product', 'fashion'],
-    description: 'Batch ads premium ($0.08/seg)',
+    categories: ['product', 'fashion', 'hero'],
+    description: 'Ultra — Máxima calidad ($0.08/s)',
   },
 };
 

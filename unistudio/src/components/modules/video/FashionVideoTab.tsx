@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Upload,
   Info,
+  Wind,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { FASHION_PRESETS } from "@/lib/video/presets";
@@ -23,6 +24,7 @@ const PRESET_ICONS: Record<string, React.ElementType> = {
   MapPin,
   Heart,
   RefreshCw,
+  Wind,
 };
 
 interface FashionVideoTabProps {
@@ -85,6 +87,33 @@ export function FashionVideoTab({
           })}
         </div>
       </div>
+
+      {/* Lingerie 360 — visual instruction panel */}
+      {isLingerie360 && (
+        <div className="bg-amber-50/10 border border-amber-500/30 rounded-lg p-3 mt-2">
+          <p className="text-amber-300 text-xs font-medium mb-2">
+            Cómo preparar las fotos:
+          </p>
+          <div className="flex gap-4 mb-2">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-amber-500/10 rounded-lg flex items-center justify-center text-2xl border border-amber-500/20">
+                👕
+              </div>
+              <p className="text-[10px] text-amber-400 mt-1">Foto 1: Frente</p>
+            </div>
+            <div className="text-center text-amber-500/60 self-center text-xl">→</div>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-amber-500/10 rounded-lg flex items-center justify-center text-2xl border border-amber-500/20">
+                👔
+              </div>
+              <p className="text-[10px] text-amber-400 mt-1">Foto 2: Espalda</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-amber-400/70">
+            Ambas fotos en fondo blanco, misma distancia y ángulo
+          </p>
+        </div>
+      )}
 
       {/* Lingerie 360 — back image upload */}
       {isLingerie360 && (
