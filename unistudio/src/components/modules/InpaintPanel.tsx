@@ -136,6 +136,11 @@ export function InpaintPanel({ imageFile, onProcess }: InpaintPanelProps) {
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Edita partes especificas de tu imagen — remueve objetos, cambia colores o borra marcas de agua.
+      </p>
+
       {/* Mode indicator */}
       <div className="rounded-lg border border-accent bg-accent/10 px-3 py-2 text-center text-xs font-medium text-accent-light">
         Edicion Guiada por Texto

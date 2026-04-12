@@ -33,6 +33,7 @@ import {
   formatCost,
 } from "@/lib/video/cost";
 import { getPresetById } from "@/lib/video/presets";
+import { TTS_LANGUAGES, getVoicesForLanguage } from "@/lib/video/tts-voices";
 
 import { VideoModeToggle } from "./video/VideoModeToggle";
 import { VideoProviderSelect } from "./video/VideoProviderSelect";
@@ -555,6 +556,11 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500 -mt-1">
+        Convierte tus fotos de producto en videos profesionales para web y redes sociales. Modo <strong className="text-gray-400">Auto</strong> = un clic genera todo.
+      </p>
+
       {/* Mode Toggle */}
       <VideoModeToggle
         mode={store.mode}
@@ -591,8 +597,9 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             </button>
             <button
               type="button"
+              aria-label="Cerrar error"
               onClick={() => setError(null)}
-              className="text-red-400 hover:text-red-200 transition-colors"
+              className="text-red-400 hover:text-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -638,42 +645,93 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
             ))}
           </div>
 
-          {/* Avatar image upload — shown when avatar tab is active in auto mode */}
+          {/* Avatar image upload + voice/language controls — shown when avatar tab is active in auto mode */}
           {store.activeTab === "avatar" && (
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-400">
-                Imagen del Avatar
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-surface-lighter bg-surface-light p-3 transition-colors hover:border-accent/50">
-                <UserCircle className="h-4 w-4 text-gray-500" />
-                <span className="text-xs text-gray-400">
-                  {avatarImageFile ? avatarImageFile.name : "Subir foto del presentador (opcional)"}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
+            <div className="space-y-3">
+              {/* Avatar image */}
+              <div>
+                <label htmlFor="auto-avatar-upload" className="mb-1.5 block text-xs font-medium text-gray-400">
+                  Imagen del Avatar
+                </label>
+                <label
+                  htmlFor="auto-avatar-upload"
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-surface-lighter bg-surface-light p-3 transition-colors hover:border-accent/50"
+                >
+                  <UserCircle className="h-4 w-4 text-gray-500" />
+                  <span className="text-xs text-gray-400">
+                    {avatarImageFile ? avatarImageFile.name : "Subir foto del presentador (opcional)"}
+                  </span>
+                  <input
+                    id="auto-avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    disabled={isAutoBusy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setAvatarImageFile(file);
+                    }}
+                    className="hidden"
+                  />
+                </label>
+                <p className="mt-1 text-[10px] text-gray-500">
+                  O usa la imagen del canvas principal como avatar
+                </p>
+              </div>
+              {/* Voice language selector */}
+              <div>
+                <label htmlFor="auto-avatar-language" className="mb-1.5 block text-xs font-medium text-gray-400">
+                  Idioma de la Voz
+                </label>
+                <select
+                  id="auto-avatar-language"
+                  value={store.language}
                   disabled={isAutoBusy}
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setAvatarImageFile(file);
+                    store.setLanguage(e.target.value);
+                    const voices = getVoicesForLanguage(e.target.value);
+                    if (voices.length > 0) store.setVoice(voices[0].id);
                   }}
-                  className="hidden"
-                />
-              </label>
-              <p className="mt-1 text-[10px] text-gray-500">
-                O usa la imagen del canvas principal como avatar
-              </p>
+                  className="w-full rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 focus:border-accent focus:outline-none disabled:opacity-50"
+                >
+                  {TTS_LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Voice selector */}
+              {(() => {
+                const voices = getVoicesForLanguage(store.language);
+                return voices.length > 0 ? (
+                  <div>
+                    <label htmlFor="auto-avatar-voice" className="mb-1.5 block text-xs font-medium text-gray-400">
+                      Voz
+                    </label>
+                    <select
+                      id="auto-avatar-voice"
+                      value={store.voice}
+                      disabled={isAutoBusy}
+                      onChange={(e) => store.setVoice(e.target.value)}
+                      className="w-full rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 focus:border-accent focus:outline-none disabled:opacity-50"
+                    >
+                      {voices.map((v) => (
+                        <option key={v.id} value={v.id}>{v.name} ({v.gender})</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
 
           {/* Description textarea */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">
+            <label htmlFor="auto-video-prompt" className="mb-1.5 block text-xs font-medium text-gray-400">
               {store.activeTab === "avatar"
                 ? "Describe tu avatar video"
                 : "Describe tu video"}
             </label>
             <textarea
+              id="auto-video-prompt"
               value={autoPrompt}
               onChange={(e) => {
                 setAutoPrompt(e.target.value);
@@ -695,7 +753,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
 
           {/* Live progress steps */}
           {(isAutoBusy || completedSteps.length > 0) && (
-            <div className="space-y-1.5 rounded-lg border border-surface-lighter bg-surface px-3 py-2.5">
+            <div role="status" aria-live="polite" className="space-y-1.5 rounded-lg border border-surface-lighter bg-surface px-3 py-2.5">
               {autoStepLabels.map(({ key, label }, i) => {
                 const isDone = completedSteps.includes(key);
                 const isActive =

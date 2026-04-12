@@ -379,6 +379,11 @@ export function JewelryTryOnPanel({ imageFile, onProcess }: JewelryTryOnPanelPro
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Muestra tu joyeria en exhibidores, flotando, o en modelos generados por IA.
+      </p>
+
       {/* Error card */}
       {errorMsg && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5">

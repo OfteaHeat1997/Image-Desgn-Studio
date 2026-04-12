@@ -18,6 +18,8 @@ import {
   Star,
   Palette,
   Globe,
+  Copy,
+  Check as CheckIcon,
 } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -154,6 +156,8 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
 
   // Inline error state
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Copy prompt state
+  const [copiedConceptId, setCopiedConceptId] = useState<string | null>(null);
 
   /* ---- Ask Claude for concepts ---- */
   const handleAskDirector = useCallback(async () => {
@@ -198,6 +202,17 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
       setIsThinking(false);
     }
   }, [productType, selectedScenario]);
+
+  /* ---- Copy concept prompt to clipboard ---- */
+  const handleCopyPrompt = useCallback((concept: PhotoConcept) => {
+    navigator.clipboard.writeText(concept.prompt).then(() => {
+      setCopiedConceptId(concept.id);
+      toast.success("Prompt copiado — pegalo en Fondos con IA");
+      setTimeout(() => setCopiedConceptId(null), 2500);
+    }).catch(() => {
+      toast.error("No se pudo copiar");
+    });
+  }, []);
 
   /* ---- Generate the selected concept ---- */
   const handleCreatePhoto = useCallback(async (concept: PhotoConcept) => {
@@ -308,6 +323,11 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
           "Puedes editar el prompt generado antes de crear la foto para ajustar detalles.",
         ]}
       />
+
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500 -mt-1">
+        La IA actua como tu director creativo — genera 4 conceptos de fotografia profesional para tu producto. Tu eliges el que mas te guste.
+      </p>
 
       {/* Step 1: Product type */}
       <div>
@@ -471,25 +491,40 @@ export function AiPromptPanel({ imageFile, onProcess }: AiPromptPanelProps) {
                   </div>
                 )}
 
-                {/* Generate button */}
-                <Button
-                  variant={concept.isFree ? "primary" : "outline"}
-                  size="sm"
-                  className={cn(
-                    "w-full",
-                    concept.isFree && "bg-emerald-600 hover:bg-emerald-700",
-                  )}
-                  onClick={() => handleCreatePhoto(concept)}
-                  disabled={!imageFile || isGenerating}
-                  loading={isCurrentlyGenerating}
-                  leftIcon={<ChevronRight className="h-3.5 w-3.5" />}
-                >
-                  {isCurrentlyGenerating
-                    ? statusText || "Creando..."
-                    : concept.isFree
-                      ? "Crear Foto (Gratis)"
-                      : "Crear Foto (~$0.05)"}
-                </Button>
+                {/* Action row: copy prompt + generate */}
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPrompt(concept)}
+                    title="Copiar prompt para usar en Fondos con IA"
+                    className="flex items-center gap-1 rounded-md border border-surface-lighter bg-surface px-2 py-1.5 text-[10px] text-gray-400 hover:text-gray-200 hover:border-surface-hover transition-colors shrink-0"
+                  >
+                    {copiedConceptId === concept.id ? (
+                      <CheckIcon className="h-3 w-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                    {copiedConceptId === concept.id ? "Copiado" : "Copiar"}
+                  </button>
+                  <Button
+                    variant={concept.isFree ? "primary" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "flex-1",
+                      concept.isFree && "bg-emerald-600 hover:bg-emerald-700",
+                    )}
+                    onClick={() => handleCreatePhoto(concept)}
+                    disabled={!imageFile || isGenerating}
+                    loading={isCurrentlyGenerating}
+                    leftIcon={<ChevronRight className="h-3.5 w-3.5" />}
+                  >
+                    {isCurrentlyGenerating
+                      ? statusText || "Creando..."
+                      : concept.isFree
+                        ? "Crear Foto (Gratis)"
+                        : "Crear Foto (~$0.05)"}
+                  </Button>
+                </div>
               </div>
             );
           })}

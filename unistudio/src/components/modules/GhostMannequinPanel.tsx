@@ -175,6 +175,11 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Crea el efecto de maniqui invisible para mostrar tu ropa de forma profesional en tu catalogo.
+      </p>
+
       {/* Error card */}
       {errorMsg && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5">

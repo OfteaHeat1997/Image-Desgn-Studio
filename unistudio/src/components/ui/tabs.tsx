@@ -80,6 +80,7 @@ export function TabContent({ className, ...props }: TabContentProps) {
       className={cn(
         "mt-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
         "data-[state=inactive]:hidden",
+        "data-[state=active]:animate-in data-[state=active]:fade-in-0 duration-200",
         className,
       )}
       {...props}

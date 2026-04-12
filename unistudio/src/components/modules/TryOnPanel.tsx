@@ -366,6 +366,27 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
               </div>
             </div>
 
+            {/* Provider auto-selection badge */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-500">Proveedor activo:</span>
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                effectiveProvider === "idm-vton"
+                  ? "bg-blue-500/20 text-blue-300"
+                  : effectiveProvider === "fashn"
+                    ? "bg-emerald-500/20 text-emerald-300"
+                    : "bg-accent/20 text-accent-light"
+              )}>
+                {effectiveProvider === "auto" ? "Auto" : effectiveProvider === "idm-vton" ? "IDM-VTON" : "FASHN v1.6"}
+              </span>
+              {provider === "auto" && !isLingerieOrSwimwear && (
+                <span className="text-[10px] text-gray-600">— auto seleccionado</span>
+              )}
+              {isLingerieOrSwimwear && (
+                <span className="text-[10px] text-blue-500">— forzado por tipo de prenda</span>
+              )}
+            </div>
+
             {/* Lingerie/swimwear notice */}
             {isLingerieOrSwimwear && (
               <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 p-2.5">

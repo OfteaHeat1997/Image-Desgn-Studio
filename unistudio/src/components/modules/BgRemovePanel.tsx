@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select } from "@/components/ui/select";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { TabRoot, TabList, TabTrigger, TabContent } from "@/components/ui/tabs";
+import { ImageCompare } from "@/components/ui/image-compare";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
 
@@ -349,6 +350,8 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
   const [progressPct, setProgressPct] = useState(0);
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [panelResultUrl, setPanelResultUrl] = useState<string | null>(null);
+  const [panelBeforeUrl, setPanelBeforeUrl] = useState<string | null>(null);
   const isFree = !isolateProduct && (selectedProvider === "browser" || selectedProvider === "withoutbg");
 
   // Track the last result blob URL so we can revoke it on replacement and unmount
@@ -585,6 +588,14 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
       if (lastResultUrlRef.current) URL.revokeObjectURL(lastResultUrlRef.current);
       const url = URL.createObjectURL(resultBlob);
       lastResultUrlRef.current = url;
+
+      // Store for in-panel comparison slider
+      if (imageFile) {
+        const beforeObjectUrl = URL.createObjectURL(imageFile);
+        setPanelBeforeUrl(beforeObjectUrl);
+      }
+      setPanelResultUrl(url);
+
       onProcess(url, undefined, operationCost);
     } catch (error) {
       console.error("BG removal error:", error);
@@ -624,6 +635,11 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
           "El margen de recorte (8-12%) es ideal para e-commerce — deja espacio alrededor del producto sin que se vea lejano.",
         ]}
       />
+
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500 -mt-1">
+        Remueve el fondo de tu imagen. Selecciona un metodo y haz clic en <strong className="text-gray-400">Remover Fondo</strong>.
+      </p>
 
       {/* E-Commerce one-click preset */}
       {imageFile && (
@@ -963,6 +979,22 @@ export function BgRemovePanel({ imageFile, onProcess }: BgRemovePanelProps) {
         <p className="text-center text-xs text-emerald-400">
           {statusText}
         </p>
+      )}
+
+      {/* Before/after comparison slider */}
+      {panelResultUrl && panelBeforeUrl && !isProcessing && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium text-gray-400">Comparacion Antes / Despues</p>
+          <ImageCompare
+            beforeSrc={panelBeforeUrl}
+            afterSrc={panelResultUrl}
+            beforeLabel="Antes"
+            afterLabel="Despues"
+            showHeaderLabels
+            showDragHint
+            className="max-h-64"
+          />
+        </div>
       )}
     </div>
   );

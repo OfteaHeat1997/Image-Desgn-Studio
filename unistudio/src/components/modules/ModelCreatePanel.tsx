@@ -204,6 +204,11 @@ export function ModelCreatePanel({ imageFile, onProcess }: ModelCreatePanelProps
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Genera modelos de IA personalizados para mostrar tu ropa — sin necesidad de contratar modelos reales.
+      </p>
+
       {/* Gender */}
       <Select
         label="Genero"

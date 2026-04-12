@@ -486,6 +486,11 @@ export function CompliancePanel({ imageFile, onProcess }: CompliancePanelProps) 
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Verifica que tu imagen cumple con los requisitos de cada plataforma antes de publicar. 100% gratis.
+      </p>
+
       {/* Platform selector */}
       <div>
         <label className="mb-2 block text-xs font-medium text-gray-400">

@@ -173,6 +173,11 @@ export function UpscalePanel({ imageFile, onProcess }: UpscalePanelProps) {
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Aumenta la resolucion de tu imagen hasta 4x sin perder calidad — ideal para impresion y marketplaces.
+      </p>
+
       {/* Provider selector */}
       <Select
         label="Proveedor de Upscale"
