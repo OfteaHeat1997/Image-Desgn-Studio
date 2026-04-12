@@ -27,7 +27,7 @@ let _apiKey: string | null = null;
 
 function getApiKey(): string {
   if (!_apiKey) {
-    const key = process.env.FAL_KEY ?? process.env.FAL_API_KEY;
+    const key = (process.env.FAL_KEY ?? process.env.FAL_API_KEY)?.trim();
     if (!key) {
       throw new FalApiError(
         'FAL_KEY environment variable is not set. Get one at https://fal.ai/dashboard/keys',

@@ -15,10 +15,6 @@ import type { VideoProviderKey, VideoCategory, VideoMode } from '@/types/video';
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
-  // DEBUG: verify FAL_KEY reaches the runtime (remove after confirming)
-  console.log('FAL_KEY exists:', !!process.env.FAL_KEY);
-  console.log('FAL_KEY length:', process.env.FAL_KEY?.length ?? 0);
-
   try {
     const body = await request.json();
     const {

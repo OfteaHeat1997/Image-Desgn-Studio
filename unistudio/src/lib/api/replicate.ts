@@ -8,7 +8,7 @@ let _client: Replicate | null = null;
 
 function getClient(): Replicate {
   if (!_client) {
-    const token = process.env.REPLICATE_API_TOKEN;
+    const token = process.env.REPLICATE_API_TOKEN?.trim();
     if (!token) {
       throw new ReplicateApiError(
         'REPLICATE_API_TOKEN environment variable is not set',
@@ -85,7 +85,7 @@ export async function extractOutputUrl(output: any): Promise<string> {
  * headers and require the API token — browsers can't access them directly.
  */
 async function replicateFileToDataUrl(fileUrl: string): Promise<string> {
-  const token = process.env.REPLICATE_API_TOKEN;
+  const token = process.env.REPLICATE_API_TOKEN?.trim();
   const res = await fetch(fileUrl, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

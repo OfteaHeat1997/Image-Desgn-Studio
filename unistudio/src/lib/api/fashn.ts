@@ -39,7 +39,7 @@ let _apiKey: string | null = null;
 
 function getApiKey(): string {
   if (!_apiKey) {
-    const key = process.env.FASHN_API_KEY;
+    const key = process.env.FASHN_API_KEY?.trim();
     if (!key) {
       throw new FashnApiError(
         'FASHN_API_KEY environment variable is not set',
