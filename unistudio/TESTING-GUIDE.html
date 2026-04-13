@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniStudio — Guia Completa de Testing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#09090B;--surface:#111113;--surface2:#1A1A1D;--border:#27272A;--accent:#C5A47E;--accent2:#D4B896;--green:#22C55E;--red:#EF4444;--yellow:#EAB308;--blue:#3B82F6;--purple:#A855F7;--text:#E4E4E7;--text2:#A1A1AA;--text3:#71717A}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;line-height:1.6}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent2);text-decoration:underline}
+
+/* Header */
+.hero{background:linear-gradient(135deg,#09090B 0%,#1a1520 50%,#09090B 100%);border-bottom:1px solid var(--border);padding:60px 20px;text-align:center}
+.hero h1{font-size:2.8rem;background:linear-gradient(135deg,var(--accent),var(--accent2),#fff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px}
+.hero p{color:var(--text2);font-size:1.1rem;max-width:700px;margin:0 auto}
+.hero .subtitle{background:var(--surface2);display:inline-block;padding:8px 20px;border-radius:8px;border:1px solid var(--border);margin-top:20px;color:var(--text2);font-size:0.9rem}
+
+/* Navigation */
+.nav{position:sticky;top:0;z-index:100;background:rgba(9,9,11,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;white-space:nowrap}
+.nav-inner{max-width:1200px;margin:0 auto;display:flex;gap:4px;padding:8px 0}
+.nav a{padding:8px 16px;border-radius:6px;color:var(--text2);font-size:0.82rem;font-weight:500;transition:all 0.2s}
+.nav a:hover{background:var(--surface2);color:var(--text);text-decoration:none}
+
+/* Layout */
+.container{max-width:1200px;margin:0 auto;padding:40px 20px}
+section{margin-bottom:60px}
+h2{font-size:1.8rem;color:var(--accent);margin-bottom:8px;padding-bottom:12px;border-bottom:2px solid var(--border)}
+h3{font-size:1.3rem;color:var(--text);margin:30px 0 12px}
+h4{font-size:1.05rem;color:var(--accent2);margin:20px 0 8px}
+p{color:var(--text2);margin-bottom:12px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px}
+.card:hover{border-color:var(--accent);transition:border-color 0.3s}
+.card-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+.card-title{font-size:1.15rem;font-weight:600;color:var(--text)}
+.card-subtitle{font-size:0.82rem;color:var(--text3)}
+
+/* Checklist */
+.checklist{list-style:none;padding:0}
+.checklist li{padding:10px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;display:flex;align-items:flex-start;gap:10px;background:var(--surface);font-size:0.9rem;cursor:pointer;transition:all 0.2s}
+.checklist li:hover{border-color:var(--accent);background:var(--surface2)}
+.checklist li.checked{border-color:var(--green);background:rgba(34,197,94,0.05)}
+.checklist li.checked .check-box{background:var(--green);border-color:var(--green);color:#fff}
+.checklist li.checked .check-text{text-decoration:line-through;color:var(--text3)}
+.check-box{width:22px;height:22px;border:2px solid var(--border);border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;color:transparent;transition:all 0.2s}
+.check-text{flex:1}
+
+/* Tags */
+.tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:600;margin-right:4px;margin-bottom:4px}
+.tag-free{background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3)}
+.tag-paid{background:rgba(234,179,8,0.15);color:var(--yellow);border:1px solid rgba(234,179,8,0.3)}
+.tag-api{background:rgba(168,85,247,0.15);color:var(--purple);border:1px solid rgba(168,85,247,0.3)}
+.tag-env{background:rgba(59,130,246,0.15);color:var(--blue);border:1px solid rgba(59,130,246,0.3)}
+.tag-critical{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+
+/* Steps */
+.step{display:flex;gap:16px;margin-bottom:16px}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0}
+.step-content{flex:1}
+.step-content strong{color:var(--text)}
+
+/* Expected Result */
+.expect{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px 18px;margin:12px 0;font-size:0.88rem}
+.expect::before{content:"✓ Resultado Esperado: ";color:var(--green);font-weight:600}
+
+/* Warning */
+.warn{background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:8px;padding:14px 18px;margin:12px 0;font-size:0.88rem}
+.warn::before{content:"⚠ Importante: ";color:var(--yellow);font-weight:600}
+
+/* Error */
+.err{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:14px 18px;margin:12px 0;font-size:0.88rem}
+.err::before{content:"✗ Si falla: ";color:var(--red);font-weight:600}
+
+/* Env var table */
+.env-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:0.85rem}
+.env-table th{background:var(--surface2);color:var(--accent);text-align:left;padding:10px 14px;border:1px solid var(--border)}
+.env-table td{padding:10px 14px;border:1px solid var(--border);color:var(--text2)}
+.env-table tr:hover td{background:var(--surface)}
+.env-table code{background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:0.82rem;color:var(--accent2)}
+
+/* Progress tracker */
+.progress-bar{background:var(--surface2);border-radius:8px;height:28px;overflow:hidden;margin:16px 0;position:relative}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:8px;transition:width 0.5s;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:600;color:var(--bg)}
+.progress-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.75rem;font-weight:600;color:var(--text2)}
+
+/* Grid */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:768px){.grid-2{grid-template-columns:1fr}}
+
+/* Section counter */
+.section-count{font-size:0.8rem;color:var(--text3);font-weight:400;margin-left:8px}
+
+/* Collapsible */
+details{margin-bottom:8px}
+details summary{cursor:pointer;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-weight:500;color:var(--text);list-style:none;display:flex;align-items:center;gap:8px}
+details summary::before{content:"▸";color:var(--accent);font-size:1.1rem;transition:transform 0.2s}
+details[open] summary::before{transform:rotate(90deg)}
+details[open] summary{border-radius:8px 8px 0 0;border-bottom:1px dashed var(--border)}
+details .detail-content{padding:16px;background:var(--surface);border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>UniStudio Testing Guide</h1>
+  <p>Guia paso a paso para probar CADA boton, cada feature y cada flujo de tu aplicacion. Marca cada item cuando lo verifiques.</p>
+  <div class="subtitle">
+    📊 Total: <strong id="totalTests">0</strong> tests &nbsp;|&nbsp;
+    ✅ Completados: <strong id="passedTests">0</strong> &nbsp;|&nbsp;
+    Progreso: <strong id="progressPct">0%</strong>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="#prereqs">0. Pre-requisitos</a>
+    <a href="#dashboard">1. Dashboard</a>
+    <a href="#editor">2. Editor</a>
+    <a href="#mod-bg-remove">3. Quitar Fondo</a>
+    <a href="#mod-bg-generate">4. Fondos IA</a>
+    <a href="#mod-enhance">5. Mejorar</a>
+    <a href="#mod-shadows">6. Sombras</a>
+    <a href="#mod-inpaint">7. Inpaint</a>
+    <a href="#mod-outpaint">8. Outpaint</a>
+    <a href="#mod-tryon">9. TryOn</a>
+    <a href="#mod-model">10. Modelo IA</a>
+    <a href="#mod-ghost">11. Ghost</a>
+    <a href="#mod-jewelry">12. Joyeria</a>
+    <a href="#mod-video">13. Video</a>
+    <a href="#mod-ad">14. Anuncios</a>
+    <a href="#mod-compliance">15. Compliance</a>
+    <a href="#mod-aiprompt">16. Director IA</a>
+    <a href="#mod-agent">17. AI Agent</a>
+    <a href="#gallery">18. Galeria</a>
+    <a href="#batch">19. Batch</a>
+    <a href="#ux">20. UX General</a>
+    <a href="#audit" style="background:rgba(34,197,94,0.1);color:var(--green)">Audit Fixes (Apr 2026)</a>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============================================================ -->
+<!-- AUDIT FIXES (APR 2026) -->
+<!-- ============================================================ -->
+<section id="audit">
+<h2>Auditoria de Estabilidad — 27 Fixes (Abr 12, 2026)</h2>
+<p>Auditoria completa del proyecto: 3 fases + 2 rondas deep hunt. Todos los bugs arreglados y pusheados.</p>
+
+<h3>Infraestructura</h3>
+<ul class="checklist" data-group="audit-infra">
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Vercel timeout 300s</strong> — video/avatar/model-create/tryon/batch ahora tienen 300s (antes 60s, videos fallaban)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>API keys .trim()</strong> — fal, replicate, fashn ahora hacen trim (trailing \n causaba 401)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Error boundary global</strong> — error.tsx + global-error.tsx, app ya no crashea en errores no manejados</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Claude model IDs centralizados</strong> — CLAUDE_HAIKU y CLAUDE_SONNET en constants.ts</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Toast en 13 paneles</strong> — todos los modulos ahora muestran toast.error() (antes solo 4)</span></li>
+</ul>
+
+<h3>API Routes Corregidas</h3>
+<ul class="checklist" data-group="audit-api">
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Video negative_prompt</strong> — Wan 2.2 ya no duplica productos (guidance_scale 3.0 + negative prompt)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Upscale Clarity</strong> — resemblance 0.85, creativity 0.25 + usa replicateUrl en vez de data URL</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Inpaint negative_prompt</strong> — ahora se envia a flux-fill-pro/dev (antes se calculaba pero no se enviaba)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Kontext Pro output_format</strong> — eliminado parametro no soportado de jewelry + shadows</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Avatar validacion</strong> — script length 2000 chars, provider existence, TTS provider checks</span></li>
+</ul>
+
+<h3>Crashes Frontend Corregidos</h3>
+<ul class="checklist" data-group="audit-frontend">
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Agent retry</strong> — ya no queda en "processing" infinito si falla el retry</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Agent page null guards</strong> — execution steps out of bounds + missing label</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Batch page crash</strong> — optional chaining en resultUrl?.startsWith()</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>BgRemovePanel canvas</strong> — 9 getContext("2d")! reemplazados con null checks</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Video en gallery</strong> — resultados de video ahora se guardan (toPersistentThumbnail fallaba en .mp4)</span></li>
+</ul>
+
+<h3>Estado y Memoria</h3>
+<ul class="checklist" data-group="audit-state">
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>brand-store partialize</strong> — excluye base64 logos de localStorage (evita QuotaExceededError)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>gallery-store race condition</strong> — addImage/addImages ahora agrega sync, thumbnail async</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>video-store quota</strong> — localStorage wrapper con QuotaExceededError handling</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>brand-kit shadowType</strong> — defaultShadowType ahora se persiste al store</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">&#10003;</span><span class="check-text"><strong>Memory leaks</strong> — blob URLs revocados en useAgentPipeline, UpscalePanel, EnhancePanel</span></li>
+</ul>
+
+<div class="card" style="border-color:var(--green);margin-top:24px">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(34,197,94,0.1);color:var(--green)">&#10003;</div>
+    <div>
+      <div class="card-title" style="color:var(--green)">Proyecto al 93% de completitud</div>
+      <div class="card-subtitle">27 bugs arreglados en 30+ archivos. Queda: before/after slider, inpaint mask mode, brand kit integration.</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 0: PRE-REQUISITOS -->
+<!-- ============================================================ -->
+<section id="prereqs">
+<h2>0. Pre-requisitos Antes de Testear</h2>
+<p>Antes de probar cualquier modulo, necesitas verificar que tu entorno esta configurado correctamente.</p>
+
+<h3>A. Variables de Entorno (.env.local)</h3>
+<p>Abre tu archivo <code>.env.local</code> en la raiz del proyecto y verifica que estas variables existen:</p>
+
+<table class="env-table">
+<tr><th>Variable</th><th>Para Que Sirve</th><th>Modulos que la Usan</th><th>Como Obtenerla</th></tr>
+<tr><td><code>REPLICATE_API_TOKEN</code></td><td>API de IA para procesar imagenes/video</td><td>BG Remove, BG Generate, Shadows IA, Inpaint, Outpaint, TryOn, Model Create, Ghost, Jewelry, Video, Avatar</td><td><a href="https://replicate.com/account/api-tokens" target="_blank">replicate.com/account</a></td></tr>
+<tr><td><code>FAL_KEY</code></td><td>Proveedor alternativo de video IA</td><td>Video (LTX, Wan 2.5, Kling, Minimax)</td><td><a href="https://fal.ai/dashboard/keys" target="_blank">fal.ai/dashboard</a></td></tr>
+<tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude IA para texto y planificacion</td><td>BG Generate (optimizar prompt), Director Creativo, AI Agent, Ad Creator, Video Auto</td><td><a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a></td></tr>
+<tr><td><code>FASHN_API_KEY</code></td><td>Try-on especializado para ropa</td><td>TryOn (proveedor FASHN)</td><td><a href="https://fashn.ai/" target="_blank">fashn.ai</a></td></tr>
+<tr><td><code>DATABASE_URL</code></td><td>Base de datos PostgreSQL</td><td>Historial, Galeria desde DB</td><td>Tu proveedor PostgreSQL</td></tr>
+</table>
+
+<div class="warn">Si NO tienes una variable, los modulos que la usan mostraran un error. Eso es NORMAL — no significa que el codigo esta roto. Significa que necesitas la API key.</div>
+
+<h3>B. Checklist de Preparacion</h3>
+<ul class="checklist" data-group="prereqs">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text">El servidor esta corriendo (<code>npm run dev</code>) y puedo abrir <code>http://localhost:3000</code></span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text">Tengo al menos <code>REPLICATE_API_TOKEN</code> en mi <code>.env.local</code></span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text">Tengo una imagen de prueba lista (JPG o PNG de un producto, ~1MB)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text">Abri <code>/api/health</code> en el navegador y vi el JSON de estado</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text">Tengo la consola del navegador abierta (F12 → Console) para ver errores</span></li>
+</ul>
+
+<h3>C. Imagen de Prueba Recomendada</h3>
+<p>Para mejores resultados, usa una foto de producto con fondo simple. Tamaño ideal: 1000x1000px, JPG, menos de 5MB.</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: DASHBOARD -->
+<!-- ============================================================ -->
+<section id="dashboard">
+<h2>1. Dashboard (Pagina Principal) <span class="section-count">/ pagina</span></h2>
+<p>Ruta: <code>http://localhost:3000</code></p>
+
+<h3>Que Testear</h3>
+<ul class="checklist" data-group="dashboard">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>La pagina carga</strong> — Ves el titulo "UniStudio", el hero con carousel, y las tarjetas de modulos</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Hero carousel</strong> — Se mueven automaticamente los 5 stages (cada ~5 seg). Los puntos de navegacion funcionan al hacer click</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton "Empezar Gratis"</strong> — Click → te lleva a <code>/editor?module=bg-remove</code></span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton "Director Creativo IA"</strong> — Click → te lleva a <code>/editor?module=ai-prompt</code></span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Seccion "No sabes por donde empezar?"</strong> — 3 escenarios visibles (Ropa, Instagram, Joyeria) con pasos clickeables</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>18 tarjetas de modulos</strong> — Cada una muestra nombre, descripcion, costo, e icono. Hover muestra video preview</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Usar herramienta" en cada tarjeta</strong> — Click → te lleva a <code>/editor?module={id}</code> correcto</span></li>
+</ul>
+
+<div class="expect">La pagina principal carga rapido, todo el texto esta en español, los botones navegan correctamente al editor con el modulo seleccionado.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: EDITOR (GENERAL) -->
+<!-- ============================================================ -->
+<section id="editor">
+<h2>2. Editor — Interfaz General <span class="section-count">/ editor</span></h2>
+<p>Ruta: <code>http://localhost:3000/editor</code></p>
+
+<h3>Layout y Navegacion</h3>
+<ul class="checklist" data-group="editor-layout">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>3 paneles visibles</strong> — Sidebar izquierdo (iconos de modulos), centro (canvas/dropzone), sidebar derecho (capas)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>ModuleSidebar (izquierda)</strong> — 6 categorias visibles: FONDOS, MEJORA, EDICION, MODELOS, CONTENIDO, AUTOMATIZACION</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Hacer click en un modulo del sidebar</strong> — El panel izquierdo cambia al modulo seleccionado. El icono se resalta en dorado</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Toolbar superior</strong> — Tiene dropdown de modulos, botones de zoom (+ / - / fit), boton de descarga</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Sidebar de modulos</strong> — Muestra los 18 modulos categorizados. Seleccionar uno cambia el panel</span></li>
+</ul>
+
+<h3>Subir Imagen</h3>
+<ul class="checklist" data-group="editor-upload">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropzone visible</strong> — En el centro ves "Arrastra una imagen aqui" o similar zona de subida</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Drag & drop funciona</strong> — Arrastra un JPG/PNG al centro → la imagen aparece en el canvas</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Click para seleccionar</strong> — Click en la dropzone → se abre el explorador de archivos → seleccionar imagen → aparece</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Imagen grande (&gt;5MB)</strong> — Sube sin error (el limite es 50MB segun next.config)</span></li>
+</ul>
+
+<h3>Zoom y Canvas</h3>
+<ul class="checklist" data-group="editor-zoom">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Zoom In (+)</strong> — La imagen se hace mas grande</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Zoom Out (-)</strong> — La imagen se hace mas pequeña</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Fit to Screen (100%)</strong> — La imagen se ajusta al area visible</span></li>
+</ul>
+
+<h3>Exportar / Descargar</h3>
+<ul class="checklist" data-group="editor-export">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton Descargar (sin imagen)</strong> — Muestra toast de advertencia: "No hay imagen para exportar"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton Descargar (con imagen)</strong> — Se abre modal con opciones de formato (PNG/JPG/WebP) y calidad</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Exportar PNG</strong> — Se descarga un archivo .png al computador</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Exportar JPG con calidad</strong> — Se descarga un .jpg (el tamaño cambia segun la calidad)</span></li>
+</ul>
+
+<h3>Empty State (sin imagen)</h3>
+<ul class="checklist" data-group="editor-empty">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Modulo que necesita imagen (ej: Quitar Fondo) sin imagen subida</strong> — Muestra EmptyState: icono + "Sube una imagen para comenzar" + instrucciones del modulo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Modulo que NO necesita imagen (ej: Crear Modelo IA)</strong> — Muestra los controles directamente, sin pedir imagen</span></li>
+</ul>
+
+<h3>Procesamiento General</h3>
+<ul class="checklist" data-group="editor-process">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Despues de procesar exitosamente</strong> — Aparece toast verde: "Imagen procesada con exito" + costo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>ResultBanner</strong> — Banner verde arriba del panel con costo y sugerencias de siguiente paso</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Antes/Despues</strong> — Slider de comparacion visible entre imagen original y procesada</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Aceptar y Seguir Editando"</strong> — La imagen procesada reemplaza la original para seguir editando</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Volver al Original"</strong> — Regresa a la imagen original sin cambios</span></li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 3: QUITAR FONDO -->
+<!-- ============================================================ -->
+<section id="mod-bg-remove">
+<h2>3. Quitar Fondo <span class="section-count">BgRemovePanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(197,164,126,0.15)">✂️</div>
+    <div><div class="card-title">Quitar Fondo</div><div class="card-subtitle">Elimina el fondo de cualquier imagen de producto</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS (Navegador)</span>
+  <span class="tag tag-paid">$0.01 (Replicate)</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+</div>
+
+<h3>Paso a Paso para Testear</h3>
+<div class="step"><div class="step-num">1</div><div class="step-content"><strong>Ir a</strong> <code>/editor?module=bg-remove</code> o seleccionar "Quitar Fondo" del sidebar</div></div>
+<div class="step"><div class="step-num">2</div><div class="step-content"><strong>Subir una imagen</strong> de producto con fondo (ej: producto sobre mesa)</div></div>
+<div class="step"><div class="step-num">3</div><div class="step-content"><strong>Seleccionar proveedor:</strong> Comienza con "Navegador" (gratis, no necesita API key)</div></div>
+<div class="step"><div class="step-num">4</div><div class="step-content"><strong>Seleccionar tipo de salida:</strong> "Transparente" para PNG sin fondo</div></div>
+<div class="step"><div class="step-num">5</div><div class="step-content"><strong>Click "Remover Fondo"</strong></div></div>
+
+<h3>Checklist de Verificacion</h3>
+<ul class="checklist" data-group="bg-remove">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Panel muestra ModuleHeader</strong> — Titulo, descripcion, "Por que lo necesitas", costo, pasos</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>3 proveedores visibles</strong> — Navegador (★★★, GRATIS), Docker Local, Replicate ($0.01)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tipo de salida: Transparente</strong> — Al seleccionar, no muestra opciones extra</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tipo de salida: Color Solido</strong> — Muestra color picker + 10 colores preset</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tipo de salida: Difuminado</strong> — Muestra slider de blur (5-100px)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown de sombra</strong> — 4 opciones: None, Soft, Hard, Reflection</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown "Redimensionar"</strong> — Presets de marketplace (1000x1000, 2048x2048, etc.)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Procesar con Navegador (gratis)</strong> — Boton cambia a "Removiendo Fondo...", barra de progreso aparece, resultado muestra fondo transparente (cuadros grises)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Procesar con Replicate ($0.01)</strong> — Misma experiencia pero llama a la API. Requiere REPLICATE_API_TOKEN</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Error sin API key</strong> — Si usas Replicate sin token, muestra toast de error (NO un alert del navegador)</span></li>
+</ul>
+
+<div class="expect">Imagen sin fondo. Si elegiste "Transparente" → PNG con cuadros grises. Si "Color Solido" → fondo del color elegido. Si "Difuminado" → fondo borroso.</div>
+<div class="err">Si ves "alert()" del navegador (popup feo de Windows), es un BUG. Deberia mostrar un toast estilizado.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 4: FONDOS CON IA -->
+<!-- ============================================================ -->
+<section id="mod-bg-generate">
+<h2>4. Fondos con IA <span class="section-count">BgGeneratePanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(59,130,246,0.15)">🖼️</div>
+    <div><div class="card-title">Fondos con IA</div><div class="card-subtitle">Reemplaza el fondo con escenas generadas por IA</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS (Estudio presets)</span>
+  <span class="tag tag-paid">$0.003-$0.05 (IA)</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-env">ANTHROPIC_API_KEY</span>
+</div>
+
+<ul class="checklist" data-group="bg-generate">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Grid de fondos</strong> — Categorias visibles: Estudio, Naturaleza, Interior, Lujo, Belleza, Abstracto, Temporada</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Presets de Estudio (GRATIS)</strong> — Seleccionar "Blanco" → boton dice "Generar Fondo (Gratis)". Click → fondo blanco aplicado localmente sin API</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Preset de IA (ej: "Jardin")</strong> — Boton dice "Generar Fondo (~$0.05)". Click → llama API → fondo reemplazado con escena</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Prompt personalizado</strong> — Escribir "superficie de marmol con velas" en el textarea. Click → Claude optimiza el prompt → genera fondo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown de proporcion</strong> — 6 opciones (1:1, 4:5, 9:16, 16:9, 3:2, 2:3). La imagen resultado tiene la proporcion seleccionada</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Error sin REPLICATE_API_TOKEN</strong> — Toast rojo de error (no popup del navegador)</span></li>
+</ul>
+
+<div class="expect">Imagen con producto sobre el nuevo fondo generado. Para presets de Estudio: fondo liso inmediato. Para IA: fondo realista de la escena seleccionada.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 5: MEJORAR CALIDAD -->
+<!-- ============================================================ -->
+<section id="mod-enhance">
+<h2>5. Mejorar Calidad <span class="section-count">EnhancePanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(34,197,94,0.15)">✨</div>
+    <div><div class="card-title">Mejorar Calidad</div><div class="card-subtitle">Ajusta brillo, contraste, nitidez y color automaticamente</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS</span>
+</div>
+
+<ul class="checklist" data-group="enhance">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>10 estilos rapidos</strong> — Botones: Auto, E-Commerce, Moda, Belleza, Lujo, Natural, Luminoso, Dramatico, Vintage, Nitido</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Click "Auto"</strong> — Los sliders se ajustan automaticamente a valores predeterminados</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>6 sliders manuales</strong> — Brillo, Contraste, Saturacion, Nitidez, Exposicion, Reduccion de Ruido. Todos se mueven y muestran su valor</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Balance de Blancos</strong> — Dropdown: Automatico, Calido, Frio, Luz de Dia, Tungsteno</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton "Reiniciar"</strong> — Todos los sliders vuelven a 0/valor por defecto</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Click "Aplicar Mejora"</strong> — Progreso visible → imagen mejorada en canvas</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>NO necesita API key</strong> — Funciona 100% local. Si falla, es un bug real</span></li>
+</ul>
+
+<div class="expect">Imagen con colores mejorados, mas nitida, mejor iluminacion. Comparacion antes/despues muestra diferencia clara.</div>
+<div class="warn">Este modulo es GRATIS y local. Si falla, el problema es del codigo, no de API keys faltantes.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 6: SOMBRAS -->
+<!-- ============================================================ -->
+<section id="mod-shadows">
+<h2>6. Sombras e Iluminacion <span class="section-count">ShadowsPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(234,179,8,0.15)">☀️</div>
+    <div><div class="card-title">Sombras e Iluminacion</div><div class="card-subtitle">Agrega sombras realistas y reajusta la iluminacion</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS (basicas)</span>
+  <span class="tag tag-paid">$0.04-$0.05 (IA)</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+</div>
+
+<ul class="checklist" data-group="shadows">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>5 tipos de sombra visibles</strong> — Sombra Suelta, Sombra de Contacto, Reflejo, Iluminacion IA, Sombras IA Avanzadas</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Sombra Suelta (GRATIS)</strong> — Sliders: Offset X, Offset Y, Blur, Opacidad. Color picker. Click "Agregar Sombra" → sombra basica aparece</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Sombra de Contacto (GRATIS)</strong> — Sliders: Spread, Opacidad, Blur. Resultado: sombra debajo del producto</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Reflejo (GRATIS)</strong> — Sliders de intensidad y fade. Resultado: reflejo debajo del producto</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Iluminacion IA ($0.04)</strong> — Dropdown: 8 presets (Soft Front, Left Key, Right Key, Top Down, Rim Light, Golden Hour, Dramatic, Studio). Requiere REPLICATE_API_TOKEN</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Sombras IA Avanzadas ($0.05)</strong> — Textarea para describir la iluminacion deseada. Chips de sugerencia rapidos</span></li>
+</ul>
+
+<div class="expect">Sombras gratuitas: efecto instantaneo en canvas. Sombras IA: espera 10-30seg → imagen con iluminacion profesional.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 7: INPAINT -->
+<!-- ============================================================ -->
+<section id="mod-inpaint">
+<h2>7. Borrar y Reemplazar <span class="section-count">InpaintPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(168,85,247,0.15)">🧹</div>
+    <div><div class="card-title">Borrar y Reemplazar</div><div class="card-subtitle">Elimina objetos o cambia colores con texto</div></div>
+  </div>
+  <span class="tag tag-paid">$0.03-$0.05</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+</div>
+
+<ul class="checklist" data-group="inpaint">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Area de pintura (mask)</strong> — Puedes pintar sobre la imagen para marcar zonas a editar</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Textarea de prompt</strong> — Describir que quieres: "eliminar la etiqueta" o "cambiar color a rojo"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Sin descripcion</strong> — Toast de advertencia: "Por favor ingresa una descripcion de que hacer"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Procesar</strong> — Llama API → zona pintada es reemplazada segun la descripcion</span></li>
+</ul>
+
+<div class="expect">La zona pintada es reemplazada con el contenido descrito. El resto de la imagen queda intacto.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 8: OUTPAINT -->
+<!-- ============================================================ -->
+<section id="mod-outpaint">
+<h2>8. Extender Imagen <span class="section-count">OutpaintPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(59,130,246,0.15)">↔️</div>
+    <div><div class="card-title">Extender Imagen</div><div class="card-subtitle">Expande los bordes para cualquier formato de red social</div></div>
+  </div>
+  <span class="tag tag-paid">~$0.05</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+</div>
+
+<ul class="checklist" data-group="outpaint">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Presets de proporcion</strong> — Opciones para Instagram (1:1), Stories (9:16), Amazon (1:1), etc.</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dimensiones custom</strong> — Input de ancho y alto personalizado</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Procesar</strong> — API extiende la imagen rellenando los bordes con contenido generado por IA</span></li>
+</ul>
+
+<div class="expect">Imagen expandida al nuevo tamaño. Los bordes nuevos tienen contenido coherente generado por IA (no pixeles negros o estirados).</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 9: TRYON -->
+<!-- ============================================================ -->
+<section id="mod-tryon">
+<h2>9. Prueba Virtual <span class="section-count">TryOnPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(236,72,153,0.15)">👕</div>
+    <div><div class="card-title">Prueba Virtual (Try-On)</div><div class="card-subtitle">Coloca tu prenda sobre un modelo virtual</div></div>
+  </div>
+  <span class="tag tag-paid">$0.015-$0.05</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-env">FASHN_API_KEY</span>
+  <span class="tag tag-critical">Necesita 2 imagenes</span>
+</div>
+
+<div class="warn">Este modulo requiere DOS imagenes: la prenda (imagen ya subida en el editor) + una foto de modelo (segundo upload dentro del panel).</div>
+
+<ul class="checklist" data-group="tryon">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Imagen de prenda</strong> — Ya subida en el editor (la imagen principal)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropzone de modelo</strong> — Segundo upload DENTRO del panel para subir foto de modelo/persona</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Categoria</strong> — Dropdown: Parte Superior, Parte Inferior, Enterizo/Vestido</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tipo de Prenda</strong> — 3 tarjetas: Ropa Regular, Lenceria, Traje de Bano</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Proveedor</strong> — 4 tarjetas: Auto, FASHN v1.6, IDM-VTON, Kolors</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Lenceria/Traje de bano</strong> → automaticamente fuerza IDM-VTON (ignora seleccion manual)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton "Generar Prueba Virtual"</strong> — Solo habilitado cuando AMBAS imagenes estan subidas</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Resultado</strong> — Imagen de modelo vistiendo la prenda. Before=modelo original, After=con prenda</span></li>
+</ul>
+
+<div class="expect">Imagen de la persona/modelo usando la prenda. La prenda se ajusta al cuerpo de forma realista.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 10: MODELO IA -->
+<!-- ============================================================ -->
+<section id="mod-model">
+<h2>10. Crear Modelo IA <span class="section-count">ModelCreatePanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(168,85,247,0.15)">👤</div>
+    <div><div class="card-title">Crear Modelo IA</div><div class="card-subtitle">Genera modelos virtuales personalizables</div></div>
+  </div>
+  <span class="tag tag-paid">$0.055</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-free">No necesita imagen</span>
+</div>
+
+<div class="warn">Este modulo NO necesita una imagen subida. Genera un modelo desde cero.</div>
+
+<ul class="checklist" data-group="model-create">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>No muestra EmptyState</strong> — El panel muestra controles directamente (es un NO_IMAGE_MODULE)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Genero</strong> — Femenino, Masculino, No binario</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Edad</strong> — 18-25, 25-35, 35-45, 45-55, 55+</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tono de Piel</strong> — 5 botones de color: Claro, Medio claro, Medio, Medio oscuro, Oscuro</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Tipo de Cuerpo</strong> — Delgado, Atletico, Promedio, Curvilineo, Talla grande</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>6 botones de Pose</strong> — De Pie, Vista 3/4, Caminando, Sentado/a, Dinamica, Casual</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Expresion</strong> — Neutral, Sonrisa, Seria, Segura, Relajada</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Campos opcionales</strong> — Estilo de cabello (texto) y Detalles adicionales (textarea)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Click "Generar Modelo"</strong> → espera 15-30s → imagen de modelo fotorrealista generada</span></li>
+</ul>
+
+<div class="expect">Imagen fotorrealista de una persona que coincide con las especificaciones seleccionadas (genero, edad, piel, pose).</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 11: GHOST MANNEQUIN -->
+<!-- ============================================================ -->
+<section id="mod-ghost">
+<h2>11. Maniqui Invisible <span class="section-count">GhostMannequinPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(107,114,128,0.15)">👻</div>
+    <div><div class="card-title">Maniqui Invisible</div><div class="card-subtitle">Elimina el maniqui para mostrar la silueta natural de la prenda</div></div>
+  </div>
+  <span class="tag tag-paid">$0.05-$0.08</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+</div>
+
+<ul class="checklist" data-group="ghost">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Subir imagen de prenda en maniqui</strong> — Necesita imagen de ropa sobre maniqui fisico</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Procesar</strong> — Click → API elimina maniqui → prenda "flota" con forma 3D natural</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Resultado</strong> — Prenda sin maniqui visible, con silueta natural y bordes limpios</span></li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 12: JOYERIA -->
+<!-- ============================================================ -->
+<section id="mod-jewelry">
+<h2>12. Joyeria Virtual <span class="section-count">JewelryTryOnPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(234,179,8,0.15)">💎</div>
+    <div><div class="card-title">Joyeria Virtual</div><div class="card-subtitle">Coloca joyeria sobre fotos de modelos</div></div>
+  </div>
+  <span class="tag tag-paid">$0.05</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-critical">Necesita 2 imagenes</span>
+</div>
+
+<ul class="checklist" data-group="jewelry">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Imagen de joyeria</strong> — Ya subida en el editor</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropzone de modelo</strong> — Upload de foto de persona (cara/mano)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tipo de joyeria</strong> — Earrings, Necklace, Ring, Bracelet, Watch, Sunglasses</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Procesar</strong> — Imagen de modelo usando la joyeria</span></li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 13: VIDEO -->
+<!-- ============================================================ -->
+<section id="mod-video">
+<h2>13. Video Studio <span class="section-count">VideoPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(239,68,68,0.15)">🎬</div>
+    <div><div class="card-title">Video Studio</div><div class="card-subtitle">Convierte fotos en videos animados para redes sociales</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS (Ken Burns)</span>
+  <span class="tag tag-paid">$0.04-$0.35</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-env">FAL_KEY</span>
+</div>
+
+<h4>Tab: Producto</h4>
+<ul class="checklist" data-group="video-product">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>3 tabs visibles</strong> — Producto, Moda, Avatar</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Toggle Manual/Auto</strong> — Cambia entre modo manual y automatico</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>7 proveedores de video</strong> — Ken Burns (GRATIS), LTX-Video ($0.04), Wan 2.2 Fast ($0.05), Wan 2.5, Wan 2.1, Kling 2.6 ($0.35), Minimax ($0.08/s)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Ken Burns (gratis)</strong> — Seleccionar → click generar → video con zoom/pan suave (client-side, sin API)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Duracion</strong> — Dropdown: 3s, 5s, 10s, 15s</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Aspect Ratio</strong> — 16:9 (Horizontal), 9:16 (Vertical), 1:1 (Cuadrado)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Prompt de movimiento</strong> — Textarea para describir el movimiento deseado</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Modo Auto</strong> — Claude genera prompt automaticamente → selecciona proveedor mas barato → genera video</span></li>
+</ul>
+
+<h4>Tab: Avatar (Talking Head)</h4>
+<ul class="checklist" data-group="video-avatar">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Upload de imagen de cara</strong> — Dropzone para foto de rostro</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>5 proveedores de avatar</strong> — Wav2Lip ($0.005), MuseTalk ($0.04), SadTalker ($0.08), LivePortrait ($0.09), Hedra (gratis)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>TTS Provider</strong> — Edge TTS (gratis, no API key) o Google Cloud TTS</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Idioma y Voz</strong> — Dropdowns de idioma (Español, etc.) y voz disponible</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Script de texto</strong> — Textarea donde escribir lo que el avatar dira</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Generar</strong> — TTS genera audio → avatar anima la cara hablando</span></li>
+</ul>
+
+<div class="expect">Video MP4 reproducible. Producto: animacion suave de la foto. Avatar: persona hablando con lip-sync.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 14: AD CREATOR -->
+<!-- ============================================================ -->
+<section id="mod-ad">
+<h2>14. Crear Anuncios <span class="section-count">AdCreatorPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(234,179,8,0.15)">📢</div>
+    <div><div class="card-title">Crear Anuncios</div><div class="card-subtitle">Genera videos publicitarios con formato exacto para cada plataforma</div></div>
+  </div>
+  <span class="tag tag-paid">$0.04-$0.35</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-env">ANTHROPIC_API_KEY</span>
+</div>
+
+<ul class="checklist" data-group="ad-creator">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>7 plantillas</strong> — IG Reel (9:16), TikTok (9:16), Facebook Ad (1:1/16:9), FB Marketplace (1:1), YT Short (9:16), IG Story (9:16), Pinterest Pin (2:3)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Headline</strong> — Input de texto para titulo del anuncio</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>CTA (Llamada a la Accion)</strong> — Input con default "Comprar Ahora"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Descripcion</strong> — Textarea con descripcion del producto/anuncio</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Generar Caption IA"</strong> — Boton → Claude genera caption automaticamente</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Proveedor</strong> — LTX-Video, Wan 2.2 Fast, Kling 2.6, Ken Burns</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Crear Anuncio Video"</strong> — Genera video con dimensiones correctas para la plataforma seleccionada</span></li>
+</ul>
+
+<div class="expect">Video MP4 con las dimensiones correctas de la plataforma elegida, listo para publicar.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 15: COMPLIANCE -->
+<!-- ============================================================ -->
+<section id="mod-compliance">
+<h2>15. Verificar Marketplace <span class="section-count">CompliancePanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(34,197,94,0.15)">✅</div>
+    <div><div class="card-title">Verificar Marketplace</div><div class="card-subtitle">Verifica que tus fotos cumplan los requisitos de cada plataforma</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS</span>
+</div>
+
+<ul class="checklist" data-group="compliance">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown de marketplace</strong> — Amazon, Shopify, Etsy, eBay, Instagram, TikTok</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Verificar</strong> — Analiza dimensiones, proporcion, tamaño de archivo vs requisitos de la plataforma</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Resultado</strong> — Reporte PASS/FAIL con detalles de que cumple y que no</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Auto-correct</strong> — Toggle para corregir automaticamente los problemas encontrados</span></li>
+</ul>
+
+<div class="expect">Reporte verde (PASS) o rojo (FAIL) con detalles especificos. Si auto-correct esta activo, corrige y redimensiona automaticamente.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 16: DIRECTOR CREATIVO IA -->
+<!-- ============================================================ -->
+<section id="mod-aiprompt">
+<h2>16. Director Creativo IA <span class="section-count">AiPromptPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(168,85,247,0.15)">🪄</div>
+    <div><div class="card-title">Director Creativo IA</div><div class="card-subtitle">La IA analiza tu producto y sugiere conceptos creativos</div></div>
+  </div>
+  <span class="tag tag-free">GRATIS (local)</span>
+  <span class="tag tag-paid">$0.003 (Claude IA)</span>
+  <span class="tag tag-env">ANTHROPIC_API_KEY</span>
+  <span class="tag tag-free">No necesita imagen</span>
+</div>
+
+<ul class="checklist" data-group="aiprompt">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>No requiere imagen</strong> — Funciona sin subir foto (NO_IMAGE_MODULE)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Producto</strong> — Ropa, Joyeria, Cosmeticos, Perfume, General</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Plataforma</strong> — Instagram, TikTok, Amazon, Pinterest, Website</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dropdown Estilo</strong> — Minimalista, Lujoso, Casual, Profesional, Creativo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Descripcion (textarea)</strong> — Describe lo que quieres crear</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Generar</strong> — Claude devuelve 4 conceptos creativos de fotografia con descripciones detalladas</span></li>
+</ul>
+
+<div class="expect">4 conceptos creativos con descripciones detalladas de como fotografiar tu producto. Incluye fondos, iluminacion, composicion, props.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MODULE 17: AI AGENT -->
+<!-- ============================================================ -->
+<section id="mod-agent">
+<h2>17. AI Agent (Auto) <span class="section-count">AiAgentPanel</span></h2>
+<div class="card">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(59,130,246,0.15)">🤖</div>
+    <div><div class="card-title">AI Agent (Automatizacion)</div><div class="card-subtitle">Describe lo que quieres y el agente IA planifica los pasos</div></div>
+  </div>
+  <span class="tag tag-paid">Variable</span>
+  <span class="tag tag-env">ANTHROPIC_API_KEY</span>
+  <span class="tag tag-env">REPLICATE_API_TOKEN</span>
+  <span class="tag tag-free">No necesita imagen</span>
+</div>
+
+<h4>Fase 1: Input</h4>
+<ul class="checklist" data-group="agent-input">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>3 tipos de agente</strong> — E-Commerce (foto producto), Modelo (try-on con modelo IA), Social (videos/ads)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Categoria</strong> — Lenceria, Perfume, Aretes, Anillos, Collares, Pulseras, Relojes, Lentes, General</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Tipo de contenido</strong> — Opciones cambian segun agente elegido (hero, category, try-on, video, etc.)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>3 niveles de presupuesto</strong> — Gratis ($0), Economico (&lt;$0.15), Premium (sin limite)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Descripcion</strong> — Textarea para describir lo que quieres</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Preview de imagen</strong> — Thumbnail con filename, dimensiones y tamanio del archivo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Crear Plan"</strong> → pasa a Fase 1.5 (Analisis) y luego Fase 2</span></li>
+</ul>
+
+<h4>Fase 1.5: Analisis Automatico</h4>
+<ul class="checklist" data-group="agent-analysis">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Analisis automatico</strong> — Al subir imagen, llama a /api/analyze-image</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Spinner "Analizando..."</strong> — Se muestra mientras analiza</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Deteccion de marcas de agua</strong> — Advertencia amber si hay watermark</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Calidad de iluminacion</strong> — Muestra si la luz es buena/mala/sobreexpuesta</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Resolucion</strong> — Muestra dimensiones y advierte si es baja</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Boton "Crear Plan" deshabilitado</strong> — Hasta que el analisis termine</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Recomendacion de presupuesto</strong> — Sugiere presupuesto minimo basado en analisis</span></li>
+</ul>
+
+<h4>Fase 2: Plan</h4>
+<ul class="checklist" data-group="agent-plan">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Plan generado</strong> — Claude devuelve una lista de pasos (ej: "1. Quitar fondo 2. Generar fondo 3. Agregar sombras")</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Cada paso muestra</strong> — Nombre del modulo, costo estimado, razon</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Costo total estimado</strong> — Suma de todos los pasos</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Watermark auto-removal</strong> — Si se detecto marca de agua, inpaint se agrega como primer paso</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Editor de plan</strong> — Mover pasos arriba/abajo, eliminar pasos, agregar nuevos (12 modulos disponibles)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Costo se recalcula</strong> — Al agregar/eliminar pasos, el costo total se actualiza en tiempo real</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Confirmar y Ejecutar"</strong> → pasa a Fase 3</span></li>
+</ul>
+
+<h4>Fase 2.5: Confirmacion de Costo</h4>
+<ul class="checklist" data-group="agent-confirm">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dialogo de confirmacion</strong> — Para pipelines pagados ($0.01+), muestra dialog amber con desglose</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Desglose por paso</strong> — Lista cada paso pagado con costo individual + total</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Confirmar y Ejecutar"</strong> — Boton requerido para proceder con pasos pagados</span></li>
+</ul>
+
+<h4>Fase 3: Ejecucion</h4>
+<ul class="checklist" data-group="agent-exec">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Barra de progreso</strong> — Muestra paso actual y total</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Cada paso</strong> — Icono de estado + emoji del modulo: pendiente / ejecutando (spinner) / completado (check) / error (X)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Preview de resultado por paso</strong> — Imagen full-width (aspect 16:10) con hover-zoom. Click abre modal fullscreen</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Pasos paralelos</strong> — bg-remove + model-create corren simultaneamente en Modelo agent</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Validacion de calidad</strong> — Cada resultado se valida (URL valido, blob legible, size > 100 bytes)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Badge "Gratis"</strong> — Steps gratuitos muestran badge verde</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Si un paso falla</strong> — Error mostrado inline, boton de retry disponible</span></li>
+</ul>
+
+<h4>Fase 4: Resultados</h4>
+<ul class="checklist" data-group="agent-results">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Imagen/video final</strong> — Resultado visible full-width con click-to-zoom</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Desglose de costos</strong> — Muestra costo real vs estimado por paso</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Descargar"</strong> — Descarga directa del resultado final</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Usar en Editor"</strong> — Envia resultado al canvas del editor</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Nuevo Flujo"</strong> — Reset para empezar de nuevo</span></li>
+</ul>
+
+<div class="expect">Flujo automatico completo: describes lo que quieres → IA planifica → ejecuta multiples herramientas en secuencia → resultado final listo.</div>
+<div class="warn">Necesita ANTHROPIC_API_KEY para planificar y REPLICATE_API_TOKEN para ejecutar los pasos de procesamiento de imagen.</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 18: GALERIA -->
+<!-- ============================================================ -->
+<section id="gallery">
+<h2>18. Galeria <span class="section-count">/ gallery</span></h2>
+<p>Ruta: <code>http://localhost:3000/gallery</code></p>
+
+<ul class="checklist" data-group="gallery">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Pagina carga</strong> — Titulo "Galeria", contador de imagenes, filtros</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Buscar por nombre</strong> — Input de busqueda filtra imagenes por filename</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Filtro de operacion</strong> — Dropdown: Todas, Quitar Fondo, Fondos IA, Mejorar, etc.</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Filtro de fuente</strong> — Dropdown: Todas, Editor, Batch</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Empty state (sin imagenes)</strong> — Mensaje: "Aun no hay imagenes procesadas"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Grid de imagenes</strong> — Thumbnails con badges de operacion, fecha, fuente</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Hover sobre imagen</strong> — Aparecen botones: Ver (ojo), Descargar, Eliminar</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Click ojo (preview)</strong> — Modal con comparacion antes/despues (ImageCompare)</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Seleccion multiple</strong> — Checkbox en esquina de cada imagen. "Seleccionar Todo" funciona</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Acciones en lote</strong> — Descargar seleccionados, Eliminar seleccionados, Limpiar seleccion</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Navegacion en preview</strong> — Botones "Anterior" y "Siguiente" en modal</span></li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 19: BATCH -->
+<!-- ============================================================ -->
+<section id="batch">
+<h2>19. Procesamiento Masivo <span class="section-count">/ batch</span></h2>
+<p>Ruta: <code>http://localhost:3000/batch</code></p>
+
+<ul class="checklist" data-group="batch">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>4 presets de pipeline</strong> — Quick Clean, Amazon Ready, Instagram Lifestyle, Full Production</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Seleccionar preset</strong> — Los pasos del pipeline se llenan automaticamente</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Pipeline custom</strong> — Agregar pasos manualmente, reordenar arrastrando, eliminar pasos</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Upload multiple imagenes</strong> — Dropzone acepta multiples archivos. Previews visibles</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Start Processing"</strong> — Barra de progreso por cada imagen. Estados: pendiente/procesando/listo/error</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Error en una imagen</strong> — No detiene el resto del batch</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Descargar resultados</strong> — Boton para descargar todas las imagenes procesadas</span></li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECTION 20: UX GENERAL -->
+<!-- ============================================================ -->
+<section id="ux">
+<h2>20. UX General — Verificaciones Globales</h2>
+
+<h3>Toast Notifications (NO alerts del navegador)</h3>
+<ul class="checklist" data-group="ux-toasts">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Errores muestran toast rojo</strong> — Esquina superior derecha, desaparece en ~5 segundos</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Exito muestra toast verde</strong> — "Imagen procesada con exito" despues de cada procesamiento</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Advertencias muestran toast amarillo</strong> — Para validaciones (ej: "sube una imagen primero")</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>NUNCA ves un popup de alert() del navegador</strong> — Si ves uno, es un BUG. Reportalo</span></li>
+</ul>
+
+<h3>Idioma (Todo en Español)</h3>
+<ul class="checklist" data-group="ux-lang">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Botones en español</strong> — "Procesar", "Generar", "Descargar", "Aplicar", no "Process" o "Download"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Errores en español</strong> — "Error al procesar la imagen", no "Processing failed"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Labels en español</strong> — "Brillo", "Contraste", no "Brightness", "Contrast"</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Si ves texto en ingles</strong> → es un BUG de traduccion. Toma nota del texto y donde aparece</span></li>
+</ul>
+
+<h3>ModuleHeader (Cada Modulo)</h3>
+<ul class="checklist" data-group="ux-header">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Titulo y descripcion</strong> — Cada modulo tiene titulo claro y descripcion en español</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"Por que lo necesitas"</strong> — Seccion azul expandible con explicacion de por que usar este modulo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Costo visible</strong> — Badge de costo estimado al lado del titulo</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Pasos de uso</strong> — Lista numerada de como usar el modulo</span></li>
+</ul>
+
+<h3>Responsividad</h3>
+<ul class="checklist" data-group="ux-responsive">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Dashboard en movil</strong> — Tarjetas se apilan verticalmente, texto legible</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Editor en pantalla completa</strong> — Los 3 paneles se ajustan al tamaño de ventana</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Galeria en movil</strong> — Grid se ajusta a 1-2 columnas</span></li>
+</ul>
+
+<h3>Health Check</h3>
+<ul class="checklist" data-group="ux-health">
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Abrir <code>/api/health</code></strong> — Muestra JSON con status de env vars y DB</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>"healthy" o "degraded"</strong> — healthy = todo OK, degraded = faltan env vars</span></li>
+  <li onclick="toggleCheck(this)"><span class="check-box">✓</span><span class="check-text"><strong>Lista de variables faltantes</strong> — Muestra cuales env vars faltan</span></li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<!-- QUICK REFERENCE TABLE -->
+<!-- ============================================================ -->
+<section id="reference">
+<h2>Tabla Rapida de Referencia</h2>
+
+<table class="env-table">
+<tr>
+  <th>Modulo</th>
+  <th>Costo</th>
+  <th>Necesita Imagen?</th>
+  <th>API Keys Requeridas</th>
+  <th>Que Probar Primero</th>
+</tr>
+<tr><td>Quitar Fondo</td><td>GRATIS-$0.01</td><td>Si</td><td>Ninguna (Navegador) / REPLICATE</td><td>Proveedor "Navegador" (gratis)</td></tr>
+<tr><td>Fondos con IA</td><td>GRATIS-$0.05</td><td>Si</td><td>Ninguna (Estudio) / REPLICATE + ANTHROPIC</td><td>Preset "Blanco" de Estudio (gratis)</td></tr>
+<tr><td>Mejorar Calidad</td><td>GRATIS</td><td>Si</td><td>Ninguna</td><td>Estilo "Auto" + click Aplicar</td></tr>
+<tr><td>Sombras</td><td>GRATIS-$0.05</td><td>Si</td><td>Ninguna (basicas) / REPLICATE (IA)</td><td>"Sombra Suelta" (gratis)</td></tr>
+<tr><td>Inpaint</td><td>$0.03-$0.05</td><td>Si</td><td>REPLICATE</td><td>Pintar zona + describir cambio</td></tr>
+<tr><td>Outpaint</td><td>~$0.05</td><td>Si</td><td>REPLICATE</td><td>Preset de Instagram 1:1</td></tr>
+<tr><td>Prueba Virtual</td><td>$0.015-$0.05</td><td>Si (x2)</td><td>REPLICATE / FASHN</td><td>Subir prenda + modelo, IDM-VTON</td></tr>
+<tr><td>Crear Modelo IA</td><td>$0.055</td><td>No</td><td>REPLICATE</td><td>Seleccionar opciones + Generar</td></tr>
+<tr><td>Ghost Mannequin</td><td>$0.05</td><td>Si</td><td>REPLICATE</td><td>Foto de prenda en maniqui</td></tr>
+<tr><td>Joyeria Virtual</td><td>$0.05</td><td>Si (x2)</td><td>REPLICATE</td><td>Joyeria + foto de rostro</td></tr>
+<tr><td>Video Studio</td><td>GRATIS-$0.35</td><td>Si</td><td>Ninguna (Ken Burns) / REPLICATE / FAL</td><td>Ken Burns (gratis)</td></tr>
+<tr><td>Crear Anuncios</td><td>$0.04-$0.35</td><td>Si</td><td>REPLICATE / FAL + ANTHROPIC</td><td>IG Reel + Ken Burns</td></tr>
+<tr><td>Compliance</td><td>GRATIS</td><td>Si</td><td>Ninguna</td><td>Seleccionar Amazon + Verificar</td></tr>
+<tr><td>Director IA</td><td>GRATIS-$0.003</td><td>No</td><td>ANTHROPIC</td><td>Seleccionar opciones + Generar</td></tr>
+<tr><td>AI Agent</td><td>Variable</td><td>Depende</td><td>ANTHROPIC + REPLICATE</td><td>E-Commerce + Gratis</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- ORDER OF TESTING -->
+<!-- ============================================================ -->
+<section>
+<h2>Orden Recomendado para Testear</h2>
+<p>Empieza por lo que NO necesita API keys (gratis) para confirmar que la app funciona. Luego ve agregando API keys una por una.</p>
+
+<div class="card" style="border-color:var(--green)">
+<h4 style="color:var(--green);margin-top:0">Nivel 1: Sin API keys (todo gratis)</h4>
+<ol style="color:var(--text2);padding-left:20px">
+  <li><strong>/api/health</strong> — Verifica estado del servidor</li>
+  <li><strong>Dashboard</strong> — Navegacion, botones, tarjetas</li>
+  <li><strong>Editor layout</strong> — Subir imagen, zoom, sidebar, export</li>
+  <li><strong>Quitar Fondo (Navegador)</strong> — Gratis, sin API</li>
+  <li><strong>Fondos con IA (Estudio presets)</strong> — Blanco/Gris/Negro, gratis</li>
+  <li><strong>Mejorar Calidad</strong> — 100% gratis y local</li>
+  <li><strong>Sombras basicas</strong> — Sombra Suelta, Contacto, Reflejo (gratis)</li>
+  <li><strong>Compliance</strong> — Verificacion gratis</li>
+  <li><strong>Video Ken Burns</strong> — Video gratis client-side</li>
+  <li><strong>Galeria</strong> — Filtros, seleccion, preview</li>
+</ol>
+</div>
+
+<div class="card" style="border-color:var(--yellow)">
+<h4 style="color:var(--yellow);margin-top:0">Nivel 2: Con REPLICATE_API_TOKEN ($)</h4>
+<ol style="color:var(--text2);padding-left:20px">
+  <li><strong>Quitar Fondo (Replicate)</strong> — $0.01</li>
+  <li><strong>Fondos con IA (presets IA)</strong> — $0.03-$0.05</li>
+  <li><strong>Sombras IA</strong> — $0.04-$0.05</li>
+  <li><strong>Inpaint</strong> — $0.03-$0.05</li>
+  <li><strong>Outpaint</strong> — ~$0.05</li>
+  <li><strong>Crear Modelo IA</strong> — $0.055</li>
+  <li><strong>Ghost Mannequin</strong> — $0.05</li>
+  <li><strong>Video (Wan 2.2 Fast)</strong> — $0.05</li>
+</ol>
+</div>
+
+<div class="card" style="border-color:var(--purple)">
+<h4 style="color:var(--purple);margin-top:0">Nivel 3: Con ANTHROPIC_API_KEY + REPLICATE ($)</h4>
+<ol style="color:var(--text2);padding-left:20px">
+  <li><strong>Director Creativo IA</strong> — $0.003</li>
+  <li><strong>AI Agent</strong> — Variable</li>
+  <li><strong>Crear Anuncios</strong> — $0.04-$0.35</li>
+  <li><strong>Fondos con IA (prompt personalizado)</strong> — optimizacion por Claude</li>
+</ol>
+</div>
+
+<div class="card" style="border-color:var(--blue)">
+<h4 style="color:var(--blue);margin-top:0">Nivel 4: Con FASHN_API_KEY + FAL_KEY (especializado)</h4>
+<ol style="color:var(--text2);padding-left:20px">
+  <li><strong>Prueba Virtual (FASHN)</strong> — $0.05</li>
+  <li><strong>Joyeria Virtual</strong> — $0.05</li>
+  <li><strong>Video (LTX, Wan 2.5, Kling)</strong> — $0.04-$0.35</li>
+  <li><strong>Avatar</strong> — $0.005-$0.09</li>
+</ol>
+</div>
+</section>
+
+</div><!-- /container -->
+
+<!-- Footer -->
+<div style="background:var(--surface);border-top:1px solid var(--border);padding:30px 20px;text-align:center;color:var(--text3);font-size:0.85rem">
+  <p>UniStudio Testing Guide — Generado Febrero 2026</p>
+  <p style="margin-top:8px">Guarda tu progreso: las marcas se guardan automaticamente en tu navegador (localStorage)</p>
+</div>
+
+<script>
+// Checklist persistence
+const STORAGE_KEY = 'unistudio-testing-progress';
+
+function loadProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function saveProgress(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function toggleCheck(li) {
+  li.classList.toggle('checked');
+  // Save state
+  const progress = loadProgress();
+  const group = li.closest('[data-group]')?.dataset.group || 'unknown';
+  const idx = Array.from(li.parentElement.children).indexOf(li);
+  const key = group + '-' + idx;
+  progress[key] = li.classList.contains('checked');
+  saveProgress(progress);
+  updateCounter();
+}
+
+function restoreChecks() {
+  const progress = loadProgress();
+  document.querySelectorAll('.checklist').forEach(ul => {
+    const group = ul.dataset.group;
+    Array.from(ul.children).forEach((li, idx) => {
+      const key = group + '-' + idx;
+      if (progress[key]) li.classList.add('checked');
+    });
+  });
+}
+
+function updateCounter() {
+  const all = document.querySelectorAll('.checklist li');
+  const checked = document.querySelectorAll('.checklist li.checked');
+  const total = all.length;
+  const passed = checked.length;
+  const pct = total > 0 ? Math.round((passed / total) * 100) : 0;
+
+  document.getElementById('totalTests').textContent = total;
+  document.getElementById('passedTests').textContent = passed;
+  document.getElementById('progressPct').textContent = pct + '%';
+}
+
+// Init
+restoreChecks();
+updateCounter();
+</script>
+</body>
+</html>

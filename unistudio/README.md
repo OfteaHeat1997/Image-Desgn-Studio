@@ -37,6 +37,13 @@ vercel --prod --yes           # Deploy to Vercel
 
 Live URL: https://unistudio.vercel.app
 
+## Important Notes (Apr 2026)
+
+- **Vercel timeouts**: `vercel.json` configured per-route — video/avatar/tryon get 300s, others 60s
+- **API keys**: All API clients use `.trim()` — safe against trailing whitespace from `vercel env pull`
+- **Error handling**: Global error boundary + toast on all 13 module panels
+- **Claude models**: Centralized in `src/lib/utils/constants.ts` — update `CLAUDE_HAIKU`/`CLAUDE_SONNET` when new versions release
+
 ## Documentation
 
 For detailed docs, see the [`docs/`](../docs/) folder:

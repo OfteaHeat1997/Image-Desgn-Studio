@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UniStudio — Guia Completa del Proyecto</title>
+  <style>
+    :root {
+      --bg: #09090B;
+      --surface: #111113;
+      --surface-light: #1A1A1D;
+      --surface-lighter: #27272A;
+      --gold: #C5A47E;
+      --gold-light: #D4B896;
+      --green: #34D399;
+      --blue: #60A5FA;
+      --red: #F87171;
+      --amber: #FBBF24;
+      --purple: #A78BFA;
+      --text: #E4E4E7;
+      --text-dim: #71717A;
+      --text-muted: #52525B;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.7;
+      padding: 0;
+    }
+
+    /* ---- HERO ---- */
+    .hero {
+      background: linear-gradient(135deg, #09090B 0%, #1a1520 50%, #09090B 100%);
+      border-bottom: 1px solid var(--surface-lighter);
+      padding: 80px 40px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--gold), var(--gold-light), #fff);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: 1.2rem;
+      color: var(--text-dim);
+      max-width: 700px;
+      margin: 0 auto 32px;
+    }
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .hero-stat {
+      text-align: center;
+    }
+    .hero-stat .number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--gold);
+    }
+    .hero-stat .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+    }
+
+    /* ---- NAV ---- */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 9, 11, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--surface-lighter);
+      padding: 12px 40px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      flex-wrap: wrap;
+    }
+    .nav a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .nav a:hover {
+      color: var(--gold);
+      background: rgba(197, 164, 126, 0.1);
+    }
+
+    /* ---- CONTAINER ---- */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    /* ---- SECTIONS ---- */
+    section {
+      margin-bottom: 80px;
+    }
+    section h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 8px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--surface-lighter);
+    }
+    section h2 .badge {
+      font-size: 0.7rem;
+      background: var(--gold);
+      color: var(--bg);
+      padding: 3px 10px;
+      border-radius: 20px;
+      vertical-align: middle;
+      margin-left: 12px;
+    }
+    section > p.intro {
+      color: var(--text-dim);
+      font-size: 1rem;
+      margin-bottom: 32px;
+      max-width: 800px;
+    }
+
+    h3 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #fff;
+      margin: 32px 0 12px;
+    }
+    h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--gold-light);
+      margin: 20px 0 8px;
+    }
+
+    /* ---- CARDS ---- */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--surface-lighter);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+    .card:hover {
+      border-color: var(--gold);
+    }
+    .card .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .card .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+    .card .card-title {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .card .card-cost {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-left: auto;
+    }
+    .card .card-desc {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    .card .card-why {
+      font-size: 0.8rem;
+      color: var(--blue);
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+    .card .card-why strong {
+      display: block;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--blue);
+      margin-bottom: 4px;
+    }
+    .card .card-flow {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .card .card-flow .step {
+      font-size: 0.7rem;
+      background: var(--surface-light);
+      border: 1px solid var(--surface-lighter);
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: var(--text-dim);
+    }
+    .card .card-flow .arrow {
+      color: var(--gold);
+      font-size: 0.8rem;
+      align-self: center;
+    }
+
+    .cost-free { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+    .cost-low { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+    .cost-mid { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+    .cost-high { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+    .icon-bg { background: rgba(197, 164, 126, 0.15); color: var(--gold); }
+    .icon-green { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+    .icon-blue { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+    .icon-purple { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
+    .icon-amber { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+    .icon-red { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+
+    /* ---- FLOWCHART ---- */
+    .flowchart {
+      background: var(--surface);
+      border: 1px solid var(--surface-lighter);
+      border-radius: 16px;
+      padding: 32px;
+      margin: 24px 0;
+      overflow-x: auto;
+    }
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    .flow-box {
+      background: var(--surface-light);
+      border: 1px solid var(--surface-lighter);
+      border-radius: 10px;
+      padding: 12px 18px;
+      text-align: center;
+      min-width: 140px;
+    }
+    .flow-box.active {
+      border-color: var(--gold);
+      background: rgba(197, 164, 126, 0.1);
+    }
+    .flow-box .flow-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .flow-box .flow-sub {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .flow-arrow {
+      font-size: 1.5rem;
+      color: var(--gold);
+    }
+
+    /* ---- TABLES ---- */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 20px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead th {
+      background: var(--surface-light);
+      color: var(--gold);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 2px solid var(--surface-lighter);
+    }
+    tbody td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--surface-lighter);
+      vertical-align: top;
+    }
+    tbody tr:hover {
+      background: var(--surface-light);
+    }
+    .status-ok { color: var(--green); font-weight: 700; }
+    .status-warn { color: var(--amber); font-weight: 700; }
+    .status-no { color: var(--red); font-weight: 700; }
+
+    /* ---- CODE ---- */
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: var(--surface-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: var(--gold-light);
+    }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--surface-lighter);
+      border-radius: 10px;
+      padding: 20px;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      margin: 16px 0;
+    }
+
+    /* ---- INFO BOXES ---- */
+    .info-box {
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      font-size: 0.85rem;
+    }
+    .info-box.green {
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+      color: var(--green);
+    }
+    .info-box.blue {
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      color: var(--blue);
+    }
+    .info-box.amber {
+      background: rgba(251, 191, 36, 0.08);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      color: var(--amber);
+    }
+    .info-box.red {
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      color: var(--red);
+    }
+    .info-box strong { display: block; margin-bottom: 4px; }
+
+    /* ---- LISTS ---- */
+    ul, ol {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+    li {
+      margin: 6px 0;
+      color: var(--text-dim);
+    }
+    li strong { color: var(--text); }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .hero { padding: 40px 20px; }
+      .hero h1 { font-size: 2rem; }
+      .container { padding: 20px; }
+      .card-grid { grid-template-columns: 1fr; }
+      .hero-stats { gap: 20px; }
+      .nav { padding: 8px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!--  HERO                                                            -->
+<!-- ================================================================ -->
+<div class="hero">
+  <h1>UniStudio</h1>
+  <p>Plataforma completa de fotografia de producto con IA para e-commerce. Cada modulo, cada API, cada flujo — documentado.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="number">18</div>
+      <div class="label">Modulos IA</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">28</div>
+      <div class="label">API Routes</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">7</div>
+      <div class="label">Video Providers</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">5</div>
+      <div class="label">Avatar Providers</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">$0.00</div>
+      <div class="label">Costo Minimo</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!--  NAVIGATION                                                      -->
+<!-- ================================================================ -->
+<nav class="nav">
+  <a href="#stack">Stack</a>
+  <a href="#architecture">Arquitectura</a>
+  <a href="#pages">Paginas</a>
+  <a href="#flowchart">Flujo Principal</a>
+  <a href="#modules">18 Modulos</a>
+  <a href="#api-routes">29 API Routes</a>
+  <a href="#providers">Proveedores IA</a>
+  <a href="#stores">Stores</a>
+  <a href="#ux-overhaul">UX Overhaul</a>
+  <a href="#env">Variables de Entorno</a>
+  <a href="#costs">Costos</a>
+  <a href="#database">Base de Datos</a>
+  <a href="#file-map">Mapa de Archivos</a>
+  <a href="#status">Estado Actual</a>
+</nav>
+
+<div class="container">
+
+<!-- ================================================================ -->
+<!--  1. TECH STACK                                                   -->
+<!-- ================================================================ -->
+<section id="stack">
+  <h2>Tech Stack</h2>
+  <p class="intro">Todo lo que se usa para construir UniStudio, desde el frontend hasta las APIs externas.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-blue">F</div>
+        <div class="card-title">Frontend</div>
+      </div>
+      <ul>
+        <li><strong>Next.js 16.1.6</strong> — App Router, Server Actions (50MB max)</li>
+        <li><strong>React 19.2.3</strong> — Ultimo version estable</li>
+        <li><strong>TypeScript</strong> — Tipado estricto en todo el proyecto</li>
+        <li><strong>Tailwind CSS 4</strong> — Tema oscuro luxury (#09090B + #C5A47E dorado)</li>
+        <li><strong>Zustand 5</strong> — Estado global (6 stores)</li>
+        <li><strong>Radix UI</strong> — Dialog, Select, Slider, Tabs, Tooltip</li>
+        <li><strong>Lucide React</strong> — Iconos (100+ usados)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">B</div>
+        <div class="card-title">Backend & APIs</div>
+      </div>
+      <ul>
+        <li><strong>Replicate</strong> — 10+ modelos IA (BG remove, video, try-on, etc.)</li>
+        <li><strong>fal.ai</strong> — 4 video providers (LTX, Wan 2.5, Kling, Minimax)</li>
+        <li><strong>Anthropic Claude</strong> — AI Agent planning + prompt optimization</li>
+        <li><strong>FASHN API</strong> — Virtual try-on especializado</li>
+        <li><strong>Edge TTS</strong> — Text-to-speech gratuito (Node.js)</li>
+        <li><strong>Sharp 0.34.5</strong> — Procesamiento de imagen server-side</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">D</div>
+        <div class="card-title">Base de Datos & Storage</div>
+      </div>
+      <ul>
+        <li><strong>Prisma 7.4.1</strong> — ORM con adaptador PostgreSQL</li>
+        <li><strong>PostgreSQL</strong> — Base de datos principal (Docker local)</li>
+        <li><strong>localStorage</strong> — Persistencia de gallery-store y video-store</li>
+        <li><strong>File System</strong> — Auto-save a <code>/output/{module}/</code></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-amber">C</div>
+        <div class="card-title">Client-Side Processing</div>
+      </div>
+      <ul>
+        <li><strong>@imgly/background-removal</strong> — BG removal 100% en browser (WASM, gratis)</li>
+        <li><strong>Fabric.js 7</strong> — Canvas editor con capas</li>
+        <li><strong>OffscreenCanvas</strong> — Post-processing local (sombras, resize, formatos)</li>
+        <li><strong>Ken Burns</strong> — Animacion de video CSS (gratis, sin API)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  2. ARCHITECTURE                                                 -->
+<!-- ================================================================ -->
+<section id="architecture">
+  <h2>Arquitectura General</h2>
+  <p class="intro">Como se conectan todas las piezas del sistema.</p>
+
+  <div class="flowchart">
+    <h4 style="color: var(--gold); margin-bottom: 20px;">Arquitectura del Sistema</h4>
+    <pre style="border: none; background: transparent; color: var(--text); font-size: 0.75rem;">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              BROWSER (Cliente)                               │
+│                                                                              │
+│  ┌──────────┐  ┌───────────────┐  ┌──────────────┐  ┌────────────────┐     │
+│  │ Dashboard │  │    Editor     │  │    Batch     │  │    Gallery     │     │
+│  │  page.tsx │  │   page.tsx    │  │  page.tsx    │  │   page.tsx     │     │
+│  └──────────┘  └───────────────┘  └──────────────┘  └────────────────┘     │
+│                        │                                                     │
+│  ┌─────────────────────┼─────────────────────────────────────────┐          │
+│  │            16 Module Panels (src/components/modules/)          │          │
+│  │  BgRemove │ BgGenerate │ Enhance │ Shadows │ Inpaint │ ...   │          │
+│  └─────────────────────┼─────────────────────────────────────────┘          │
+│                        │                                                     │
+│  ┌─────────────────────┼─────────────────────────────────────────┐          │
+│  │            6 Zustand Stores (src/stores/)                      │          │
+│  │  editor │ video │ gallery │ batch │ brand │ settings           │          │
+│  └─────────────────────┼─────────────────────────────────────────┘          │
+│                        │                                                     │
+│  Client-side: @imgly/background-removal (WASM) │ Fabric.js │ Ken Burns     │
+└────────────────────────┼─────────────────────────────────────────────────────┘
+                         │  fetch() / FormData / JSON
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         NEXT.JS SERVER (29 API Routes)                       │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────┐       │
+│  │  /api/bg-remove  │ /api/bg-generate │ /api/enhance │ /api/shadows│       │
+│  │  /api/inpaint    │ /api/outpaint    │ /api/tryon   │ /api/video  │       │
+│  │  /api/avatar     │ /api/model-create│ /api/ad-create│ /api/upload│       │
+│  │  /api/ghost-mannequin │ /api/jewelry-tryon │ /api/upscale       │       │
+│  │  /api/prompt     │ /api/tts         │ /api/batch   │ /api/health │       │
+│  │  /api/ai-agent/plan │ /api/save-result │ /api/db/history       │       │
+│  │  /api/brand-kit  │ /api/compliance  │ /api/inventory/*         │       │
+│  └──────────────────────────────────────────────────────────────────┘       │
+│                         │                                                    │
+│  ┌──────────────────────┼───────────────────────────────────────┐           │
+│  │  Processing Libraries (src/lib/processing/) — 16 archivos    │           │
+│  │  bg-remove.ts │ enhance.ts │ shadows.ts │ video.ts │ ...     │           │
+│  └──────────────────────┼───────────────────────────────────────┘           │
+│                         │                                                    │
+│  ┌──────────────────────┼───────────────────────────────────────┐           │
+│  │  API Clients (src/lib/api/) — 4 archivos                     │           │
+│  │  replicate.ts │ fal.ts │ fashn.ts │ withoutbg.ts             │           │
+│  └──────────────────────┼───────────────────────────────────────┘           │
+└─────────────────────────┼────────────────────────────────────────────────────┘
+                          │  HTTP / REST APIs
+                          ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SERVICIOS EXTERNOS                                   │
+│                                                                              │
+│  ┌────────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌──────────┐  │
+│  │  Replicate │  │  fal.ai  │  │ Anthropic │  │  FASHN   │  │ Edge TTS │  │
+│  │  10+ models│  │  4 models│  │  Claude   │  │  TryOn   │  │  Free    │  │
+│  └────────────┘  └──────────┘  └───────────┘  └──────────┘  └──────────┘  │
+│                                                                              │
+│  ┌────────────────┐  ┌────────────────────┐                                 │
+│  │  PostgreSQL DB │  │  withoutBG Docker  │                                 │
+│  │  (Prisma ORM)  │  │  (localhost:8000)  │                                 │
+│  └────────────────┘  └────────────────────┘                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  3. PAGES                                                        -->
+<!-- ================================================================ -->
+<section id="pages">
+  <h2>5 Paginas <span class="badge">App Router</span></h2>
+  <p class="intro">Cada pagina del app y que hace exactamente.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-bg">🏠</div>
+        <div class="card-title">/ — Dashboard</div>
+      </div>
+      <div class="card-desc">Pagina de inicio con hero animado, 3 escenarios de workflow (e-commerce, Instagram, joyeria), y grid de los 18 modulos organizados en 5 pasos.</div>
+      <div class="card-flow">
+        <span class="step">Hero Video</span>
+        <span class="arrow">→</span>
+        <span class="step">3 Escenarios</span>
+        <span class="arrow">→</span>
+        <span class="step">18 Modulos</span>
+        <span class="arrow">→</span>
+        <span class="step">→ /editor</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-blue">✂️</div>
+        <div class="card-title">/editor — Editor Principal</div>
+      </div>
+      <div class="card-desc">Workspace de 3 paneles: sidebar de modulos (izquierda), canvas central con antes/despues, y panel contextual (derecha). Aqui ocurre todo el procesamiento.</div>
+      <div class="card-flow">
+        <span class="step">ModuleSidebar</span>
+        <span class="arrow">→</span>
+        <span class="step">Module Panel</span>
+        <span class="arrow">→</span>
+        <span class="step">Canvas</span>
+        <span class="arrow">→</span>
+        <span class="step">Layers/Guide</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-amber">📦</div>
+        <div class="card-title">/batch — Procesamiento Masivo</div>
+      </div>
+      <div class="card-desc">Procesa multiples imagenes a la vez. Inventario de productos, pipeline builder drag-and-drop, cola de trabajos con progreso.</div>
+      <div class="card-flow">
+        <span class="step">Inventario</span>
+        <span class="arrow">→</span>
+        <span class="step">Pipeline</span>
+        <span class="arrow">→</span>
+        <span class="step">Cola</span>
+        <span class="arrow">→</span>
+        <span class="step">Resultados</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">🎨</div>
+        <div class="card-title">/brand-kit — Kit de Marca</div>
+      </div>
+      <div class="card-desc">Configura colores, logo, tipografia y watermark de tu marca. Se aplica automaticamente a todos los modulos.</div>
+      <div class="card-flow">
+        <span class="step">Colores</span>
+        <span class="arrow">→</span>
+        <span class="step">Logo</span>
+        <span class="arrow">→</span>
+        <span class="step">Fuentes</span>
+        <span class="arrow">→</span>
+        <span class="step">Watermark</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">🖼️</div>
+        <div class="card-title">/gallery — Galeria</div>
+      </div>
+      <div class="card-desc">Todas tus imagenes procesadas. Filtros por operacion, fuente, busqueda. Comparacion antes/despues. Descarga individual o masiva.</div>
+      <div class="card-flow">
+        <span class="step">Filtros</span>
+        <span class="arrow">→</span>
+        <span class="step">Grid</span>
+        <span class="arrow">→</span>
+        <span class="step">Preview</span>
+        <span class="arrow">→</span>
+        <span class="step">Descargar</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  4. MAIN FLOWCHART                                               -->
+<!-- ================================================================ -->
+<section id="flowchart">
+  <h2>Flujo Principal de Procesamiento</h2>
+  <p class="intro">El camino completo que sigue una imagen desde que la subes hasta que la descargas.</p>
+
+  <div class="flowchart">
+    <div class="flow-row">
+      <div class="flow-box active">
+        <div class="flow-label">1. Subir Imagen</div>
+        <div class="flow-sub">Dropzone / Drag & Drop</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">2. Crear Blob URL</div>
+        <div class="flow-sub">URL.createObjectURL()</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">3. Mostrar en Canvas</div>
+        <div class="flow-sub">Vista previa central</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-box active">
+        <div class="flow-label">4. Elegir Modulo</div>
+        <div class="flow-sub">ModuleSidebar (16 opciones)</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">5. Configurar</div>
+        <div class="flow-sub">Panel izquierdo con opciones</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">6. Click "Procesar"</div>
+        <div class="flow-sub">Toast + loading spinner</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-box">
+        <div class="flow-label">7. Upload a Server</div>
+        <div class="flow-sub">POST /api/upload → FormData</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box active">
+        <div class="flow-label">8. API Route procesa</div>
+        <div class="flow-sub">Replicate / fal.ai / Sharp</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">9. Guardar en DB</div>
+        <div class="flow-sub">ProcessingJob + cost</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-box">
+        <div class="flow-label">10. Devolver URL</div>
+        <div class="flow-sub">URL del resultado</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">11. Convertir a Blob</div>
+        <div class="flow-sub">toBlobUrl() confiable</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box active">
+        <div class="flow-label">12. Mostrar Resultado</div>
+        <div class="flow-sub">Slider antes/despues</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-box">
+        <div class="flow-label">13. Toast de Exito</div>
+        <div class="flow-sub">"Imagen procesada" + costo</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">14. Auto-Save</div>
+        <div class="flow-sub">/api/save-result → disco</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box">
+        <div class="flow-label">15. Galeria</div>
+        <div class="flow-sub">gallery-store + DB sync</div>
+      </div>
+    </div>
+
+    <div class="flow-row">
+      <div class="flow-box active" style="border-color: var(--green);">
+        <div class="flow-label" style="color: var(--green);">16. Aceptar y Continuar</div>
+        <div class="flow-sub">Encadenar con otro modulo</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box" style="border-color: var(--green);">
+        <div class="flow-label">Resultado → Nuevo Input</div>
+        <div class="flow-sub">blobUrlToFile() para chains</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  5. ALL 18 MODULES                                               -->
+<!-- ================================================================ -->
+<section id="modules">
+  <h2>Los 18 Modulos <span class="badge">Todos Funcionales</span></h2>
+  <p class="intro">Cada modulo con su descripcion, por que lo necesitas, como funciona, y cuanto cuesta. Organizados en 6 categorias.</p>
+
+  <h3>FONDOS (Backgrounds)</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-bg">✂️</div>
+        <div class="card-title">Quitar Fondo</div>
+        <span class="card-cost cost-free">Gratis-$0.01</span>
+      </div>
+      <div class="card-desc">Elimina automaticamente el fondo de cualquier foto de producto. 3 proveedores: Navegador (gratis, WASM), Docker local (gratis), Replicate ($0.01).</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Amazon, Shopify y la mayoria de marketplaces requieren fondo blanco. Ahorra horas de edicion manual en Photoshop.
+      </div>
+      <div class="card-flow">
+        <span class="step">Upload</span>
+        <span class="arrow">→</span>
+        <span class="step">Elegir provider</span>
+        <span class="arrow">→</span>
+        <span class="step">Tipo salida</span>
+        <span class="arrow">→</span>
+        <span class="step">Resultado PNG</span>
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/bg-remove</code> → <code>src/lib/processing/bg-remove.ts</code> + <code>bg-remove-browser.ts</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-bg">🖼️</div>
+        <div class="card-title">Fondos con IA</div>
+        <span class="card-cost cost-low">$0.003-$0.05</span>
+      </div>
+      <div class="card-desc">Reemplaza el fondo con escenas profesionales. 25+ presets (estudio, naturaleza, lujo, belleza, temporada) + prompt personalizado con Claude IA.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Fotos lifestyle venden 30% mas que fondo blanco. Crea escenas de lujo sin estudio fotografico.
+      </div>
+      <div class="card-flow">
+        <span class="step">Upload</span>
+        <span class="arrow">→</span>
+        <span class="step">Elegir fondo</span>
+        <span class="arrow">→</span>
+        <span class="step">Replicate IA</span>
+        <span class="arrow">→</span>
+        <span class="step">Composicion</span>
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/bg-generate</code> → <code>src/lib/processing/bg-generate.ts</code></p>
+    </div>
+  </div>
+
+  <h3>MEJORA (Enhancement)</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">✨</div>
+        <div class="card-title">Mejorar Calidad</div>
+        <span class="card-cost cost-free">Gratis</span>
+      </div>
+      <div class="card-desc">Ajusta brillo, contraste, nitidez y color. 10 presets profesionales (E-Commerce, Moda, Lujo, Vintage, Nitido). 100% local con Sharp.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Fotos de celular salen oscuras o descoloridas. Este modulo las convierte en calidad profesional.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/enhance</code> → <code>src/lib/processing/enhance.ts</code> (Sharp, 100% local)</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-amber">☀️</div>
+        <div class="card-title">Sombras e Iluminacion</div>
+        <span class="card-cost cost-low">Gratis-$0.05</span>
+      </div>
+      <div class="card-desc">5 tipos de sombra: Drop Shadow, Contacto, Reflejo, AI Relight, AI Kontext. Las basicas son gratis (Sharp), las IA usan Replicate.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Sin sombras, los productos parecen flotando. Las sombras dan profundidad y realismo profesional.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/shadows</code> → <code>src/lib/processing/shadows.ts</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-blue">↔️</div>
+        <div class="card-title">Extender Imagen</div>
+        <span class="card-cost cost-mid">$0.05</span>
+      </div>
+      <div class="card-desc">Expande los bordes para adaptarla a cualquier formato: 12 presets (Amazon 1:1, IG Stories 9:16, Pinterest 2:3, etc.).</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Instagram requiere 1:1, Stories 9:16, Amazon 1:1. No recortes — extiende con IA.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/outpaint</code> → Replicate (Kontext)</p>
+    </div>
+  </div>
+
+  <h3>EDICION</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-red">🧹</div>
+        <div class="card-title">Borrar y Reemplazar</div>
+        <span class="card-cost cost-mid">$0.03-$0.05</span>
+      </div>
+      <div class="card-desc">Elimina objetos no deseados o cambia colores con texto. 8 presets rapidos (quitar etiqueta, arrugas, mancha, cambiar color).</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Quitar etiquetas, manchas, arrugas o cambiar el color del producto sin re-fotografiar.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/inpaint</code> → Replicate (Flux Fill / Kontext)</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">✅</div>
+        <div class="card-title">Verificar Marketplace</div>
+        <span class="card-cost cost-free">Gratis</span>
+      </div>
+      <div class="card-desc">Verifica que tu foto cumple los requisitos de Amazon, Shopify, Etsy, eBay. Detecta problemas de tamanio, formato, resolucion con auto-correccion.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Fotos rechazadas = productos no publicados = ventas perdidas.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> Local — analisis de metadata de imagen</p>
+    </div>
+  </div>
+
+  <h3>MODELOS (Models & Try-On)</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">👕</div>
+        <div class="card-title">Prueba Virtual</div>
+        <span class="card-cost cost-mid">$0.02-$0.05</span>
+      </div>
+      <div class="card-desc">Coloca tu prenda sobre un modelo virtual. 3 proveedores IA (IDM-VTON, Kolors, FASHN) con routing inteligente por tipo de prenda.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Fotos en modelo venden 40% mas. Prueba diferentes modelos sin contratar fotografos.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/tryon</code> → Replicate (IDM-VTON, Kolors) + FASHN</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-blue">👤</div>
+        <div class="card-title">Crear Modelo IA</div>
+        <span class="card-cost cost-mid">$0.055</span>
+      </div>
+      <div class="card-desc">Genera modelos virtuales con genero, edad, tono de piel, pose y expresion personalizables. Para usar con Prueba Virtual.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Diversifica tu catalogo con modelos de todas las etnias sin sesion fotografica.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/model-create</code> → Replicate (Flux Kontext Pro)</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-amber">👻</div>
+        <div class="card-title">Maniqui Invisible</div>
+        <span class="card-cost cost-mid">$0.05-$0.08</span>
+      </div>
+      <div class="card-desc">Efecto hollow-man profesional. 3 operaciones: quitar maniqui, flat-to-model, model-to-flat.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Los maniquis distraen al comprador. El efecto invisible es estandar en moda profesional.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/ghost-mannequin</code> → Replicate</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">💎</div>
+        <div class="card-title">Joyeria Virtual</div>
+        <span class="card-cost cost-mid">$0.05</span>
+      </div>
+      <div class="card-desc">Prueba aretes, collares, anillos o pulseras sobre fotos de modelos sin sesion fotografica.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Muestra como se ve la joyeria puesta sin sesion fotografica.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/jewelry-tryon</code> → Replicate / FASHN</p>
+    </div>
+  </div>
+
+  <h3>CONTENIDO (Content Creation)</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-red">🎬</div>
+        <div class="card-title">Video Studio</div>
+        <span class="card-cost cost-high">$0-$0.35</span>
+      </div>
+      <div class="card-desc">3 tabs: Producto (7 video providers), Moda (fashion videos), Avatar (5 talking-head providers + TTS). Manual o Auto mode.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Videos tienen 5x mas engagement que fotos en Instagram y TikTok.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/video</code> + <code>/api/avatar</code> + <code>/api/tts</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-amber">📣</div>
+        <div class="card-title">Crear Anuncios</div>
+        <span class="card-cost cost-high">$0.04-$0.35</span>
+      </div>
+      <div class="card-desc">7 plantillas: IG Reel, TikTok, FB Ad, Facebook Marketplace, YT Short, IG Story, Pinterest Pin. Headline + CTA automaticos.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Cada red social requiere dimensiones especificas. Genera ads listos para publicar.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/ad-create</code> → Video providers</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">🪄</div>
+        <div class="card-title">Director Creativo IA</div>
+        <span class="card-cost cost-free">Gratis-$0.003</span>
+      </div>
+      <div class="card-desc">Claude IA analiza tu producto y sugiere 4 conceptos creativos de fotografia. Elige uno y la IA lo genera automaticamente.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        Cuando no sabes que estilo usar, el Director Creativo genera ideas profesionales.
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/prompt</code> → Anthropic Claude</p>
+    </div>
+  </div>
+
+  <h3>AUTOMATIZACION</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">🤖</div>
+        <div class="card-title">AI Agent (Auto)</div>
+        <span class="card-cost cost-mid">Variable</span>
+      </div>
+      <div class="card-desc">3 agentes: E-Commerce (fotos de producto), Modelo (prueba virtual), Social (videos/ads). Claude IA planifica los pasos, el sistema los ejecuta automaticamente.</div>
+      <div class="card-why">
+        <strong>Por que lo necesitas</strong>
+        No necesitas saber que herramientas usar — solo describe el resultado deseado.
+      </div>
+      <div class="card-flow">
+        <span class="step">Describir</span>
+        <span class="arrow">→</span>
+        <span class="step">Claude Planifica</span>
+        <span class="arrow">→</span>
+        <span class="step">Ejecutar Steps</span>
+        <span class="arrow">→</span>
+        <span class="step">Resultados</span>
+      </div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/ai-agent/plan</code> → Claude + cadena de APIs</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-amber">📦</div>
+        <div class="card-title">Procesamiento Masivo</div>
+        <span class="card-cost cost-mid">Variable</span>
+      </div>
+      <div class="card-desc">Procesa carpetas enteras de productos. Pipeline drag-and-drop, cola de trabajos, progreso en tiempo real.</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/batch</code> + <code>/api/inventory/*</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-purple">🎨</div>
+        <div class="card-title">Kit de Marca</div>
+        <span class="card-cost cost-free">Gratis</span>
+      </div>
+      <div class="card-desc">Configura colores, logo, tipografia y watermark. Se persiste en la base de datos y se aplica a todos los modulos.</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 8px;"><strong>API:</strong> <code>/api/brand-kit</code> → Prisma DB</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  6. API ROUTES TABLE                                             -->
+<!-- ================================================================ -->
+<section id="api-routes">
+  <h2>29 API Routes <span class="badge">Todas Reales</span></h2>
+  <p class="intro">Cada ruta de API con su estado, servicio externo, y costo. No hay stubs ni mocks — todo es implementacion real.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ruta</th>
+          <th>Funcion</th>
+          <th>Servicio Externo</th>
+          <th>Costo</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>/api/bg-remove</code></td><td>Quitar fondo</td><td>Replicate (rembg) + withoutBG Docker</td><td>$0-$0.01</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/bg-generate</code></td><td>Generar fondo IA</td><td>Replicate</td><td>$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/enhance</code></td><td>Mejorar imagen</td><td>Sharp (local)</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/shadows</code></td><td>Sombras + iluminacion</td><td>Sharp + Replicate (IC-Light)</td><td>$0-$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/inpaint</code></td><td>Borrar y reemplazar</td><td>Replicate (Flux Fill / Kontext)</td><td>$0.03-$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/outpaint</code></td><td>Extender imagen</td><td>Replicate (Kontext)</td><td>$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/upscale</code></td><td>Escalar imagen</td><td>Replicate (ESRGAN/Clarity)</td><td>$0.02-$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/tryon</code></td><td>Prueba virtual</td><td>Replicate (IDM-VTON) + FASHN</td><td>$0.015-$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/model-create</code></td><td>Crear modelo IA</td><td>Replicate (Flux Kontext Pro)</td><td>$0.055</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/ghost-mannequin</code></td><td>Maniqui invisible</td><td>Replicate</td><td>$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/jewelry-tryon</code></td><td>Joyeria virtual</td><td>Replicate / FASHN</td><td>$0.05</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/video</code></td><td>Generar video</td><td>Replicate (Wan) + fal.ai (LTX, Kling, Minimax)</td><td>$0.04-$0.08</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/avatar</code></td><td>Avatar parlante</td><td>Replicate (Wav2Lip, SadTalker) + fal.ai</td><td>$0.005-$0.09</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/tts</code></td><td>Texto a voz</td><td>Edge TTS (gratis) / Google TTS</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/ad-create</code></td><td>Crear anuncios</td><td>Video providers</td><td>$0.04+</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/analyze-image</code></td><td>Analisis de imagen</td><td>Sharp + Claude Vision (opcional)</td><td>$0-$0.001</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/ai-agent/plan</code></td><td>Plan del AI Agent</td><td>Anthropic Claude (con fallback local)</td><td>$0.003</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/prompt</code></td><td>Generar prompts</td><td>Anthropic Claude</td><td>$0.003</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/prompt-templates</code></td><td>Templates de prompts</td><td>Local (JSON)</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/upload</code></td><td>Subir archivo</td><td>Local filesystem</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/save-result</code></td><td>Auto-guardar resultado</td><td>Local filesystem</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/batch</code></td><td>Procesamiento masivo</td><td>Todas las APIs de imagen</td><td>Variable</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/brand-kit</code></td><td>Guardar/cargar marca</td><td>Prisma DB</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/video-enhance</code></td><td>Mejorar video</td><td>Replicate/fal.ai</td><td>Variable</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/ai-models</code></td><td>Listar modelos IA</td><td>Replicate API</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/health</code></td><td>Health check</td><td>Prisma + env vars</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/db/history</code></td><td>Historial de procesamiento</td><td>Prisma DB</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/inventory/scan</code></td><td>Escanear carpeta</td><td>Local filesystem</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+        <tr><td><code>/api/inventory/load</code></td><td>Cargar inventario</td><td>Prisma DB</td><td>$0.00</td><td class="status-ok">REAL</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  7. PROVIDERS                                                    -->
+<!-- ================================================================ -->
+<section id="providers">
+  <h2>Proveedores de IA</h2>
+  <p class="intro">Todos los servicios externos que usa UniStudio para procesar imagenes, videos y audio.</p>
+
+  <h3>Video Providers (7)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Provider</th><th>Backend</th><th>Costo</th><th>Calidad</th><th>Velocidad</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Ken Burns</strong></td><td>Cliente (CSS)</td><td class="status-ok">GRATIS</td><td>Basico (zoom/pan)</td><td>Instantaneo</td></tr>
+        <tr><td><strong>LTX-Video</strong></td><td>fal.ai</td><td>$0.04</td><td>Buena</td><td>~30s</td></tr>
+        <tr><td><strong>Wan 2.2 Fast</strong></td><td>Replicate</td><td>$0.05</td><td>Buena</td><td>~45s</td></tr>
+        <tr><td><strong>Wan 2.5</strong></td><td>fal.ai</td><td>$0.06</td><td>Muy buena</td><td>~60s</td></tr>
+        <tr><td><strong>Wan 2.1</strong></td><td>Replicate</td><td>$0.04</td><td>Buena</td><td>~45s</td></tr>
+        <tr><td><strong>Kling 2.6</strong></td><td>fal.ai</td><td>$0.07/s</td><td>Premium</td><td>~90s</td></tr>
+        <tr><td><strong>Minimax Hailuo</strong></td><td>fal.ai</td><td>$0.08/s</td><td>Premium</td><td>~90s</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Avatar Providers (5)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Provider</th><th>Backend</th><th>Costo</th><th>Calidad</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Wav2Lip</strong></td><td>Replicate</td><td>$0.005</td><td>Basica (lip-sync)</td></tr>
+        <tr><td><strong>MuseTalk</strong></td><td>fal.ai</td><td>$0.04</td><td>Buena</td></tr>
+        <tr><td><strong>SadTalker</strong></td><td>Replicate</td><td>$0.08</td><td>Buena (head motion)</td></tr>
+        <tr><td><strong>LivePortrait</strong></td><td>fal.ai</td><td>$0.09</td><td>Premium</td></tr>
+        <tr><td><strong>Hedra Free</strong></td><td>Hedra API</td><td class="status-ok">GRATIS</td><td>Buena (22/mes)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>TTS (Text-to-Speech)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Provider</th><th>Costo</th><th>Voces</th><th>Nota</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Edge TTS</strong></td><td class="status-ok">GRATIS</td><td>es-MX-DaliaNeural, es-ES-ElviraNeural, etc.</td><td>Sin API key, usa WebSocket de Microsoft</td></tr>
+        <tr><td><strong>Google Cloud TTS</strong></td><td>Free tier + paid</td><td>Multiples idiomas</td><td>Requiere GOOGLE_TTS_KEY</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  8. STORES                                                       -->
+<!-- ================================================================ -->
+<section id="stores">
+  <h2>6 Zustand Stores</h2>
+  <p class="intro">Estado global de la aplicacion, persistido donde se necesita.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-blue">E</div><div class="card-title">editor-store</div></div>
+      <div class="card-desc">Canvas layers, selectedLayerId, tool, zoom, canvasWidth/Height, history (50 max), historyIndex. Undo/redo, layer CRUD, filter editing.</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-red">V</div><div class="card-title">video-store</div></div>
+      <div class="card-desc">Mode, activeTab, selectedProvider, preset, prompt, duration, aspectRatio, avatar settings, TTS config, projects array. <strong>Persistido en localStorage.</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-green">G</div><div class="card-title">gallery-store</div></div>
+      <div class="card-desc">Array de imagenes procesadas con id, filename, URLs, date, operations, project. <strong>Persistido en localStorage + DB sync.</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-amber">B</div><div class="card-title">batch-store</div></div>
+      <div class="card-desc">Cola de batch jobs, pipeline definitions, progreso por job, errores.</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-purple">K</div><div class="card-title">brand-store</div></div>
+      <div class="card-desc">Colores de marca, fuentes, logo URL, configuracion de watermark. Sincroniza con /api/brand-kit.</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-bg">S</div><div class="card-title">settings-store</div></div>
+      <div class="card-desc">Preferencias del usuario, idioma, configuraciones globales.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  9. UX OVERHAUL                                                  -->
+<!-- ================================================================ -->
+<section id="ux-overhaul">
+  <h2>UX Overhaul (Feb 2026) <span class="badge">7 Fases</span></h2>
+  <p class="intro">Todas las mejoras de experiencia de usuario implementadas para que la app sea intuitiva.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">1</div>
+        <div class="card-title">Toast Notifications</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">Reemplazo de 19 <code>alert()</code> con toasts animados (success/error/warning/info). Auto-dismiss, dark theme, stack queue.</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted);">Archivos: <code>use-toast.ts</code> + <code>toast.tsx</code> + 10 archivos modificados</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">2</div>
+        <div class="card-title">Module Sidebar</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">Sidebar categorizado con iconos (FONDOS, MEJORA, EDICION, MODELOS, CONTENIDO, AUTOMATIZACION). Reemplaza el viejo dropdown en el toolbar.</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted);">Archivo: <code>ModuleSidebar.tsx</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">3</div>
+        <div class="card-title">Empty States</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">Cuando no hay imagen cargada, muestra icono + descripcion + instruccion de subir imagen. Excepto modulos que no necesitan imagen.</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted);">Archivo: <code>empty-state.tsx</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">4</div>
+        <div class="card-title">Module Descriptions</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">Cada modulo ahora explica QUE hace, POR QUE lo necesitas, y COMO usarlo. Seccion "Por que lo necesitas" con icono azul en 14 paneles.</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted);">Prop: <code>whyNeeded</code> en <code>ModuleHeader</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">5</div>
+        <div class="card-title">Processing Feedback</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">Processing overlay (spinner + progreso + cancelar) y Result banner (exito + costo + sugerencias de "que hacer ahora").</div>
+      <p style="font-size: 0.7rem; color: var(--text-muted);">Archivos: <code>processing-overlay.tsx</code> + <code>result-banner.tsx</code></p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">6</div>
+        <div class="card-title">Spanish Translation</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">28+ strings traducidos del ingles al espanol. Galeria, error messages, labels, placeholders. Toda la UI ahora es 100% en espanol.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">7</div>
+        <div class="card-title">Backend Polish</div>
+        <span class="card-cost cost-free" style="background: rgba(52, 211, 153, 0.15); color: var(--green);">Completado</span>
+      </div>
+      <div class="card-desc">Health check route (<code>/api/health</code>), gallery DB sync, fix de errores TypeScript en VideoPanel, fix duplicate import en dashboard.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  9b. STABILITY AUDIT (APR 2026)                                  -->
+<!-- ================================================================ -->
+<section id="audit">
+  <h2>Auditoria de Estabilidad <span class="badge" style="background:rgba(34,197,94,0.15);color:#34D399;">27 Fixes — Abr 2026</span></h2>
+  <p class="intro">Auditoria completa: 3 fases + 2 rondas deep hunt. Proyecto al <strong>93%</strong> de completitud.</p>
+
+  <div class="info-box green">
+    <strong>Resumen:</strong> 27 bugs corregidos en 30+ archivos. Los mas criticos: Vercel timeout mataba videos (60s→300s), video results no se guardaban en gallery, API keys con trailing \n causaban 401, 9 canvas null assertions podian crashear BG Remove, inpaint no enviaba negative_prompt.
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:20px;">
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-green">5</div><div class="card-title">Infraestructura</div></div>
+      <div class="card-desc">Vercel timeout 300s, API keys .trim(), error boundary global, Claude model IDs centralizados, toast en 13 paneles.</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-blue">5</div><div class="card-title">API Routes</div></div>
+      <div class="card-desc">Video negative_prompt, Upscale Clarity params, Inpaint negative_prompt, Kontext output_format eliminado, Avatar validacion.</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-amber">5</div><div class="card-title">Crashes Frontend</div></div>
+      <div class="card-desc">Agent retry, Agent null guards, Batch resultUrl, BgRemove canvas, Video gallery persistence.</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-icon icon-purple">5</div><div class="card-title">Estado y Memoria</div></div>
+      <div class="card-desc">brand-store partialize, gallery race condition, video-store quota, brand-kit shadowType, blob URL memory leaks.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  10. ENVIRONMENT VARIABLES                                       -->
+<!-- ================================================================ -->
+<section id="env">
+  <h2>Variables de Entorno</h2>
+  <p class="intro">Todo lo que necesitas en <code>.env.local</code> para que funcione.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Servicio</th><th>Requerido</th><th>Nota</th></tr></thead>
+      <tbody>
+        <tr><td><code>REPLICATE_API_TOKEN</code></td><td>Replicate</td><td class="status-ok">SI</td><td>Token r8_... para 10+ modelos IA</td></tr>
+        <tr><td><code>FAL_KEY</code></td><td>fal.ai</td><td class="status-ok">SI</td><td>Para LTX-Video, Wan 2.5, Kling, Minimax, MuseTalk, LivePortrait</td></tr>
+        <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL</td><td class="status-ok">SI</td><td>postgresql://user:pass@host:5432/db</td></tr>
+        <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Claude</td><td class="status-warn">Opcional</td><td>Para AI Agent + Director Creativo. Tiene fallback local.</td></tr>
+        <tr><td><code>FASHN_API_KEY</code></td><td>FASHN</td><td class="status-warn">Opcional</td><td>Try-on especializado. Replicate funciona sin esto.</td></tr>
+        <tr><td><code>WITHOUTBG_API_KEY</code></td><td>withoutBG Docker</td><td class="status-warn">Opcional</td><td>BG removal local gratis (necesita Docker corriendo)</td></tr>
+        <tr><td><code>HEDRA_API_KEY</code></td><td>Hedra</td><td class="status-warn">Opcional</td><td>Avatar gratuito (22 videos/mes)</td></tr>
+        <tr><td><code>GOOGLE_TTS_KEY</code></td><td>Google Cloud</td><td class="status-warn">Opcional</td><td>TTS alternativo. Edge TTS es gratis sin key.</td></tr>
+        <tr><td><code>REMOVE_BG_API_KEY</code></td><td>Remove.bg</td><td class="status-warn">Opcional</td><td>BG removal alternativo</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="info-box green">
+    <strong>Minimo para funcionar:</strong>
+    Solo necesitas REPLICATE_API_TOKEN + FAL_KEY + DATABASE_URL. Con esos 3, el 90% del app funciona. Los modulos gratis (enhance, sombras basicas, bg-remove browser) funcionan sin ningun API key.
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  11. COSTS                                                       -->
+<!-- ================================================================ -->
+<section id="costs">
+  <h2>Tabla de Costos</h2>
+  <p class="intro">Cuanto cuesta cada operacion. Todo es pay-per-use, sin suscripcion.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Operacion</th><th>Costo Min</th><th>Costo Max</th><th>Nota</th></tr></thead>
+      <tbody>
+        <tr><td>Quitar Fondo (browser)</td><td class="status-ok">$0.00</td><td class="status-ok">$0.00</td><td>100% gratis, procesa en tu PC</td></tr>
+        <tr><td>Quitar Fondo (Replicate)</td><td>$0.01</td><td>$0.01</td><td>Mejor calidad, necesita API key</td></tr>
+        <tr><td>Mejorar Calidad</td><td class="status-ok">$0.00</td><td class="status-ok">$0.00</td><td>Sharp local, siempre gratis</td></tr>
+        <tr><td>Sombras basicas</td><td class="status-ok">$0.00</td><td class="status-ok">$0.00</td><td>Sharp local (drop, contact, reflection)</td></tr>
+        <tr><td>Sombras IA</td><td>$0.04</td><td>$0.05</td><td>Replicate IC-Light / Kontext</td></tr>
+        <tr><td>Fondos con IA (estudio)</td><td class="status-ok">$0.00</td><td class="status-ok">$0.00</td><td>Colores solidos = browser gratis</td></tr>
+        <tr><td>Fondos con IA (escena)</td><td>$0.05</td><td>$0.05</td><td>Replicate para fondos complejos</td></tr>
+        <tr><td>Borrar/Reemplazar</td><td>$0.03</td><td>$0.05</td><td>Flux Fill Dev ($0.03) o Pro ($0.05)</td></tr>
+        <tr><td>Extender Imagen</td><td>$0.05</td><td>$0.05</td><td>Replicate Kontext</td></tr>
+        <tr><td>Prueba Virtual</td><td>$0.015</td><td>$0.05</td><td>Depende del provider</td></tr>
+        <tr><td>Crear Modelo</td><td>$0.055</td><td>$0.055</td><td>Flux Kontext Pro</td></tr>
+        <tr><td>Maniqui Invisible</td><td>$0.05</td><td>$0.08</td><td>Replicate</td></tr>
+        <tr><td>Joyeria Virtual</td><td>$0.05</td><td>$0.05</td><td>Replicate / FASHN</td></tr>
+        <tr><td>Video (Ken Burns)</td><td class="status-ok">$0.00</td><td class="status-ok">$0.00</td><td>CSS animation, gratis</td></tr>
+        <tr><td>Video (IA)</td><td>$0.04</td><td>$0.35</td><td>Depende del provider y duracion</td></tr>
+        <tr><td>Avatar (Wav2Lip)</td><td>$0.005</td><td>$0.005</td><td>Mas barato, calidad basica</td></tr>
+        <tr><td>Avatar (LivePortrait)</td><td>$0.09</td><td>$0.09</td><td>Mejor calidad</td></tr>
+        <tr><td>Compliance</td><td class="status-ok">$0.00</td><td class="status-ok">$0.00</td><td>Analisis local de metadata</td></tr>
+        <tr><td>Director Creativo</td><td class="status-ok">$0.00</td><td>$0.003</td><td>Gratis (local) o Claude ($0.003)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  12. DATABASE                                                    -->
+<!-- ================================================================ -->
+<section id="database">
+  <h2>Base de Datos (Prisma + PostgreSQL)</h2>
+  <p class="intro">Esquema de la base de datos y como se persisten los datos.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tabla</th><th>Campos Principales</th><th>Proposito</th></tr></thead>
+      <tbody>
+        <tr><td><code>images</code></td><td>id, originalUrl, processedUrl, filename, width, height, fileSize, mimeType, metadata</td><td>Metadata de cada imagen subida</td></tr>
+        <tr><td><code>processing_jobs</code></td><td>id, imageId, operation, provider, model, status, cost, processingTime, outputUrl, error</td><td>Registro de cada operacion IA con costo</td></tr>
+        <tr><td><code>brand_kits</code></td><td>id, name, colors (JSON), fonts (JSON), logoUrl, watermark (JSON), defaults</td><td>Configuracion de marca</td></tr>
+        <tr><td><code>projects</code></td><td>id, name, description, thumbnailUrl, createdAt</td><td>Proyectos (futuro)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="info-box amber">
+    <strong>Importante:</strong>
+    Para que la DB funcione, necesitas PostgreSQL corriendo. El comando es: <code>docker compose up -d db</code> (si tienes docker-compose configurado) o usa el DATABASE_URL de tu .env.local.
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  13. FILE MAP                                                    -->
+<!-- ================================================================ -->
+<section id="file-map">
+  <h2>Mapa de Archivos</h2>
+  <p class="intro">La estructura completa del proyecto con cada carpeta explicada.</p>
+
+  <pre>
+unistudio/
+├── prisma/
+│   └── schema.prisma              # Esquema de BD (5 tablas)
+├── public/                        # Archivos estaticos
+├── src/
+│   ├── app/                       # PAGINAS (Next.js App Router)
+│   │   ├── page.tsx               # Dashboard (/)
+│   │   ├── layout.tsx             # Layout global + ToastContainer
+│   │   ├── globals.css            # Tema dark luxury + Tailwind
+│   │   ├── editor/page.tsx        # Editor principal (/editor)
+│   │   ├── batch/page.tsx         # Procesamiento masivo (/batch)
+│   │   ├── brand-kit/page.tsx     # Kit de marca (/brand-kit)
+│   │   ├── gallery/page.tsx       # Galeria (/gallery)
+│   │   ├── agent/page.tsx        # Agente IA standalone (/agent)
+│   │   ├── docs/page.tsx         # Documentacion interactiva (/docs)
+│   │   ├── workflows/page.tsx    # Guia visual de flujos (/workflows)
+│   │   ├── architecture/page.tsx # Diagrama de arquitectura (/architecture)
+│   │   └── api/                   # 29 API ROUTES
+│   │       ├── bg-remove/route.ts
+│   │       ├── bg-generate/route.ts
+│   │       ├── enhance/route.ts
+│   │       ├── shadows/route.ts
+│   │       ├── inpaint/route.ts
+│   │       ├── outpaint/route.ts
+│   │       ├── upscale/route.ts
+│   │       ├── tryon/route.ts
+│   │       ├── model-create/route.ts
+│   │       ├── ghost-mannequin/route.ts
+│   │       ├── jewelry-tryon/route.ts
+│   │       ├── video/route.ts
+│   │       ├── avatar/route.ts
+│   │       ├── tts/route.ts
+│   │       ├── ad-create/route.ts
+│   │       ├── prompt/route.ts
+│   │       ├── prompt-templates/route.ts
+│   │       ├── upload/route.ts
+│   │       ├── save-result/route.ts
+│   │       ├── batch/route.ts
+│   │       ├── brand-kit/route.ts
+│   │       ├── video-enhance/route.ts
+│   │       ├── ai-models/route.ts
+│   │       ├── health/route.ts
+│   │       ├── analyze-image/route.ts
+│   │       ├── ai-agent/plan/route.ts
+│   │       ├── db/history/route.ts
+│   │       └── inventory/
+│   │           ├── scan/route.ts
+│   │           └── load/route.ts
+│   │
+│   ├── components/                # COMPONENTES UI
+│   │   ├── ui/                    # 20+ componentes base
+│   │   │   ├── button.tsx, badge.tsx, card.tsx
+│   │   │   ├── modal.tsx, tabs.tsx, slider.tsx
+│   │   │   ├── select.tsx, switch.tsx, tooltip.tsx
+│   │   │   ├── dropzone.tsx, color-picker.tsx
+│   │   │   ├── image-compare.tsx, spinner.tsx, progress.tsx
+│   │   │   ├── toast.tsx          # Sistema de notificaciones
+│   │   │   ├── empty-state.tsx    # Estado vacio por modulo
+│   │   │   ├── module-header.tsx  # Header estandar con whyNeeded
+│   │   │   ├── processing-overlay.tsx
+│   │   │   └── result-banner.tsx
+│   │   ├── editor/                # Componentes del editor
+│   │   │   ├── Toolbar.tsx
+│   │   │   ├── ModuleSidebar.tsx  # Sidebar categorizado
+│   │   │   ├── LayersPanel.tsx
+│   │   │   ├── PropertiesPanel.tsx
+│   │   │   ├── ShadowsGuidePanel.tsx
+│   │   │   └── TryOnGuidePanel.tsx
+│   │   └── modules/               # 19 PANELES DE MODULOS
+│   │       ├── BgRemovePanel.tsx
+│   │       ├── BgGeneratePanel.tsx
+│   │       ├── EnhancePanel.tsx
+│   │       ├── ShadowsPanel.tsx
+│   │       ├── InpaintPanel.tsx
+│   │       ├── OutpaintPanel.tsx
+│   │       ├── TryOnPanel.tsx
+│   │       ├── ModelCreatePanel.tsx
+│   │       ├── GhostMannequinPanel.tsx
+│   │       ├── JewelryTryOnPanel.tsx
+│   │       ├── VideoPanel.tsx
+│   │       ├── AdCreatorPanel.tsx
+│   │       ├── CompliancePanel.tsx
+│   │       ├── AiPromptPanel.tsx
+│   │       ├── AiAgentPanel.tsx
+│   │       ├── BatchProcessPanel.tsx
+│   │       ├── BrandKitPanel.tsx
+│   │       ├── UpscalePanel.tsx
+│   │       ├── SmartEditorPanel.tsx
+│   │       └── video/             # Sub-componentes de video
+│   │           ├── ProductVideoTab.tsx
+│   │           ├── FashionVideoTab.tsx
+│   │           ├── AvatarVideoTab.tsx
+│   │           ├── VideoModeToggle.tsx
+│   │           ├── VideoProviderSelect.tsx
+│   │           └── VideoPreview.tsx
+│   │
+│   ├── hooks/                     # 6 HOOKS CUSTOM
+│   │   ├── useAgentPipeline.ts    # Orquestacion AI Agent
+│   │   ├── useImageProcessing.ts
+│   │   ├── useEditor.ts
+│   │   ├── useApiCost.ts
+│   │   ├── useBatchProcessing.ts
+│   │   └── use-toast.ts           # Toast notifications
+│   │
+│   ├── stores/                    # 6 ZUSTAND STORES
+│   │   ├── editor-store.ts
+│   │   ├── video-store.ts
+│   │   ├── gallery-store.ts
+│   │   ├── batch-store.ts
+│   │   ├── brand-store.ts
+│   │   └── settings-store.ts
+│   │
+│   ├── lib/                       # LOGICA DE NEGOCIO
+│   │   ├── api/                   # 4 clientes API
+│   │   │   ├── replicate.ts
+│   │   │   ├── fal.ts
+│   │   │   ├── fashn.ts
+│   │   │   └── withoutbg.ts
+│   │   ├── processing/            # 16 procesadores
+│   │   │   ├── bg-remove.ts, bg-remove-browser.ts
+│   │   │   ├── bg-generate.ts, enhance.ts
+│   │   │   ├── shadows.ts, inpaint.ts, outpaint.ts
+│   │   │   ├── upscale.ts, tryon.ts
+│   │   │   ├── model-create.ts, ghost-mannequin.ts
+│   │   │   ├── jewelry.ts, video.ts, avatar.ts
+│   │   │   ├── ad-compose.ts
+│   │   │   └── sharp-utils.ts
+│   │   ├── video/                 # Sistema de video
+│   │   │   ├── providers.ts       # Registro de providers
+│   │   │   ├── cost.ts, presets.ts
+│   │   │   ├── tts.ts             # Server-only TTS
+│   │   │   └── tts-voices.ts      # Client-safe voices
+│   │   ├── db/
+│   │   │   └── prisma.ts          # Cliente Prisma singleton
+│   │   └── utils/
+│   │       └── cn.ts              # clsx + tailwind-merge
+│   │
+│   └── types/                     # TIPOS TYPESCRIPT
+│       ├── api.ts, editor.ts
+│       ├── video.ts, agent.ts
+│       ├── batch.ts, brand.ts
+│       └── ...
+│
+├── .env.local                     # API keys y secrets
+├── package.json
+├── next.config.ts
+├── tailwind.config.ts
+└── tsconfig.json
+  </pre>
+</section>
+
+<!-- ================================================================ -->
+<!--  14. STATUS                                                      -->
+<!-- ================================================================ -->
+<section id="status">
+  <h2>Estado Actual del Proyecto</h2>
+  <p class="intro">Resumen de que funciona, que necesita setup, y que falta.</p>
+
+  <div class="info-box green">
+    <strong>LO QUE FUNCIONA (sin setup adicional):</strong>
+    <ul>
+      <li>Dashboard con hero animado y 18 modulos</li>
+      <li>Editor con 19 paneles de modulos, todos con logica real</li>
+      <li>Toast notifications (ya no hay alert() feos)</li>
+      <li>Sidebar categorizado con iconos y costos</li>
+      <li>Empty states cuando no hay imagen</li>
+      <li>Descripciones completas en espanol en cada modulo</li>
+      <li>BG Removal en browser (100% gratis, sin API key)</li>
+      <li>Enhance con Sharp (100% gratis, local)</li>
+      <li>Sombras programaticas (drop, contact, reflection — gratis)</li>
+      <li>Fondos de estudio (colores solidos — gratis)</li>
+      <li>Ken Burns video (CSS animation — gratis)</li>
+      <li>Marketplace compliance (analisis local — gratis)</li>
+      <li>Galeria con filtros y preview</li>
+      <li>Brand Kit con colores, fonts, watermark</li>
+      <li>Auto-save de resultados al disco</li>
+    </ul>
+  </div>
+
+  <div class="info-box blue">
+    <strong>LO QUE NECESITA API KEYS (en .env.local):</strong>
+    <ul>
+      <li>Replicate: BG remove cloud, fondos IA, inpaint, outpaint, try-on, model-create, video (Wan), avatar (Wav2Lip, SadTalker)</li>
+      <li>fal.ai: Video (LTX, Wan 2.5, Kling, Minimax), Avatar (MuseTalk, LivePortrait)</li>
+      <li>Anthropic: AI Agent planning, Director Creativo IA (tiene fallback local)</li>
+      <li>FASHN: Try-on especializado (alternativa a Replicate)</li>
+    </ul>
+  </div>
+
+  <div class="info-box amber">
+    <strong>LO QUE NECESITA DOCKER/DB:</strong>
+    <ul>
+      <li>PostgreSQL: Para persistir processing_jobs, brand_kit, gallery history</li>
+      <li>withoutBG Docker: Para BG removal local gratis (opcional — browser mode ya es gratis)</li>
+      <li>Si no tienes DB corriendo, el app funciona pero no persiste historial en la base de datos</li>
+    </ul>
+  </div>
+
+  <div class="info-box green">
+    <strong>BUILD STATUS:</strong>
+    <code>npx next build</code> compila exitosamente con CERO errores. El proyecto esta listo para production deployment.
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!--  FOOTER                                                          -->
+<!-- ================================================================ -->
+<div style="text-align: center; padding: 60px 0; border-top: 1px solid var(--surface-lighter); margin-top: 60px;">
+  <p style="color: var(--gold); font-weight: 700; font-size: 1.2rem;">UniStudio</p>
+  <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 8px;">AI-Powered Product Photography Platform</p>
+  <p style="color: var(--text-muted); font-size: 0.7rem; margin-top: 4px;">Documentacion generada — Febrero 2026</p>
+  <p style="color: var(--text-muted); font-size: 0.7rem; margin-top: 16px;">
+    18 Modulos &middot; 29 API Routes &middot; 7 Video Providers &middot; 5 Avatar Providers &middot; 0 Stubs
+  </p>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

@@ -186,32 +186,60 @@ unistudio/
 
 ---
 
-## Current Status (March 2026)
+## Current Status (April 2026)
 
 ### What's Complete
 - All 18 modules implemented with API routes and processing logic
 - All 19 module panels have UI (16 original + UpscalePanel, BatchProcessPanel, BrandKitPanel)
-- AI Agent Phase 1 (11 fixes): image analysis, budget validation, visual results, cost confirmation, retry fixes, blob cleanup
-- AI Agent Phase 2 (4 fixes): watermark auto-removal, parallel execution, quality validation, plan editor UI
+- AI Agent Phase 1 (11 fixes) + Phase 2 (4 fixes) complete
+- **Stability Audit (Apr 12, 2026)**: 27 bug fixes across 30+ files — see below
+- Toast notifications on all 13 module panels
+- Global error boundary (error.tsx + global-error.tsx)
 - All UI text in Spanish
 - Luxury dark theme (#09090B background, #C5A47E gold accent)
-- Zero TODO/FIXME comments in codebase
-- All imports valid, no broken references
+
+### Stability Audit — 27 Fixes (Apr 12, 2026)
+
+**Infrastructure:**
+- Vercel timeout fix: video/avatar/model-create routes now get 300s (was 60s — videos were failing)
+- API keys `.trim()` on all providers (fal, replicate, fashn) — trailing `\n` from env pull caused 401s
+- Global error boundary added — app no longer crashes on unhandled errors
+- Claude model IDs centralized in constants.ts (CLAUDE_HAIKU, CLAUDE_SONNET)
+
+**API Route Fixes:**
+- Video: added negative_prompt + lowered guidance_scale to prevent product duplication
+- Upscale: fixed Clarity params (resemblance 0.85, creativity 0.25) + use replicateUrl
+- Inpaint: negative_prompt now passed to flux-fill-pro/dev (was computed but never sent)
+- Kontext Pro: removed unsupported `output_format` param from jewelry + shadows
+- Avatar: added input validation (script length, provider, TTS provider checks)
+
+**Frontend Crash Fixes:**
+- Agent page: retry error handling + null guards on execution steps
+- Batch page: optional chaining on resultUrl to prevent crash
+- BgRemovePanel: replaced 9 canvas `getContext("2d")!` with proper null checks
+- Video results now saved to gallery (toPersistentThumbnail was failing on .mp4 URLs)
+
+**State Management Fixes:**
+- brand-store: added partialize to exclude base64 from localStorage
+- gallery-store: fixed addImage/addImages race condition (add sync, thumbnail async)
+- video-store: added QuotaExceededError-safe localStorage wrapper
+- brand-kit page: defaultShadowType now persisted to store
+
+**UX Fixes:**
+- Toast notifications added to all 13 module panels (was only 4)
+- Memory leaks fixed: blob URLs now revoked in useAgentPipeline, UpscalePanel, EnhancePanel
 
 ### Known Gaps
-- Outpaint: both provider options route to same flux-kontext-pro model
-- Batch + enhance incompatibility: batch route sends JSON but enhance API expects FormData
 - No dedicated watermark removal module (uses inpaint + Kontext as workaround)
 - No auth/rate limiting (single-user tool by design)
-- Intelligent prompt construction partially done (needs per-category rich templates)
 - No before/after comparison slider in module panels
 - No inpaint mask drawing mode (Fabric.js brush)
+- Brand Kit settings not yet auto-applied to module panels
 
-### Future Roadmap (Phase 3-5)
-See [AI Agent Analysis](./docs/ai-agent-analysis.md) for the complete roadmap:
+### Future Roadmap
 - **Phase 3**: Before/after slider, inpaint mask mode, UX polish
-- **Phase 4**: Multi-image batch agent, brand-aware processing, learning from history
-- **Phase 5**: Timeouts, caching, rate limiting, progress streaming
+- **Phase 4**: Multi-image batch agent, brand-aware processing
+- **Phase 5**: Timeouts, caching, progress streaming
 
 ---
 
