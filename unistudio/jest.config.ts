@@ -7,7 +7,11 @@ const config: Config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts', '!**/__tests__/integration/**'],
+  testPathIgnorePatterns: ['/node_modules/', '/__tests__/integration/'],
+  collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.test.*', '!src/**/__tests__/**'],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'text-summary', 'html'],
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
