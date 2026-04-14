@@ -14,7 +14,11 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "postinstall": "DATABASE_URL=${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder} prisma generate",
-    "smoke-test": "node ../scripts/smoke-test.mjs https://unistudio.vercel.app"
+    "smoke-test": "node ../scripts/smoke-test.mjs https://unistudio.vercel.app",
+    "test:integration": "jest --config jest.integration.config.ts",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:all": "npm run test:integration && npm run test:e2e"
   },
   "dependencies": {
     "@fal-ai/client": "^1.2.1",
@@ -54,6 +58,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -68,6 +73,7 @@
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.3.0",
+    "jest-environment-node": "^30.3.0",
     "prettier": "^3.8.1",
     "prisma": "^7.4.1",
     "tailwindcss": "^4",
