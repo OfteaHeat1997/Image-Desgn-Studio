@@ -10,7 +10,7 @@ import path from 'path';
 import os from 'os';
 import ffmpegPath from 'ffmpeg-static';
 import { runModel, extractOutputUrl, ensureHttpUrl, ReplicateApiError } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl, ensureFalHttpUrl, uploadToFalStorage, FalApiError } from '@/lib/api/fal';
+import { runFal, extractFalVideoUrl, ensureFalHttpUrl, ensureFalAccessibleUrl, uploadToFalStorage, FalApiError } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
@@ -213,14 +213,15 @@ export async function POST(request: NextRequest) {
     let resultUrl: string;
     const cost = getProviderCost(provider, duration);
 
-    // Convert data URLs to HTTP URLs so AI providers can access them.
+    // Convert data URLs / private Replicate URLs to accessible HTTP URLs.
+    // fal.ai cannot download private Replicate file URLs (api.replicate.com/v1/files/...)
+    // because they require Bearer auth. ensureFalAccessibleUrl handles all three cases:
+    // data URIs, private Replicate URLs, and regular public URLs.
     let httpImageUrl = imageUrl;
-    if (imageUrl.startsWith('data:')) {
-      if (provider.backend === 'fal') {
-        httpImageUrl = await ensureFalHttpUrl(imageUrl);
-      } else if (provider.backend === 'replicate') {
-        httpImageUrl = await ensureHttpUrl(imageUrl);
-      }
+    if (provider.backend === 'fal') {
+      httpImageUrl = await ensureFalAccessibleUrl(imageUrl);
+    } else if (provider.backend === 'replicate' && imageUrl.startsWith('data:')) {
+      httpImageUrl = await ensureHttpUrl(imageUrl);
     }
 
     switch (provider.backend) {

@@ -272,6 +272,50 @@ export async function ensureFalHttpUrl(url: string): Promise<string> {
   throw new FalApiError(`Unsupported URL scheme: ${url.slice(0, 30)}...`, 'INVALID_URL');
 }
 
+/**
+ * Ensure a URL is accessible by fal.ai models.
+ * Handles three cases:
+ *   1. data: URIs → uploaded to fal.ai storage
+ *   2. Private Replicate file URLs (api.replicate.com/v1/files/...) → downloaded with
+ *      REPLICATE_API_TOKEN auth and re-uploaded to fal.ai storage
+ *   3. Any other HTTP URL → returned as-is (assumed publicly accessible)
+ */
+export async function ensureFalAccessibleUrl(url: string): Promise<string> {
+  if (!url) throw new FalApiError('Empty URL provided', 'INVALID_URL');
+
+  // data: URI → upload to fal storage
+  if (url.startsWith('data:')) {
+    return ensureFalHttpUrl(url);
+  }
+
+  // Private Replicate file URL → download with auth and re-upload to fal storage
+  if (url.includes('api.replicate.com/v1/files/')) {
+    const replicateToken = process.env.REPLICATE_API_TOKEN;
+    if (!replicateToken) {
+      throw new FalApiError(
+        'REPLICATE_API_TOKEN is not set — cannot download private Replicate file',
+        'AUTH_MISSING',
+      );
+    }
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${replicateToken}` },
+    });
+    if (!response.ok) {
+      throw new FalApiError(
+        `Failed to download private Replicate file (${response.status}): ${url}`,
+        'DOWNLOAD_FAILED',
+      );
+    }
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
+    return uploadToFalStorage(buffer, contentType, `replicate-upload.${ext}`);
+  }
+
+  // Any other HTTP URL → assume publicly accessible
+  return url;
+}
+
 // ---------------------------------------------------------------------------
 // Output extraction
 // ---------------------------------------------------------------------------
