@@ -28,7 +28,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
     supportedAspectRatios: ['16:9', '9:16', '1:1', '4:3'],
     quality: 'draft',
     categories: ['product', 'fashion', 'hero'],
-    description: 'Gratis — MP4 real descargable',
+    description: 'Gratis con FFmpeg, o $0.04 con LTX si FFmpeg no está disponible',
   },
   'ltx-video': {
     key: 'ltx-video',

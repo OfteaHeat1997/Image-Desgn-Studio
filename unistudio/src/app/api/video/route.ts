@@ -311,14 +311,25 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const videoBuffer = await generateKenBurns(kenBurnsImageUrl, duration, aspectRatio, motion);
-
-        // Upload to fal.ai storage for a clean public URL, fall back to base64 data URI
         try {
-          resultUrl = await uploadToFalStorage(videoBuffer, 'video/mp4', `kenburns-${Date.now()}.mp4`);
-        } catch (uploadErr) {
-          console.warn('[API /video] fal storage upload failed, falling back to base64:', uploadErr);
-          resultUrl = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+          const videoBuffer = await generateKenBurns(kenBurnsImageUrl, duration, aspectRatio, motion);
+
+          // Upload to fal.ai storage for a clean public URL, fall back to base64 data URI
+          try {
+            resultUrl = await uploadToFalStorage(videoBuffer, 'video/mp4', `kenburns-${Date.now()}.mp4`);
+          } catch (uploadErr) {
+            console.warn('[API /video] fal storage upload failed, falling back to base64:', uploadErr);
+            resultUrl = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
+          }
+        } catch (ffmpegError) {
+          console.warn('[API /video] FFmpeg Ken Burns failed, falling back to LTX-Video:', ffmpegError);
+          // Fall back to LTX-Video (cheapest real provider at $0.04)
+          const falImageUrl = await ensureFalAccessibleUrl(kenBurnsImageUrl);
+          const output = await runFal('fal-ai/ltx-video/image-to-video', {
+            image_url: falImageUrl,
+            prompt: fullPrompt,
+          });
+          resultUrl = extractFalVideoUrl(output);
         }
         break;
       }

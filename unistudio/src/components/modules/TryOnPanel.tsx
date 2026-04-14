@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
+import { compressForUpload } from "@/lib/utils/compress-image";
 import { Shirt, Info, Sparkles, CheckCircle2, Circle, Upload, ImageIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { Button } from "@/components/ui/button";
@@ -147,15 +148,17 @@ export function TryOnPanel({ imageFile, onProcess, onProviderChange, onModelImag
 
     try {
       // Step 1: Upload model image
+      const compressedModel = await compressForUpload(modelFile);
       const modelFormData = new FormData();
-      modelFormData.append("file", modelFile);
+      modelFormData.append("file", compressedModel);
       const modelUploadRes = await fetch("/api/upload", { method: "POST", body: modelFormData });
       const modelUploadData = await safeJson(modelUploadRes);
       if (!modelUploadData.success) throw new Error(modelUploadData.error || "Error al subir imagen del modelo");
 
       // Step 2: Upload garment image
+      const compressedGarment = await compressForUpload(imageFile);
       const garmentFormData = new FormData();
-      garmentFormData.append("file", imageFile);
+      garmentFormData.append("file", compressedGarment);
       const garmentUploadRes = await fetch("/api/upload", { method: "POST", body: garmentFormData });
       const garmentUploadData = await safeJson(garmentUploadRes);
       if (!garmentUploadData.success) throw new Error(garmentUploadData.error || "Error al subir imagen de la prenda");
