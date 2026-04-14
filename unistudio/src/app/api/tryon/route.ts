@@ -35,12 +35,15 @@ async function tryOnIdmVton(
   modelImage: string,
   garmentImage: string,
   category: string,
+  garmentDescription?: string,
 ): Promise<string> {
+  const garmentDes = garmentDescription || `${category} garment`;
   const output = await runModel(
     'cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985',
     {
       human_img: modelImage,
       garm_img: garmentImage,
+      garment_des: garmentDes,
       category: toIdmVtonCategory(category),
       is_checked: true,
       is_checked_crop: false,
@@ -72,12 +75,13 @@ async function smartTryOn(
   garmentImage: string,
   category: string,
   garmentType?: string,
+  garmentDescription?: string,
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
   // For intimate/lingerie garments, always use IDM-VTON (best for delicate garments)
   if (isIntimate) {
-    const url = await tryOnIdmVton(modelImage, garmentImage, category);
+    const url = await tryOnIdmVton(modelImage, garmentImage, category, garmentDescription);
     return { url, provider: 'idm-vton' };
   }
 
@@ -92,7 +96,7 @@ async function smartTryOn(
   }
 
   // Default to IDM-VTON (also fallback if FASHN fails)
-  const url = await tryOnIdmVton(modelImage, garmentImage, category);
+  const url = await tryOnIdmVton(modelImage, garmentImage, category, garmentDescription);
   return { url, provider: 'idm-vton' };
 }
 
@@ -108,12 +112,14 @@ export async function POST(request: NextRequest) {
       garmentImage,
       category,
       garmentType,
+      garmentDescription,
       provider = 'auto',
     } = body as {
       modelImage: string;
       garmentImage: string;
       category: string;
       garmentType?: string;
+      garmentDescription?: string;
       provider?: 'idm-vton' | 'fashn' | 'auto';
     };
 
@@ -149,14 +155,14 @@ export async function POST(request: NextRequest) {
     let usedProvider: string;
 
     if (provider === 'auto' || !provider) {
-      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType);
+      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription);
       resultUrl = result.url;
       usedProvider = result.provider;
     } else {
       usedProvider = provider;
       switch (provider) {
         case 'idm-vton':
-          resultUrl = await tryOnIdmVton(httpModelImage, httpGarmentImage, category);
+          resultUrl = await tryOnIdmVton(httpModelImage, httpGarmentImage, category, garmentDescription);
           break;
         case 'fashn':
           resultUrl = await tryOnFashn(httpModelImage, httpGarmentImage, category);
