@@ -61,30 +61,41 @@ type Phase = "input" | "plan" | "executing" | "results";
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
 
-const AGENTS: { type: AgentType; label: string; icon: React.ReactNode; desc: string }[] = [
+const AGENTS: { type: AgentType; label: string; emoji: string; icon: React.ReactNode; desc: string }[] = [
   {
     type: "ecommerce",
+    emoji: "🛍️",
     label: "E-Commerce",
     icon: <ShoppingBag className="h-4 w-4" />,
-    desc: "Foto de producto: fondo blanco, uniforme, HD",
+    desc: "Prepara tus fotos para vender online. Fondo blanco, buena calidad, listas para tu tienda.",
+  },
+  {
+    type: "cambiar-modelo",
+    emoji: "👗",
+    label: "Cambiar Modelo",
+    icon: <User className="h-4 w-4" />,
+    desc: "Cambia la modelo de tu ropa. Sube la foto y elige cómo quieres la nueva modelo.",
   },
   {
     type: "modelo",
-    label: "Modelo",
+    emoji: "👤",
+    label: "Modelo IA",
     icon: <User className="h-4 w-4" />,
-    desc: "Modelo IA vistiendo tu producto",
+    desc: "Pon tu ropa en una modelo IA desde cero. Para fotos de producto sin modelo.",
   },
   {
     type: "social",
-    label: "Social",
+    emoji: "📱",
+    label: "Redes Sociales",
     icon: <Share2 className="h-4 w-4" />,
-    desc: "Videos, banners y ads para redes",
+    desc: "Crea fotos y videos bonitos para tus redes sociales.",
   },
   {
     type: "catalogo",
-    label: "Catalogo",
+    emoji: "📋",
+    label: "Catálogo",
     icon: <LayoutGrid className="h-4 w-4" />,
-    desc: "Set completo: 4 angulos + 2 infografias (estilo Leonisa)",
+    desc: "Crea un catálogo completo con fotos desde todos los ángulos.",
   },
 ];
 
@@ -120,7 +131,9 @@ const BUDGET_OPTIONS: { value: BudgetTier; label: string; desc: string }[] = [
 const FREE_TIER_WARNINGS: Record<AgentType, string | null> = {
   ecommerce: null,
   modelo:
-    "El modo Gratis solo puede quitar fondo y mejorar la imagen. Para generar un modelo IA y vestirlo necesitas minimo el plan Economico.",
+    "El modo Gratis solo puede quitar fondo y mejorar la imagen. Para generar una modelo IA y vestirla necesitas minimo el plan Economico.",
+  "cambiar-modelo":
+    "El modo Gratis no puede crear modelos IA ni hacer prueba virtual. Necesitas minimo el plan Economico para cambiar la modelo.",
   social:
     "El modo Gratis solo genera videos Ken Burns basicos. Para fondos creativos, videos IA y anuncios usa el plan Economico.",
   catalogo:
@@ -193,9 +206,9 @@ const ADDABLE_MODULES: { module: AgentModule; label: string; cost: number }[] = 
   { module: "inpaint", label: "Inpainting / Remover", cost: 0.05 },
   { module: "outpaint", label: "Extender imagen", cost: 0.05 },
   { module: "upscale", label: "Escalar resolucion", cost: 0.02 },
-  { module: "model-create", label: "Crear modelo IA", cost: 0.055 },
-  { module: "tryon", label: "Try-On virtual", cost: 0.02 },
-  { module: "jewelry-tryon", label: "Try-On joyeria", cost: 0.05 },
+  { module: "model-create", label: "Crear modelo nueva", cost: 0.055 },
+  { module: "tryon", label: "Poner ropa en modelo", cost: 0.02 },
+  { module: "jewelry-tryon", label: "Poner joyeria en modelo", cost: 0.05 },
   { module: "video", label: "Generar video", cost: 0.05 },
   { module: "ad-create", label: "Crear anuncio", cost: 0 },
   { module: "infographic", label: "Infografia con texto", cost: 0 },
@@ -222,6 +235,12 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const [bodyType, setBodyType] = useState("average");
   const [pose, setPose] = useState("standing");
   const [ageRange, setAgeRange] = useState("26-35");
+
+  // Execution mode: manual (confirm each step) or auto (run all)
+  const [executionMode, setExecutionMode] = useState<"manual" | "auto">("manual");
+  // Manual mode: which step is next to run
+  const [manualStep, setManualStep] = useState(0);
+  const [isManualRunning, setIsManualRunning] = useState(false);
 
   // Error state (inline, visible in panel)
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -353,7 +372,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
       imageCount: 1,
       budget,
       contentType: agentType === "social" ? contentType : undefined,
-      preferences: (agentType === "modelo" || agentType === "catalogo") ? { gender, skinTone, bodyType, pose, ageRange } : undefined,
+      preferences: (agentType === "modelo" || agentType === "catalogo" || agentType === "cambiar-modelo") ? { gender, skinTone, bodyType, pose, ageRange } : undefined,
       imageAnalysis: imageAnalysis ?? undefined,
     };
 
@@ -382,6 +401,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     setPhase("executing");
     setStartTime(Date.now());
     setElapsed(0);
+    setManualStep(0);
 
     try {
       const result = await pipeline.execute(plan, imageFile);
@@ -430,6 +450,8 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     setImageAnalysis(null);
     setEditedPlan(null);
     setShowAddStep(false);
+    setManualStep(0);
+    setIsManualRunning(false);
   }, [pipeline]);
 
   // ----- Plan editing helpers -----
@@ -506,29 +528,29 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           Selecciona un agente y sube tu imagen. La IA planifica y ejecuta todo automaticamente.
         </p>
 
-        {/* Agent tabs */}
-        <SectionLabel>Agente</SectionLabel>
-        <div className="grid grid-cols-3 gap-1.5">
+        {/* Agent cards */}
+        <SectionLabel>¿Qué quieres hacer?</SectionLabel>
+        <div className="grid grid-cols-2 gap-2">
           {AGENTS.map((a) => (
             <button
               key={a.type}
               type="button"
               onClick={() => setAgentType(a.type)}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center transition-all",
+                "flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-all",
                 agentType === a.type
-                  ? "border-accent bg-accent/10 text-accent-light"
-                  : "border-surface-lighter bg-surface-light text-gray-400 hover:border-surface-hover",
+                  ? "border-accent bg-accent/10"
+                  : "border-surface-lighter bg-surface-light hover:border-surface-hover",
               )}
             >
-              {a.icon}
-              <span className="text-[10px] font-semibold">{a.label}</span>
+              <span className="text-xl">{a.emoji}</span>
+              <span className={cn("text-[11px] font-bold", agentType === a.type ? "text-accent-light" : "text-gray-200")}>
+                {a.label}
+              </span>
+              <span className="text-[9px] text-gray-500 leading-tight">{a.desc}</span>
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-gray-500">
-          {AGENTS.find((a) => a.type === agentType)?.desc}
-        </p>
 
         {/* Product category */}
         <SectionLabel>Categoria de Producto</SectionLabel>
@@ -551,7 +573,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         )}
 
         {/* Modelo preferences */}
-        {(agentType === "modelo" || agentType === "catalogo") && (
+        {(agentType === "modelo" || agentType === "catalogo" || agentType === "cambiar-modelo") && (
           <>
             <SectionLabel>Modelo IA</SectionLabel>
             <div className="grid grid-cols-2 gap-2">
@@ -770,7 +792,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           loading={isPlanning || isAnalyzing}
           disabled={!imageFile || isPlanning || isAnalyzing}
         >
-          {isAnalyzing ? "Analizando imagen..." : isPlanning ? "Planificando..." : "Crear Plan IA"}
+          {isAnalyzing ? "Analizando imagen..." : isPlanning ? "Preparando tus pasos..." : "Ver mis pasos"}
         </Button>
 
         {!imageFile && (
@@ -802,7 +824,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         <p className="text-[11px] text-gray-400">{plan.description}</p>
 
         {/* Steps (editable) */}
-        <SectionLabel>Pipeline ({plan.steps.length} pasos) — editable</SectionLabel>
+        <SectionLabel>Pasos ({plan.steps.length}) — puedes editar</SectionLabel>
         <div className="space-y-2">
           {plan.steps.map((step, i) => (
             <div
@@ -955,6 +977,45 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           </div>
         )}
 
+        {/* Mode selector */}
+        {!showCostConfirm && (
+          <div className="rounded-lg border border-surface-lighter bg-surface-light p-2.5 space-y-1.5">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Modo de ejecución</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setExecutionMode("manual")}
+                className={cn(
+                  "rounded-lg border px-2 py-2 text-left transition-all",
+                  executionMode === "manual"
+                    ? "border-accent bg-accent/10"
+                    : "border-surface-lighter bg-surface hover:border-surface-hover",
+                )}
+              >
+                <p className={cn("text-[11px] font-bold", executionMode === "manual" ? "text-accent-light" : "text-gray-300")}>
+                  🙋 Manual
+                </p>
+                <p className="text-[9px] text-gray-500 mt-0.5">Tú apruebas cada paso</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setExecutionMode("auto")}
+                className={cn(
+                  "rounded-lg border px-2 py-2 text-left transition-all",
+                  executionMode === "auto"
+                    ? "border-accent bg-accent/10"
+                    : "border-surface-lighter bg-surface hover:border-surface-hover",
+                )}
+              >
+                <p className={cn("text-[11px] font-bold", executionMode === "auto" ? "text-accent-light" : "text-gray-300")}>
+                  ⚡ Automático
+                </p>
+                <p className="text-[9px] text-gray-500 mt-0.5">Ejecuta todo solo</p>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         {!showCostConfirm && (
           <div className="flex gap-2">
@@ -965,7 +1026,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
               leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
               onClick={() => { setPhase("input"); setEditedPlan(null); setShowAddStep(false); }}
             >
-              Regenerar
+              Cambiar
             </Button>
             <Button
               variant="primary"
@@ -975,7 +1036,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
               onClick={handleExecute}
               disabled={!imageFile}
             >
-              Ejecutar{plan.totalEstimatedCost > 0 ? ` ($${plan.totalEstimatedCost.toFixed(2)})` : ""}
+              ¡Empezar!{plan.totalEstimatedCost > 0 ? ` ($${plan.totalEstimatedCost.toFixed(2)})` : ""}
             </Button>
           </div>
         )}
@@ -999,15 +1060,28 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
             {execution.status === "completed" && <Check className="h-4 w-4 text-emerald-400" />}
             {execution.status === "failed" && <AlertCircle className="h-4 w-4 text-red-400" />}
             <h2 className="text-sm font-bold text-white">
-              {execution.status === "running" ? "Ejecutando..." : execution.status === "completed" ? "Completado" : "Error"}
+              {execution.status === "running" ? "Trabajando..." : execution.status === "completed" ? "¡Todo listo!" : "Error"}
             </h2>
           </div>
+          {/* BIG RED STOP BUTTON — always visible during execution */}
           {execution.status === "running" && (
-            <Button variant="outline" size="sm" onClick={pipeline.cancel}>
-              <X className="h-3 w-3" />
-            </Button>
+            <button
+              type="button"
+              onClick={() => { pipeline.cancel(); }}
+              className="flex items-center gap-1.5 rounded-lg border-2 border-red-500 bg-red-500/20 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all"
+            >
+              <X className="h-3.5 w-3.5" />
+              Cancelar Todo
+            </button>
           )}
         </div>
+
+        {/* Manual mode label */}
+        {executionMode === "manual" && execution.status === "running" && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/5 px-2.5 py-1.5">
+            <span className="text-[10px] text-blue-300">🙋 Modo manual — puedes cancelar en cualquier momento</span>
+          </div>
+        )}
 
         {/* Progress bar */}
         <Progress value={progress} size="sm" label={`${progress}%`} showPercentage />
@@ -1121,7 +1195,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="h-6 w-6 animate-spin text-accent-light" />
                       <span className="text-[10px] text-accent-light animate-pulse">
-                        Procesando {step.label.toLowerCase()}...
+                        Trabajando en: {step.label.toLowerCase()}...
                       </span>
                     </div>
                   </div>
@@ -1260,7 +1334,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         </div>
 
         {/* Results gallery — Before/After per step */}
-        <SectionLabel>Resultados por Paso (Antes → Despues)</SectionLabel>
+        <SectionLabel>Pasos completados (Antes → Despues)</SectionLabel>
         <div className="space-y-3">
           {completedSteps.map((stepExec, i) => {
             const stepDef = plan.steps.find((s) => s.id === stepExec.stepId);
