@@ -22,6 +22,7 @@ import { ArrowRight, RotateCcw, Eye, EyeOff, ImagePlus, Layers } from "lucide-re
 import { toast } from "@/hooks/use-toast";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ResultBanner } from "@/components/ui/result-banner";
+import { compressForUpload } from "@/lib/utils/compress-image";
 
 /* Module panel imports */
 import { BgRemovePanel } from "@/components/modules/BgRemovePanel";
@@ -430,8 +431,9 @@ function EditorInner() {
     // Upload in background to get a persistent URL for gallery
     (async () => {
       try {
+        const compressed = await compressForUpload(file);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", compressed);
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const data = await res.json();
         // Guard: only apply if this is still the latest drop (prevents stale upload overwriting newer image)
