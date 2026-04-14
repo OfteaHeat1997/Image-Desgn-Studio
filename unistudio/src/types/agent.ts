@@ -101,7 +101,7 @@ export interface AgentPlan {
 // Pipeline Execution
 // -----------------------------------------------------------------------------
 
-export type StepStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type StepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
 
 export interface StepExecution {
   stepId: string;

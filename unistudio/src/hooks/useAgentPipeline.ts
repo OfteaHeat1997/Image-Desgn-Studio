@@ -17,6 +17,8 @@ import type {
 // Orchestrates existing /api/* routes sequentially based on an AgentPlan.
 // =============================================================================
 
+type ManualAction = 'accept' | 'skip' | 'rerun';
+
 /** Compress an image to stay under Vercel's 4.5MB body limit */
 async function compressIfNeeded(file: File, maxSizeKB = 3000): Promise<File> {
   if (file.size <= maxSizeKB * 1024) return file;
@@ -558,6 +560,11 @@ export function useAgentPipeline() {
   const [isPlanning, setIsPlanning] = useState(false);
   const abortRef = useRef(false);
 
+  // Manual mode state — pauses between steps for user approval
+  const manualResolverRef = useRef<((action: ManualAction) => void) | null>(null);
+  const [waitingForApproval, setWaitingForApproval] = useState(false);
+  const [approvalStepIndex, setApprovalStepIndex] = useState(-1);
+
   // Track blob URLs for cleanup to prevent memory leaks
   const blobUrlsRef = useRef<string[]>([]);
 
@@ -605,8 +612,8 @@ export function useAgentPipeline() {
     }
   }, []);
 
-  // ----- Execute the plan (with parallel support) -----
-  const execute = useCallback(async (agentPlan: AgentPlan, imageFile: File) => {
+  // ----- Execute the plan (with parallel support + optional manual mode) -----
+  const execute = useCallback(async (agentPlan: AgentPlan, imageFile: File, manualMode = false) => {
     abortRef.current = false;
     const steps = agentPlan.steps;
 
@@ -644,7 +651,7 @@ export function useAgentPipeline() {
       setExecution({ ...exec });
 
       if (group.length === 1) {
-        // Single step — sequential execution
+        // Single step — sequential execution (with optional manual mode rerun loop)
         const i = group[0];
         const step = steps[i];
         // Capture input URL before this step runs (for before/after)
@@ -652,56 +659,107 @@ export function useAgentPipeline() {
         exec.steps[i] = { ...exec.steps[i], inputUrl: stepInputUrl };
         setExecution({ ...exec });
 
-        try {
-          const result = await executeStep(step, ctx);
+        let lastResult: { resultUrl: string; cost: number; updatedCtx: Partial<StepContext> } | null = null;
+        let skippedByUser = false;
+        let isFirstIteration = true;
 
-          const validation = await validateStepResult(result.resultUrl, step.module);
-          if (!validation.valid) {
-            throw new Error(validation.warning ?? "Validacion de calidad fallida");
+        while (true) {
+          // On reruns, reset step back to running
+          if (!isFirstIteration) {
+            exec.steps[i] = {
+              ...exec.steps[i],
+              status: "running",
+              resultUrl: null,
+              error: null,
+              actualCost: 0,
+              startedAt: Date.now(),
+            };
+            setExecution({ ...exec });
+          }
+          isFirstIteration = false;
+
+          try {
+            const result = await executeStep(step, ctx);
+
+            const validation = await validateStepResult(result.resultUrl, step.module);
+            if (!validation.valid) {
+              throw new Error(validation.warning ?? "Validacion de calidad fallida");
+            }
+
+            lastResult = result;
+            exec.steps[i] = {
+              ...exec.steps[i],
+              status: "completed",
+              inputUrl: stepInputUrl,
+              resultUrl: result.resultUrl,
+              actualCost: result.cost,
+              completedAt: Date.now(),
+              error: validation.warning ?? null,
+            };
+            exec.totalCost += result.cost;
+            setExecution({ ...exec });
+          } catch (err) {
+            exec.steps[i] = {
+              ...exec.steps[i],
+              status: "failed",
+              error: err instanceof Error ? err.message : "Unknown error",
+              completedAt: Date.now(),
+            };
+            exec.status = "failed";
+            setExecution({ ...exec });
+            return exec;
           }
 
-          const catalogAngle = step.params._catalogAngle as string | undefined;
+          // Automatic mode: continue immediately
+          if (!manualMode) break;
 
+          // Manual mode: pause and wait for user decision
+          setWaitingForApproval(true);
+          setApprovalStepIndex(i);
+          const action = await new Promise<ManualAction>((resolve) => {
+            manualResolverRef.current = resolve;
+          });
+          setWaitingForApproval(false);
+          setApprovalStepIndex(-1);
+          manualResolverRef.current = null;
+
+          if (action === 'accept') break;
+
+          if (action === 'skip') {
+            skippedByUser = true;
+            exec.totalCost -= lastResult!.cost;
+            exec.steps[i] = { ...exec.steps[i], status: "skipped", actualCost: 0 };
+            setExecution({ ...exec });
+            break;
+          }
+
+          // action === 'rerun': undo cost and loop again
+          exec.totalCost -= lastResult!.cost;
+          lastResult = null;
+        }
+
+        // If user skipped this step, don't update ctx — continue to next group
+        if (skippedByUser) continue;
+
+        // Update context from accepted result
+        if (lastResult) {
+          const catalogAngle = step.params._catalogAngle as string | undefined;
           if (step.module === "model-create") {
-            ctx.modelUrl = result.resultUrl;
+            ctx.modelUrl = lastResult.resultUrl;
             if (catalogAngle) ctx.currentAngle = catalogAngle;
           } else if (step.module === "infographic" && step.params._useResult) {
             // Infographic doesn't change the main flow
           } else {
-            ctx.currentUrl = result.resultUrl;
+            ctx.currentUrl = lastResult.resultUrl;
           }
-          if (result.updatedCtx.garmentUrl) ctx.garmentUrl = result.updatedCtx.garmentUrl;
-          if (result.updatedCtx.modelUrl) ctx.modelUrl = result.updatedCtx.modelUrl;
-
-          // Track catalog results by angle
+          if (lastResult.updatedCtx.garmentUrl) ctx.garmentUrl = lastResult.updatedCtx.garmentUrl;
+          if (lastResult.updatedCtx.modelUrl) ctx.modelUrl = lastResult.updatedCtx.modelUrl;
           if (catalogAngle && step.module === "tryon") {
-            ctx.catalogResults[catalogAngle] = result.resultUrl;
+            ctx.catalogResults[catalogAngle] = lastResult.resultUrl;
           }
-
-          exec.steps[i] = {
-            ...exec.steps[i],
-            status: "completed",
-            inputUrl: stepInputUrl,
-            resultUrl: result.resultUrl,
-            actualCost: result.cost,
-            completedAt: Date.now(),
-            error: validation.warning ?? null,
-          };
-          exec.totalCost += result.cost;
-          setExecution({ ...exec });
-        } catch (err) {
-          exec.steps[i] = {
-            ...exec.steps[i],
-            status: "failed",
-            error: err instanceof Error ? err.message : "Unknown error",
-            completedAt: Date.now(),
-          };
-          exec.status = "failed";
-          setExecution({ ...exec });
-          return exec;
         }
       } else {
-        // Parallel group — run all steps concurrently
+        // Parallel group — run all steps concurrently (no manual pause for parallel groups)
         // Capture input URLs before parallel execution
         for (const idx of group) {
           const step = steps[idx];
@@ -892,9 +950,24 @@ export function useAgentPipeline() {
     return exec;
   }, [execution]);
 
+  // ----- Manual mode controls -----
+  const resumeExecution = useCallback(() => {
+    manualResolverRef.current?.('accept');
+  }, []);
+
+  const skipCurrentStep = useCallback(() => {
+    manualResolverRef.current?.('skip');
+  }, []);
+
+  const rerunCurrentStep = useCallback(() => {
+    manualResolverRef.current?.('rerun');
+  }, []);
+
   // ----- Cancel -----
   const cancel = useCallback(() => {
     abortRef.current = true;
+    // If waiting for manual approval, resolve it as 'accept' so the pipeline can exit cleanly
+    manualResolverRef.current?.('accept');
   }, []);
 
   // ----- Reset -----
@@ -916,9 +989,14 @@ export function useAgentPipeline() {
     planMethod,
     execution,
     isPlanning,
+    waitingForApproval,
+    approvalStepIndex,
     requestPlan,
     execute,
     retryFromStep,
+    resumeExecution,
+    skipCurrentStep,
+    rerunCurrentStep,
     cancel,
     reset,
   };
