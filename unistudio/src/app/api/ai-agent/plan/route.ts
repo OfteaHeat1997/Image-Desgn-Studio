@@ -100,18 +100,14 @@ function getEcommercePipeline(
   }
 
   const shadowType =
-    category === "perfume"
-      ? "reflection"
-      : category === "lingerie"
-        ? "contact"
-        : "drop";
+    category === "lingerie"
+      ? "contact"
+      : "drop";
 
   const shadowLabel =
-    shadowType === "reflection"
-      ? "Reflejo elegante"
-      : shadowType === "contact"
-        ? "Sombra de contacto"
-        : "Sombra suave";
+    shadowType === "contact"
+      ? "Sombra de contacto"
+      : "Sombra suave";
 
   const steps: PipelineStep[] = [
     makeStep(

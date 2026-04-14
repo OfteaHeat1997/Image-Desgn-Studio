@@ -19,6 +19,7 @@ export type AgentModule =
   | 'video'
   | 'ad-create'
   | 'jewelry-tryon'
+  | 'jewelry'
   | 'ghost-mannequin'
   | 'infographic';
 
