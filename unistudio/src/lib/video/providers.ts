@@ -21,14 +21,14 @@ export const VIDEO_PROVIDERS: Record<VideoProviderKey, VideoProviderConfig> = {
   kenburns: {
     key: 'kenburns',
     name: 'Ken Burns',
-    backend: 'client',
-    model: 'client-side-css',
+    backend: 'ffmpeg',
+    model: 'ffmpeg-zoompan',
     costPerVideo: 0,
     maxDuration: 15,
     supportedAspectRatios: ['16:9', '9:16', '1:1', '4:3'],
     quality: 'draft',
     categories: ['product', 'fashion', 'hero'],
-    description: 'Animación Gratis (sin IA)',
+    description: 'Gratis — MP4 real descargable',
   },
   'ltx-video': {
     key: 'ltx-video',
