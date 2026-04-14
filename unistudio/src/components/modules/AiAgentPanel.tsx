@@ -25,7 +25,6 @@ import {
   ChevronDown,
   Trash2,
   Plus,
-  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -61,41 +60,41 @@ type Phase = "input" | "plan" | "executing" | "results";
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
 
-const AGENTS: { type: AgentType; label: string; emoji: string; icon: React.ReactNode; desc: string }[] = [
+const AGENTS: { id: string; type: AgentType; label: string; emoji: string; icon: React.ReactNode; desc: string; defaultCategory?: ProductCategory }[] = [
   {
-    type: "ecommerce",
-    emoji: "🛍️",
-    label: "E-Commerce",
-    icon: <ShoppingBag className="h-4 w-4" />,
-    desc: "Prepara tus fotos para vender online. Fondo blanco, buena calidad, listas para tu tienda.",
-  },
-  {
+    id: "lingerie-ropa",
     type: "cambiar-modelo",
     emoji: "👗",
-    label: "Cambiar Modelo",
+    label: "Lencería y Ropa",
     icon: <User className="h-4 w-4" />,
-    desc: "Cambia la modelo de tu ropa. Sube la foto y elige cómo quieres la nueva modelo.",
+    desc: "Cambia la modelo de tu ropa. Sube la foto con modelo → elige nueva modelo → ¡Listo!",
+    defaultCategory: "lingerie",
   },
   {
-    type: "modelo",
-    emoji: "👤",
-    label: "Modelo IA",
-    icon: <User className="h-4 w-4" />,
-    desc: "Pon tu ropa en una modelo IA desde cero. Para fotos de producto sin modelo.",
+    id: "joyeria-accesorios",
+    type: "ecommerce",
+    emoji: "💎",
+    label: "Joyería y Accesorios",
+    icon: <ShoppingBag className="h-4 w-4" />,
+    desc: "Fotos profesionales de tu joyería. En exhibidor, flotando, o en modelo.",
+    defaultCategory: "earrings",
   },
   {
+    id: "perfumes-belleza",
+    type: "ecommerce",
+    emoji: "🧴",
+    label: "Perfumes y Belleza",
+    icon: <ShoppingBag className="h-4 w-4" />,
+    desc: "Fotos y videos profesionales de perfumes, cremas, y cuidado personal.",
+    defaultCategory: "perfume",
+  },
+  {
+    id: "redes-sociales",
     type: "social",
     emoji: "📱",
-    label: "Redes Sociales",
+    label: "Para Redes Sociales",
     icon: <Share2 className="h-4 w-4" />,
-    desc: "Crea fotos y videos bonitos para tus redes sociales.",
-  },
-  {
-    type: "catalogo",
-    emoji: "📋",
-    label: "Catálogo",
-    icon: <LayoutGrid className="h-4 w-4" />,
-    desc: "Crea un catálogo completo con fotos desde todos los ángulos.",
+    desc: "Contenido listo para Instagram, TikTok, y Facebook.",
   },
 ];
 
@@ -223,7 +222,8 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const [phase, setPhase] = useState<Phase>("input");
 
   // Input state
-  const [agentType, setAgentType] = useState<AgentType>("ecommerce");
+  const [agentType, setAgentType] = useState<AgentType>("cambiar-modelo");
+  const [selectedCardId, setSelectedCardId] = useState<string>("lingerie-ropa");
   const [category, setCategory] = useState<ProductCategory>("lingerie");
   const [description, setDescription] = useState("");
   const [contentType, setContentType] = useState<SocialContentType>("hero");
@@ -581,18 +581,22 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         <div className="grid grid-cols-2 gap-2">
           {AGENTS.map((a) => (
             <button
-              key={a.type}
+              key={a.id}
               type="button"
-              onClick={() => setAgentType(a.type)}
+              onClick={() => {
+                setSelectedCardId(a.id);
+                setAgentType(a.type);
+                if (a.defaultCategory) setCategory(a.defaultCategory);
+              }}
               className={cn(
                 "flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-all",
-                agentType === a.type
+                selectedCardId === a.id
                   ? "border-accent bg-accent/10"
                   : "border-surface-lighter bg-surface-light hover:border-surface-hover",
               )}
             >
               <span className="text-xl">{a.emoji}</span>
-              <span className={cn("text-[11px] font-bold", agentType === a.type ? "text-accent-light" : "text-gray-200")}>
+              <span className={cn("text-[11px] font-bold", selectedCardId === a.id ? "text-accent-light" : "text-gray-200")}>
                 {a.label}
               </span>
               <span className="text-[9px] text-gray-500 leading-tight">{a.desc}</span>
@@ -665,13 +669,13 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={
-            agentType === "ecommerce"
-              ? "Ej: Brasier encaje negro, tienda online Unistyles"
-              : agentType === "catalogo"
-                ? "Ej: Brasier push-up, catalogo estilo Leonisa, 4 angulos"
-                : agentType === "modelo"
-                  ? "Ej: Modelo latina, ambiente de playa tropical"
-                  : "Ej: Promo de San Valentin, reel de 15 segundos"
+            selectedCardId === "lingerie-ropa"
+              ? "Ej: Brasier encaje negro, quiero modelo con tono medio y pose frontal"
+              : selectedCardId === "joyeria-accesorios"
+                ? "Ej: Aretes de oro, fondo blanco, sombra suave, video girando"
+                : selectedCardId === "perfumes-belleza"
+                  ? "Ej: Perfume floral 100ml, fondo negro elegante, video de 5 segundos"
+                  : "Ej: Reel de lencería para Instagram, estilo editorial elegante"
           }
           className="h-16 w-full resize-none rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 focus:border-accent/50 focus:outline-none"
         />
