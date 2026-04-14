@@ -80,7 +80,7 @@ export const useVideoStore = create<VideoStoreState>()(
         },
         removeItem: (name) => { try { localStorage.removeItem(name); } catch {} },
       },
-      partialize: (state) => ({
+      partialize: (state): Partial<VideoStoreState> => ({
         mode: state.mode,
         activeTab: state.activeTab,
         selectedProvider: state.selectedProvider,
