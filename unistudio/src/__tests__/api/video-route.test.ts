@@ -87,6 +87,7 @@ jest.mock('@/lib/api/fal', () => {
     runFal: jest.fn(),
     extractFalVideoUrl: jest.fn(),
     ensureFalHttpUrl: jest.fn(),
+    ensureFalAccessibleUrl: jest.fn().mockImplementation((url: string) => Promise.resolve(url)),
     uploadToFalStorage: jest.fn(),
     FalApiError,
   };
@@ -94,21 +95,6 @@ jest.mock('@/lib/api/fal', () => {
 
 jest.mock('@/lib/db/persist', () => ({ saveJob: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/lib/utils/image', () => ({ proxyReplicateUrl: jest.fn((url: string) => url) }));
-jest.mock('ffmpeg-static', () => '/usr/bin/ffmpeg');
-jest.mock('fs', () => ({
-  writeFileSync: jest.fn(),
-  readFileSync: jest.fn().mockReturnValue(Buffer.from('fake-video-data')),
-  unlinkSync: jest.fn(),
-}));
-jest.mock('os', () => ({ tmpdir: jest.fn().mockReturnValue('/tmp') }));
-jest.mock('child_process', () => ({
-  spawn: jest.fn().mockImplementation(() => ({
-    stderr: { on: jest.fn() },
-    on: jest.fn().mockImplementation((event: string, cb: (code: number) => void) => {
-      if (event === 'exit') cb(0);
-    }),
-  })),
-}));
 
 // ---- Imports after mocks ----
 import { POST } from '@/app/api/video/route';
@@ -120,7 +106,6 @@ import {
 import {
   runFal,
   extractFalVideoUrl,
-  uploadToFalStorage,
   FalApiError,
 } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
@@ -317,28 +302,22 @@ describe('POST /api/video', () => {
     expect(body.error).toMatch(/Error|procesando|Intenta/i);
   });
 
-  // ---- Ken Burns (ffmpeg) provider ----
-  it('routes kenburns requests through ffmpeg (not Replicate)', async () => {
-    (uploadToFalStorage as jest.Mock).mockResolvedValue('https://fal.media/kenburns.mp4');
-    // Mock global fetch for image download inside generateKenBurns
-    const origFetch = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
-    }) as unknown as typeof fetch;
+  // ---- Ken Burns (fal/ltx-video) provider ----
+  it('routes kenburns requests through fal.ai LTX-Video (not Replicate)', async () => {
+    (runFal as jest.Mock).mockResolvedValue({ video: { url: 'https://fal.media/kenburns.mp4' } });
+    (extractFalVideoUrl as jest.Mock).mockReturnValue('https://fal.media/kenburns.mp4');
 
     const req = createRequest({
       imageUrl: 'https://example.com/img.jpg',
+      falImageUrl: 'https://fal.media/img.jpg',
       provider: 'kenburns',
       duration: 3,
       aspectRatio: '16:9',
     });
     const res = await POST(req as any);
-    // runModel (Replicate) should NOT have been called
     expect(runModel).not.toHaveBeenCalled();
-    expect(runFal).not.toHaveBeenCalled();
+    expect(runFal).toHaveBeenCalled();
     expect(res.status).toBe(200);
-    global.fetch = origFetch;
   });
 
   // ---- Valid request → 200 ----

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { saveUploadedImage } from '@/lib/db/persist';
 import { ensureHttpUrl } from '@/lib/api/replicate';
+import { uploadToFalStorage } from '@/lib/api/fal';
 
 const ALLOWED_TYPES = new Set([
   'image/png',
@@ -79,14 +80,22 @@ export async function POST(request: NextRequest) {
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${outputMime};base64,${base64}`;
 
-    // Also upload to Replicate file hosting — this URL is passed to Replicate AI models.
-    // Note: Replicate file URLs are only accessible by Replicate models, NOT downloadable
-    // by our server. So we return BOTH: dataUrl for local processing, replicateUrl for AI.
+    // Upload to Replicate — URL is passed to Replicate AI models (private, Replicate-only access).
     let replicateUrl: string | null = null;
     try {
       replicateUrl = await ensureHttpUrl(dataUrl);
     } catch (err) {
       console.warn('[upload] Replicate file upload failed:', err);
+    }
+
+    // Upload to fal.ai storage — public CDN URL that fal.ai models can always access.
+    // This avoids the "Unable to download image" 422 error when passing Replicate private URLs to fal.
+    let falUrl: string | null = null;
+    try {
+      const ext = outputMime.split('/')[1] ?? 'jpg';
+      falUrl = await uploadToFalStorage(buffer, outputMime, `upload.${ext}`);
+    } catch (err) {
+      console.warn('[upload] fal.ai storage upload failed:', err);
     }
 
     // Save to database
@@ -107,8 +116,10 @@ export async function POST(request: NextRequest) {
       data: {
         // Primary URL: data URL (works everywhere — local processing + display)
         url: dataUrl,
-        // Replicate URL: for passing to AI models (only Replicate can access)
+        // Replicate URL: for passing to Replicate AI models (private, Replicate-only access)
         replicateUrl,
+        // fal.ai URL: public CDN URL that fal.ai models can always access
+        falUrl,
         filename: file.name,
         width,
         height,

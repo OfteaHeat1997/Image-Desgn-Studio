@@ -1,150 +1,26 @@
 // =============================================================================
 // Video Generation API Route - UniStudio (Video Studio)
-// POST: Accepts JSON with multi-provider support (fal.ai + Replicate + Ken Burns)
+// POST: Accepts JSON with multi-provider support (fal.ai + Replicate)
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import ffmpegPath from 'ffmpeg-static';
-import { runModel, extractOutputUrl, ensureHttpUrl, ReplicateApiError } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl, ensureFalHttpUrl, ensureFalAccessibleUrl, uploadToFalStorage, FalApiError } from '@/lib/api/fal';
+import { runModel, extractOutputUrl, ReplicateApiError } from '@/lib/api/replicate';
+import { runFal, extractFalVideoUrl, ensureFalAccessibleUrl, FalApiError } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { getPresetById } from '@/lib/video/presets';
 import type { VideoProviderKey, VideoCategory, VideoMode } from '@/types/video';
 
-// Video generation can take 2-5 minutes for AI providers; 60s covers FFmpeg Ken Burns
+// Video generation can take 2-5 minutes for AI providers
 export const maxDuration = 300;
-
-/**
- * Download any image URL (or decode a data URI) and re-upload it to fal.ai
- * storage so that fal models can access it via a public CDN URL.
- *
- * Replicate delivery URLs (replicate.delivery) are private / short-lived and
- * cause a 422 "Unable to download image" error when passed directly to fal.ai.
- */
-async function reuploadToFalStorage(url: string): Promise<string> {
-  // data: URIs — delegate to existing helper
-  if (url.startsWith('data:')) {
-    return ensureFalHttpUrl(url);
-  }
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download image for fal.ai re-upload: ${response.status} ${response.statusText}`,
-    );
-  }
-  const contentType = response.headers.get('content-type') ?? 'image/jpeg';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const ext = contentType.split('/')[1]?.split(';')[0]?.replace('+xml', '') ?? 'jpg';
-  return uploadToFalStorage(buffer, contentType, `input.${ext}`);
-}
-
-// ---------------------------------------------------------------------------
-// Ken Burns — real MP4 via FFmpeg zoompan filter
-// ---------------------------------------------------------------------------
-
-type KenBurnsMotion = 'zoom-in' | 'zoom-out' | 'pan-left' | 'pan-right';
-
-async function generateKenBurns(
-  imageUrl: string,
-  durationSec: number,
-  aspectRatio: string,
-  motion: KenBurnsMotion = 'zoom-in',
-): Promise<Buffer> {
-  if (!ffmpegPath) {
-    throw new Error('FFmpeg binary no encontrado. Contacta al administrador.');
-  }
-
-  const tempDir = os.tmpdir();
-  const inputPath = path.join(tempDir, `kb-input-${Date.now()}.jpg`);
-  const outputPath = path.join(tempDir, `kb-output-${Date.now()}.mp4`);
-
-  // Download image to temp file
-  const imgResponse = await fetch(imageUrl);
-  if (!imgResponse.ok) {
-    throw new Error(`No se pudo descargar la imagen: ${imgResponse.status} ${imgResponse.statusText}`);
-  }
-  const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
-  fs.writeFileSync(inputPath, imgBuffer);
-
-  // Output dimensions based on aspect ratio
-  const dimensions =
-    aspectRatio === '9:16' ? '1080x1920' :
-    aspectRatio === '1:1'  ? '1080x1080' :
-    aspectRatio === '4:3'  ? '1440x1080' :
-    '1920x1080'; // 16:9 default
-
-  const fps = 25;
-  const totalFrames = durationSec * fps;
-
-  // Build zoompan expression for each motion type
-  // `on` is the frame number (1-based) in zoompan
-  let zoompanExpr: string;
-  switch (motion) {
-    case 'zoom-in':
-      zoompanExpr = `zoompan=z='min(zoom+0.0015,1.3)':d=${totalFrames}:s=${dimensions}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
-      break;
-    case 'zoom-out':
-      zoompanExpr = `zoompan=z='if(lte(zoom,1.0),1.3,zoom-0.0015)':d=${totalFrames}:s=${dimensions}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
-      break;
-    case 'pan-left':
-      zoompanExpr = `zoompan=z=1.2:d=${totalFrames}:s=${dimensions}:x='iw-iw/zoom-(on/${totalFrames})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'`;
-      break;
-    case 'pan-right':
-      zoompanExpr = `zoompan=z=1.2:d=${totalFrames}:s=${dimensions}:x='(on/${totalFrames})*(iw-iw/zoom)':y='ih/2-(ih/zoom/2)'`;
-      break;
-  }
-
-  // Scale input to at least output dimensions before zoompan (so filter has enough pixels)
-  const vf = `scale=${dimensions}:force_original_aspect_ratio=increase,crop=${dimensions},${zoompanExpr}`;
-
-  await new Promise<void>((resolve, reject) => {
-    const proc = spawn(ffmpegPath as string, [
-      '-loop', '1',
-      '-i', inputPath,
-      '-vf', vf,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '26',
-      '-pix_fmt', 'yuv420p',
-      '-t', String(durationSec),
-      '-r', String(fps),
-      '-y', outputPath,
-    ]);
-
-    const stderrLines: string[] = [];
-    proc.stderr?.on('data', (chunk: Buffer) => stderrLines.push(chunk.toString()));
-
-    proc.on('exit', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        const tail = stderrLines.slice(-10).join('');
-        reject(new Error(`FFmpeg terminó con código ${code}: ${tail}`));
-      }
-    });
-    proc.on('error', (err) => reject(new Error(`No se pudo iniciar FFmpeg: ${err.message}`)));
-  });
-
-  const outputBuffer = fs.readFileSync(outputPath);
-
-  // Cleanup temp files
-  try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
-  try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
-
-  return outputBuffer;
-}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
       imageUrl,
+      falImageUrl,
       provider: providerKey = 'wan-2.2-fast',
       preset,
       prompt: userPrompt,
@@ -156,6 +32,7 @@ export async function POST(request: NextRequest) {
       motionType,
     } = body as {
       imageUrl: string;
+      falImageUrl?: string | null;
       provider?: VideoProviderKey;
       preset?: string;
       prompt?: string;
@@ -237,22 +114,20 @@ export async function POST(request: NextRequest) {
     let resultUrl: string;
     const cost = getProviderCost(provider, duration);
 
-    // Convert data URLs / private Replicate URLs to accessible HTTP URLs.
-    // fal.ai cannot download private Replicate file URLs (api.replicate.com/v1/files/...)
-    // because they require Bearer auth. ensureFalAccessibleUrl handles all three cases:
-    // data URIs, private Replicate URLs, and regular public URLs.
+    // Resolve the image URL for each backend:
+    // - fal.ai: use falImageUrl (pre-uploaded to fal CDN during initial upload) if available,
+    //   otherwise fall back to ensureFalAccessibleUrl (handles data URIs + private Replicate URLs)
+    // - Replicate: imageUrl is already the Replicate file URL from the upload step
     let httpImageUrl = imageUrl;
     if (provider.backend === 'fal') {
-      httpImageUrl = await ensureFalAccessibleUrl(imageUrl);
-    } else if (provider.backend === 'replicate' && imageUrl.startsWith('data:')) {
-      httpImageUrl = await ensureHttpUrl(imageUrl);
+      httpImageUrl = falImageUrl || await ensureFalAccessibleUrl(imageUrl);
     }
 
     switch (provider.backend) {
       case 'fal': {
         let falInput: Record<string, unknown>;
 
-        if (providerKey === 'ltx-video') {
+        if (providerKey === 'ltx-video' || providerKey === 'kenburns') {
           falInput = {
             image_url: httpImageUrl,
             prompt: fullPrompt,
@@ -315,34 +190,6 @@ export async function POST(request: NextRequest) {
             prompt: fullPrompt,
           });
           resultUrl = await extractOutputUrl(output);
-        }
-        break;
-      }
-
-      case 'ffmpeg': {
-        // Ken Burns — generate real MP4 with FFmpeg zoompan filter
-        const motion = (motionType as KenBurnsMotion) || 'zoom-in';
-
-        // Ensure we have an accessible HTTP URL for the image download
-        let kenBurnsImageUrl = imageUrl;
-        if (imageUrl.startsWith('data:')) {
-          // Upload to fal storage to get a downloadable URL
-          const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            const mimeType = match[1];
-            const buffer = Buffer.from(match[2], 'base64');
-            kenBurnsImageUrl = await uploadToFalStorage(buffer, mimeType, 'input.jpg');
-          }
-        }
-
-        const videoBuffer = await generateKenBurns(kenBurnsImageUrl, duration, aspectRatio, motion);
-
-        // Upload to fal.ai storage for a clean public URL, fall back to base64 data URI
-        try {
-          resultUrl = await uploadToFalStorage(videoBuffer, 'video/mp4', `kenburns-${Date.now()}.mp4`);
-        } catch (uploadErr) {
-          console.warn('[API /video] fal storage upload failed, falling back to base64:', uploadErr);
-          resultUrl = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
         }
         break;
       }

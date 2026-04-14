@@ -348,6 +348,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageUrl: httpImageUrl,
+            falImageUrl: uploadData.data.falUrl || null,
             provider: ai.recommendedProvider,
             preset: store.selectedPreset,
             prompt: ai.enhancedPrompt,
@@ -471,6 +472,7 @@ export function VideoPanel({ imageFile, onProcess }: VideoPanelProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             imageUrl: manualHttpUrl,
+            falImageUrl: uploadData.data.falUrl || null,
             provider: store.selectedProvider,
             preset: store.selectedPreset,
             prompt,
