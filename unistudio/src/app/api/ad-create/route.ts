@@ -10,7 +10,7 @@ import { proxyReplicateUrl } from '@/lib/utils/image';
 import { buildAdPrompt, AD_TEMPLATES, getRecommendedDuration } from '@/lib/processing/ad-compose';
 import { VIDEO_PROVIDERS, getProviderCost } from '@/lib/video/providers';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl } from '@/lib/api/fal';
+import { runFal, extractFalVideoUrl, ensureFalAccessibleUrl } from '@/lib/api/fal';
 import type { AdFormat, VideoProviderKey } from '@/types/video';
 
 export async function POST(request: NextRequest) {
@@ -80,8 +80,9 @@ export async function POST(request: NextRequest) {
     if (provider.backend === 'fal') {
       // Use correct input param name per provider
       const isKling = videoProvider === 'kling-2.6';
+      const httpImageUrl = await ensureFalAccessibleUrl(imageUrl);
       const falInput: Record<string, unknown> = {
-        [isKling ? 'start_image_url' : 'image_url']: imageUrl,
+        [isKling ? 'start_image_url' : 'image_url']: httpImageUrl,
         prompt,
         ...(videoProvider === 'wan-2.5' && { duration: String(duration), resolution: '480p' }),
         ...(isKling && { duration: String(duration) }),

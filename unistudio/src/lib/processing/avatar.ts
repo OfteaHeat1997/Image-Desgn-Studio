@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
-import { runFal, extractFalVideoUrl, ensureFalHttpUrl } from '@/lib/api/fal';
+import { runFal, extractFalVideoUrl, ensureFalAccessibleUrl } from '@/lib/api/fal';
 import type { AvatarProviderKey, AvatarGenerateResult } from '@/types/video';
 import { AVATAR_PROVIDERS } from '@/lib/video/providers';
 
@@ -168,11 +168,11 @@ export async function generateAvatar(
   // Convert data URLs (from TTS / upload) to HTTP URLs for the target backend.
   // TTS returns base64 data URLs; AI models need HTTP URLs.
   const isFal = providerConfig.backend === 'fal';
-  const httpImageUrl = imageUrl.startsWith('data:')
-    ? (isFal ? await ensureFalHttpUrl(imageUrl) : await ensureHttpUrl(imageUrl))
-    : imageUrl;
+  const httpImageUrl = isFal
+    ? await ensureFalAccessibleUrl(imageUrl)
+    : (imageUrl.startsWith('data:') ? await ensureHttpUrl(imageUrl) : imageUrl);
   const httpAudioUrl = audioUrl.startsWith('data:')
-    ? (isFal ? await ensureFalHttpUrl(audioUrl) : await ensureHttpUrl(audioUrl))
+    ? (isFal ? await ensureFalAccessibleUrl(audioUrl) : await ensureHttpUrl(audioUrl))
     : audioUrl;
 
   const startTime = Date.now();
