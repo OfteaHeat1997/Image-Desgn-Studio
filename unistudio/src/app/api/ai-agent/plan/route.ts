@@ -504,6 +504,46 @@ function getCatalogoPipeline(
   return steps;
 }
 
+function getCambiarModeloPipeline(
+  category: ProductCategory,
+  budget: BudgetTier,
+  prefs?: AgentPlanRequest["preferences"],
+): PipelineStep[] {
+  const garmentCategory = category === "lingerie" ? "one-pieces" : "tops";
+
+  const steps: PipelineStep[] = [
+    makeStep(
+      "model-create",
+      "Crear modelo nueva",
+      {
+        gender: prefs?.gender ?? "female",
+        ageRange: prefs?.ageRange ?? "26-35",
+        skinTone: prefs?.skinTone ?? "medium",
+        bodyType: prefs?.bodyType ?? "average",
+        pose: prefs?.pose ?? "standing",
+        expression: "confident",
+        hairStyle: "natural professional",
+        background: "studio white",
+      },
+      budget === "free" ? 0 : 0.055,
+      "Creamos una modelo IA nueva con las características elegidas.",
+    ),
+    makeStep(
+      "tryon",
+      "Poner ropa en modelo nueva",
+      { provider: "idm-vton", category: garmentCategory },
+      budget === "free" ? 0 : 0.02,
+      "IDM-VTON extrae tu prenda de la foto original y la transfiere a la modelo nueva. No necesitas aislar la ropa primero.",
+    ),
+  ];
+
+  if (budget === "free") {
+    return steps.filter((s) => s.estimatedCost === 0);
+  }
+
+  return steps;
+}
+
 function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
   const budget = req.budget ?? "economic";
   const analysis = req.imageAnalysis;
@@ -531,6 +571,11 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       steps = getCatalogoPipeline(req.productCategory, budget, req.preferences);
       name = "Agente Catalogo Completo";
       description = `Set completo de fotos de catalogo: frontal, espalda, lateral, lifestyle + infografias. Estilo Leonisa.`;
+      break;
+    case "cambiar-modelo":
+      steps = getCambiarModeloPipeline(req.productCategory, budget, req.preferences);
+      name = "Cambiar Modelo de mi Ropa";
+      description = `Cambia la modelo de tu foto de ${req.productCategory}. IDM-VTON extrae la prenda automáticamente y la pone en la nueva modelo.`;
       break;
     default:
       steps = getEcommercePipeline(req.productCategory, budget);
@@ -815,7 +860,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate agent type
-    const validAgents: AgentType[] = ["ecommerce", "modelo", "social", "catalogo"];
+    const validAgents: AgentType[] = ["ecommerce", "modelo", "social", "catalogo", "cambiar-modelo"];
     if (!validAgents.includes(body.agentType)) {
       return NextResponse.json(
         { success: false, data: null, cost: 0, error: `Invalid agentType: ${body.agentType}` },
@@ -840,7 +885,7 @@ export async function POST(request: NextRequest) {
     let plan: AgentPlan | null = null;
     let method: "ai" | "fallback" = "fallback";
 
-    if (body.agentType === "catalogo") {
+    if (body.agentType === "catalogo" || body.agentType === "cambiar-modelo") {
       plan = buildFallbackPlan(body);
     } else {
       plan = await planWithClaude(body);
