@@ -64,7 +64,8 @@
       "Bash(python3 -c ':*)",
       "Bash(vercel:*)",
       "Bash(git:*)",
-      "Bash(xargs basename:*)"
+      "Bash(xargs basename:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

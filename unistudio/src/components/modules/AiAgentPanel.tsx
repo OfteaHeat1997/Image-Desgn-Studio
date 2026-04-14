@@ -243,12 +243,36 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const [editedPlan, setEditedPlan] = useState<AgentPlan | null>(null);
   const [showAddStep, setShowAddStep] = useState(false);
 
+  // Execution mode: manual pauses after each step, automatic runs all without pausing
+  const [isManualMode, setIsManualMode] = useState(false);
+
+  // Multi-image: extra images queued beyond the primary imageFile prop
+  const [extraImages, setExtraImages] = useState<File[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [multiResults, setMultiResults] = useState<{ file: File; resultUrl: string }[]>([]);
+
   // Pipeline hook
   const pipeline = useAgentPipeline();
-  const { plan: rawPlan, planMethod, execution, isPlanning } = pipeline;
+  const {
+    plan: rawPlan,
+    planMethod,
+    execution,
+    isPlanning,
+    waitingForApproval,
+    approvalStepIndex,
+    resumeExecution,
+    skipCurrentStep,
+    rerunCurrentStep,
+  } = pipeline;
 
   // Use editedPlan if user has modified, otherwise use raw plan from pipeline
   const plan = editedPlan ?? rawPlan;
+
+  // All images to process (primary + extras)
+  const allImages = useMemo(
+    () => (imageFile ? [imageFile, ...extraImages] : extraImages),
+    [imageFile, extraImages],
+  );
 
   // Elapsed time tracking
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -382,21 +406,42 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     setPhase("executing");
     setStartTime(Date.now());
     setElapsed(0);
+    setMultiResults([]);
+    setCurrentImageIndex(0);
 
     try {
-      const result = await pipeline.execute(plan, imageFile);
+      const files = allImages.length > 0 ? allImages : [imageFile];
 
-      if (result?.status === "completed") {
-        setPhase("results");
-      } else if (result?.status === "failed") {
-        // Stay in executing phase so user can see error & retry
+      for (let imgIdx = 0; imgIdx < files.length; imgIdx++) {
+        setCurrentImageIndex(imgIdx);
+        const result = await pipeline.execute(plan, files[imgIdx], isManualMode);
+
+        if (result?.status === "completed") {
+          const lastCompleted = [...result.steps].reverse().find(
+            (s) => s.status === "completed" && s.resultUrl,
+          );
+          if (lastCompleted?.resultUrl) {
+            setMultiResults((prev) => [
+              ...prev,
+              { file: files[imgIdx], resultUrl: lastCompleted.resultUrl! },
+            ]);
+          }
+          if (imgIdx === files.length - 1) {
+            setPhase("results");
+          }
+        } else if (result?.status === "failed") {
+          // Stay in executing phase so user can see the error & retry
+          break;
+        } else if (result?.status === "cancelled") {
+          break;
+        }
       }
     } catch (err) {
       console.error("Execution failed:", err);
       setErrorMsg(err instanceof Error ? err.message : "Error inesperado durante ejecucion");
       setPhase("input");
     }
-  }, [plan, imageFile, pipeline, showCostConfirm]);
+  }, [plan, imageFile, pipeline, showCostConfirm, isManualMode, allImages]);
 
   const handleRetry = useCallback(async (index: number) => {
     if (!plan || !imageFile) return;
@@ -430,6 +475,9 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     setImageAnalysis(null);
     setEditedPlan(null);
     setShowAddStep(false);
+    setMultiResults([]);
+    setCurrentImageIndex(0);
+    setExtraImages([]);
   }, [pipeline]);
 
   // ----- Plan editing helpers -----
@@ -749,6 +797,66 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           </div>
         )}
 
+        {/* Multi-image upload */}
+        {imageFile && (
+          <div>
+            <SectionLabel>Imagenes Adicionales (opcional)</SectionLabel>
+            <div className="flex gap-2 flex-wrap">
+              {/* Primary image thumbnail */}
+              <div className="relative w-16 h-16 rounded-lg border border-accent/50 overflow-hidden shrink-0">
+                <img
+                  src={URL.createObjectURL(imageFile)}
+                  alt="Principal"
+                  className="w-full h-full object-contain bg-black/20"
+                />
+                <span className="absolute bottom-0 inset-x-0 text-[7px] text-center bg-accent/80 text-white py-0.5 font-bold">
+                  Principal
+                </span>
+              </div>
+              {/* Extra image thumbnails */}
+              {extraImages.map((file, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-16 h-16 rounded-lg border border-surface-lighter overflow-hidden shrink-0 group"
+                >
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={`Extra ${idx + 1}`}
+                    className="w-full h-full object-contain bg-black/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExtraImages((prev) => prev.filter((_, j) => j !== idx))}
+                    className="absolute top-0.5 right-0.5 hidden group-hover:flex h-4 w-4 items-center justify-center bg-red-500/80 rounded-full"
+                  >
+                    <X className="h-2.5 w-2.5 text-white" />
+                  </button>
+                </div>
+              ))}
+              {/* Add more button */}
+              <label className="flex w-16 h-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-surface-lighter cursor-pointer hover:border-accent/40 hover:bg-accent/5 transition-colors">
+                <Plus className="h-5 w-5 text-gray-500" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    setExtraImages((prev) => [...prev, ...files]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {extraImages.length > 0 && (
+              <p className="text-[10px] text-gray-500 mt-1.5">
+                {extraImages.length + 1} imagenes en cola — se procesaran una por una con el mismo pipeline.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Error card */}
         {errorMsg && (
           <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
@@ -900,6 +1008,37 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           )}
         </div>
 
+        {/* Execution mode toggle */}
+        <SectionLabel>Modo de Ejecucion</SectionLabel>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsManualMode(false)}
+            className={cn(
+              "flex-1 px-3 py-2 text-xs rounded-lg border transition-colors text-center",
+              !isManualMode
+                ? "bg-green-500/20 text-green-400 border-green-500/30"
+                : "bg-surface-light text-gray-400 border-surface-lighter hover:border-surface-hover",
+            )}
+          >
+            <div className="font-semibold">Automatico</div>
+            <div className="text-[10px] opacity-70">Ejecuta todos los pasos sin parar</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsManualMode(true)}
+            className={cn(
+              "flex-1 px-3 py-2 text-xs rounded-lg border transition-colors text-center",
+              isManualMode
+                ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                : "bg-surface-light text-gray-400 border-surface-lighter hover:border-surface-hover",
+            )}
+          >
+            <div className="font-semibold">Manual (paso a paso)</div>
+            <div className="text-[10px] opacity-70">Pausa para revisar cada paso</div>
+          </button>
+        </div>
+
         {/* Summary */}
         <div className="flex items-center justify-between rounded-lg border border-surface-lighter bg-surface-light px-3 py-2">
           <div className="flex items-center gap-2">
@@ -1012,17 +1151,59 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         {/* Progress bar */}
         <Progress value={progress} size="sm" label={`${progress}%`} showPercentage />
 
-        {/* Time + Cost */}
+        {/* Time + Cost + mode badge */}
         <div className="flex items-center justify-between text-[10px]">
-          <span className="text-gray-500">
+          <span className="text-gray-500 flex items-center gap-2">
             <Clock className="mr-1 inline h-3 w-3" />
             {elapsed}s
+            {isManualMode && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                Manual
+              </span>
+            )}
           </span>
           <span className="text-emerald-400">
             <DollarSign className="mr-0.5 inline h-3 w-3" />
             ${execution.totalCost.toFixed(3)}
           </span>
         </div>
+
+        {/* Multi-image progress indicator */}
+        {allImages.length > 1 && (
+          <div className="flex items-center gap-2 rounded-lg border border-surface-lighter bg-surface-light px-3 py-2">
+            <ImageIcon className="h-3.5 w-3.5 text-accent-light shrink-0" />
+            <span className="text-xs text-gray-300">
+              Procesando imagen{" "}
+              <span className="font-bold text-accent-light">{currentImageIndex + 1}</span>
+              {" "}de{" "}
+              <span className="font-bold text-white">{allImages.length}</span>
+            </span>
+            <div className="ml-auto flex gap-1">
+              {allImages.map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    i < currentImageIndex
+                      ? "bg-emerald-400"
+                      : i === currentImageIndex
+                        ? "bg-accent-light animate-pulse"
+                        : "bg-surface-lighter",
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Manual mode waiting banner */}
+        {isManualMode && waitingForApproval && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 animate-pulse">
+            <span className="text-xs text-amber-300 font-medium">
+              Paso {approvalStepIndex + 1} completado — revisa el resultado y decide
+            </span>
+          </div>
+        )}
 
         {/* Step list — each step shows full-width result preview */}
         <div className="space-y-2">
@@ -1031,6 +1212,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
             const isRunning = stepExec.status === "running";
             const isCompleted = stepExec.status === "completed";
             const isFailed = stepExec.status === "failed";
+            const isSkipped = stepExec.status === "skipped";
 
             return (
               <div
@@ -1040,6 +1222,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                   isRunning ? "border-accent/50 bg-accent/5" :
                   isCompleted ? "border-emerald-500/30 bg-emerald-500/5" :
                   isFailed ? "border-red-500/30 bg-red-500/5" :
+                  isSkipped ? "border-zinc-600/40 bg-zinc-800/30 opacity-60" :
                   "border-surface-lighter bg-surface-light opacity-50",
                 )}
               >
@@ -1049,6 +1232,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                   {isRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-light shrink-0" />}
                   {isCompleted && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
                   {isFailed && <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+                  {isSkipped && <span className="text-[11px] shrink-0 text-zinc-500">⏭</span>}
                   {stepExec.status === "pending" && (
                     <span className="flex h-3.5 w-3.5 items-center justify-center text-[10px] text-gray-600 shrink-0">
                       {i + 1}
@@ -1131,6 +1315,45 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                 {isFailed && stepExec.error && (
                   <div className="px-2.5 pb-2">
                     <p className="text-[10px] text-red-400">{stepExec.error}</p>
+                  </div>
+                )}
+
+                {/* Skipped label */}
+                {isSkipped && (
+                  <div className="px-2.5 pb-2">
+                    <p className="text-[10px] text-zinc-500">Saltado por el usuario</p>
+                  </div>
+                )}
+
+                {/* Manual mode approval buttons — shown when this step is waiting for decision */}
+                {isManualMode && waitingForApproval && approvalStepIndex === i && isCompleted && (
+                  <div className="border-t border-amber-500/20 px-2.5 py-2">
+                    <p className="text-[10px] text-amber-300 mb-2 font-medium">
+                      Revisa el resultado y decide:
+                    </p>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={skipCurrentStep}
+                        className="px-2.5 py-1 text-xs text-zinc-400 hover:text-white rounded hover:bg-zinc-700/50 transition-colors"
+                      >
+                        Saltar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={rerunCurrentStep}
+                        className="px-2.5 py-1 text-xs text-amber-400 hover:text-amber-300 border border-amber-400/30 rounded hover:bg-amber-500/10 transition-colors"
+                      >
+                        Rehacer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resumeExecution}
+                        className="px-2.5 py-1 text-xs text-green-400 hover:text-green-300 border border-green-400/30 rounded hover:bg-green-500/10 transition-colors font-medium"
+                      >
+                        Aceptar
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1258,6 +1481,65 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
             {plan.steps.length} pasos en {elapsed}s
           </span>
         </div>
+
+        {/* Multi-image results grid — shown when more than 1 image was processed */}
+        {multiResults.length > 1 && (
+          <>
+            <SectionLabel>Resultados — {multiResults.length} imagenes procesadas</SectionLabel>
+            <div className="grid grid-cols-2 gap-2">
+              {multiResults.map((r, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setPreviewStepUrl(r.resultUrl);
+                    setPreviewStepInputUrl(URL.createObjectURL(r.file));
+                    setPreviewStepLabel(`Imagen ${idx + 1}: ${r.file.name}`);
+                    setPreviewShowBefore(false);
+                  }}
+                  className="group relative rounded-lg border border-surface-lighter overflow-hidden hover:border-accent/50 transition-colors"
+                >
+                  <img
+                    src={r.resultUrl}
+                    alt={`Resultado ${idx + 1}`}
+                    className="w-full aspect-[4/3] object-contain bg-black/20"
+                  />
+                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
+                    <span className="text-[10px] font-semibold text-white truncate block">
+                      {r.file.name}
+                    </span>
+                  </div>
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Eye className="h-4 w-4 text-white drop-shadow-lg" />
+                  </div>
+                  <span className="absolute top-1 left-1 text-[8px] bg-emerald-500/80 text-white px-1 py-0.5 rounded font-bold">
+                    {idx + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {/* Download all */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              leftIcon={<Download className="h-3.5 w-3.5" />}
+              onClick={() => {
+                multiResults.forEach((r, idx) => {
+                  const a = document.createElement("a");
+                  a.href = r.resultUrl;
+                  a.download = `unistudio-${idx + 1}-${Date.now()}.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                });
+                toast.success(`${multiResults.length} resultados descargados`);
+              }}
+            >
+              Descargar Todas ({multiResults.length})
+            </Button>
+          </>
+        )}
 
         {/* Results gallery — Before/After per step */}
         <SectionLabel>Resultados por Paso (Antes → Despues)</SectionLabel>
