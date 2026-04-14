@@ -632,7 +632,7 @@ export default function CatalogPipelinePage() {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, uploadedUrl, falUrl } : j));
       } catch (err) {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
-        toast({ variant: "destructive", title: "Error de carga", description: `${job.file.name}: ${err instanceof Error ? err.message : "Error desconocido"}` });
+        toast.error(`Error de carga — ${job.file.name}: ${err instanceof Error ? err.message : "Error desconocido"}`);
         return {};
       }
     }
@@ -740,7 +740,7 @@ export default function CatalogPipelinePage() {
           });
         } else {
           // Auto mode: skip errored step and continue
-          toast({ variant: "destructive", title: `Error en "${stepDef.label}"`, description: errorMsg });
+          toast.error(`Error en "${stepDef.label}": ${errorMsg}`);
         }
       }
     }
@@ -791,7 +791,7 @@ export default function CatalogPipelinePage() {
     }
 
     setIsRunning(false);
-    toast({ title: "Pipeline completado", description: `${jobsSnapshot.length} imagen(es) procesada(s)` });
+    toast.success(`Pipeline completado — ${jobsSnapshot.length} imagen(es) procesada(s)`);
   }, [jobs, steps, sharedModelUrl, processJob]);
 
   /* ---- Manual mode action dispatcher ---- */

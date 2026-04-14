@@ -194,47 +194,6 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-
-      case 'ffmpeg': {
-        // Ken Burns — generate real MP4 with FFmpeg zoompan filter
-        const motion = (motionType as KenBurnsMotion) || 'zoom-in';
-
-        // Ensure we have an accessible HTTP URL for the image download
-        let kenBurnsImageUrl = imageUrl;
-        if (imageUrl.startsWith('data:')) {
-          // Upload to fal storage to get a downloadable URL
-          const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            const mimeType = match[1];
-            const buffer = Buffer.from(match[2], 'base64');
-            kenBurnsImageUrl = await uploadToFalStorage(buffer, mimeType, 'input.jpg');
-          }
-        }
-
-        try {
-          const videoBuffer = await generateKenBurns(kenBurnsImageUrl, duration, aspectRatio, motion);
-
-          // Upload to fal.ai storage for a clean public URL, fall back to base64 data URI
-          try {
-            resultUrl = await uploadToFalStorage(videoBuffer, 'video/mp4', `kenburns-${Date.now()}.mp4`);
-          } catch (uploadErr) {
-            console.warn('[API /video] fal storage upload failed, falling back to base64:', uploadErr);
-            resultUrl = `data:video/mp4;base64,${videoBuffer.toString('base64')}`;
-          }
-        } catch (ffmpegError) {
-          console.warn('[API /video] FFmpeg Ken Burns failed, falling back to LTX-Video:', ffmpegError);
-          // Fall back to LTX-Video (cheapest real provider at $0.04)
-          const falImageUrl = await ensureFalAccessibleUrl(kenBurnsImageUrl);
-          const output = await runFal('fal-ai/ltx-video/image-to-video', {
-            image_url: falImageUrl,
-            prompt: fullPrompt,
-          });
-          resultUrl = extractFalVideoUrl(output);
-        }
-        break;
-      }
-
-
       default:
         return NextResponse.json(
           { success: false, error: `Unsupported backend "${provider.backend}".` },
