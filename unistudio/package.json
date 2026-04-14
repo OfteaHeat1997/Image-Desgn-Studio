@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "lint:strict": "eslint src/ --ext .ts,.tsx",
+    "lint": "eslint src/",
+    "lint:strict": "eslint src/ --max-warnings 0",
+    "lint:fix": "eslint src/ --fix",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:coverage:html": "jest --coverage && open coverage/index.html",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
@@ -74,12 +76,14 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "jest": "^30.3.0",
     "jest-environment-node": "^30.3.0",
     "prettier": "^3.8.1",
     "prisma": "^7.4.1",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.9",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.58.2"
   }
 }
