@@ -23,6 +23,7 @@ import {
   Layers,
   Palette,
   SlidersHorizontal,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -107,6 +108,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
       { id: "ai-agent", label: "Agente IA (Auto)", icon: Bot, cost: "Variable", description: "Describe lo que quieres, el agente lo hace" },
       { id: "batch", label: "Procesamiento Masivo", icon: Layers, cost: "Variable", description: "Procesa multiples imagenes automaticamente" },
       { id: "brand-kit", label: "Kit de Marca", icon: Palette, cost: "Gratis", description: "Colores, fuentes, logo y marca de agua" },
+      { id: "catalog-pipeline", label: "Pipeline de Catálogo", icon: Package, cost: "$0.18+/ref", description: "Genera todo el contenido de e-commerce para una referencia en un clic" },
     ],
   },
 ];
@@ -167,13 +169,19 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
                     const Icon = mod.icon;
                     const isActive = selectedModule === mod.id;
 
+                    // Standalone pages — navigate instead of loading in editor
+                    const STANDALONE_PAGES: Record<string, string> = {
+                      "catalog-pipeline": "/catalog-pipeline",
+                    };
+                    const standaloneHref = STANDALONE_PAGES[mod.id];
+
                     return (
                       <button
                         key={mod.id}
                         type="button"
                         title={mod.description}
                         aria-label={`${mod.label} — ${mod.description}`}
-                        onClick={() => onModuleChange(mod.id)}
+                        onClick={() => standaloneHref ? window.location.assign(standaloneHref) : onModuleChange(mod.id)}
                         className={cn(
                           "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all group",
                           isActive
@@ -234,6 +242,14 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
         >
           <Layers className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
           Batch Masivo
+        </a>
+        <a
+          href="/catalog-pipeline"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <Package className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+          Pipeline Catálogo
         </a>
       </div>
     </div>

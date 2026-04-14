@@ -2,6 +2,69 @@
 
 ---
 
+## Sesión 14 de Abril, 2026 — Pipeline de Catálogo
+
+### Nueva feature: Pipeline de Catálogo (`/catalog-pipeline`)
+
+Workflow automatizado que genera todo el contenido de e-commerce para una referencia completa de lencería Leonisa.
+
+#### URL
+`https://unistudio.vercel.app/catalog-pipeline`
+
+#### Acceso desde editor
+- Sidebar izquierdo → sección AUTOMATIZACION → **Pipeline de Catálogo**
+- Quick link en la parte inferior del sidebar
+- URL directa: `/catalog-pipeline`
+
+#### Qué hace
+Para cada foto de un producto (múltiples colores/ángulos):
+1. **Aislar Producto** — elimina modelo/fondo con Replicate, deja solo la prenda (~$0.01)
+2. **Fondo Profesional** — fondo blanco studio 1:1 para e-commerce (~$0.003)
+3. **Crear Modelo IA** — genera modelo personalizado UNA VEZ, se reutiliza para todas las fotos (~$0.055 total)
+4. **Prueba Virtual** — viste el modelo con la prenda via IDM-VTON/FASHN (~$0.02)
+5. **Video del Producto** — rotación 360° de la prenda aislada, 5s 1:1 (~$0.10)
+6. **Video del Modelo** — modelo con movimiento natural, 5s 9:16 (~$0.10)
+
+#### API route
+`POST /api/catalog-pipeline` — orquesta el pipeline completo para una imagen (todos los pasos en secuencia).
+
+#### Testing checklist — Pipeline de Catálogo
+
+**Setup:**
+- [ ] Ir a `/catalog-pipeline`
+- [ ] Arrastrar 2–3 fotos al zona de carga
+- [ ] Verificar que aparecen miniaturas con botón X para eliminar
+- [ ] Ingresar referencia "011473" y seleccionar tipo "Brassiere"
+- [ ] Activar/desactivar pasos — verificar que el costo estimado cambia
+- [ ] Cambiar tono de piel, tipo de cuerpo, rango de edad
+- [ ] Seleccionar **Modo Manual** vs **Modo Automático**
+
+**Modo Automático:**
+- [ ] Iniciar pipeline → barra de progreso en header
+- [ ] Cada paso muestra spinner → luego imagen resultado
+- [ ] Sidebar izquierdo muestra estado de cada imagen (en cola / activo / done)
+- [ ] Al terminar: banner verde "Imagen procesada" + costo
+- [ ] Botón "Descargar todo" descarga resultados individuales
+
+**Modo Manual:**
+- [ ] Iniciar pipeline → paso 1 se procesa y PAUSA mostrando resultado
+- [ ] Tarjeta muestra: imagen original (izq) → resultado (der)
+- [ ] Botón **Aceptar y continuar** → avanza al paso 2
+- [ ] Botón **Rehacer** → borra resultado y re-ejecuta el paso
+- [ ] Botón **Saltar** → marca como saltado y avanza
+- [ ] Error simulado → muestra mensaje de error rojo + botones Reintentar/Saltar
+
+**Reuso de modelo:**
+- [ ] Con 3 fotos: verificar que "Crear Modelo IA" solo se ejecuta para la primera imagen
+- [ ] Las imágenes 2 y 3 muestran el modelo con costo $0 (reutilizado)
+
+**Visual:**
+- [ ] Cards de pasos tienen colores correctos: processing=violeta, done=verde, error=rojo
+- [ ] Fondo de checkerboard visible bajo imágenes con transparencia (PNG recortados)
+- [ ] Header sticky con progreso general visible
+
+---
+
 ## Sesión 12 de Abril, 2026 — Actualizaciones Adicionales
 
 ### Nuevas features implementadas
