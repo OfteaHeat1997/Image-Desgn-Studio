@@ -217,6 +217,80 @@ export const BACKGROUND_PRESETS: Record<string, BackgroundPreset> = {
     negativePrompt: 'dark, scary, cold tones, cluttered, low quality, text',
     category: 'seasonal',
   },
+
+  // ---- Lingerie ----
+  'lingerie-boudoir': {
+    name: 'Boudoir',
+    prompt: 'elegant boudoir bedroom setting, soft silk sheets, romantic warm golden lighting, rose petals, luxury intimate atmosphere, high-end fashion photography, soft diffused light',
+    negativePrompt: 'harsh light, dirty, cluttered, explicit, low quality, people',
+    category: 'lifestyle',
+  },
+  'lingerie-silk': {
+    name: 'Seda & Flores',
+    prompt: 'flowing soft silk fabric background, delicate flower petals, gentle diffused light, pastel blush and ivory tones, feminine and elegant, luxury product photography',
+    negativePrompt: 'harsh, dark, cluttered, low quality, explicit, people',
+    category: 'lifestyle',
+  },
+  'lingerie-coastal': {
+    name: 'Costera',
+    prompt: 'tropical Caribbean coastal setting, warm golden hour light, soft white sand and azure ocean bokeh, resort luxury feel, lifestyle photography, warm and sensual atmosphere',
+    negativePrompt: 'cold, dark, urban, cluttered, low quality, people',
+    category: 'nature',
+  },
+
+  // ---- Fragancias ----
+  'fragrance-crystal': {
+    name: 'Crystal',
+    prompt: 'crystal clear glass surface with sparkling water droplets, highly reflective luxury surface, macro photography, pristine and clean, high-end fragrance display, dramatic moody lighting',
+    negativePrompt: 'dirty, cluttered, dull, low quality, warm earthy tones',
+    category: 'luxury',
+  },
+  'fragrance-dark': {
+    name: 'Lujo Oscuro',
+    prompt: 'dramatic deep black background with warm golden bokeh lights, rich black and gold atmosphere, luxury perfume editorial photography, moody and sophisticated, opulent feel',
+    negativePrompt: 'bright, colorful, cluttered, cheap, low quality',
+    category: 'luxury',
+  },
+  'fragrance-garden': {
+    name: 'Botanico',
+    prompt: 'lush botanical garden with exotic tropical flowers, vibrant fresh colors, dappled natural sunlight, romantic and sensual atmosphere, editorial fragrance photography',
+    negativePrompt: 'dead flowers, dark, urban, people, low quality',
+    category: 'beauty',
+  },
+
+  // ---- Joyeria ----
+  'jewelry-velvet': {
+    name: 'Terciopelo',
+    prompt: 'rich deep navy velvet jewelry display cushion, dramatic side lighting, luxury jewelry store atmosphere, macro detail photography, elegant and premium, dark background',
+    negativePrompt: 'cheap, dirty, bright background, low quality, cluttered',
+    category: 'luxury',
+  },
+  'jewelry-marble': {
+    name: 'Marmol Lujo',
+    prompt: 'polished white Carrara marble surface with subtle gold veining, premium jewelry photography, clean and sophisticated, luxury brand aesthetic, high-key lighting with soft shadows',
+    negativePrompt: 'dirty, cracked, colored, cluttered, low quality',
+    category: 'luxury',
+  },
+  'jewelry-dark': {
+    name: 'Elegancia Oscura',
+    prompt: 'deep black background with dramatic single spotlight, fine jewelry against darkness, high contrast luxury photography, editorial style, gemstone sparkle enhanced, reflection on surface',
+    negativePrompt: 'bright, colorful, cluttered, cheap, low quality',
+    category: 'luxury',
+  },
+
+  // ---- Skincare ----
+  'skincare-spa': {
+    name: 'Ritual Spa',
+    prompt: 'serene spa environment, smooth zen stones, fresh green bamboo, soft white towels, floating flower petals on water, calming natural elements, clean and pure wellness aesthetic',
+    negativePrompt: 'cluttered, dirty, industrial, dark, urban, people, low quality',
+    category: 'beauty',
+  },
+  'skincare-botanical': {
+    name: 'Botanico Natural',
+    prompt: 'natural botanical setting, fresh green aloe vera leaves, natural clay textures, herbal ingredients, bright clean natural daylight, organic and pure, clean beauty brand aesthetic',
+    negativePrompt: 'artificial, dark, cluttered, synthetic, low quality, people',
+    category: 'beauty',
+  },
 };
 
 // ---------------------------------------------------------------------------
