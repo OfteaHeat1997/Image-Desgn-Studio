@@ -151,16 +151,20 @@ export async function POST(request: NextRequest) {
     const httpModelImage = await ensureHttpUrl(modelImage);
     const httpGarmentImage = await ensureHttpUrl(garmentImage);
 
+    // Force IDM-VTON for lingerie/swimwear — FASHN explicitly excludes these garment types
+    const effectiveProvider: 'idm-vton' | 'fashn' | 'auto' =
+      (garmentType === 'lingerie' || garmentType === 'swimwear') ? 'idm-vton' : provider;
+
     let resultUrl: string;
     let usedProvider: string;
 
-    if (provider === 'auto' || !provider) {
+    if (effectiveProvider === 'auto' || !effectiveProvider) {
       const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription);
       resultUrl = result.url;
       usedProvider = result.provider;
     } else {
-      usedProvider = provider;
-      switch (provider) {
+      usedProvider = effectiveProvider;
+      switch (effectiveProvider) {
         case 'idm-vton':
           resultUrl = await tryOnIdmVton(httpModelImage, httpGarmentImage, category, garmentDescription);
           break;
@@ -171,7 +175,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             {
               success: false,
-              error: `Proveedor "${provider}" no soportado. Usa "fashn", "idm-vton", o "auto".`,
+              error: `Proveedor "${effectiveProvider}" no soportado. Usa "fashn", "idm-vton", o "auto".`,
             },
             { status: 400 },
           );

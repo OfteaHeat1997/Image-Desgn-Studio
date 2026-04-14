@@ -23,6 +23,19 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 // Local fallback templates
 // -----------------------------------------------------------------------------
 
+const GARMENT_DESCRIPTIONS: Record<string, string> = {
+  lingerie: 'Delicate lingerie piece with lace detailing, structured support, and soft fabric finish',
+  bra: 'Bra with underwire support, molded cups, adjustable straps, and back closure',
+  panty: 'Panty with soft elastic waistband, comfortable cut, smooth fabric with lace edge detail',
+  shapewear: 'Medium compression shapewear bodysuit, firm elastic fabric, invisible seams',
+  perfume: 'Glass perfume bottle with metallic cap',
+  cream: 'Skincare cream jar with lid',
+  earrings: 'Stainless steel earrings with polished finish',
+  necklace: 'Stainless steel chain necklace',
+  bracelet: 'Stainless steel bracelet with clasp',
+  ring: 'Stainless steel ring with polished band',
+};
+
 function makeStep(
   module: PipelineStep["module"],
   label: string,
@@ -44,6 +57,48 @@ function getEcommercePipeline(
   category: ProductCategory,
   budget: BudgetTier,
 ): PipelineStep[] {
+  // Perfumes y Belleza: specialized luxury pipeline
+  if (category === "perfume") {
+    const steps: PipelineStep[] = [
+      makeStep(
+        "bg-remove",
+        "Quitar fondo",
+        { provider: "replicate" },
+        0.01,
+        "Removemos el fondo con Replicate para precision en productos de vidrio.",
+      ),
+      makeStep(
+        "bg-generate",
+        "Fondo profesional",
+        {
+          mode: "precise",
+          style: "luxury-marble",
+          prompt: "soft diffused studio lighting, no harsh reflections on glass surface, luxury product photography",
+        },
+        budget === "free" ? 0 : 0.05,
+        "Generamos fondo de marmol de lujo con iluminacion difusa, sin reflejos duros en el vidrio.",
+      ),
+      makeStep(
+        "shadows",
+        "Reflejo elegante",
+        { type: "reflection", provider: "browser" },
+        0,
+        "Reflejo suave debajo del perfume — efecto superficie de lujo.",
+      ),
+      makeStep(
+        "enhance",
+        "Mejorar calidad",
+        { preset: "lujo" },
+        0,
+        "Ajuste final: realza nitidez, contraste y brillo para fotografia de lujo.",
+      ),
+    ];
+    if (budget === "free") {
+      return steps.filter((s) => s.estimatedCost === 0);
+    }
+    return steps;
+  }
+
   const shadowType =
     category === "perfume"
       ? "reflection"
@@ -103,18 +158,12 @@ function getModeloPipeline(
   prefs?: AgentPlanRequest["preferences"],
 ): PipelineStep[] {
   const isJewelry = ["earrings", "rings", "necklace", "bracelet", "watch", "sunglasses"].includes(category);
+  const garmentDescription = GARMENT_DESCRIPTIONS[category] ?? 'Prenda de moda';
 
   const steps: PipelineStep[] = [
     makeStep(
-      "bg-remove",
-      "Aislar producto",
-      { provider: "browser" },
-      0,
-      "Eliminamos el fondo original (evitar copyright de foto de marca).",
-    ),
-    makeStep(
       "model-create",
-      "Crear modelo IA",
+      "Crear modelo nueva",
       {
         gender: prefs?.gender ?? "female",
         ageRange: prefs?.ageRange ?? "26-35",
@@ -157,10 +206,10 @@ function getModeloPipeline(
     steps.push(
       makeStep(
         "tryon",
-        "Vestir modelo con prenda",
-        { provider: "idm-vton", category: garmentCategory },
+        "Poner ropa en modelo",
+        { provider: "idm-vton", category: garmentCategory, garmentDescription },
         budget === "free" ? 0 : 0.02,
-        "Virtual try-on: el modelo IA viste la prenda aislada.",
+        "IDM-VTON extrae la prenda de la foto original y la transfiere a la modelo nueva. No necesitas aislar la ropa primero.",
       ),
     );
   }
@@ -327,6 +376,49 @@ function getCatalogoPipeline(
   budget: BudgetTier,
   prefs?: AgentPlanRequest["preferences"],
 ): PipelineStep[] {
+  const isJewelryCatalog = ["earrings", "rings", "necklace", "bracelet", "watch", "sunglasses"].includes(category);
+
+  // Joyería y Accesorios: simple exhibidor pipeline
+  if (isJewelryCatalog) {
+    const jewelryType = category === "earrings" ? "earrings"
+      : category === "rings" ? "ring"
+      : category === "necklace" ? "necklace"
+      : category === "bracelet" ? "bracelet"
+      : category === "watch" ? "watch"
+      : "sunglasses";
+    const jewelrySteps: PipelineStep[] = [
+      makeStep(
+        "bg-remove",
+        "Quitar fondo",
+        { provider: "replicate" },
+        0.01,
+        "Removemos el fondo con precision para aislar la joya.",
+      ),
+      makeStep(
+        "jewelry",
+        "Exhibidor de joyería",
+        {
+          mode: "exhibidor",
+          type: jewelryType,
+          prompt: "dramatic side lighting creating metallic sheen highlights on brushed stainless steel surface, dark velvet background",
+        },
+        budget === "free" ? 0 : 0.05,
+        "Exhibidor virtual de joyeria con iluminacion dramatica sobre fondo de terciopelo oscuro.",
+      ),
+      makeStep(
+        "enhance",
+        "Mejorar calidad",
+        { preset: "nitido" },
+        0,
+        "Mejora de nitidez y detalles metalicos de la joya.",
+      ),
+    ];
+    if (budget === "free") {
+      return jewelrySteps.filter((s) => s.estimatedCost === 0);
+    }
+    return jewelrySteps;
+  }
+
   const gender = prefs?.gender ?? "female";
   const ageRange = prefs?.ageRange ?? "25-35";
   const skinTone = prefs?.skinTone ?? "medium";
@@ -609,7 +701,8 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       // If background is NOT white and NOT transparent, we need to remove it
       (bgType !== "transparent" && bgType !== "white");
 
-    if (needsBgRemove && !hasBgRemove) {
+    // Skip auto bg-remove for modelo/cambiar-modelo — IDM-VTON extracts garment from original photo automatically
+    if (needsBgRemove && !hasBgRemove && req.agentType !== "modelo" && req.agentType !== "cambiar-modelo") {
       // Insert bg-remove as the first step (or after inpaint if watermark removal is first)
       const insertIdx = steps.findIndex((s) => s.module === "inpaint") >= 0 ? 1 : 0;
       steps.splice(
@@ -708,14 +801,14 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 
 ## 4 Agent Types
 1. ecommerce: Product photos for web store. Goal: white bg, uniform, HD. Typical: bg-remove → enhance → shadows → outpaint
-2. modelo: Extract garment → create AI model → try-on. Goal: copyright-free model photos. ALWAYS start with bg-remove first to isolate the garment. NEVER start with bg-generate. Typical: bg-remove → model-create → tryon → enhance
+2. modelo: Create AI model → try-on garment. Goal: copyright-free model photos. IDM-VTON extracts the garment from the original photo automatically — NO bg-remove needed. Typical: model-create → tryon (IDM-VTON) → enhance
 3. social: Content for social media. Goal: engaging visuals/videos. Varies by content type.
 4. catalogo: DO NOT plan this — always use fallback template.
 
 ## CRITICAL RULES
-- For "modelo" agent: the FIRST step MUST ALWAYS be "bg-remove" to isolate the garment from the original photo. NEVER use bg-generate as first step.
+- For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
 - bg-generate means ADD/CREATE a new background. bg-remove means REMOVE the existing background. These are OPPOSITE operations.
-- For lingerie/clothing: bg-remove isolates the garment, then model-create generates a new model, then tryon puts the garment on the model.
+- For lingerie/clothing: model-create generates the new AI model, then tryon (IDM-VTON) puts the garment on the model — no isolation step needed.
 
 ## Budget Tiers
 - free: Only use $0 modules (browser bg-remove, enhance, programmatic shadows, kenburns video)
@@ -757,13 +850,13 @@ ${req.imageCount ? `- Images: ${req.imageCount}` : ""}
 ${analysisContext}
 
 CRITICAL RULES:
-1. For "modelo" agent: FIRST step MUST be "bg-remove" (remove background) to isolate the garment. NEVER use "bg-generate" as first step. bg-generate ADDS a background, bg-remove REMOVES it — they are OPPOSITE.
-2. The flow for modelo is ALWAYS: bg-remove → model-create → tryon → enhance. Never change this order.
-3. If watermark detected AND budget allows: add "inpaint" BEFORE bg-remove.
+1. For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment from the original photo automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
+2. Never change the modelo order: model-create FIRST, then tryon, then enhance. No bg-remove.
+3. If watermark detected AND budget allows: add "inpaint" FIRST (before model-create for modelo agent).
 4. For ecommerce: bg-remove first, then enhance, shadows, outpaint.
 5. If lighting or color is bad, add an "enhance" step.
 6. If resolution is low, add "upscale" as the LAST step.
-7. NEVER put bg-generate as the first step for any pipeline. Always remove the original background first.
+7. NEVER put bg-generate as the first step for any pipeline. For ecommerce, always bg-remove first.
 
 Return JSON: {"id","name","description","agentType","steps":[{"id","module","label","params","estimatedCost","reasoning"}],"totalEstimatedCost","estimatedDuration"}`;
 
@@ -806,7 +899,7 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
     const validModules = new Set([
       "bg-remove", "bg-generate", "enhance", "shadows", "outpaint",
       "upscale", "tryon", "model-create", "inpaint", "video",
-      "ad-create", "jewelry-tryon", "infographic",
+      "ad-create", "jewelry-tryon", "infographic", "jewelry",
     ]);
     const invalidSteps = plan.steps.filter((s) => !validModules.has(s.module));
     if (invalidSteps.length > 0) {
