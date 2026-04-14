@@ -62,24 +62,6 @@ type Phase = "input" | "plan" | "executing" | "results";
 
 const AGENTS: { id: string; type: AgentType; label: string; emoji: string; icon: React.ReactNode; desc: string; defaultCategory?: ProductCategory }[] = [
   {
-    id: "lingerie-ropa",
-    type: "cambiar-modelo",
-    emoji: "👗",
-    label: "Lencería y Ropa",
-    icon: <User className="h-4 w-4" />,
-    desc: "Cambia la modelo de tu ropa. Sube la foto con modelo → elige nueva modelo → ¡Listo!",
-    defaultCategory: "lingerie",
-  },
-  {
-    id: "joyeria-accesorios",
-    type: "ecommerce",
-    emoji: "💎",
-    label: "Joyería y Accesorios",
-    icon: <ShoppingBag className="h-4 w-4" />,
-    desc: "Fotos profesionales de tu joyería. En exhibidor, flotando, o en modelo.",
-    defaultCategory: "earrings",
-  },
-  {
     id: "perfumes-belleza",
     type: "ecommerce",
     emoji: "🧴",
@@ -89,12 +71,30 @@ const AGENTS: { id: string; type: AgentType; label: string; emoji: string; icon:
     defaultCategory: "perfume",
   },
   {
+    id: "lingerie-ropa",
+    type: "modelo",
+    emoji: "👗",
+    label: "Lencería y Ropa",
+    icon: <User className="h-4 w-4" />,
+    desc: "Genera una modelo IA y viste tu prenda directamente. Sin quitar fondo.",
+    defaultCategory: "lingerie",
+  },
+  {
     id: "redes-sociales",
     type: "social",
     emoji: "📱",
     label: "Para Redes Sociales",
     icon: <Share2 className="h-4 w-4" />,
     desc: "Contenido listo para Instagram, TikTok, y Facebook.",
+  },
+  {
+    id: "joyeria-accesorios",
+    type: "catalogo",
+    emoji: "💎",
+    label: "Joyería y Accesorios",
+    icon: <Sparkles className="h-4 w-4" />,
+    desc: "Fotos profesionales de tu joyería. En exhibidor, flotando, o en modelo.",
+    defaultCategory: "earrings",
   },
 ];
 
@@ -222,9 +222,9 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
   const [phase, setPhase] = useState<Phase>("input");
 
   // Input state
-  const [agentType, setAgentType] = useState<AgentType>("cambiar-modelo");
-  const [selectedCardId, setSelectedCardId] = useState<string>("lingerie-ropa");
-  const [category, setCategory] = useState<ProductCategory>("lingerie");
+  const [agentType, setAgentType] = useState<AgentType>("ecommerce");
+  const [selectedCardId, setSelectedCardId] = useState<string>("perfumes-belleza");
+  const [category, setCategory] = useState<ProductCategory>("perfume");
   const [description, setDescription] = useState("");
   const [contentType, setContentType] = useState<SocialContentType>("hero");
   const [budget, setBudget] = useState<BudgetTier>("economic");
@@ -669,12 +669,12 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={
-            selectedCardId === "lingerie-ropa"
-              ? "Ej: Brasier encaje negro, quiero modelo con tono medio y pose frontal"
-              : selectedCardId === "joyeria-accesorios"
-                ? "Ej: Aretes de oro, fondo blanco, sombra suave, video girando"
-                : selectedCardId === "perfumes-belleza"
-                  ? "Ej: Perfume floral 100ml, fondo negro elegante, video de 5 segundos"
+            selectedCardId === "perfumes-belleza"
+              ? "Ej: Perfume floral 100ml, fondo negro elegante, video de 5 segundos"
+              : selectedCardId === "lingerie-ropa"
+                ? "Ej: Brasier encaje negro, quiero modelo con tono medio y pose frontal"
+                : selectedCardId === "joyeria-accesorios"
+                  ? "Ej: Aretes de oro, fondo blanco, sombra suave, video girando"
                   : "Ej: Reel de lencería para Instagram, estilo editorial elegante"
           }
           className="h-16 w-full resize-none rounded-lg border border-surface-lighter bg-surface-light px-3 py-2 text-xs text-gray-200 placeholder:text-gray-600 focus:border-accent/50 focus:outline-none"
