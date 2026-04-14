@@ -81,15 +81,16 @@ export function AvatarVideoTab({
     <div className="space-y-4">
       {/* Avatar image upload */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-400">
+        <label htmlFor="avatar-tab-upload" className="mb-1.5 block text-xs font-medium text-gray-400">
           Imagen del Avatar
         </label>
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-surface-lighter bg-surface-light p-3 transition-colors hover:border-accent/50">
+        <label htmlFor="avatar-tab-upload" className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-surface-lighter bg-surface-light p-3 transition-colors hover:border-accent/50">
           <Upload className="h-4 w-4 text-gray-500" />
           <span className="text-xs text-gray-400">
             {avatarImageFile ? avatarImageFile.name : "Subir foto del presentador"}
           </span>
           <input
+            id="avatar-tab-upload"
             type="file"
             accept="image/*"
             onChange={handleFileChange}
@@ -103,10 +104,11 @@ export function AvatarVideoTab({
 
       {/* Script / Text */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-400">
+        <label htmlFor="avatar-tab-script" className="mb-1.5 block text-xs font-medium text-gray-400">
           Script / Texto
         </label>
         <textarea
+          id="avatar-tab-script"
           value={script}
           onChange={(e) => onScriptChange(e.target.value)}
           placeholder="Descubre nuestra nueva coleccion de lenceria..."

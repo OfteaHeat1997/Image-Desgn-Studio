@@ -211,6 +211,11 @@ export function EnhancePanel({ imageFile, onProcess }: EnhancePanelProps) {
               "Todo es gratis y se procesa localmente — puedes experimentar sin costo.",
             ]}
           />
+
+          {/* Quick instruction */}
+          <p className="text-xs text-gray-500 -mt-1">
+            Mejora la calidad de tu imagen con ajustes profesionales. <strong className="text-gray-400">100% gratis</strong> — se procesa en tu navegador.
+          </p>
           <button
             type="button"
             onClick={resetSettings}

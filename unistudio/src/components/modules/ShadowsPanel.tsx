@@ -269,6 +269,11 @@ export function ShadowsPanel({ imageFile, onProcess, onShadowTypeChange }: Shado
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Agrega sombras y luces profesionales a tu producto para que se vea real y tridimensional.
+      </p>
+
       {/* Upload hint when no image */}
       {!imageFile && (
         <div className="flex items-center gap-2 rounded-lg border border-dashed border-accent/30 bg-accent/5 px-3 py-2.5">

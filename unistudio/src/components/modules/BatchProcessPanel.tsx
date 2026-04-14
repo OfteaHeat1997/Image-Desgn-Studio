@@ -219,6 +219,8 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStepIdx, setCurrentStepIdx] = useState<number>(-1);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [skipFailed, setSkipFailed] = useState(false);
+  const [skippedSteps, setSkippedSteps] = useState<string[]>([]);
 
   /* ---- Pipeline management ---- */
 
@@ -271,9 +273,11 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
     setIsProcessing(true);
     setCurrentStepIdx(0);
     setErrorMsg(null);
+    setSkippedSteps([]);
 
     let totalCost = 0;
     let currentImageUrl = "";
+    const skipped: string[] = [];
 
     try {
       // Capture original for before/after (non-blocking — fallback to empty string)
@@ -286,14 +290,27 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
       for (let i = 0; i < enabledSteps.length; i++) {
         setCurrentStepIdx(i);
         const step = enabledSteps[i];
-        const { resultUrl, cost } = await callStep(step, currentImageUrl);
-        currentImageUrl = resultUrl;
-        totalCost += cost;
+        try {
+          const { resultUrl, cost } = await callStep(step, currentImageUrl);
+          currentImageUrl = resultUrl;
+          totalCost += cost;
+        } catch (stepErr) {
+          const stepMsg = stepErr instanceof Error ? stepErr.message : "Error desconocido";
+          if (skipFailed) {
+            skipped.push(step.operation);
+            setSkippedSteps([...skipped]);
+            toast.warning(`Paso "${OP_MAP[step.operation]?.label ?? step.operation}" omitido — continuando...`);
+          } else {
+            throw stepErr;
+          }
+        }
       }
 
       setCurrentStepIdx(-1);
+      setSkippedSteps(skipped);
       onProcess(currentImageUrl, beforeDataUrl || undefined, totalCost);
-      toast.success(`Pipeline completado — ${enabledSteps.length} paso(s) aplicados`);
+      const skippedNote = skipped.length > 0 ? ` (${skipped.length} omitido${skipped.length > 1 ? "s" : ""})` : "";
+      toast.success(`Pipeline completado — ${enabledSteps.length - skipped.length} paso(s) aplicados${skippedNote}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       setErrorMsg(msg);
@@ -339,6 +356,11 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
           "Para procesar muchas imagenes a la vez, usa la pagina dedicada /batch con mas opciones.",
         ]}
       />
+
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500 -mt-2">
+        Encadena multiples operaciones y aplicalas a tu imagen automaticamente en un solo clic.
+      </p>
 
       {/* Single image notice */}
       {imageFile ? (
@@ -533,6 +555,35 @@ export function BatchProcessPanel({ imageFile, onProcess }: BatchProcessPanelPro
           </div>
         )}
       </div>
+
+      {/* Skip failed toggle */}
+      {steps.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-surface-lighter bg-surface-light px-3 py-2">
+          <div>
+            <p className="text-xs font-medium text-gray-300">Omitir pasos fallidos</p>
+            <p className="text-[10px] text-gray-500">Si un paso falla, continua con el siguiente</p>
+          </div>
+          <Switch
+            checked={skipFailed}
+            onCheckedChange={setSkipFailed}
+            disabled={isProcessing}
+          />
+        </div>
+      )}
+
+      {/* Skipped steps notice */}
+      {skippedSteps.length > 0 && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <p className="text-[11px] text-amber-300 font-medium">Pasos omitidos:</p>
+          <ul className="mt-1 space-y-0.5">
+            {skippedSteps.map((op) => (
+              <li key={op} className="text-[10px] text-amber-400">
+                • {OP_MAP[op]?.label ?? op}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Cost summary */}
       {steps.length > 0 && (

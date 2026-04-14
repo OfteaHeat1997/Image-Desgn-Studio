@@ -243,14 +243,20 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500 -mt-1">
+        Crea videos publicitarios para Instagram, TikTok, Facebook y YouTube. Elige la plataforma, escribe un titular y haz clic en <strong className="text-gray-400">Crear Anuncio</strong>.
+      </p>
+
       {/* Inline error card */}
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
           <span className="flex-1 text-xs text-red-300">{error}</span>
           <button
             type="button"
+            aria-label="Cerrar error"
             onClick={() => setError(null)}
-            className="shrink-0 text-red-400 hover:text-red-200 transition-colors"
+            className="shrink-0 text-red-400 hover:text-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -271,7 +277,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
                 type="button"
                 onClick={() => setSelectedTemplate(t.id)}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg border p-2.5 text-left transition-all",
+                  "flex items-center gap-2 rounded-lg border p-2.5 text-left transition-all min-h-[44px]",
                   selectedTemplate === t.id
                     ? "border-accent bg-accent/10"
                     : "border-surface-lighter bg-surface-light hover:border-surface-hover",
@@ -370,10 +376,11 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
 
       {/* Headline */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-400">
+        <label htmlFor="ad-headline" className="mb-1.5 block text-xs font-medium text-gray-400">
           Titular
         </label>
         <input
+          id="ad-headline"
           type="text"
           value={headline}
           onChange={(e) => setHeadline(e.target.value)}
@@ -384,10 +391,11 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
 
       {/* CTA */}
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-400">
+        <label htmlFor="ad-cta" className="mb-1.5 block text-xs font-medium text-gray-400">
           Llamada a la Accion
         </label>
         <input
+          id="ad-cta"
           type="text"
           value={cta}
           onChange={(e) => setCta(e.target.value)}
@@ -399,7 +407,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
       {/* Description + AI Caption button */}
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <label className="text-xs font-medium text-gray-400">
+          <label htmlFor="ad-description" className="text-xs font-medium text-gray-400">
             Descripcion (opcional)
           </label>
           <button
@@ -413,6 +421,7 @@ export function AdCreatorPanel({ imageFile, onProcess }: AdCreatorPanelProps) {
           </button>
         </div>
         <textarea
+          id="ad-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe tu anuncio o dejalo vacio para auto-generar..."

@@ -151,6 +151,11 @@ export function OutpaintPanel({ imageFile, onProcess }: OutpaintPanelProps) {
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Extiende tu imagen para adaptarla a diferentes plataformas — Instagram cuadrado, TikTok vertical, YouTube horizontal.
+      </p>
+
       {/* Provider info */}
       <div className="rounded-lg border border-surface-lighter bg-surface-light p-2.5 text-center">
         <span className="text-[11px] font-semibold text-gray-200">Flux Kontext Pro</span>

@@ -354,6 +354,11 @@ export function BgGeneratePanel({ imageFile, onProcess }: BgGeneratePanelProps) 
         ]}
       />
 
+      {/* Quick instruction */}
+      <p className="text-xs text-gray-500">
+        Reemplaza el fondo de tu producto con escenas profesionales generadas por IA.
+      </p>
+
       {/* Smart info banner */}
       <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
         <div className="flex items-center gap-2 mb-1.5">
