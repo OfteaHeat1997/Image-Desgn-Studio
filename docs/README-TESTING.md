@@ -1,7 +1,56 @@
-si bo# 📋 Guía de Testing — UniStudio
-## Fecha: 10 de Abril, 2026
+# 📋 Guía de Testing — UniStudio
 
 ---
+
+## Sesión 12 de Abril, 2026 — Actualizaciones Adicionales
+
+### Nuevas features implementadas
+- **Hero de Página tab** — Nuevo tab para videos de página principal del website
+- **11 presets nuevos de video** — Perfumería, Joyería, Skincare, Lencería
+- **Labels en español** — Todos los proveedores de video en español descriptivo
+- **Plantillas Rápidas** — 6 templates one-click (Perfume Premium, Joya con Brillo, etc.)
+- **Campañas Estacionales** — San Valentín, Día de la Madre, Black Friday, Navidad, Día de la Mujer
+- **Selector de marca para fragancias** — Esika, Cyzone, Yanbal, L'Bel, Avon
+- **Instrucciones visuales Lencería 360°** — Diagrama explicando foto frente/espalda
+- **Descripciones de presets** — Cada preset ahora explica qué resultado obtendrás
+- **Sección "Qué Esperar"** — Muestra tiempo, resolución, costo, y tipo de producto antes de generar
+- **Modo Creativo** (Fondos con IA) — Ya expuesto en UI
+- **Selector de producto dinámico** — Para Fondos con IA
+- **Tabs por categoría** — Reemplaza scroll infinito
+
+### Bugs críticos arreglados
+- **CORS de imágenes de Replicate** — Proxy del servidor /api/proxy-image para GET + POST
+- **12 API routes** — Todos convierten URLs de Replicate antes de devolverlas
+- **401 Unauthorized en video** — checkOrigin ya no bloquea requests legítimas
+- **413 Content Too Large** — Ya usa replicateUrl en vez de data URL
+- **500 Internal Server Error en video** — Validación de API keys, mensajes de error claros
+- **IDM-VTON NoneType error** — garment_des default agregado para try-on
+- **Foto a Video** — Auto mode ya no usa Ken Burns siempre
+- **Brand Kit persistente** — Ahora se guarda permanentemente
+
+### Mejoras de seguridad
+- Autenticación en 5 API routes de video
+- Rate limiting (video 10/hr, avatar 5/hr, TTS 20/hr)
+- Límites de texto en TTS, prompts
+- Errores genéricos al usuario
+- Path traversal fix en inventario
+- Prompt injection protection
+
+### Testing checklist — Sesión 12 de Abril
+
+- [ ] Hero de Página → seleccionar escena + mood + duración → generar
+- [ ] Plantilla Rápida "Perfume Premium" → 1 click → generar
+- [ ] Campaña Estacional → San Valentín → pre-llena headline
+- [ ] Selector de marca Esika → aparece al seleccionar preset de fragancia
+- [ ] Lencería 360° → muestra diagrama con emojis 👕→👔
+- [ ] Ver descripción debajo de cada preset
+- [ ] Ver sección "Qué Esperar" con ⏱️ 📐 💰 🎯
+- [ ] Modo Creativo en Fondos con IA → pide texto en vez de imagen
+- [ ] Brand Kit → guardar colores/logo → refrescar página → siguen guardados
+
+---
+
+## Sesión 10 de Abril, 2026
 
 ### Resumen de cambios realizados hoy (80+ fixes)
 
@@ -328,13 +377,13 @@ en botones y formularios, corrección de z-index en modales móvil.
 ---
 
 ### Módulo 18: Kit de Marca
-**Estado:** ⚠️ Solo en memoria (se pierde al refrescar — issue conocido)
+**Estado:** ✅ Arreglado (ahora persiste entre sesiones — fix Sesión 12 Abril)
 
 **Pasos para testear:**
 1. Ir a /brand-kit
 2. Configurar colores corporativos y subir logo
 3. ✅ Verificar: configuración visible durante la sesión
-4. ⚠️ Refrescar página → los datos se pierden (comportamiento esperado por ahora)
+4. ✅ Refrescar página → los datos deben persistir (ya no se pierden)
 
 ---
 
