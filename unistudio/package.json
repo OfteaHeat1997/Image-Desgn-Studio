@@ -12,7 +12,8 @@
     "db:push": "prisma db push",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "postinstall": "DATABASE_URL=${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder} prisma generate"
+    "postinstall": "DATABASE_URL=${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder} prisma generate",
+    "smoke-test": "node ../scripts/smoke-test.mjs https://unistudio.vercel.app"
   },
   "dependencies": {
     "@fal-ai/client": "^1.2.1",
