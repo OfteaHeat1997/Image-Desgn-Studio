@@ -20,6 +20,30 @@ import type { VideoProviderKey, VideoCategory, VideoMode } from '@/types/video';
 // Video generation can take 2-5 minutes for AI providers; 60s covers FFmpeg Ken Burns
 export const maxDuration = 300;
 
+/**
+ * Download any image URL (or decode a data URI) and re-upload it to fal.ai
+ * storage so that fal models can access it via a public CDN URL.
+ *
+ * Replicate delivery URLs (replicate.delivery) are private / short-lived and
+ * cause a 422 "Unable to download image" error when passed directly to fal.ai.
+ */
+async function reuploadToFalStorage(url: string): Promise<string> {
+  // data: URIs — delegate to existing helper
+  if (url.startsWith('data:')) {
+    return ensureFalHttpUrl(url);
+  }
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to download image for fal.ai re-upload: ${response.status} ${response.statusText}`,
+    );
+  }
+  const contentType = response.headers.get('content-type') ?? 'image/jpeg';
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const ext = contentType.split('/')[1]?.split(';')[0]?.replace('+xml', '') ?? 'jpg';
+  return uploadToFalStorage(buffer, contentType, `input.${ext}`);
+}
+
 // ---------------------------------------------------------------------------
 // Ken Burns — real MP4 via FFmpeg zoompan filter
 // ---------------------------------------------------------------------------
@@ -213,14 +237,18 @@ export async function POST(request: NextRequest) {
     let resultUrl: string;
     const cost = getProviderCost(provider, duration);
 
-    // Convert data URLs to HTTP URLs so AI providers can access them.
+    // Ensure the image URL is accessible by the chosen backend.
+    // fal.ai requires a public CDN URL — data URIs and Replicate delivery URLs
+    // (private/short-lived) must be re-uploaded to fal.ai storage first.
     let httpImageUrl = imageUrl;
-    if (imageUrl.startsWith('data:')) {
-      if (provider.backend === 'fal') {
-        httpImageUrl = await ensureFalHttpUrl(imageUrl);
-      } else if (provider.backend === 'replicate') {
-        httpImageUrl = await ensureHttpUrl(imageUrl);
+    if (provider.backend === 'fal') {
+      const isDataUrl = imageUrl.startsWith('data:');
+      const isReplicateUrl = /replicate\.delivery/.test(imageUrl);
+      if (isDataUrl || isReplicateUrl) {
+        httpImageUrl = await reuploadToFalStorage(imageUrl);
       }
+    } else if (provider.backend === 'replicate' && imageUrl.startsWith('data:')) {
+      httpImageUrl = await ensureHttpUrl(imageUrl);
     }
 
     switch (provider.backend) {
