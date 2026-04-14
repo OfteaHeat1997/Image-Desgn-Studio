@@ -80,7 +80,8 @@ export const useVideoStore = create<VideoStoreState>()(
         },
         removeItem: (name) => { try { localStorage.removeItem(name); } catch {} },
       },
-      partialize: (state): Partial<VideoStoreState> => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      partialize: (state) => ({
         mode: state.mode,
         activeTab: state.activeTab,
         selectedProvider: state.selectedProvider,
@@ -96,7 +97,7 @@ export const useVideoStore = create<VideoStoreState>()(
           sourceImageUrl: p.sourceImageUrl?.startsWith('data:') ? '' : p.sourceImageUrl,
           resultVideoUrl: p.resultVideoUrl?.startsWith('data:') ? '' : p.resultVideoUrl,
         })),
-      }),
+      }) as unknown as VideoStoreState,
     },
   ),
 );
