@@ -31,7 +31,7 @@ export type AvatarProviderKey =
 
 export type TtsProviderKey = 'edge-tts' | 'google-tts';
 
-export type VideoBackend = 'replicate' | 'fal';
+export type VideoBackend = 'replicate' | 'fal' | 'ffmpeg';
 
 export interface VideoProviderConfig {
   key: VideoProviderKey;

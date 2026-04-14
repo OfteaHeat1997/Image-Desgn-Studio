@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // ffmpeg-static ships a native binary — keep it out of the Next.js bundle so
+  // the binary path resolves correctly at runtime (Vercel Linux environment).
+  serverExternalPackages: ['ffmpeg-static'],
+
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
