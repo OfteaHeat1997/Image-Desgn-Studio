@@ -81,14 +81,19 @@ interface UploadedImage {
 /* ------------------------------------------------------------------ */
 
 const OPERATIONS = [
-  { value: "bg-remove", label: "Quitar Fondo" },
-  { value: "enhance", label: "Mejorar Calidad" },
-  { value: "shadows", label: "Agregar Sombras" },
-  { value: "upscale", label: "Upscale 2x" },
-  { value: "resize", label: "Redimensionar" },
-  { value: "outpaint", label: "Extender Imagen" },
-  { value: "compliance", label: "Verificar Cumplimiento" },
-  { value: "watermark", label: "Marca de Agua" },
+  { value: "bg-remove", label: "Quitar Fondo", description: "Elimina el fondo de tu producto" },
+  { value: "enhance", label: "Mejorar Calidad", description: "Ajusta brillo, color, nitidez — Gratis" },
+  { value: "shadows", label: "Agregar Sombras", description: "Agrega sombras profesionales" },
+  { value: "upscale", label: "Upscale 2x", description: "Duplica el tamaño sin perder calidad" },
+  { value: "resize", label: "Redimensionar", description: "Cambia el tamaño para diferentes plataformas" },
+  { value: "outpaint", label: "Extender Imagen", description: "Adapta a formato Instagram, TikTok, etc." },
+  { value: "compliance", label: "Verificar Cumplimiento", description: "Verifica que tu imagen cumple con las plataformas" },
+  { value: "watermark", label: "Marca de Agua", description: "Agrega tu logo o marca" },
+  { value: "bg-generate", label: "Fondos con IA", description: "Reemplaza el fondo con escenas profesionales — $0.003-0.05/foto" },
+  { value: "model-create", label: "Crear Modelo IA", description: "Genera una modelo virtual — $0.055/foto" },
+  { value: "tryon", label: "Prueba Virtual (Try-On)", description: "Pone tu prenda en la modelo — $0.02/foto" },
+  { value: "video", label: "Generar Video", description: "Crea video del producto girando — $0.05/foto" },
+  { value: "jewelry-tryon", label: "Joyería Virtual", description: "Prueba virtual de joyas — $0.02/foto" },
 ];
 
 const PROVIDERS = [
@@ -109,7 +114,7 @@ const PIPELINE_PRESETS: PresetDef[] = [
   {
     id: "ecommerce-pro",
     name: "E-Commerce Profesional",
-    description: "Fondo blanco puro + mejora + sombra + cuadrado 1:1 — listo para web",
+    description: "Fondo blanco + mejorar + sombra + cuadrado 1:1 — listo para tu tienda",
     steps: [
       { id: "s1", operation: "bg-remove", provider: "replicate", label: "Quitar Fondo" },
       { id: "s2", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "ecommerce" } },
@@ -119,42 +124,53 @@ const PIPELINE_PRESETS: PresetDef[] = [
   },
   {
     id: "quick-clean",
-    name: "Limpieza Rapida",
-    description: "Eliminar fondo + mejora automatica",
+    name: "Limpieza Rápida",
+    description: "Quita el fondo y mejora la calidad automáticamente",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
-      { id: "s2", operation: "enhance", provider: "auto", label: "Mejora" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Quitar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejorar Calidad" },
     ],
   },
   {
-    id: "amazon-ready",
-    name: "Listo para Amazon",
-    description: "Fondo blanco + mejora + verificacion",
+    id: "whatsapp-catalog",
+    name: "Catálogo WhatsApp",
+    description: "Formato cuadrado optimizado para catálogo de WhatsApp Business",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
-      { id: "s2", operation: "enhance", provider: "auto", label: "Mejora" },
-      { id: "s3", operation: "compliance", provider: "auto", label: "Verificacion" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Quitar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejorar Calidad" },
+      { id: "s3", operation: "outpaint", provider: "auto", label: "Cuadrado 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional product photography, centered product" } },
+    ],
+  },
+  {
+    id: "social-full",
+    name: "Redes Sociales Completo",
+    description: "Fondo bonito + mejora + video — listo para Instagram y TikTok",
+    steps: [
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Quitar Fondo" },
+      { id: "s2", operation: "bg-generate", provider: "auto", label: "Fondo Lifestyle" },
+      { id: "s3", operation: "enhance", provider: "auto", label: "Mejorar Calidad" },
+      { id: "s4", operation: "video", provider: "auto", label: "Generar Video" },
     ],
   },
   {
     id: "instagram-lifestyle",
     name: "Instagram Lifestyle",
-    description: "Fondo IA + mejora + redimensionar para IG",
+    description: "Fondo IA lifestyle + mejora + redimensionar para Instagram",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Quitar Fondo" },
       { id: "s2", operation: "outpaint", provider: "auto", label: "Extender Imagen" },
-      { id: "s3", operation: "enhance", provider: "auto", label: "Mejora" },
+      { id: "s3", operation: "enhance", provider: "auto", label: "Mejorar Calidad" },
       { id: "s4", operation: "resize", provider: "auto", label: "Redimensionar" },
     ],
   },
   {
     id: "full-production",
-    name: "Produccion Completa",
-    description: "Pipeline completo: Fondo + mejora + sombras + upscale + marca",
+    name: "Producción Completa",
+    description: "Pipeline completo: fondo + mejora + sombras + upscale + marca",
     steps: [
-      { id: "s1", operation: "bg-remove", provider: "auto", label: "Eliminar Fondo" },
-      { id: "s2", operation: "enhance", provider: "auto", label: "Mejora" },
-      { id: "s3", operation: "shadows", provider: "auto", label: "Sombras" },
+      { id: "s1", operation: "bg-remove", provider: "auto", label: "Quitar Fondo" },
+      { id: "s2", operation: "enhance", provider: "auto", label: "Mejorar Calidad" },
+      { id: "s3", operation: "shadows", provider: "auto", label: "Agregar Sombras" },
       { id: "s4", operation: "upscale", provider: "auto", label: "Upscale 2x" },
       { id: "s5", operation: "watermark", provider: "auto", label: "Marca de Agua" },
     ],
@@ -551,6 +567,77 @@ export default function BatchPage() {
           // Revoke previous intermediate blob URL (if any) before replacing
           if (currentImageUrl.startsWith("blob:")) URL.revokeObjectURL(currentImageUrl);
           currentImageUrl = URL.createObjectURL(wmOutBlob);
+          break;
+        }
+        case "bg-generate": {
+          const res = await fetch("/api/bg-generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: currentImageUrl,
+              prompt: (step.params?.prompt as string) ?? "professional lifestyle product photography, beautiful background",
+              style: (step.params?.style as string) ?? "lifestyle",
+            }),
+          });
+          const data = await safeJson(res);
+          if (!data.success) throw new Error(data.error || "Background generation failed");
+          currentImageUrl = data.data.url || data.data.imageUrl;
+          break;
+        }
+        case "model-create": {
+          const res = await fetch("/api/model-create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: currentImageUrl,
+              ...step.params,
+            }),
+          });
+          const data = await safeJson(res);
+          if (!data.success) throw new Error(data.error || "Model creation failed");
+          currentImageUrl = data.data.url || data.data.imageUrl;
+          break;
+        }
+        case "tryon": {
+          const res = await fetch("/api/tryon", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              garmentUrl: currentImageUrl,
+              ...step.params,
+            }),
+          });
+          const data = await safeJson(res);
+          if (!data.success) throw new Error(data.error || "Try-on failed");
+          currentImageUrl = data.data.url || data.data.imageUrl;
+          break;
+        }
+        case "video": {
+          const res = await fetch("/api/video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: currentImageUrl,
+              ...step.params,
+            }),
+          });
+          const data = await safeJson(res);
+          if (!data.success) throw new Error(data.error || "Video generation failed");
+          currentImageUrl = data.data.url || data.data.videoUrl;
+          break;
+        }
+        case "jewelry-tryon": {
+          const res = await fetch("/api/jewelry-tryon", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jewelryUrl: currentImageUrl,
+              ...step.params,
+            }),
+          });
+          const data = await safeJson(res);
+          if (!data.success) throw new Error(data.error || "Jewelry try-on failed");
+          currentImageUrl = data.data.url || data.data.imageUrl;
           break;
         }
         default:
@@ -1069,6 +1156,12 @@ export default function BatchPage() {
                         options={OPERATIONS}
                         placeholder="Operation"
                       />
+                      {(() => {
+                        const op = OPERATIONS.find((o) => o.value === step.operation);
+                        return op?.description ? (
+                          <p className="mt-0.5 text-[10px] text-gray-500">{op.description}</p>
+                        ) : null;
+                      })()}
                     </div>
 
                     {/* Provider select */}
@@ -1114,6 +1207,15 @@ export default function BatchPage() {
               </div>
             )}
 
+            {/* Lingerie / model warning */}
+            {steps.some((s) => s.operation === "bg-remove") && images.length >= 5 && (
+              <div className="mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+                <p className="text-[11px] text-yellow-300">
+                  💡 Si tus fotos tienen una modelo usando la ropa, usa &quot;Prueba Virtual&quot; en vez de &quot;Quitar Fondo&quot;. El módulo de quitar fondo no puede separar la prenda del cuerpo.
+                </p>
+              </div>
+            )}
+
             {steps.length > 0 && (
               <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                 <span>
@@ -1123,7 +1225,7 @@ export default function BatchPage() {
                   Est. costo:{" "}
                   <span className="text-emerald-400">
                     ~${(steps.reduce((sum, s) => {
-                      const costs: Record<string, number> = { "bg-remove": 0.01, enhance: 0, shadows: 0.04, upscale: 0.02, outpaint: 0.05, resize: 0.05, compliance: 0, watermark: 0 };
+                      const costs: Record<string, number> = { "bg-remove": 0.01, enhance: 0, shadows: 0.04, upscale: 0.02, outpaint: 0.05, resize: 0.05, compliance: 0, watermark: 0, "bg-generate": 0.03, "model-create": 0.055, tryon: 0.02, video: 0.05, "jewelry-tryon": 0.02 };
                       return sum + (costs[s.operation] ?? 0.02);
                     }, 0) * Math.max(images.length, 1)).toFixed(2)}
                   </span>{" "}
