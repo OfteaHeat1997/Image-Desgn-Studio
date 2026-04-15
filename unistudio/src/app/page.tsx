@@ -49,11 +49,105 @@ export default function HomePage() {
           <span className="text-sm text-zinc-400 ml-2">— Todas las herramientas disponibles</span>
         </a>
 
-        {/* More links */}
-        <div className="flex justify-center gap-6 mt-8 text-sm text-zinc-500">
-          <a href="/gallery" className="hover:text-white">Galería</a>
-          <a href="/brand-kit" className="hover:text-white">Kit de Marca</a>
-          <a href="/batch" className="hover:text-white">Batch</a>
+        {/* AI Agents Section */}
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold mb-4">🤖 Automatización con IA</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <a href="/editor?module=ai-agent" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-violet-500/50 transition-all">
+              <h3 className="font-medium">Agente IA</h3>
+              <p className="text-xs text-zinc-500">El AI decide los pasos y ejecuta todo automáticamente</p>
+            </a>
+            <a href="/batch" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 transition-all">
+              <h3 className="font-medium">Procesamiento Masivo</h3>
+              <p className="text-xs text-zinc-500">Procesa 50+ imágenes con un pipeline configurable</p>
+            </a>
+            <a href="/catalog-pipeline" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 transition-all">
+              <h3 className="font-medium">Pipeline de Catálogo</h3>
+              <p className="text-xs text-zinc-500">Genera catálogo completo de una referencia</p>
+            </a>
+            <a href="/brand-kit" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
+              <h3 className="font-medium">Kit de Marca</h3>
+              <p className="text-xs text-zinc-500">Tu logo, colores, y marca de agua</p>
+            </a>
+          </div>
+        </div>
+
+        {/* All Modules Section */}
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold mb-4">📸 Todos los Módulos</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            <a href="/editor?module=bg-remove" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Quitar Fondo</span>
+              <span className="text-[10px] text-zinc-500">Gratis / $0.01</span>
+            </a>
+            <a href="/editor?module=bg-generate" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Fondos con IA</span>
+              <span className="text-[10px] text-zinc-500">$0.003 - $0.05</span>
+            </a>
+            <a href="/editor?module=enhance" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Mejorar Calidad</span>
+              <span className="text-[10px] text-zinc-500">Gratis</span>
+            </a>
+            <a href="/editor?module=inpaint" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Borrar y Reemplazar</span>
+              <span className="text-[10px] text-zinc-500">$0.03 - $0.05</span>
+            </a>
+            <a href="/editor?module=upscale" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Aumentar Resolución</span>
+              <span className="text-[10px] text-zinc-500">$0.02 - $0.05</span>
+            </a>
+            <a href="/editor?module=tryon" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Prueba Virtual</span>
+              <span className="text-[10px] text-zinc-500">$0.02 - $0.05</span>
+            </a>
+            <a href="/editor?module=model-create" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Crear Modelo IA</span>
+              <span className="text-[10px] text-zinc-500">$0.055</span>
+            </a>
+            <a href="/editor?module=ghost-mannequin" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Maniquí Invisible</span>
+              <span className="text-[10px] text-zinc-500">$0.05 - $0.08</span>
+            </a>
+            <a href="/editor?module=jewelry" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Joyería Virtual</span>
+              <span className="text-[10px] text-zinc-500">$0.05</span>
+            </a>
+            <a href="/editor?module=video" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Estudio de Video</span>
+              <span className="text-[10px] text-zinc-500">$0 - $0.35</span>
+            </a>
+            <a href="/editor?module=ad-create" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Crear Anuncios</span>
+              <span className="text-[10px] text-zinc-500">$0.04 - $0.35</span>
+            </a>
+            <a href="/editor?module=shadows" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Sombras y Luces</span>
+              <span className="text-[10px] text-zinc-500">Gratis / $0.04</span>
+            </a>
+            <a href="/editor?module=outpaint" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Extender Imagen</span>
+              <span className="text-[10px] text-zinc-500">$0.05</span>
+            </a>
+            <a href="/editor?module=compliance" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Verificar</span>
+              <span className="text-[10px] text-zinc-500">Gratis</span>
+            </a>
+            <a href="/editor?module=smart-editor" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Editor Avanzado</span>
+              <span className="text-[10px] text-zinc-500">Gratis</span>
+            </a>
+            <a href="/editor?module=ai-prompt" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Director Creativo</span>
+              <span className="text-[10px] text-zinc-500">Gratis</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Quick links */}
+        <div className="flex justify-center gap-6 mt-10 mb-8 text-sm text-zinc-500">
+          <a href="/gallery" className="hover:text-white">📁 Galería</a>
+          <a href="/workflows" className="hover:text-white">📋 Workflows</a>
+          <a href="/docs" className="hover:text-white">📖 Documentación</a>
         </div>
       </div>
     </div>
