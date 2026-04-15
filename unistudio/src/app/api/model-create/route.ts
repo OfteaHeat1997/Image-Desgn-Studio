@@ -351,12 +351,17 @@ export async function POST(request: NextRequest) {
       customDetails,
     });
 
-    // Step 1: Generate base model using Flux Kontext Pro
-    // Retry with safer prompt if content filter triggers
+    // Step 1: Generate base model
+    // Use SeedDream 4.5 for lingerie/swimwear to avoid E005 content filter
+    const isLingerieGarment = garmentType === 'lingerie' || garmentType === 'swimwear' ||
+      garmentType === 'bra' || garmentType === 'panty' || garmentType === 'shapewear';
+    const modelGenId = isLingerieGarment
+      ? 'bytedance/seedream-4.5'  // No content filter for lingerie
+      : 'black-forest-labs/flux-kontext-pro';
     let baseModelUrl: string;
     let usedPrompt = prompt;
     try {
-      const output = await runModel('black-forest-labs/flux-kontext-pro', {
+      const output = await runModel(modelGenId, {
         prompt,
         aspect_ratio: '3:4',
       });
@@ -369,7 +374,7 @@ export async function POST(request: NextRequest) {
           gender, ageRange, skinTone, bodyType, pose, expression,
           hairStyle, hairColor, background, ethnicity, height,
         });
-        const retryOutput = await runModel('black-forest-labs/flux-kontext-pro', {
+        const retryOutput = await runModel(modelGenId, {
           prompt: usedPrompt,
           aspect_ratio: '3:4',
         });

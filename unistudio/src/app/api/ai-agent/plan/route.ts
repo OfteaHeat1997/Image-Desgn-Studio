@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CLAUDE_HAIKU } from "@/lib/utils/constants";
+const PLANNING_MODEL = "claude-sonnet-4-5-20250514";
 import type {
   AgentPlanRequest,
   AgentPlanResponse,
@@ -816,7 +816,31 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 - Chain outputs: each step's output becomes next step's input
 - For tryon: the pipeline engine handles passing both garment (from bg-remove) and model (from model-create) images
 - For jewelry categories, use jewelry-tryon instead of tryon
-- Output valid JSON matching the AgentPlan schema`;
+- Output valid JSON matching the AgentPlan schema
+
+## Example outputs
+
+User: modelo + lingerie + economic
+{"steps":[
+  {"module":"model-create","label":"Crear modelo IA","params":{"gender":"female","skinTone":"medium","bodyType":"average","pose":"standing","background":"studio white"},"estimatedCost":0.055,"reasoning":"Generamos modelo nueva"},
+  {"module":"tryon","label":"Poner lencería en modelo","params":{"provider":"idm-vton","category":"one-pieces"},"estimatedCost":0.02,"reasoning":"IDM-VTON extrae la prenda automáticamente"},
+  {"module":"enhance","label":"Mejorar resultado","params":{"preset":"product-clean"},"estimatedCost":0,"reasoning":"Ajuste final de calidad"}
+]}
+
+User: ecommerce + perfume + economic
+{"steps":[
+  {"module":"bg-remove","label":"Quitar fondo","params":{"provider":"replicate"},"estimatedCost":0.01,"reasoning":"Aislamos el frasco"},
+  {"module":"bg-generate","label":"Fondo de mármol","params":{"mode":"precise","style":"luxury-marble"},"estimatedCost":0.05,"reasoning":"Fondo lujo para perfume"},
+  {"module":"shadows","label":"Reflejo elegante","params":{"type":"reflection","provider":"browser"},"estimatedCost":0,"reasoning":"Efecto superficie"},
+  {"module":"enhance","label":"Mejorar calidad","params":{"preset":"lujo"},"estimatedCost":0,"reasoning":"Ajuste final"}
+]}
+
+User: catalogo + earrings + economic
+{"steps":[
+  {"module":"bg-remove","label":"Quitar fondo","params":{"provider":"replicate"},"estimatedCost":0.01,"reasoning":"Aislamos la joya"},
+  {"module":"jewelry","label":"Exhibidor de joyería","params":{"mode":"exhibidor","type":"earrings"},"estimatedCost":0.05,"reasoning":"Exhibidor profesional"},
+  {"module":"enhance","label":"Mejorar nitidez","params":{"preset":"nitido"},"estimatedCost":0,"reasoning":"Detalle del metal"}
+]}`;
 
 async function planWithClaude(req: AgentPlanRequest): Promise<AgentPlan | null> {
   if (!ANTHROPIC_API_KEY) return null;
@@ -835,26 +859,18 @@ async function planWithClaude(req: AgentPlanRequest): Promise<AgentPlan | null> 
 - Warnings: ${req.imageAnalysis.warnings.join("; ") || "none"}`
       : "";
 
-    const userPrompt = `Plan a pipeline for:
+    const userPrompt = `Plan a pipeline for UniStudio.
+
+INPUT:
 - Agent: ${req.agentType}
 - Product: ${req.productCategory}
 - Budget: ${req.budget ?? "economic"}
-- Description: ${req.description || "Standard processing"}
+- User description: ${req.description || "none"}
 ${req.contentType ? `- Content type: ${req.contentType}` : ""}
-${req.preferences ? `- Model preferences: ${JSON.stringify(req.preferences)}` : ""}
-${req.imageCount ? `- Images: ${req.imageCount}` : ""}
+${req.preferences ? `- Model prefs: ${JSON.stringify(req.preferences)}` : ""}
 ${analysisContext}
 
-CRITICAL RULES:
-1. For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment from the original photo automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
-2. Never change the modelo order: model-create FIRST, then tryon, then enhance. No bg-remove.
-3. If watermark detected AND budget allows: add "inpaint" FIRST (before model-create for modelo agent).
-4. For ecommerce: bg-remove first, then enhance, shadows, outpaint.
-5. If lighting or color is bad, add an "enhance" step.
-6. If resolution is low, add "upscale" as the LAST step.
-7. NEVER put bg-generate as the first step for any pipeline. For ecommerce, always bg-remove first.
-
-Return JSON: {"id","name","description","agentType","steps":[{"id","module","label","params","estimatedCost","reasoning"}],"totalEstimatedCost","estimatedDuration"}`;
+Return ONLY valid JSON. No markdown. No explanation.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -864,7 +880,7 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: CLAUDE_HAIKU,
+        model: PLANNING_MODEL,
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
@@ -884,7 +900,13 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
-    const plan = JSON.parse(jsonMatch[0]) as AgentPlan;
+    let plan: AgentPlan;
+    try {
+      plan = JSON.parse(jsonMatch[0]) as AgentPlan;
+    } catch (e) {
+      console.error("[ai-agent/plan] Failed to parse Claude response as JSON:", text);
+      return null;
+    }
 
     // Validate minimum structure
     if (!plan.steps || !Array.isArray(plan.steps) || plan.steps.length === 0) {
@@ -899,11 +921,11 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
     ]);
     const invalidSteps = plan.steps.filter((s) => !validModules.has(s.module));
     if (invalidSteps.length > 0) {
-      console.error(
-        "[ai-agent/plan] Claude returned invalid modules:",
+      console.error("[ai-agent/plan] Claude returned invalid modules:",
         invalidSteps.map((s) => s.module),
+        "Full response:", text
       );
-      return null; // Fall back to templates
+      return null;
     }
 
     // Validate budget constraints on Claude's output
