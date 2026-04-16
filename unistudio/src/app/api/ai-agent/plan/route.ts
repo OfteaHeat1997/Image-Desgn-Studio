@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CLAUDE_HAIKU } from "@/lib/utils/constants";
+
 import type {
   AgentPlanRequest,
   AgentPlanResponse,
@@ -457,7 +457,7 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (frontal)",
-      { provider: "idm-vton", category: garmentCat, _catalogAngle: "front" },
+      { provider: "kolors", category: garmentCat, _catalogAngle: "front" },
       0.02,
       "Ponemos el bra aislado en la modelo nueva — vista frontal.",
     ),
@@ -485,7 +485,7 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (espalda)",
-      { provider: "idm-vton", category: garmentCat, _catalogAngle: "back" },
+      { provider: "kolors", category: garmentCat, _catalogAngle: "back" },
       0.02,
       "Ponemos el bra en la modelo — vista trasera.",
     ),
@@ -513,7 +513,7 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (lateral)",
-      { provider: "idm-vton", category: garmentCat, _catalogAngle: "side" },
+      { provider: "kolors", category: garmentCat, _catalogAngle: "side" },
       0.02,
       "Ponemos el bra en la modelo — vista lateral.",
     ),
@@ -541,7 +541,7 @@ function getCatalogoPipeline(
     makeStep(
       "tryon",
       "Vestir modelo (lifestyle)",
-      { provider: "idm-vton", category: garmentCat, _catalogAngle: "lifestyle" },
+      { provider: "kolors", category: garmentCat, _catalogAngle: "lifestyle" },
       0.02,
       "Ponemos el bra en la modelo — pose lifestyle.",
     ),
@@ -805,6 +805,11 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 - For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
 - bg-generate means ADD/CREATE a new background. bg-remove means REMOVE the existing background. These are OPPOSITE operations.
 - For lingerie/clothing: model-create generates the new AI model, then tryon (IDM-VTON) puts the garment on the model — no isolation step needed.
+- For bra/panty/shapewear/lingerie categories:
+  * model-create MUST use seedream-4.5 with enable_safety_checker:false
+  * tryon MUST use kolors (NOT idm-vton, NOT fashn)
+  * clothing param should be "plain beige tank top" to avoid content filter
+  * NEVER use flux-kontext-pro for these categories
 
 ## Budget Tiers
 - free: Only use $0 modules (browser bg-remove, enhance, programmatic shadows, kenburns video)
@@ -816,7 +821,18 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 - Chain outputs: each step's output becomes next step's input
 - For tryon: the pipeline engine handles passing both garment (from bg-remove) and model (from model-create) images
 - For jewelry categories, use jewelry-tryon instead of tryon
-- Output valid JSON matching the AgentPlan schema`;
+- Output valid JSON matching the AgentPlan schema
+
+## Example outputs
+
+User: modelo + lingerie + economic
+{"steps":[{"module":"model-create","label":"Crear modelo IA","params":{"gender":"female","skinTone":"medium","bodyType":"average","pose":"standing","background":"studio white"},"estimatedCost":0.055},{"module":"tryon","label":"Poner lencería en modelo","params":{"provider":"kolors","category":"one-pieces"},"estimatedCost":0.02},{"module":"enhance","label":"Mejorar resultado","params":{"preset":"product-clean"},"estimatedCost":0}]}
+
+User: ecommerce + perfume + economic
+{"steps":[{"module":"bg-remove","label":"Quitar fondo","params":{"provider":"replicate"},"estimatedCost":0.01},{"module":"bg-generate","label":"Fondo de mármol","params":{"mode":"precise","style":"luxury-marble"},"estimatedCost":0.05},{"module":"shadows","label":"Reflejo elegante","params":{"type":"reflection","provider":"browser"},"estimatedCost":0},{"module":"enhance","label":"Mejorar calidad","params":{"preset":"lujo"},"estimatedCost":0}]}
+
+User: catalogo + earrings + economic
+{"steps":[{"module":"bg-remove","label":"Quitar fondo","params":{"provider":"replicate"},"estimatedCost":0.01},{"module":"jewelry","label":"Exhibidor de joyería","params":{"mode":"exhibidor","type":"earrings"},"estimatedCost":0.05},{"module":"enhance","label":"Mejorar nitidez","params":{"preset":"nitido"},"estimatedCost":0}]}`;
 
 async function planWithClaude(req: AgentPlanRequest): Promise<AgentPlan | null> {
   if (!ANTHROPIC_API_KEY) return null;
@@ -835,26 +851,16 @@ async function planWithClaude(req: AgentPlanRequest): Promise<AgentPlan | null> 
 - Warnings: ${req.imageAnalysis.warnings.join("; ") || "none"}`
       : "";
 
-    const userPrompt = `Plan a pipeline for:
+    const userPrompt = `Plan a pipeline for UniStudio.
+
+INPUT:
 - Agent: ${req.agentType}
 - Product: ${req.productCategory}
 - Budget: ${req.budget ?? "economic"}
-- Description: ${req.description || "Standard processing"}
-${req.contentType ? `- Content type: ${req.contentType}` : ""}
-${req.preferences ? `- Model preferences: ${JSON.stringify(req.preferences)}` : ""}
-${req.imageCount ? `- Images: ${req.imageCount}` : ""}
+- User description: ${req.description || "none"}
 ${analysisContext}
 
-CRITICAL RULES:
-1. For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment from the original photo automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
-2. Never change the modelo order: model-create FIRST, then tryon, then enhance. No bg-remove.
-3. If watermark detected AND budget allows: add "inpaint" FIRST (before model-create for modelo agent).
-4. For ecommerce: bg-remove first, then enhance, shadows, outpaint.
-5. If lighting or color is bad, add an "enhance" step.
-6. If resolution is low, add "upscale" as the LAST step.
-7. NEVER put bg-generate as the first step for any pipeline. For ecommerce, always bg-remove first.
-
-Return JSON: {"id","name","description","agentType","steps":[{"id","module","label","params","estimatedCost","reasoning"}],"totalEstimatedCost","estimatedDuration"}`;
+Return ONLY valid JSON. No markdown. No explanation.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -864,7 +870,7 @@ Return JSON: {"id","name","description","agentType","steps":[{"id","module","lab
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: CLAUDE_HAIKU,
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
