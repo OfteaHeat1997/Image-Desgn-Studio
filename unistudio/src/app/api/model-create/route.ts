@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
+import { runFal } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { saveAiModel } from '@/lib/db/queries';
@@ -24,6 +25,9 @@ const TRYON_COSTS: Record<string, number> = {
 const IDM_VTON_PREFERRED_TYPES = new Set([
   'lingerie', 'swimwear', 'underwear', 'bikini', 'bodysuit', 'intimate',
 ]);
+
+// Garment types that use SeedDream (no content filter) for base model generation
+const LINGERIE_CATEGORIES = new Set(['lingerie', 'bra', 'panty', 'shapewear', 'bodysuit', 'swimwear']);
 
 // ---------------------------------------------------------------------------
 // Prompt builder
@@ -351,31 +355,46 @@ export async function POST(request: NextRequest) {
       customDetails,
     });
 
-    // Step 1: Generate base model using Flux Kontext Pro
-    // Retry with safer prompt if content filter triggers
+    // Step 1: Generate base model
+    // For lingerie categories, use SeedDream on fal.ai (no content filter)
+    // Otherwise use Flux Kontext Pro with retry on content filter
     let baseModelUrl: string;
     let usedPrompt = prompt;
-    try {
-      const output = await runModel('black-forest-labs/flux-kontext-pro', {
+    const isLingerie = LINGERIE_CATEGORIES.has(garmentType || '');
+
+    if (isLingerie) {
+      console.log('[model-create] Lingerie detected — using SeedDream (no content filter)');
+      const falResult = await runFal('fal-ai/bytedance/seedream/v4.5/text-to-image', {
         prompt,
-        aspect_ratio: '3:4',
+        image_size: 'portrait_4_3',
+        enable_safety_checker: false,
+        seed: Math.floor(Math.random() * 999999),
+        num_images: 1,
       });
-      baseModelUrl = await extractOutputUrl(output);
-    } catch (firstErr) {
-      const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
-      if (errMsg.includes('flagged as sensitive') || errMsg.includes('E005')) {
-        console.warn('[model-create] Content filter triggered, retrying with safe prompt...');
-        usedPrompt = buildSafeRetryPrompt({
-          gender, ageRange, skinTone, bodyType, pose, expression,
-          hairStyle, hairColor, background, ethnicity, height,
-        });
-        const retryOutput = await runModel('black-forest-labs/flux-kontext-pro', {
-          prompt: usedPrompt,
+      baseModelUrl = falResult.images[0].url;
+    } else {
+      try {
+        const output = await runModel('black-forest-labs/flux-kontext-pro', {
+          prompt,
           aspect_ratio: '3:4',
         });
-        baseModelUrl = await extractOutputUrl(retryOutput);
-      } else {
-        throw firstErr;
+        baseModelUrl = await extractOutputUrl(output);
+      } catch (firstErr) {
+        const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+        if (errMsg.includes('flagged as sensitive') || errMsg.includes('E005')) {
+          console.warn('[model-create] Content filter triggered, retrying with safe prompt...');
+          usedPrompt = buildSafeRetryPrompt({
+            gender, ageRange, skinTone, bodyType, pose, expression,
+            hairStyle, hairColor, background, ethnicity, height,
+          });
+          const retryOutput = await runModel('black-forest-labs/flux-kontext-pro', {
+            prompt: usedPrompt,
+            aspect_ratio: '3:4',
+          });
+          baseModelUrl = await extractOutputUrl(retryOutput);
+        } else {
+          throw firstErr;
+        }
       }
     }
     let totalCost = MODEL_GEN_COST;
