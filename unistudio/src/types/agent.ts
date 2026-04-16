@@ -69,6 +69,12 @@ export interface ImageAnalysis {
   lightingQuality: 'good' | 'dark' | 'overexposed' | 'uneven';
   colorBalance: 'good' | 'warm' | 'cool' | 'oversaturated' | 'desaturated';
 
+  /** Lingerie/garment detection (requires Vision API) */
+  hasModel?: boolean;
+  garmentType?: 'bra' | 'panty' | 'set' | 'other' | null;
+  estimatedColor?: string | null;
+  material?: 'lace' | 'cotton' | 'satin' | 'other' | null;
+
   /** Recommendations for the agent */
   suggestedSteps: AgentModule[];
   warnings: string[];

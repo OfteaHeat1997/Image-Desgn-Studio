@@ -138,6 +138,10 @@ async function analyzeWithVision(
   hasWatermark: boolean;
   hasText: boolean;
   additionalWarnings: string[];
+  hasModel: boolean | null;
+  garmentType: 'bra' | 'panty' | 'set' | 'other' | null;
+  estimatedColor: string | null;
+  material: 'lace' | 'cotton' | 'satin' | 'other' | null;
 } | null> {
   if (!ANTHROPIC_API_KEY) return null;
 
@@ -170,7 +174,11 @@ async function analyzeWithVision(
 {
   "hasWatermark": boolean (visible watermark, logo overlay, or stock photo mark?),
   "hasText": boolean (visible text, price tags, labels, brand logos on the image?),
-  "issues": string[] (list of specific issues, e.g. "watermark in bottom-right corner", "price tag visible", "image is blurry", "poor lighting on left side", "mannequin visible")
+  "issues": string[] (list of specific issues, e.g. "watermark in bottom-right corner", "price tag visible", "image is blurry", "poor lighting on left side", "mannequin visible"),
+  "hasModel": true if there is a person/model visible in the image, false otherwise,
+  "garmentType": if clothing is visible, classify as "bra", "panty", "set", or "other". null if no garment.,
+  "estimatedColor": the dominant color of the main product (e.g. "beige", "black", "white", "red"). null if unclear.,
+  "material": if fabric is visible, classify as "lace", "cotton", "satin", or "other". null if not fabric.
 }
 Be strict: only flag issues that would affect professional e-commerce use. Empty issues array if image is clean.`,
               },
@@ -197,6 +205,10 @@ Be strict: only flag issues that would affect professional e-commerce use. Empty
       hasWatermark: result.hasWatermark === true,
       hasText: result.hasText === true,
       additionalWarnings: Array.isArray(result.issues) ? result.issues : [],
+      hasModel: result.hasModel === true ? true : result.hasModel === false ? false : null,
+      garmentType: result.garmentType ?? null,
+      estimatedColor: result.estimatedColor ?? null,
+      material: result.material ?? null,
     };
   } catch (err) {
     console.error("[analyze-image] Vision analysis failed:", err);
@@ -393,6 +405,10 @@ export async function POST(request: NextRequest) {
       hasText,
       lightingQuality,
       colorBalance,
+      hasModel: visionResult?.hasModel ?? null,
+      garmentType: visionResult?.garmentType ?? null,
+      estimatedColor: visionResult?.estimatedColor ?? null,
+      material: visionResult?.material ?? null,
       suggestedSteps: recommendations.suggestedSteps,
       warnings: recommendations.warnings,
       minBudgetNeeded: recommendations.minBudgetNeeded,
