@@ -105,6 +105,7 @@ interface StepContext {
   catalogResults: Record<string, string>;
   /** Current catalog angle being processed */
   currentAngle: string | null;
+  modelSeed: number | null;  // seed from first model-create for angle consistency
 }
 
 async function executeStep(
@@ -270,12 +271,13 @@ async function executeStep(
           expression: params.expression ?? "confident",
           hairStyle: params.hairStyle ?? "natural professional",
           background: params.background ?? "studio white",
+          ...(ctx.modelSeed ? { seed: ctx.modelSeed } : {}),
         }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "model-create failed");
       // Store model URL but DON'T replace currentUrl (garment stays current)
-      return { resultUrl: data.data.url, cost: data.cost ?? 0.055, updatedCtx: { modelUrl: data.data.url } };
+      return { resultUrl: data.data.url, cost: data.cost ?? 0.055, updatedCtx: { modelUrl: data.data.url, modelSeed: data.data.seed ?? null } };
     }
 
     // ----- Try-On (needs garment + model) -----
@@ -631,6 +633,7 @@ export function useAgentPipeline() {
       inputFile: imageFile,
       catalogResults: {},
       currentAngle: null,
+      modelSeed: null,
     };
 
     // Find parallel groups
@@ -866,6 +869,7 @@ export function useAgentPipeline() {
       inputFile: imageFile,
       catalogResults: {},
       currentAngle: null,
+      modelSeed: null,
     };
 
     // Replay context from completed steps
