@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
+import { runFal, ensureFalAccessibleUrl } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
@@ -15,6 +16,7 @@ import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories
 const PROVIDER_COSTS: Record<string, number> = {
   'idm-vton': 0.02,
   fashn: 0.05,
+  kolors: 0.02,
 };
 
 // Garment types that should prefer IDM-VTON (better for delicate/revealing garments)
@@ -69,6 +71,19 @@ async function tryOnFashn(
   throw new Error('FASHN prediction completed but returned no output');
 }
 
+async function tryOnKolors(
+  modelImage: string,
+  garmentImage: string,
+): Promise<string> {
+  const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
+  const garmentImageUrl = await ensureFalAccessibleUrl(garmentImage);
+  const result = await runFal('fal-ai/kling/v1-5/kolors-virtual-try-on', {
+    human_image_url: humanImageUrl,
+    garment_image_url: garmentImageUrl,
+  });
+  return result.image.url;
+}
+
 // Smart routing: picks the best provider based on garment type
 async function smartTryOn(
   modelImage: string,
@@ -79,10 +94,10 @@ async function smartTryOn(
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
-  // For intimate/lingerie garments, always use IDM-VTON (best for delicate garments)
+  // For intimate/lingerie garments, use Kolors (no content filter, simpler API)
   if (isIntimate) {
-    const url = await tryOnIdmVton(modelImage, garmentImage, category, garmentDescription);
-    return { url, provider: 'idm-vton' };
+    const url = await tryOnKolors(modelImage, garmentImage);
+    return { url, provider: 'kolors' };
   }
 
   // Prefer FASHN when API key is configured (highest quality for non-intimate)
@@ -120,7 +135,7 @@ export async function POST(request: NextRequest) {
       category: string;
       garmentType?: string;
       garmentDescription?: string;
-      provider?: 'idm-vton' | 'fashn' | 'auto';
+      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'auto';
     };
 
     if (!modelImage) {
@@ -151,9 +166,9 @@ export async function POST(request: NextRequest) {
     const httpModelImage = await ensureHttpUrl(modelImage);
     const httpGarmentImage = await ensureHttpUrl(garmentImage);
 
-    // Force IDM-VTON for lingerie/swimwear — FASHN explicitly excludes these garment types
-    const effectiveProvider: 'idm-vton' | 'fashn' | 'auto' =
-      (garmentType === 'lingerie' || garmentType === 'swimwear') ? 'idm-vton' : provider;
+    // Force Kolors for lingerie/swimwear — no content filter, FASHN excludes these
+    const effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'auto' =
+      (garmentType === 'lingerie' || garmentType === 'swimwear') ? 'kolors' : provider;
 
     let resultUrl: string;
     let usedProvider: string;
@@ -170,6 +185,9 @@ export async function POST(request: NextRequest) {
           break;
         case 'fashn':
           resultUrl = await tryOnFashn(httpModelImage, httpGarmentImage, category);
+          break;
+        case 'kolors':
+          resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);
           break;
         default:
           return NextResponse.json(
