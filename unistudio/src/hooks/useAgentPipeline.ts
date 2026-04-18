@@ -107,6 +107,8 @@ interface StepContext {
   currentAngle: string | null;
   /** Product category ("lingerie", "perfume", ...) — routes model-create + tryon */
   garmentType: string | null;
+  /** Shared random seed for model-create so multi-angle catalogs keep the same face */
+  modelSeed: number | null;
 }
 
 async function executeStep(
@@ -128,7 +130,15 @@ async function executeStep(
       const res = await fetch("/api/bg-remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: dataUrl, provider }),
+        body: JSON.stringify({
+          imageUrl: dataUrl,
+          provider,
+          // Lingerie: input often has a model wearing the garment. We need to
+          // isolate just the prenda so Kolors receives only the garment, not
+          // a whole-person photo.
+          removeSubject: !!params.removeSubject,
+          garmentType: ctx.garmentType,
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "bg-remove failed");
@@ -273,6 +283,9 @@ async function executeStep(
           hairStyle: params.hairStyle ?? "natural professional",
           background: params.background ?? "studio white",
           garmentType: (params.garmentType as string | undefined) ?? ctx.garmentType ?? undefined,
+          // Share the same seed across all model-create calls in a catalog
+          // run so the 4 angles (front/back/side/lifestyle) are the SAME person.
+          seed: (params.seed as number | undefined) ?? ctx.modelSeed ?? undefined,
         }),
       });
       const data = await res.json();
@@ -640,6 +653,9 @@ export function useAgentPipeline() {
       catalogResults: {},
       currentAngle: null,
       garmentType,
+      // One seed per pipeline run — keeps the model consistent across all
+      // model-create steps (e.g. 4 catalog angles show the same face).
+      modelSeed: Math.floor(Math.random() * 999999),
     };
 
     // Find parallel groups
@@ -881,6 +897,7 @@ export function useAgentPipeline() {
       catalogResults: {},
       currentAngle: null,
       garmentType,
+      modelSeed: Math.floor(Math.random() * 999999),
     };
 
     // Replay context from completed steps

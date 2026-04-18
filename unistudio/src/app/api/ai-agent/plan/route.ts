@@ -154,9 +154,27 @@ function getModeloPipeline(
   prefs?: AgentPlanRequest["preferences"],
 ): PipelineStep[] {
   const isJewelry = ["earrings", "rings", "necklace", "bracelet", "watch", "sunglasses"].includes(category);
+  const isLingerie = category === "lingerie";
   const garmentDescription = GARMENT_DESCRIPTIONS[category] ?? 'Prenda de moda';
 
-  const steps: PipelineStep[] = [
+  const steps: PipelineStep[] = [];
+
+  // Lingerie: isolate the garment FIRST. Kolors (the only lingerie-safe try-on)
+  // cannot extract a prenda from a photo that has a model, so we must strip the
+  // person out before the try-on step.
+  if (isLingerie) {
+    steps.push(
+      makeStep(
+        "bg-remove",
+        "Aislar prenda",
+        { provider: "replicate", removeSubject: true },
+        budget === "free" ? 0 : 0.055,
+        "Quitamos la modelo original y dejamos solo la prenda para el try-on.",
+      ),
+    );
+  }
+
+  steps.push(
     makeStep(
       "model-create",
       "Crear modelo nueva",
@@ -173,7 +191,7 @@ function getModeloPipeline(
       budget === "free" ? 0 : 0.055,
       "Generamos un modelo IA original con las caracteristicas elegidas.",
     ),
-  ];
+  );
 
   if (isJewelry) {
     const jewelryType = category === "earrings"
@@ -199,13 +217,17 @@ function getModeloPipeline(
   } else {
     const garmentCategory =
       category === "lingerie" ? "one-pieces" : "tops";
+    const tryonProvider = isLingerie ? "kolors" : "idm-vton";
+    const tryonReasoning = isLingerie
+      ? "Kolors sobrepone la prenda ya aislada sobre la modelo IA — es el único try-on que no bloquea lencería."
+      : "IDM-VTON extrae la prenda de la foto original y la transfiere a la modelo nueva. No necesitas aislar la ropa primero.";
     steps.push(
       makeStep(
         "tryon",
         "Poner ropa en modelo",
-        { provider: "idm-vton", category: garmentCategory, garmentDescription },
+        { provider: tryonProvider, category: garmentCategory, garmentDescription },
         budget === "free" ? 0 : 0.02,
-        "IDM-VTON extrae la prenda de la foto original y la transfiere a la modelo nueva. No necesitas aislar la ropa primero.",
+        tryonReasoning,
       ),
     );
   }
@@ -424,14 +446,16 @@ function getCatalogoPipeline(
   const steps: PipelineStep[] = [];
 
   // PASO 1: Quitar modelo Leonisa + fondo → aislar solo el bra
-  // El watermark se va automaticamente porque esta sobre la modelo/fondo
+  // Needs removeSubject:true so Kontext isolates just the prenda (browser
+  // bg-remove only strips background, leaves the person in the photo).
+  // Watermarks on the model/background disappear automatically here.
   steps.push(
     makeStep(
       "bg-remove",
       "Quitar modelo Leonisa — aislar solo el bra",
-      { provider: "browser" },
-      0,
-      "Removemos la modelo original y el fondo. Queda solo el bra aislado (sin copyright).",
+      { provider: "replicate", removeSubject: true },
+      0.055,
+      "Removemos la modelo original y el fondo. Queda solo el bra aislado (sin copyright, sin watermark).",
     ),
   );
 
@@ -782,7 +806,7 @@ const SYSTEM_PROMPT = `You are an AI pipeline planner for UniStudio, a product p
 You plan image processing pipelines by selecting and ordering modules. You MUST respond with valid JSON only — no markdown, no explanation.
 
 ## Available Modules (with costs)
-- bg-remove: Remove background. Providers: "browser" ($0), "withoutbg" ($0), "replicate" ($0.01). Params: {provider}
+- bg-remove: Remove background. Providers: "browser" ($0), "withoutbg" ($0), "replicate" ($0.01). Params: {provider, removeSubject?:boolean}. When removeSubject:true, also removes the person/model from the photo and leaves ONLY the garment isolated (uses Kontext, costs ~$0.055). Use this for lingerie photos that contain a model wearing the prenda.
 - bg-generate: Generate new background. Modes: "precise"/"creative"/"fast". Cost: $0.05. Params: {mode, style}
 - enhance: Improve quality (free, local sharp). Presets: auto, product-clean, warm-lifestyle, cool-modern. Params: {preset}
 - shadows: Add shadows. Types: "drop"/$0, "contact"/$0, "reflection"/$0, "ai-relight"/$0.04, "ai-kontext"/$0.05. Params: {type, provider:"browser"|"replicate"}
@@ -804,12 +828,13 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 ## CRITICAL RULES
 - For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
 - bg-generate means ADD/CREATE a new background. bg-remove means REMOVE the existing background. These are OPPOSITE operations.
-- For lingerie/clothing: model-create generates the new AI model, then tryon (IDM-VTON) puts the garment on the model — no isolation step needed.
-- For bra/panty/shapewear/lingerie categories:
-  * model-create MUST use seedream-4.5 with enable_safety_checker:false
-  * tryon MUST use kolors (NOT idm-vton, NOT fashn)
-  * clothing param should be "plain beige tank top" to avoid content filter
-  * NEVER use flux-kontext-pro for these categories
+- For non-lingerie clothing: model-create generates the new AI model, then tryon (IDM-VTON) puts the garment on the model — no isolation step needed, IDM-VTON extracts the garment automatically.
+- For bra/panty/shapewear/lingerie categories (SPECIAL FLOW — Kolors does NOT extract the garment from a photo with a person, so we MUST isolate first):
+  1. FIRST step: bg-remove with {"provider":"replicate","removeSubject":true} — isolates the prenda from a photo that contains a model (cost $0.055). ALWAYS include this step when the image may have a person wearing the garment. Label in Spanish: "Aislar prenda".
+  2. model-create MUST use seedream (provider handled automatically when garmentType is lingerie) with the "plain nude base layer" clothing handled automatically — do NOT override the clothing param.
+  3. tryon MUST use {"provider":"kolors","category":"one-pieces"} — NOT idm-vton, NOT fashn.
+  4. NEVER use flux-kontext-pro for model-create on these categories.
+  5. When generating multiple angles (front/back/side/lifestyle), the pipeline automatically shares the same seed across all model-create calls so the face stays consistent — do NOT pass a seed param.
 
 ## Budget Tiers
 - free: Only use $0 modules (browser bg-remove, enhance, programmatic shadows, kenburns video)
@@ -826,7 +851,7 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 ## Example outputs
 
 User: modelo + lingerie + economic
-{"steps":[{"module":"model-create","label":"Crear modelo IA","params":{"gender":"female","skinTone":"medium","bodyType":"average","pose":"standing","background":"studio white"},"estimatedCost":0.055},{"module":"tryon","label":"Poner lencería en modelo","params":{"provider":"kolors","category":"one-pieces"},"estimatedCost":0.02},{"module":"enhance","label":"Mejorar resultado","params":{"preset":"product-clean"},"estimatedCost":0}]}
+{"steps":[{"module":"bg-remove","label":"Aislar prenda","params":{"provider":"replicate","removeSubject":true},"estimatedCost":0.055,"reasoning":"Quitar la modelo original y dejar solo la prenda antes del try-on"},{"module":"model-create","label":"Crear modelo IA","params":{"gender":"female","skinTone":"medium","bodyType":"average","pose":"standing","background":"studio white"},"estimatedCost":0.055,"reasoning":"Generar modelo IA con base neutra, lista para recibir la prenda"},{"module":"tryon","label":"Poner lencería en modelo","params":{"provider":"kolors","category":"one-pieces"},"estimatedCost":0.02,"reasoning":"Kolors sobrepone la prenda aislada sobre la modelo generada"},{"module":"enhance","label":"Mejorar resultado","params":{"preset":"product-clean"},"estimatedCost":0,"reasoning":"Ajuste final de nitidez y color"}]}
 
 User: ecommerce + perfume + economic
 {"steps":[{"module":"bg-remove","label":"Quitar fondo","params":{"provider":"replicate"},"estimatedCost":0.01},{"module":"bg-generate","label":"Fondo de mármol","params":{"mode":"precise","style":"luxury-marble"},"estimatedCost":0.05},{"module":"shadows","label":"Reflejo elegante","params":{"type":"reflection","provider":"browser"},"estimatedCost":0},{"module":"enhance","label":"Mejorar calidad","params":{"preset":"lujo"},"estimatedCost":0}]}

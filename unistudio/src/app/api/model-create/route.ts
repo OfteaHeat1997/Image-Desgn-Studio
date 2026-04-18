@@ -289,10 +289,12 @@ export async function POST(request: NextRequest) {
       garmentImage,
       garmentCategory,
       garmentType,
+      seed,
     } = body as ModelCreateOptions & {
       garmentImage?: string;
       garmentCategory?: string;
       garmentType?: string;
+      seed?: number;
     };
 
     // Validate required fields
@@ -367,12 +369,13 @@ export async function POST(request: NextRequest) {
     let usedPrompt = prompt;
 
     if (isLingerie) {
-      console.log('[model-create] Lingerie detected — using SeedDream (no content filter)');
+      const effectiveSeed = typeof seed === 'number' ? seed : Math.floor(Math.random() * 999999);
+      console.log(`[model-create] Lingerie detected — using SeedDream (seed=${effectiveSeed})`);
       const falResult = await runFal('fal-ai/bytedance/seedream/v4.5/text-to-image', {
         prompt,
         image_size: 'portrait_4_3',
         enable_safety_checker: false,
-        seed: Math.floor(Math.random() * 999999),
+        seed: effectiveSeed,
         num_images: 1,
       });
       baseModelUrl = falResult.images[0].url;
