@@ -270,6 +270,7 @@ async function executeStep(
           expression: params.expression ?? "confident",
           hairStyle: params.hairStyle ?? "natural professional",
           background: params.background ?? "studio white",
+          garmentType: params.garmentType,
         }),
       });
       const data = await res.json();
@@ -314,6 +315,7 @@ async function executeStep(
           garmentImage: garmentHttpUrl,
           category: mappedCategory,
           provider: params.provider ?? "idm-vton",
+          garmentType: params.garmentType,
         }),
       });
       const data = await res.json();
