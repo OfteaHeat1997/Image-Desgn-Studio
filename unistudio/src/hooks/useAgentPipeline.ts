@@ -114,6 +114,21 @@ async function executeStep(
   const { module, params } = step;
 
   switch (module) {
+    // ----- Analyze Image (informational — image passes through unchanged) -----
+    case "analyze-image": {
+      try {
+        const dataUrl = await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
+        await fetch("/api/analyze-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: dataUrl }),
+        });
+      } catch {
+        // Analysis failure is non-blocking — pipeline continues
+      }
+      return { resultUrl: ctx.currentUrl, cost: 0, updatedCtx: {} };
+    }
+
     // ----- Background Remove -----
     case "bg-remove": {
       const provider = (params.provider as string) ?? "browser";
@@ -270,6 +285,8 @@ async function executeStep(
           expression: params.expression ?? "confident",
           hairStyle: params.hairStyle ?? "natural professional",
           background: params.background ?? "studio white",
+          garmentType: params.garmentType as string | undefined,
+          clothing: params.clothing as string | undefined,
         }),
       });
       const data = await res.json();
@@ -314,6 +331,7 @@ async function executeStep(
           garmentImage: garmentHttpUrl,
           category: mappedCategory,
           provider: params.provider ?? "idm-vton",
+          garmentType: params.garmentType as string | undefined,
         }),
       });
       const data = await res.json();

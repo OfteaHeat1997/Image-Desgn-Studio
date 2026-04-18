@@ -156,6 +156,63 @@ function getModeloPipeline(
   const isJewelry = ["earrings", "rings", "necklace", "bracelet", "watch", "sunglasses"].includes(category);
   const garmentDescription = GARMENT_DESCRIPTIONS[category] ?? 'Prenda de moda';
 
+  // Lingerie pipeline: analyze → bg-remove (isolate garment) → model-create (SeedDream, beige tank) → tryon (Kolors) → enhance
+  if (category === "lingerie") {
+    const lingerieSteps: PipelineStep[] = [
+      makeStep(
+        "analyze-image",
+        "Analizar prenda",
+        {},
+        0,
+        "Claude Vision detecta color, textura y material de la prenda.",
+      ),
+      makeStep(
+        "bg-remove",
+        "Aislar prenda — quitar modelo y fondo",
+        { provider: "browser" },
+        0,
+        "Removemos la modelo original y el fondo. Queda solo la prenda aislada (sin copyright).",
+      ),
+      makeStep(
+        "model-create",
+        "Crear modelo IA nueva (SeedDream)",
+        {
+          gender: prefs?.gender ?? "female",
+          ageRange: prefs?.ageRange ?? "26-35",
+          skinTone: prefs?.skinTone ?? "medium",
+          bodyType: prefs?.bodyType ?? "average",
+          pose: prefs?.pose ?? "standing",
+          expression: "confident",
+          hairStyle: "natural professional",
+          background: "studio white",
+          garmentType: "lingerie",
+          clothing: "plain beige tank top",
+        },
+        budget === "free" ? 0 : 0.055,
+        "SeedDream genera modelo nueva con camiseta beige — lista para try-on sin filtro de contenido.",
+      ),
+      makeStep(
+        "tryon",
+        "Vestir modelo con lencería (Kolors)",
+        { provider: "kolors", category: "one-pieces", garmentType: "lingerie" },
+        budget === "free" ? 0 : 0.02,
+        "Kolors v1.5 pone la prenda aislada en la modelo nueva — sin filtro de contenido.",
+      ),
+      makeStep(
+        "enhance",
+        "Mejorar resultado final",
+        { preset: "product-clean" },
+        0,
+        "Ajuste final de calidad para resultado profesional.",
+      ),
+    ];
+
+    if (budget === "free") {
+      return lingerieSteps.filter((s) => s.estimatedCost === 0);
+    }
+    return lingerieSteps;
+  }
+
   const steps: PipelineStep[] = [
     makeStep(
       "model-create",
@@ -794,6 +851,7 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 - inpaint: Edit specific areas. Cost: $0.03-0.05. Params: {prompt, provider}
 - video: Generate video. Providers: "kenburns" ($0), "ltx-video" ($0.04), "wan-2.2-fast" ($0.05). Params: {provider, prompt, category}
 - ad-create: Format as ad. Templates: instagram-reel, tiktok, facebook-ad, youtube-short, instagram-story, pinterest-pin. Params: {template}
+- analyze-image: Analyze garment/product. Free ($0). Returns analysis data without changing the image. Params: {}
 
 ## 4 Agent Types
 1. ecommerce: Product photos for web store. Goal: white bg, uniform, HD. Typical: bg-remove → enhance → shadows → outpaint
@@ -802,13 +860,12 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 4. catalogo: DO NOT plan this — always use fallback template.
 
 ## CRITICAL RULES
-- For "modelo" agent: do NOT use bg-remove. IDM-VTON extracts the garment automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
+- For "modelo" agent + NON-lingerie: do NOT use bg-remove. IDM-VTON extracts the garment automatically. Flow: model-create → tryon (IDM-VTON) → enhance.
+- For "modelo" agent + lingerie/bra/panty/shapewear: MUST isolate garment first. Flow: analyze-image → bg-remove → model-create (garmentType:"lingerie", clothing:"plain beige tank top") → tryon (provider:"kolors", garmentType:"lingerie") → enhance. NEVER skip bg-remove for lingerie.
 - bg-generate means ADD/CREATE a new background. bg-remove means REMOVE the existing background. These are OPPOSITE operations.
-- For lingerie/clothing: model-create generates the new AI model, then tryon (IDM-VTON) puts the garment on the model — no isolation step needed.
 - For bra/panty/shapewear/lingerie categories:
-  * model-create MUST use seedream-4.5 with enable_safety_checker:false
-  * tryon MUST use kolors (NOT idm-vton, NOT fashn)
-  * clothing param should be "plain beige tank top" to avoid content filter
+  * model-create MUST include params garmentType:"lingerie" and clothing:"plain beige tank top"
+  * tryon MUST use kolors (NOT idm-vton, NOT fashn) and include garmentType:"lingerie"
   * NEVER use flux-kontext-pro for these categories
 
 ## Budget Tiers
@@ -826,7 +883,7 @@ You plan image processing pipelines by selecting and ordering modules. You MUST 
 ## Example outputs
 
 User: modelo + lingerie + economic
-{"steps":[{"module":"model-create","label":"Crear modelo IA","params":{"gender":"female","skinTone":"medium","bodyType":"average","pose":"standing","background":"studio white"},"estimatedCost":0.055},{"module":"tryon","label":"Poner lencería en modelo","params":{"provider":"kolors","category":"one-pieces"},"estimatedCost":0.02},{"module":"enhance","label":"Mejorar resultado","params":{"preset":"product-clean"},"estimatedCost":0}]}
+{"steps":[{"module":"analyze-image","label":"Analizar prenda","params":{},"estimatedCost":0},{"module":"bg-remove","label":"Aislar prenda","params":{"provider":"browser"},"estimatedCost":0},{"module":"model-create","label":"Crear modelo IA (SeedDream)","params":{"gender":"female","skinTone":"medium","bodyType":"average","pose":"standing","background":"studio white","garmentType":"lingerie","clothing":"plain beige tank top"},"estimatedCost":0.055},{"module":"tryon","label":"Vestir modelo con lencería","params":{"provider":"kolors","category":"one-pieces","garmentType":"lingerie"},"estimatedCost":0.02},{"module":"enhance","label":"Mejorar resultado","params":{"preset":"product-clean"},"estimatedCost":0}]}
 
 User: ecommerce + perfume + economic
 {"steps":[{"module":"bg-remove","label":"Quitar fondo","params":{"provider":"replicate"},"estimatedCost":0.01},{"module":"bg-generate","label":"Fondo de mármol","params":{"mode":"precise","style":"luxury-marble"},"estimatedCost":0.05},{"module":"shadows","label":"Reflejo elegante","params":{"type":"reflection","provider":"browser"},"estimatedCost":0},{"module":"enhance","label":"Mejorar calidad","params":{"preset":"lujo"},"estimatedCost":0}]}
@@ -901,7 +958,7 @@ Return ONLY valid JSON. No markdown. No explanation.`;
     const validModules = new Set([
       "bg-remove", "bg-generate", "enhance", "shadows", "outpaint",
       "upscale", "tryon", "model-create", "inpaint", "video",
-      "ad-create", "jewelry-tryon", "infographic", "jewelry",
+      "ad-create", "jewelry-tryon", "infographic", "jewelry", "analyze-image",
     ]);
     const invalidSteps = plan.steps.filter((s) => !validModules.has(s.module));
     if (invalidSteps.length > 0) {
