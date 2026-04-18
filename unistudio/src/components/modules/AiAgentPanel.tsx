@@ -434,7 +434,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
 
       for (let imgIdx = 0; imgIdx < files.length; imgIdx++) {
         setCurrentImageIndex(imgIdx);
-        const result = await pipeline.execute(plan, files[imgIdx], isManualMode);
+        const result = await pipeline.execute(plan, files[imgIdx], isManualMode, category);
 
         if (result?.status === "completed") {
           const lastCompleted = [...result.steps].reverse().find(
@@ -467,7 +467,7 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     if (!plan || !imageFile) return;
     setPhase("executing");
     try {
-      const result = await pipeline.retryFromStep(plan, imageFile, index);
+      const result = await pipeline.retryFromStep(plan, imageFile, index, category);
       if (result?.status === "completed") {
         setPhase("results");
       } else {
@@ -485,6 +485,17 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     if (!finalResultUrl) return;
     onProcess(finalResultUrl, undefined, execution?.totalCost ?? 0);
   }, [finalResultUrl, execution, onProcess]);
+
+  // Auto-push the final result to the editor canvas when the pipeline finishes,
+  // so the big central canvas shows the result instead of the original input.
+  const autoPushedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (phase !== "results") return;
+    if (!finalResultUrl) return;
+    if (autoPushedRef.current === finalResultUrl) return;
+    autoPushedRef.current = finalResultUrl;
+    onProcess(finalResultUrl, undefined, execution?.totalCost ?? 0);
+  }, [phase, finalResultUrl, execution, onProcess]);
 
   const handleReset = useCallback(() => {
     pipeline.reset();

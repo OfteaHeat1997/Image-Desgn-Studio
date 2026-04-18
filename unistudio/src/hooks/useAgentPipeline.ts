@@ -105,6 +105,8 @@ interface StepContext {
   catalogResults: Record<string, string>;
   /** Current catalog angle being processed */
   currentAngle: string | null;
+  /** Product category ("lingerie", "perfume", ...) — routes model-create + tryon */
+  garmentType: string | null;
 }
 
 async function executeStep(
@@ -270,6 +272,7 @@ async function executeStep(
           expression: params.expression ?? "confident",
           hairStyle: params.hairStyle ?? "natural professional",
           background: params.background ?? "studio white",
+          garmentType: (params.garmentType as string | undefined) ?? ctx.garmentType ?? undefined,
         }),
       });
       const data = await res.json();
@@ -613,7 +616,12 @@ export function useAgentPipeline() {
   }, []);
 
   // ----- Execute the plan (with parallel support + optional manual mode) -----
-  const execute = useCallback(async (agentPlan: AgentPlan, imageFile: File, manualMode = false) => {
+  const execute = useCallback(async (
+    agentPlan: AgentPlan,
+    imageFile: File,
+    manualMode = false,
+    garmentType: string | null = null,
+  ) => {
     abortRef.current = false;
     const steps = agentPlan.steps;
 
@@ -631,6 +639,7 @@ export function useAgentPipeline() {
       inputFile: imageFile,
       catalogResults: {},
       currentAngle: null,
+      garmentType,
     };
 
     // Find parallel groups
@@ -828,7 +837,12 @@ export function useAgentPipeline() {
   }, []);
 
   // ----- Retry from a specific step -----
-  const retryFromStep = useCallback(async (agentPlan: AgentPlan, imageFile: File, fromIndex: number) => {
+  const retryFromStep = useCallback(async (
+    agentPlan: AgentPlan,
+    imageFile: File,
+    fromIndex: number,
+    garmentType: string | null = null,
+  ) => {
     if (!execution) return;
     abortRef.current = false;
 
@@ -866,6 +880,7 @@ export function useAgentPipeline() {
       inputFile: imageFile,
       catalogResults: {},
       currentAngle: null,
+      garmentType,
     };
 
     // Replay context from completed steps

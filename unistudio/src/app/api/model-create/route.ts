@@ -333,9 +333,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // When garment provided, generate model wearing minimal clothing for better try-on
-    const promptClothing = garmentImage
-      ? 'wearing a plain white fitted tank top and neutral shorts'
+    const isLingerie = LINGERIE_CATEGORIES.has(garmentType || '');
+
+    // When garment provided OR when this is a lingerie flow, generate the model
+    // in a neutral minimal base so the subsequent try-on has a clean canvas.
+    // Without this, the default prompt adds "casual outfit" and Kolors ends up
+    // layering the user's garment on top of a blazer/pants, producing garbage.
+    const promptClothing = (garmentImage || isLingerie)
+      ? 'wearing a plain nude seamless fitted tank top and plain nude shorts, minimal base layer, no logos, no patterns, neutral canvas ready for virtual try-on'
       : clothing;
 
     // Build the prompt
@@ -360,7 +365,6 @@ export async function POST(request: NextRequest) {
     // Otherwise use Flux Kontext Pro with retry on content filter
     let baseModelUrl: string;
     let usedPrompt = prompt;
-    const isLingerie = LINGERIE_CATEGORIES.has(garmentType || '');
 
     if (isLingerie) {
       console.log('[model-create] Lingerie detected — using SeedDream (no content filter)');
