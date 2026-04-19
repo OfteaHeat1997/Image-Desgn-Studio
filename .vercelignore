@@ -1,0 +1,28 @@
+# Exclude everything Vercel doesn't need to build the Next.js app.
+# The app lives in unistudio/ — Vercel's Root Directory setting points there —
+# but `vercel --prod` from the repo root still uploads the WHOLE tree, which
+# hits the 10MB request limit when the .claude/worktrees/ copies pile up.
+
+# Claude Code session state (worktrees are 60+ full project copies)
+.claude/
+.claude/worktrees/
+
+# Top-level docs / planning files (not needed at build time)
+docs/
+scripts/
+CHANGELOG.md
+UniStudioResearchGuide.docx
+*.docx
+
+# unistudio/ build/cache artifacts — safe to skip, Vercel rebuilds them
+unistudio/.next/
+unistudio/node_modules/
+unistudio/coverage/
+unistudio/output/
+unistudio/test-results/
+unistudio/playwright-report/
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
