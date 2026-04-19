@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
       hasText,
       lightingQuality,
       colorBalance,
-      hasModel: visionResult?.hasModel ?? null,
+      hasModel: visionResult?.hasModel,
       garmentType: visionResult?.garmentType ?? null,
       estimatedColor: visionResult?.estimatedColor ?? null,
       material: visionResult?.material ?? null,
