@@ -49,7 +49,12 @@ async function safeJson(res: Response): Promise<{ success: boolean; data?: any; 
 interface InventoryCategory {
   id: string;
   name: string;
-  agentPreset: string;
+  /** Legacy — set for categories still using a /batch preset. */
+  agentPreset?: string;
+  /** New — URL to redirect the user to (a canonical pipeline). Wins over agentPreset. */
+  pipeline?: string;
+  /** Query params to attach to the pipeline redirect. */
+  pipelineParams?: Record<string, string>;
   imageCount: number;
   folders: string[];
 }
@@ -182,29 +187,8 @@ const PIPELINE_PRESETS: PresetDef[] = [
 /* ------------------------------------------------------------------ */
 
 const AGENT_PRESETS: PresetDef[] = [
-  {
-    id: "agent-perfumes",
-    name: "Colonias / Perfumes",
-    description: "Limpiar fondo, mejorar, reflejo elegante, 1:1 cuadrado",
-    steps: [
-      { id: "a1", operation: "bg-remove", provider: "replicate", label: "Quitar Fondo" },
-      { id: "a2", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "product-clean" } },
-      { id: "a3", operation: "shadows", provider: "auto", label: "Reflejo Elegante", params: { type: "reflection", blur: 15, opacity: 0.4, distance: 5, fade: 0.8 } },
-      { id: "a4", operation: "outpaint", provider: "auto", label: "Fondo Blanco 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional perfume product photography, centered" } },
-    ],
-  },
-  {
-    id: "agent-cremas",
-    name: "Cremas / Skincare",
-    description: "Upscale (son muy pequenas), limpiar fondo, mejorar, sombra contacto",
-    steps: [
-      { id: "a1", operation: "bg-remove", provider: "replicate", label: "Quitar Fondo" },
-      { id: "a2", operation: "upscale", provider: "auto", label: "Upscale 2x (baja resolucion)", params: { scale: 2, provider: "real-esrgan" } },
-      { id: "a3", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "product-clean" } },
-      { id: "a4", operation: "shadows", provider: "auto", label: "Sombra de Contacto", params: { type: "contact", blur: 20, opacity: 0.35, distance: 8, color: "#000000" } },
-      { id: "a5", operation: "outpaint", provider: "auto", label: "Fondo Blanco 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional skincare product photography, centered" } },
-    ],
-  },
+  // agent-perfumes, agent-cremas: removed in commit 3 — these flows migrated to /pipelines/static-product.
+  // Inventory scan redirects the "colonias" and "cremas" categories there automatically.
   {
     id: "agent-accesorios",
     name: "Accesorios / Joyas",
@@ -237,16 +221,8 @@ const AGENT_PRESETS: PresetDef[] = [
       { id: "a3", operation: "outpaint", provider: "auto", label: "Estandarizar 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, centered product, professional e-commerce photography" } },
     ],
   },
-  {
-    id: "agent-desodorantes",
-    name: "Desodorantes / Bloqueador",
-    description: "Ya estan limpios — mejorar y estandarizar formato",
-    steps: [
-      { id: "a1", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "product-clean" } },
-      { id: "a2", operation: "shadows", provider: "auto", label: "Sombra Suave", params: { type: "drop", offsetX: 3, offsetY: 6, blur: 12, opacity: 0.2, color: "#000000", spread: 0 } },
-      { id: "a3", operation: "outpaint", provider: "auto", label: "Estandarizar 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional product photography, centered" } },
-    ],
-  },
+  // agent-desodorantes: removed in commit 3 — migrated to /pipelines/static-product.
+  // The "desodorantes" and "limpieza" inventory categories redirect there automatically.
 ];
 
 /* ------------------------------------------------------------------ */
@@ -653,6 +629,16 @@ export default function BatchPage() {
   const startAutoMode = useCallback(async (cat: InventoryCategory) => {
     if (isRunning || autoProcessing) return;
 
+    // If the category routes to a canonical pipeline (new style), redirect there.
+    // The pipeline page handles its own inventory load.
+    if (cat.pipeline) {
+      const qs = cat.pipelineParams
+        ? "?" + new URLSearchParams(cat.pipelineParams).toString()
+        : "";
+      window.location.assign(cat.pipeline + qs);
+      return;
+    }
+
     setLoadingCategory(cat.id);
     setAutoProcessing(cat.id);
     // Revoke any existing preview and result blob URLs before clearing the image list
@@ -665,9 +651,10 @@ export default function BatchPage() {
     setAutoBatchTotal(cat.imageCount);
     setOverallProgress(0);
 
-    // 1. Load the right pipeline preset
+    // 1. Load the right batch preset (legacy path — for categories not yet migrated to a pipeline)
     const preset = AGENT_PRESETS.find((p) => p.id === cat.agentPreset);
     if (!preset) {
+      toast.error(`No hay preset configurado para "${cat.name}".`);
       setAutoProcessing(null);
       setLoadingCategory(null);
       return;

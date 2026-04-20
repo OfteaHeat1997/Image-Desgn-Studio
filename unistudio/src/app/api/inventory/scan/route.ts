@@ -5,19 +5,32 @@ import path from "path";
 // =============================================================================
 // Inventory Scanner — GET /api/inventory/scan
 // Scans the local inventory folders and returns categories with image counts.
+//
+// Two routing modes per category:
+//   - `agentPreset` — legacy, loads a preset in /batch auto-mode
+//   - `pipeline` + `pipelineParams` — new, redirects the user to a canonical
+//     pipeline page (/pipelines/lingerie, /pipelines/static-product, etc.)
 // =============================================================================
 
-/** Inventory source directories — mapped to agent preset IDs */
-const INVENTORY_FOLDERS: {
+interface FolderConfig {
   id: string;
   name: string;
-  agentPreset: string;
+  /** Legacy routing — batch preset ID. Used when `pipeline` is not set. */
+  agentPreset?: string;
+  /** New routing — redirect URL to a canonical pipeline. Wins over agentPreset. */
+  pipeline?: string;
+  /** Query params to attach to the pipeline redirect (productType, brand, etc.). */
+  pipelineParams?: Record<string, string>;
   paths: string[];
-}[] = [
+}
+
+/** Inventory source directories — mapped to pipelines or batch presets */
+const INVENTORY_FOLDERS: FolderConfig[] = [
   {
     id: "colonias",
     name: "Colonias / Perfumes",
-    agentPreset: "agent-perfumes",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "perfume" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\catalogo colonias",
     ],
@@ -25,7 +38,8 @@ const INVENTORY_FOLDERS: {
   {
     id: "cremas",
     name: "Cremas / Skincare",
-    agentPreset: "agent-cremas",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "cream" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\catalogo  cremas",
     ],
@@ -33,6 +47,7 @@ const INVENTORY_FOLDERS: {
   {
     id: "accesorios",
     name: "Accesorios / Joyas",
+    // Commit 4 will redirect this to /pipelines/jewelry
     agentPreset: "agent-accesorios",
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Aretes",
@@ -45,6 +60,7 @@ const INVENTORY_FOLDERS: {
   {
     id: "lenceria",
     name: "Bras / Lenceria",
+    // Commit 7 will redirect this to /pipelines/lingerie (currently still uses batch preset)
     agentPreset: "agent-lenceria",
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\bra",
@@ -53,6 +69,7 @@ const INVENTORY_FOLDERS: {
   {
     id: "pantys",
     name: "Panties / Ropa Interior",
+    // Commit 7 will redirect this to /pipelines/lingerie with garmentType=panty
     agentPreset: "agent-pantys",
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Pantys",
@@ -61,7 +78,8 @@ const INVENTORY_FOLDERS: {
   {
     id: "desodorantes",
     name: "Desodorantes / Bloqueador",
-    agentPreset: "agent-desodorantes",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "deodorant" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\DESODORANTES_HD",
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\CATALOGO BLOQUEADOR",
@@ -70,7 +88,8 @@ const INVENTORY_FOLDERS: {
   {
     id: "limpieza",
     name: "Limpieza Facial",
-    agentPreset: "agent-desodorantes",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "facial" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\limpieza facial",
     ],
@@ -103,7 +122,12 @@ function scanFolder(dirPath: string): { files: string[]; count: number } {
 export interface InventoryCategory {
   id: string;
   name: string;
-  agentPreset: string;
+  /** Legacy — set for categories still using a /batch preset. */
+  agentPreset?: string;
+  /** New — URL to redirect the user to (a canonical pipeline). */
+  pipeline?: string;
+  /** Query params to attach to the pipeline redirect. */
+  pipelineParams?: Record<string, string>;
   imageCount: number;
   folders: string[];
 }
@@ -125,6 +149,8 @@ export async function GET() {
       id: folder.id,
       name: folder.name,
       agentPreset: folder.agentPreset,
+      pipeline: folder.pipeline,
+      pipelineParams: folder.pipelineParams,
       imageCount: totalCount,
       folders: allFolders,
     };

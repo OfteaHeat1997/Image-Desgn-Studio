@@ -3,8 +3,8 @@
 > Para: Unistyles (Curaçao) — **240 productos** (146 perfumes + 49 cremas + 28 desodorantes + 11 bloqueador + 6 facial + maquillaje futuro)
 
 **Última actualización:** 2026-04-20
-**Estado:** Por crear (commit 3 del ciclo actual)
-**Ruta API:** `/api/pipelines/static-product`
+**Estado:** Implementado (MVP) — commit 3 del ciclo. Matriz de fondo adaptativo en `src/lib/pipelines/static-product.ts`, página orquesta los módulos desde el cliente.
+**Ruta API:** No tiene ruta propia — la página llama a `/api/bg-remove`, `/api/enhance`, `/api/bg-generate`, `/api/shadows` directamente (mismo patrón que Lencería, permite per-step UI).
 **Página UI:** `/pipelines/static-product`
 
 ---

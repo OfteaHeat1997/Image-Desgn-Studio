@@ -1,5 +1,59 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Pipeline Estáticos created at /pipelines/static-product (commit 3 of pipeline rewrite)
+
+Second canonical pipeline is live. Replaces the 3 category-specific batch presets (`agent-perfumes`, `agent-cremas`, `agent-desodorantes`) with a single pipeline that picks an adaptive background based on product category + brand, mimicking how Sephora/La Mer/MAC present similar products instead of defaulting to generic white.
+
+### Created
+
+- `unistudio/src/lib/pipelines/static-product.ts` — pure-function adaptive background matrix:
+  - Types: `StaticProductType` (perfume / cream / sunscreen / deodorant / facial / makeup), `StaticBrand` (esika / yanbal / lbel / cyzone / avon / salome / other)
+  - `getAdaptiveBgConfig(productType, brand)` returns `{ prompt, shadowType, bgMode, label }` — no fetch, no side effects
+  - Matrix covers: perfume premium (Esika/Yanbal/L'Bel) → gradient con reflejo; perfume Cyzone → pastel juvenil; crema premium → mármol blanco; crema normal → beige spa; bloqueador → playa desenfocada; desodorante → gris neutro; facial → spa azul/blanco; maquillaje → negro mate dramático
+  - `STATIC_PRODUCT_ENHANCE_NORMALIZE` constant for canvas normalization (2000×2000 1:1)
+- `unistudio/src/app/pipelines/static-product/page.tsx` — new UI page:
+  - Upload zone (multi-file), product type + brand selector per job (default from URL params `?productType=...&brand=...` so redirects from inventory auto-mode work)
+  - 6 steps per image: upload → bg-remove → enhance (normalize) → bg-generate (adaptive prompt) → shadows → enhance (final)
+  - Per-image status pill, adaptive-look label preview, download link on done
+  - Soft-fails the normalize step if preset not registered (pipeline continues)
+
+### Deleted / replaced (same commit, per no-duplicate rule)
+
+- `unistudio/src/app/batch/page.tsx`:
+  - Removed preset `agent-perfumes` (was lines 186-195)
+  - Removed preset `agent-cremas` (was lines 197-207)
+  - Removed preset `agent-desodorantes` (was lines 241-249)
+- `unistudio/src/app/batch/page.tsx` — `startAutoMode` now checks `cat.pipeline` BEFORE `cat.agentPreset`; if set, redirects to the pipeline URL with query params. No-op → clear toast when preset missing (was silent).
+- `unistudio/src/app/batch/page.tsx` — `InventoryCategory` interface gained `pipeline?: string` and `pipelineParams?: Record<string, string>` fields.
+
+### Updated
+
+- `unistudio/src/app/api/inventory/scan/route.ts`:
+  - `FolderConfig` type has new `pipeline` + `pipelineParams` fields (optional)
+  - Categories `colonias`, `cremas`, `desodorantes`, `limpieza` now redirect to `/pipelines/static-product` with `productType=perfume|cream|deodorant|facial` query param instead of loading a batch preset
+  - `accesorios`, `lenceria`, `pantys` keep `agentPreset` for now (commits 4 and 7 handle them)
+  - `InventoryCategory` export type updated to match
+- `unistudio/src/components/editor/ModuleSidebar.tsx` — new sidebar entry `static-product-pipeline`; added to `STANDALONE_PAGES` map; footer quick-link for Pipeline Estáticos
+- `unistudio/src/app/page.tsx` — homepage card for Pipeline de Estáticos
+- `docs/pipelines/static-product.md` — status "Por crear" → "Implementado (MVP)"
+
+### Coverage
+
+After commit 3, **404 of 486 inventory products (83%) are served by canonical pipelines:**
+- Pipeline Lencería: 164 (bras + panties + shapewear)
+- Pipeline Estáticos: 240 (perfumes 146 + creams 49 + sunscreen 11 + personal care 28 + facial 6)
+
+Pending: 82 accessories/jewelry (commit 4 — Pipeline Joyería).
+
+### What's NOT in this commit (intentional)
+
+- **Claude Haiku integration** for the adaptive background decision — current matrix is hardcoded fallback only. Adding Haiku to refine the decision is a future iteration, not blocking.
+- **Per-step manual approve/skip UI** — the lingerie pipeline has it; static-product ships MVP "procesar todas" since bulk processing is the primary use case. Can be added later without breaking.
+- **Accesorios / lenceria / pantys inventory redirects** — still use `agentPreset`. Commit 4 handles accesorios → /pipelines/jewelry; commit 7 handles lenceria/pantys → /pipelines/lingerie.
+- **Folder auto-scanning from inside the static-product page** — user currently uploads manually; inventory auto-mode redirects from `/batch` into this page with category pre-selected. Full folder scan integration is commit 5.
+
+---
+
 ## 2026-04-20 — Pipeline Lencería moved to /pipelines/lingerie (commit 2 of pipeline rewrite)
 
 Migrated the working lingerie catalog flow from `/catalog-pipeline` to the canonical location `/pipelines/lingerie`. Deleted the dead server-side orchestrator at `/api/catalog-pipeline`. No functional regression — the page's local-state orchestration continues to work as it did; only the URL and branding changed.

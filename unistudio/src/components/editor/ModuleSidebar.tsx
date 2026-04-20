@@ -229,6 +229,16 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
         example: "Foto de bra Leonisa con modelo original → modelo nueva vistiendo el bra + video 360° de la prenda",
         useWhen: "Tenés fotos de bras, panties o shapewear con modelo original y necesitas copyright-free",
       },
+      {
+        id: "static-product-pipeline",
+        label: "Estáticos (Perfumes · Cremas · Skincare)",
+        icon: Package,
+        cost: "$0.004–$0.06/foto",
+        kind: "pipeline",
+        description: "Perfumes, cremas, bloqueador, desodorantes, limpieza facial, maquillaje. Fondo adaptativo por categoría y marca (no blanco siempre)",
+        example: "Perfume Esika → fondo gradient premium con reflejo · Desodorante → degradado gris neutro · Crema Yanbal → mármol blanco",
+        useWhen: "Tenés fotos de envase estático (perfume/crema/spray) y querés e-commerce con estética profesional tipo Sephora/La Mer/MAC",
+      },
     ],
   },
   {
@@ -358,6 +368,7 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
                     // Standalone pages — navigate instead of loading in editor
                     const STANDALONE_PAGES: Record<string, string> = {
                       "lingerie-pipeline": "/pipelines/lingerie",
+                      "static-product-pipeline": "/pipelines/static-product",
                     };
                     const standaloneHref = STANDALONE_PAGES[mod.id];
 
@@ -495,6 +506,14 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
         >
           <Package className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
           Pipeline Lencería
+        </a>
+        <a
+          href="/pipelines/static-product"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <Package className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+          Pipeline Estáticos
         </a>
       </div>
     </div>
