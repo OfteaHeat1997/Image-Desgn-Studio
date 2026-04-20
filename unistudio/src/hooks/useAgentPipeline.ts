@@ -135,12 +135,27 @@ async function executeStep(
         const resultUrl = await clientBgRemove(file);
         return { resultUrl, cost: 0, updatedCtx: { garmentUrl: resultUrl } };
       }
-      const dataUrl = await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
+      // Upload the source image via /api/upload first so we send an HTTP URL
+      // instead of a multi-megabyte base64 data URL in the JSON body. Vercel
+      // rejects request bodies > ~4.5MB with an HTML error page — the client
+      // then blows up with "Unexpected token 'A'..." when it tries to parse.
+      const inputFile = await urlToFile(ctx.currentUrl, "input.png");
+      const uploadForm = new FormData();
+      uploadForm.append("file", inputFile);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadForm });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) throw new Error(uploadData.error ?? "Failed to upload input for bg-remove");
+      // Prefer an HTTP URL (fal > replicate) — only fall back to the data URL
+      // if both uploads failed server-side. Replicate's own rembg works with
+      // either; the subject-removal path downloads the image anyway.
+      const httpInputUrl: string =
+        uploadData.data.falUrl ?? uploadData.data.replicateUrl ?? uploadData.data.url;
+
       const res = await fetch("/api/bg-remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: dataUrl,
+          imageUrl: httpInputUrl,
           provider,
           // Lingerie: input often has a model wearing the garment. We need to
           // isolate just the prenda so Kolors receives only the garment, not
