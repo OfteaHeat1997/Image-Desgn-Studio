@@ -192,27 +192,8 @@ const AGENT_PRESETS: PresetDef[] = [
   // agent-accesorios: removed in commit 4 — migrated to /pipelines/jewelry.
   // The inventory scan now splits jewelry into 5 sub-categories (aretes, collares,
   // pulseras, anillos, sets), each redirecting to /pipelines/jewelry with subType param.
-  {
-    id: "agent-lenceria",
-    name: "Lenceria (Producto Solo)",
-    description: "Quitar fondo del producto, mejorar, sombra, 1:1 blanco",
-    steps: [
-      { id: "a1", operation: "bg-remove", provider: "replicate", label: "Quitar Fondo" },
-      { id: "a2", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "product-clean" } },
-      { id: "a3", operation: "shadows", provider: "auto", label: "Sombra de Contacto", params: { type: "contact", blur: 20, opacity: 0.3, distance: 10, color: "#000000" } },
-      { id: "a4", operation: "outpaint", provider: "auto", label: "Fondo Blanco 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional lingerie product photography, centered, e-commerce" } },
-    ],
-  },
-  {
-    id: "agent-pantys",
-    name: "Panties / Ropa Interior",
-    description: "Ya tienen fondo blanco — solo mejorar, sombra, estandarizar 1:1",
-    steps: [
-      { id: "a1", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "product-clean" } },
-      { id: "a2", operation: "shadows", provider: "auto", label: "Sombra de Contacto", params: { type: "contact", blur: 18, opacity: 0.3, distance: 8, color: "#000000" } },
-      { id: "a3", operation: "outpaint", provider: "auto", label: "Estandarizar 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, centered product, professional e-commerce photography" } },
-    ],
-  },
+  // agent-lenceria, agent-pantys: removed in commit 5 — the "lenceria" and "pantys"
+  // inventory categories now redirect to /pipelines/lingerie with productType=bra|panty.
   // agent-desodorantes: removed in commit 3 — migrated to /pipelines/static-product.
   // The "desodorantes" and "limpieza" inventory categories redirect there automatically.
 ];

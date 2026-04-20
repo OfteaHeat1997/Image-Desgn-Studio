@@ -92,8 +92,8 @@ const INVENTORY_FOLDERS: FolderConfig[] = [
   {
     id: "lenceria",
     name: "Bras / Lenceria",
-    // Commit 7 will redirect this to /pipelines/lingerie (currently still uses batch preset)
-    agentPreset: "agent-lenceria",
+    pipeline: "/pipelines/lingerie",
+    pipelineParams: { productType: "bra" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\bra",
     ],
@@ -101,8 +101,8 @@ const INVENTORY_FOLDERS: FolderConfig[] = [
   {
     id: "pantys",
     name: "Panties / Ropa Interior",
-    // Commit 7 will redirect this to /pipelines/lingerie with garmentType=panty
-    agentPreset: "agent-pantys",
+    pipeline: "/pipelines/lingerie",
+    pipelineParams: { productType: "panty" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Pantys",
     ],

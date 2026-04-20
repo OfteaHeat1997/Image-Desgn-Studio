@@ -593,6 +593,15 @@ export default function LingeriePipelinePage() {
     return () => previewUrlsRef.current.forEach(URL.revokeObjectURL);
   }, []);
 
+  // Read URL params on mount — inventory auto-mode redirects with ?productType=bra|panty
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pt = params.get("productType");
+    if (pt && ["bra", "panty", "set", "faja"].includes(pt)) {
+      setProductType(pt);
+    }
+  }, []);
+
   /* ---- Setup: add images ---- */
   const handleFiles = useCallback((files: File[]) => {
     const newJobs: ImageJob[] = files.map((file) => {

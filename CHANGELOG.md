@@ -1,5 +1,56 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Inventory auto-routing + lingerie URL params (commit 5 of pipeline rewrite)
+
+Finishes the folder → pipeline auto-routing for the 2 remaining lingerie categories. Fixes a bug in `/pipelines/lingerie` that was silently ignoring the `?productType=` URL param — detected while preparing this commit. Deletes the last 2 batch presets (`agent-lenceria`, `agent-pantys`), which are now orphaned since their inventory categories redirect elsewhere.
+
+After this commit: **every category in the inventory scanner redirects to a canonical pipeline** (no category points at a batch preset anymore).
+
+### Bug fix
+
+- `unistudio/src/app/pipelines/lingerie/page.tsx` — added `useEffect` to read `?productType=` from URL on mount and seed the `productType` state. Accepts `bra`, `panty`, `set`, `faja`. Without this, the redirect from `/batch` auto-mode was landing on the page but the user still had to manually pick the product type.
+  - Root cause: the page was migrated from `/catalog-pipeline` as-is in commit 2, but that file never read URL params (it was accessed without them). Came to light when wiring the inventory redirects in this commit.
+
+### Updated
+
+- `unistudio/src/app/api/inventory/scan/route.ts`:
+  - `lenceria` category: replaced `agentPreset: "agent-lenceria"` with `pipeline: "/pipelines/lingerie"` + `pipelineParams: { productType: "bra" }`
+  - `pantys` category: replaced `agentPreset: "agent-pantys"` with `pipeline: "/pipelines/lingerie"` + `pipelineParams: { productType: "panty" }`
+
+### Deleted
+
+- `unistudio/src/app/batch/page.tsx`:
+  - Removed preset `agent-lenceria` (was lines 196-205 approx)
+  - Removed preset `agent-pantys` (was lines 207-215 approx)
+  - `AGENT_PRESETS` array is now empty — kept declared for defensive code elsewhere; commit 7 evaluates full removal.
+
+### Post-commit state of inventory scan
+
+| Category | Previously | Now |
+|---|---|---|
+| colonias | `agent-perfumes` (commit 3 redirected) | `/pipelines/static-product?productType=perfume` |
+| cremas | `agent-cremas` (commit 3) | `/pipelines/static-product?productType=cream` |
+| desodorantes | `agent-desodorantes` (commit 3) | `/pipelines/static-product?productType=deodorant` |
+| limpieza | `agent-desodorantes` (commit 3) | `/pipelines/static-product?productType=facial` |
+| aretes | `agent-accesorios` (commit 4) | `/pipelines/jewelry?subType=earrings` |
+| collares | `agent-accesorios` (commit 4) | `/pipelines/jewelry?subType=necklace` |
+| pulseras | `agent-accesorios` (commit 4) | `/pipelines/jewelry?subType=bracelet` |
+| anillos | `agent-accesorios` (commit 4) | `/pipelines/jewelry?subType=ring` |
+| sets | `agent-accesorios` (commit 4) | `/pipelines/jewelry?subType=set` |
+| **lenceria** | `agent-lenceria` | **`/pipelines/lingerie?productType=bra`** |
+| **pantys** | `agent-pantys` | **`/pipelines/lingerie?productType=panty`** |
+
+Total: **11/11 inventory categories (100%)** route to canonical pipelines. No remaining use of batch presets from inventory scan.
+
+### What's NOT in this commit
+
+- AI Agent `/agent` page still has `modelo` workflow card that overlaps with the Lingerie pipeline. Commit 6.
+- Historical comment `// proven copy from catalog-pipeline that works well` still lives in `api/ai-agent/plan/route.ts:280`. Commit 7.
+- `AGENT_PRESETS` empty-array declaration is still in `batch/page.tsx` with 2 dead references (line 380-381 `??` fallback and line 670 find). Commit 7 evaluates removal.
+- `/editor?agent=modelo` and `?agent=catalogo` dead links in homepage/nav. Commit 8.
+
+---
+
 ## 2026-04-20 — Pipeline Joyería created at /pipelines/jewelry (commit 4 of pipeline rewrite)
 
 Third (and last) canonical pipeline is live. Covers 82 jewelry products (aretes, cadenas, anillos, pulseras, topos, candongas, sets). Each piece gets a luxury display shot, an optional on-model shot with the piece on the correct body part (ears / neck / hand / wrist), and an optional 360° video.
