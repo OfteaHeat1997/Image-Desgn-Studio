@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -438,11 +439,8 @@ async function runStep(
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
   // - tryon's forced Kolors for lingerie
-  const lingerieTypes = ['bra', 'panty', 'set', 'shapewear', 'bodysuit', 'lingerie'];
-  const garmentTypeForApi =
-    productType === 'bra' || productType === 'panty' || productType === 'set' || productType === 'shapewear'
-      ? productType
-      : lingerieTypes.includes(productType) ? 'lingerie' : 'other';
+  // Centralized in src/lib/constants/garment-types.ts (commit S1).
+  const garmentTypeForApi = mapProductTypeToGarmentType(productType);
   const isLingerieFlow = garmentTypeForApi !== 'other';
 
   if (stepId === "isolate") {
@@ -774,12 +772,18 @@ export default function LingeriePipelinePage() {
           j.id !== jobId ? j : { ...j, totalCost: j.totalCost + result.cost }
         ));
 
-        // Manual mode: pause and wait for user action
+        // Manual mode: pause and wait for user action (10 min timeout to prevent memory leak)
         if (!autoMode && (stepDef.id !== "model" || !newSharedModel)) {
           await new Promise<void>((resolve) => {
+            const TIMEOUT_MS = 10 * 60 * 1000; // 10 min — si la usuaria cierra tab, no queda pendiente forever
+            let timeoutId: ReturnType<typeof setTimeout>;
+            const cleanup = () => {
+              window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+              clearTimeout(timeoutId);
+            };
             const handler = (event: CustomEvent<{ jobId: string; stepId: string; action: string }>) => {
               if (event.detail.jobId === jobId && event.detail.stepId === stepDef.id) {
-                window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+                cleanup();
                 if (event.detail.action === "skip") {
                   updateStep(jobId, stepDef.id, { status: "skipped" });
                 } else {
@@ -789,6 +793,11 @@ export default function LingeriePipelinePage() {
               }
             };
             window.addEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+            timeoutId = setTimeout(() => {
+              cleanup();
+              updateStep(jobId, stepDef.id, { status: "skipped" });
+              resolve();
+            }, TIMEOUT_MS);
           });
         } else {
           updateStep(jobId, stepDef.id, { status: "accepted" });
@@ -798,21 +807,31 @@ export default function LingeriePipelinePage() {
         updateStep(jobId, stepDef.id, { status: "error", error: errorMsg });
 
         if (!autoMode) {
-          // Wait for user to retry or skip
+          // Wait for user to retry or skip (10 min timeout)
           await new Promise<void>((resolve) => {
+            const TIMEOUT_MS = 10 * 60 * 1000;
+            let timeoutId: ReturnType<typeof setTimeout>;
+            const cleanup = () => {
+              window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+              clearTimeout(timeoutId);
+            };
             const handler = (event: CustomEvent<{ jobId: string; stepId: string; action: string }>) => {
               if (event.detail.jobId === jobId && event.detail.stepId === stepDef.id) {
-                window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+                cleanup();
                 if (event.detail.action === "skip") {
                   updateStep(jobId, stepDef.id, { status: "skipped" });
                   resolve();
                 } else if (event.detail.action === "rerun") {
-                  // Rerun is handled by re-triggering processJob from outside
                   resolve();
                 }
               }
             };
             window.addEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+            timeoutId = setTimeout(() => {
+              cleanup();
+              updateStep(jobId, stepDef.id, { status: "skipped" });
+              resolve();
+            }, TIMEOUT_MS);
           });
         } else {
           // Auto mode: skip errored step and continue
