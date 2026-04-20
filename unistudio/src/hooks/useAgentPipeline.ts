@@ -309,14 +309,18 @@ async function executeStep(
       const modelUrl = ctx.modelUrl;
       if (!modelUrl) throw new Error("No model image available for try-on. Run model-create first.");
 
-      // Upload garment image to get a public URL (Replicate needs HTTP URLs, not data URLs)
+      // Upload garment image to get a public URL. Kolors needs a URL that
+      // fal.ai can actually fetch (data URIs and private Replicate URLs don't
+      // work). /api/upload returns three variants — prefer falUrl (public on
+      // fal's CDN), then replicateUrl, then fall back to the data URL.
       const garmentFile = await urlToFile(garmentUrl, "garment.png");
       const uploadForm = new FormData();
       uploadForm.append("file", garmentFile);
       const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadForm });
       const uploadData = await uploadRes.json();
       if (!uploadData.success) throw new Error(uploadData.error ?? "Failed to upload garment image");
-      const garmentHttpUrl = uploadData.data.url;
+      const garmentHttpUrl: string =
+        uploadData.data.falUrl ?? uploadData.data.replicateUrl ?? uploadData.data.url;
 
       // Map category names to IDM-VTON format
       const categoryMap: Record<string, string> = {

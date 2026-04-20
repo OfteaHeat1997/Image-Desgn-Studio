@@ -253,8 +253,27 @@ async function autoSaveResult(
   filename: string,
 ) {
   try {
-    // Convert blob URLs to data URLs for the server
-    const sendableUrl = await blobUrlToDataUrl(imageUrl);
+    // If the URL is already http/https (most step results — Replicate, fal,
+    // our own upload CDN), send it as-is. No need to fetch the bytes and
+    // re-encode to a multi-megabyte data URL that blows past Vercel's 10MB
+    // request body limit (→ 413).
+    let sendableUrl: string;
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      sendableUrl = imageUrl;
+    } else {
+      // blob: / data: — re-encode to a JPEG data URL. If it's still too big,
+      // skip the save instead of hitting 413 for every step.
+      const encoded = await blobUrlToDataUrl(imageUrl);
+      // 9MB ceiling leaves slack under Vercel's 10MB body limit
+      if (encoded.length > 9 * 1024 * 1024) {
+        console.warn(
+          `[auto-save] Skipping save — payload ${(encoded.length / 1024 / 1024).toFixed(1)}MB over 9MB limit`,
+        );
+        return;
+      }
+      sendableUrl = encoded;
+    }
+
     await fetch("/api/save-result", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

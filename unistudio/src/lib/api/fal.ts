@@ -214,7 +214,17 @@ export async function runFal(
 // File upload — convert data URLs to fal.ai storage HTTP URLs
 // ---------------------------------------------------------------------------
 
-const FAL_STORAGE_URL = 'https://fal.ai/api/storage/upload/url';
+// Current fal.ai storage endpoint. The old /api/storage/upload/url on fal.ai
+// has been removed and now returns their marketing page, so any PUT there
+// fails with 404. The /storage/upload/initiate flow on rest.alpha.fal.ai is
+// the documented two-step process: (1) POST to initiate to get a signed
+// URL + the eventual public file URL, (2) PUT the bytes to the signed URL.
+const FAL_STORAGE_INITIATE_URL = 'https://rest.alpha.fal.ai/storage/upload/initiate';
+
+interface FalUploadInitiateResponse {
+  upload_url: string;
+  file_url: string;
+}
 
 /**
  * Upload a Buffer to fal.ai storage and return a public HTTP URL.
@@ -224,31 +234,50 @@ export async function uploadToFalStorage(
   contentType: string,
   fileName: string = 'upload.bin',
 ): Promise<string> {
-  const url = `${FAL_STORAGE_URL}?file_name=${encodeURIComponent(fileName)}&content_type=${encodeURIComponent(contentType)}`;
-
-  const response = await fetch(url, {
-    method: 'PUT',
+  // Step 1: initiate — exchange (file_name, content_type) for a signed upload
+  // URL and the final public file URL.
+  const initiateRes = await fetch(FAL_STORAGE_INITIATE_URL, {
+    method: 'POST',
     headers: {
       Authorization: `Key ${getApiKey()}`,
-      'Content-Type': contentType,
+      'Content-Type': 'application/json',
     },
-    body: new Uint8Array(buffer),
+    body: JSON.stringify({ content_type: contentType, file_name: fileName }),
   });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'unknown');
+  if (!initiateRes.ok) {
+    const text = await initiateRes.text().catch(() => 'unknown');
     throw new FalApiError(
-      `fal.ai storage upload failed (${response.status}): ${text}`,
+      `fal.ai storage initiate failed (${initiateRes.status}): ${text.slice(0, 200)}`,
       'UPLOAD_FAILED',
     );
   }
 
-  const data = await response.json();
-  const resultUrl = data.url ?? data.file_url ?? data.access_url;
-  if (!resultUrl) {
-    throw new FalApiError('fal.ai storage upload returned no URL', 'UPLOAD_FAILED');
+  const initiate = (await initiateRes.json()) as FalUploadInitiateResponse;
+  if (!initiate.upload_url || !initiate.file_url) {
+    throw new FalApiError(
+      `fal.ai storage initiate returned unexpected shape: ${JSON.stringify(initiate).slice(0, 200)}`,
+      'UPLOAD_FAILED',
+    );
   }
-  return resultUrl;
+
+  // Step 2: PUT the bytes to the signed URL (no auth header — the URL is
+  // pre-signed and adding Authorization would break it).
+  const uploadRes = await fetch(initiate.upload_url, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: new Uint8Array(buffer),
+  });
+
+  if (!uploadRes.ok) {
+    const text = await uploadRes.text().catch(() => 'unknown');
+    throw new FalApiError(
+      `fal.ai storage PUT failed (${uploadRes.status}): ${text.slice(0, 200)}`,
+      'UPLOAD_FAILED',
+    );
+  }
+
+  return initiate.file_url;
 }
 
 /**
