@@ -341,8 +341,14 @@ export async function POST(request: NextRequest) {
     // in a neutral minimal base so the subsequent try-on has a clean canvas.
     // Without this, the default prompt adds "casual outfit" and Kolors ends up
     // layering the user's garment on top of a blazer/pants, producing garbage.
+    //
+    // IMPORTANT: this string is inserted into the prompt WITHOUT a leading
+    // "wearing" (buildModelPrompt adds that). Avoid trigger words like "nude",
+    // "minimal base layer", "seamless", etc. — ByteDance's partner content
+    // checker (used by SeedDream on fal.ai) flags them even when the actual
+    // SFW safety checker is disabled.
     const promptClothing = (garmentImage || isLingerie)
-      ? 'wearing a plain nude seamless fitted tank top and plain nude shorts, minimal base layer, no logos, no patterns, neutral canvas ready for virtual try-on'
+      ? 'a simple beige athletic crop top and matching beige athletic shorts, plain activewear, solid color, suitable base for virtual try-on'
       : clothing;
 
     // Build the prompt
@@ -371,14 +377,37 @@ export async function POST(request: NextRequest) {
     if (isLingerie) {
       const effectiveSeed = typeof seed === 'number' ? seed : Math.floor(Math.random() * 999999);
       console.log(`[model-create] Lingerie detected — using SeedDream (seed=${effectiveSeed})`);
-      const falResult = await runFal('fal-ai/bytedance/seedream/v4.5/text-to-image', {
-        prompt,
-        image_size: 'portrait_4_3',
-        enable_safety_checker: false,
-        seed: effectiveSeed,
-        num_images: 1,
-      });
-      baseModelUrl = falResult.images[0].url;
+      try {
+        const falResult = await runFal('fal-ai/bytedance/seedream/v4.5/text-to-image', {
+          prompt,
+          image_size: 'portrait_4_3',
+          enable_safety_checker: false,
+          seed: effectiveSeed,
+          num_images: 1,
+        });
+        baseModelUrl = falResult.images[0].url;
+      } catch (firstErr) {
+        const errMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+        // ByteDance's partner content checker ignores enable_safety_checker and
+        // flags words like "nude", "seamless", "base layer", etc. Retry with a
+        // minimal neutral prompt that describes only the model + activewear.
+        if (errMsg.includes('content_policy_violation') || errMsg.includes('partner_validation_failed') || errMsg.includes('flagged')) {
+          console.warn('[model-create] SeedDream content checker fired — retrying with safer prompt');
+          const genderWord = gender === 'female' ? 'woman' : gender === 'male' ? 'man' : 'person';
+          const safePrompt = `E-commerce catalog photo of a ${genderWord} wearing a simple beige athletic crop top and matching shorts, standing facing the camera, clean white studio background, professional fashion photography, full body visible.`;
+          const falResult = await runFal('fal-ai/bytedance/seedream/v4.5/text-to-image', {
+            prompt: safePrompt,
+            image_size: 'portrait_4_3',
+            enable_safety_checker: false,
+            seed: effectiveSeed,
+            num_images: 1,
+          });
+          baseModelUrl = falResult.images[0].url;
+          usedPrompt = safePrompt;
+        } else {
+          throw firstErr;
+        }
+      }
     } else {
       try {
         const output = await runModel('black-forest-labs/flux-kontext-pro', {
