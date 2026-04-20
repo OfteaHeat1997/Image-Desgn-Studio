@@ -36,19 +36,23 @@ const ISOLATE_COST = 0.01;
 function garmentTypeToPrompt(garmentType: string | null): string {
   switch (garmentType) {
     case 'bra':
+      // Grounding DINO responds better to a richer vocabulary — catches
+      // soft bras, sports bras, wireless, bralettes, and nude/skin-tone
+      // pieces that the single word "bra" sometimes misses.
+      return 'bra,bralette,sports bra,wireless bra,soft bra,lingerie top,chest garment';
     case 'lingerie':
     case 'bodysuit':
-      return 'bra,bralette,lingerie top';
+      return 'bra,bralette,lingerie top,bodysuit,one-piece lingerie';
     case 'panty':
-      return 'panty,underwear bottom';
+      return 'panty,underwear bottom,briefs,thong,bikini bottom';
     case 'set':
-      return 'lingerie set,bra,panty';
+      return 'lingerie set,bra and panty,bra,panty';
     case 'swimwear':
-      return 'swimsuit,bikini';
+      return 'swimsuit,bikini,swim top,swim bottom';
     case 'shapewear':
-      return 'shapewear,bodysuit';
+      return 'shapewear,bodysuit,compression garment';
     default:
-      return 'garment,clothing';
+      return 'garment,clothing,product';
   }
 }
 
