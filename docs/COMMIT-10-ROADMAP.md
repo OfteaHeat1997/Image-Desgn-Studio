@@ -286,6 +286,109 @@ Prioridad absoluta al arrancar: leer este doc entero + ejecutar los comandos de 
 
 ---
 
+# 🔬 RESEARCH — Proyectos similares + patrones a adoptar
+
+La usuaria pidió deep analysis de otros proyectos AI automation similares. Resumen de lo que existe + patrones para adoptar:
+
+## Competidores comerciales (ya compilados en commit 9 competitive analysis)
+
+| Herramienta | Patrón clave aprovechable para UniStudio |
+|---|---|
+| **Photoroom** ($15-30/mo) | Mobile-first + "preview antes de aplicar" en cada paso — copiar UX de "show-what-will-happen" |
+| **Pebblely** ($29/mo) | Librería curada de "escenas" con preview visual — reemplazar matriz hardcoded por UI de "elegir escena" |
+| **Claid.ai** ($24/mo) | API-first con webhooks para progreso — permite integrar con Shopify sin frontend |
+| **Flair.ai** ($30-99/mo) | "AI brief" — user escribe "quiero perfume con vibe playa" y AI arma prompt. LLM pasa el brief a un composer |
+| **Booth.ai** ($50+/mo) | Template saving + batch consistency "mi look Yanbal" |
+| **FASHN.ai v1.6** | Arquitectura de try-on — separar MODEL layer de GARMENT layer (ya hacemos con isolate + tryon) |
+| **Draft** (jewelry-specific) | Macro close-ups automáticos + variantes de material (oro/plata/acero). Pattern crítico para joyería |
+| **CreatorKit** | Export bundle multi-format (1:1 + 4:5 + 9:16 en 1 click) |
+
+## Proyectos open-source relevantes (patrones arquitecturales)
+
+### 1. **ComfyUI** (github.com/comfyanonymous/ComfyUI) — el referente de node-based
+**Patrón:** canvas visual donde cada node es un paso (bg-remove, upscale, model-create), conectás outputs→inputs, preview por node. El usuario no-técnico VE el flujo.
+**Aplicar a UniStudio:** el editor/plan view de lencería (STEP_DEFS) + panel de pasos podría ser un canvas tipo React Flow. La usuaria ya dijo que quiere ver cada paso. **Refactor target:** usar `@xyflow/react` (está declarado en package.json pero se borró en commit 1143bab — reinstalarlo si se adopta este patrón).
+
+### 2. **InvokeAI** (github.com/invoke-ai/InvokeAI) — pattern gallery + workflows
+**Patrón:** galería como first-class citizen, cada imagen tiene "metadata sticky" (el pipeline que la produjo, params), se puede "re-run" desde la galería.
+**Aplicar:** `/gallery` debería mostrar el pipeline + params de cada resultado, con botón "Generar otra con mismos ajustes".
+
+### 3. **Diffusers Web UI / Automatic1111** — "Send to..." pattern
+**Patrón:** Result → "Send to inpaint" / "Send to img2img". User itera sin re-upload.
+**Aplicar:** en cada resultado de los pipelines, botón "Usar como input" que manda la imagen al módulo de inpaint/enhance/etc. sin re-subir.
+
+### 4. **Luma AI / Kling** — video progressive preview
+**Patrón:** mientras el video renderiza, muestran low-res preview actualizando, y el resultado HD viene al final.
+**Aplicar:** pedir a fal/Replicate formato de preview incremental, o simular con placeholder animado durante los 30s que tarda.
+
+### 5. **n8n / Zapier / Make.com** — workflow automation pattern
+**Patrón:** cada step es un "trigger" + "action" con error branches (qué pasa si falla). Visualmente claro.
+**Aplicar:** en los pipelines, mostrar qué hace cada step si falla (skip, retry, abort) como decisión visible al usuario.
+
+## Repositorios específicos de AI product photography
+
+1. **lllyasviel/Fooocus** — UX simplificada sobre SD, "AI decides the rest". Inspiración para el AI Agent router del commit 7.
+2. **bmaltais/kohya_ss** — training pipelines con checkpoints visibles. Pattern: "save intermediate artifacts".
+3. **Mikubill/sd-webui-controlnet** — pose/edge/depth conditioning. Relevante si querés agregar "mantener la pose de la foto original" en try-on.
+
+## Arquitectura de referencia (los mejores hacen esto)
+
+Pattern común a todos los SaaS exitosos:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. INPUT LAYER                                              │
+│    Upload + categorization (auto or manual)                 │
+│    → inventory auto-scan (UniStudio YA hace esto)           │
+├─────────────────────────────────────────────────────────────┤
+│ 2. PLANNING LAYER                                           │
+│    AI decides the pipeline based on input + brief           │
+│    Shows PREVIEW of steps before executing                  │
+│    User can edit/skip steps (manual mode)                   │
+│    → UniStudio lo tiene en lingerie, falta en static+jewelry│
+├─────────────────────────────────────────────────────────────┤
+│ 3. EXECUTION LAYER                                          │
+│    Steps run with live preview per step                     │
+│    Each step result is a checkpoint (can retry from there)  │
+│    Cost tracked per step + accumulated                      │
+│    → UniStudio lo tiene en lingerie, falta en static+jewelry│
+├─────────────────────────────────────────────────────────────┤
+│ 4. POST-PROCESSING LAYER                                    │
+│    Multi-format export (1:1 + 4:5 + 9:16 + 16:9)            │
+│    Brand Kit auto-apply (logo + watermark)                  │
+│    Compliance check (Amazon, Shopify, Meta)                 │
+│    → Los tres módulos EXISTEN pero no están wired a los     │
+│      pipelines. Commit 12+ target.                          │
+├─────────────────────────────────────────────────────────────┤
+│ 5. GALLERY/PERSISTENCE LAYER                                │
+│    Metadata sticky (pipeline + params + cost + timestamp)   │
+│    Re-run from gallery                                      │
+│    Analytics (which look performs best)                     │
+│    → UniStudio gallery-store tier-2 IDB OK (commit 9).      │
+│      Falta metadata sticky + re-run.                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-processing), 5 (re-run desde gallery).
+
+## Recomendaciones priorizadas (después de arreglar el bug de aislar)
+
+1. **Adoptar el pattern ComfyUI a nivel UX** (no código) — mostrar el pipeline como cadena visible con nodes clickeables. Puede ser un `<StepGraph>` simple sin react-flow, inspirado en el concepto. **Esfuerzo: 3-4h**.
+2. **Multi-format export bundle** (commit F2 del competitive analysis) — 1 solo extra paso al final que llama outpaint 3 veces. **2-3h**.
+3. **Brand Kit auto-apply** (commit F7) — agregar watermark/logo como último paso opcional en los 3 pipelines. El módulo BrandKit ya existe. **3h**.
+4. **"Send to..." pattern** — botón "Usar como input en otro pipeline" en cada resultado. **2h**.
+5. **Gallery metadata sticky + re-run** — guardar pipeline + params + inputs en ProcessingJob, botón "Generar otra igual". **3-4h**.
+
+## Fuentes útiles (para deep research en próxima sesión)
+
+- https://github.com/comfyanonymous/ComfyUI/wiki (workflows documentados)
+- https://huggingface.co/spaces?category=image-to-image (space gallery — ver qué hace cada uno)
+- Reddit r/StableDiffusion — best practices comunitarias
+- https://fal.ai/models (actualizar lista de providers cada 3 meses — modelos nuevos salen seguido)
+- Paper: "Realistic E-commerce Product Photography via Controllable Diffusion" (2024) — pattern de scene composition
+
+---
+
 # 🔴 BUG REPORT URGENTE — Aislar Producto falla en producción (2026-04-21, screenshot enviado)
 
 La usuaria reportó con screenshot (`/mnt/c/Users/maria/Downloads/Screenshot 2026-04-21 004944.png`) que en `/pipelines/lingerie` el paso 1 "Aislar Producto" devuelve Error sin imagen. Los demás pasos quedan pendientes.
