@@ -10,10 +10,14 @@ import {
   removeBgWithoutBg,
 } from '@/lib/processing/bg-remove';
 import { isWithoutBgHealthy } from '@/lib/api/withoutbg';
+import {
+  runModel,
+  extractOutputUrl,
+  ensureHttpUrl,
+} from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
-import { proxyReplicateUrl } from '@/lib/utils/image';
-import { CLAUDE_HAIKU } from '@/lib/utils/constants';
+import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
   replicate: 0.01,
@@ -21,162 +25,134 @@ const PROVIDER_COSTS: Record<string, number> = {
   withoutbg: 0,
 };
 
-// Cost of the garment isolation path (Claude Vision bbox + rembg)
-const ISOLATE_COST = 0.012;
-
-interface BBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+// Cost of the garment isolation path (grounded_sam + local compositing)
+const ISOLATE_COST = 0.01;
 
 /**
- * Ask Claude Vision for the bounding box of the product garment in pixels.
- * Uses e-commerce-friendly framing so the request isn't flagged as sensitive.
- * Falls back to the centered 60% of the image if Claude is unavailable.
+ * Map our internal garmentType values to the exact text prompt that
+ * grounded_sam (Grounding DINO under the hood) responds to best.
  */
-async function getGarmentBbox(
-  base64: string,
-  mimeType: string,
-  garmentType: string | null,
-  width: number,
-  height: number,
-): Promise<BBox> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-  if (!apiKey) {
-    return {
-      x: Math.round(width * 0.2),
-      y: Math.round(height * 0.2),
-      width: Math.round(width * 0.6),
-      height: Math.round(height * 0.6),
-    };
-  }
-
-  const productWord =
-    garmentType && garmentType !== 'other' ? garmentType : 'product';
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: CLAUDE_HAIKU,
-        max_tokens: 256,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mimeType, data: base64 },
-              },
-              {
-                type: 'text',
-                text:
-                  `This is an e-commerce catalog photo (${width} wide x ${height} tall pixels). ` +
-                  `I need the TIGHT pixel bounding box of JUST the ${productWord} garment itself (cups, band, straps). ` +
-                  `DO NOT include the person's head, neck, shoulders, arms, torso skin, or waist — only the fabric of the ${productWord}. ` +
-                  `Return ONLY valid JSON: {"x": number, "y": number, "width": number, "height": number}. ` +
-                  `Coordinates are in pixels, origin top-left. x+width must be <= ${width}, y+height must be <= ${height}. ` +
-                  `Be as tight as possible around the garment fabric only.`,
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) throw new Error(`vision ${res.status}`);
-    const data = await res.json();
-    const text: string | undefined = data.content?.[0]?.text;
-    const match = text?.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('no json');
-    const parsed = JSON.parse(match[0]) as Partial<BBox>;
-    const x = Math.max(0, Math.round(parsed.x ?? 0));
-    const y = Math.max(0, Math.round(parsed.y ?? 0));
-    const w = Math.min(width - x, Math.round(parsed.width ?? width));
-    const h = Math.min(height - y, Math.round(parsed.height ?? height));
-    if (w < 10 || h < 10) throw new Error('degenerate bbox');
-    return { x, y, width: w, height: h };
-  } catch (err) {
-    console.warn('[bg-remove:isolate] bbox vision failed, using center crop:', err);
-    return {
-      x: Math.round(width * 0.2),
-      y: Math.round(height * 0.2),
-      width: Math.round(width * 0.6),
-      height: Math.round(height * 0.6),
-    };
+function garmentTypeToPrompt(garmentType: string | null): string {
+  switch (garmentType) {
+    case 'bra':
+    case 'lingerie':
+    case 'bodysuit':
+      return 'bra,bralette,lingerie top';
+    case 'panty':
+      return 'panty,underwear bottom';
+    case 'set':
+      return 'lingerie set,bra,panty';
+    case 'swimwear':
+      return 'swimsuit,bikini';
+    case 'shapewear':
+      return 'shapewear,bodysuit';
+    default:
+      return 'garment,clothing';
   }
 }
 
 /**
  * Isolate a garment from a photo that may contain a model/person.
- * Replicate's Flux Kontext Pro has non-disableable content moderation that
- * rejects lingerie (E005), so we avoid it entirely: Claude Vision gives us a
- * bbox around the product, Sharp crops to that region, then standard rembg
- * strips the remaining background. No moderated endpoints touched.
+ *
+ * Why not Kontext Pro or rembg?
+ *   - Flux Kontext Pro (Replicate) rejects lingerie with error E005 — content
+ *     moderation cannot be disabled.
+ *   - Standard rembg keeps the PERSON as the foreground and removes the
+ *     background, so the model's body stays in the output and only the scene
+ *     disappears. We want the exact opposite.
+ *
+ * What we do instead:
+ *   1. schananas/grounded_sam — Grounding DINO finds the garment by text
+ *      prompt ("bra", "panty", etc.), SAM returns a pixel-perfect mask.
+ *   2. Sharp applies that mask to the original image via dest-in compositing,
+ *      producing a transparent PNG with ONLY the garment pixels visible.
+ * No content-moderated endpoints involved. Cost ~$0.01 per run.
  */
 async function isolateGarment(
   imageUrl: string,
   garmentType: string | null,
 ): Promise<string> {
-  // Load the image as a buffer
+  // Load the image as a buffer so we can both ship it to the segmentation
+  // model (needs an HTTP URL) and keep the pixel data locally for masking.
   let inputBuffer: Buffer;
-  let mimeType = 'image/jpeg';
   if (imageUrl.startsWith('data:')) {
     const m = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (!m) throw new Error('Invalid data URI');
-    mimeType = m[1];
     inputBuffer = Buffer.from(m[2], 'base64');
   } else {
     const res = await fetch(imageUrl);
     if (!res.ok) throw new Error(`fetch input ${res.status}`);
-    mimeType = res.headers.get('content-type') || 'image/jpeg';
     inputBuffer = Buffer.from(await res.arrayBuffer());
   }
 
-  // Re-encode to JPEG at a sane size so Vision + rembg are fast and stable
+  // Normalize the input: rotate via EXIF, cap at 1600px, re-encode as PNG so
+  // the mask aligns pixel-for-pixel with what we send to the model.
   const prepared = await sharp(inputBuffer)
     .rotate()
     .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 88 })
+    .png()
     .toBuffer();
   const meta = await sharp(prepared).metadata();
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
   if (!width || !height) throw new Error('Could not read image dimensions');
 
-  // 1) bbox around the garment (Vision, or fallback to center crop)
-  const base64 = prepared.toString('base64');
-  const bbox = await getGarmentBbox(base64, 'image/jpeg', garmentType, width, height);
-  console.log(
-    `[bg-remove:isolate] image=${width}x${height} bbox=${bbox.x},${bbox.y},${bbox.width}x${bbox.height} garmentType=${garmentType}`,
+  const maskPrompt = garmentTypeToPrompt(garmentType);
+  console.log(`[bg-remove:isolate] running grounded_sam prompt="${maskPrompt}" size=${width}x${height}`);
+
+  // Upload the prepared PNG so Replicate can fetch it by URL
+  const preparedDataUrl = `data:image/png;base64,${prepared.toString('base64')}`;
+  const httpInput = await ensureHttpUrl(preparedDataUrl);
+
+  // schananas/grounded_sam returns [annotated, neg_annotated, mask, inverted_mask].
+  // Index 2 is the clean B/W mask (white = garment, black = everything else).
+  const output = await runModel(
+    'schananas/grounded_sam:ee871c19efb1941f55f66a3d7d960428c8a5afcb77449547fe8e5a3ab9ebc21c',
+    {
+      image: httpInput,
+      mask_prompt: maskPrompt,
+      negative_mask_prompt: 'skin,body,face,hair,arm,shoulder,neck,torso,background',
+      adjustment_factor: 0,
+    },
   );
 
-  // 2) crop with ~3% padding. Tight padding matters: the bigger the padding,
-  //    the more body/skin rembg will retain as "foreground".
-  const padX = Math.round(bbox.width * 0.03);
-  const padY = Math.round(bbox.height * 0.03);
-  const left = Math.max(0, bbox.x - padX);
-  const top = Math.max(0, bbox.y - padY);
-  const cropW = Math.min(width - left, bbox.width + 2 * padX);
-  const cropH = Math.min(height - top, bbox.height + 2 * padY);
-  const croppedBuffer = await sharp(prepared)
-    .extract({ left, top, width: cropW, height: cropH })
+  // Output can be an iterator, array, or list of urls — handle all shapes.
+  const outArr: string[] = Array.isArray(output)
+    ? output.map((o) => (typeof o === 'string' ? o : (o?.url?.() ?? o?.href ?? ''))).filter(Boolean)
+    : [await extractOutputUrl(output)];
+  if (outArr.length < 3) {
+    throw new Error(`grounded_sam returned unexpected output (${outArr.length} items)`);
+  }
+  const maskUrl = outArr[2];
+  console.log(`[bg-remove:isolate] mask url=${maskUrl.slice(0, 80)}`);
+
+  // Download the mask
+  const maskResp = await fetch(maskUrl, { headers: replicateHeaders(maskUrl) });
+  if (!maskResp.ok) throw new Error(`mask download ${maskResp.status}`);
+  const maskBuffer = Buffer.from(await maskResp.arrayBuffer());
+
+  // The mask comes back at the model's processing resolution — resize it to
+  // match our prepared image before compositing.
+  const resizedMask = await sharp(maskBuffer)
+    .resize(width, height, { fit: 'fill' })
+    .grayscale()
+    .toColorspace('b-w')
     .png()
     .toBuffer();
-  console.log(
-    `[bg-remove:isolate] cropped to ${cropW}x${cropH} (${(croppedBuffer.length / 1024).toFixed(0)} KB)`,
-  );
 
-  // 3) rembg (no content moderation) strips the remaining bg → PNG cutout
-  const cropDataUrl = `data:image/png;base64,${croppedBuffer.toString('base64')}`;
-  return await removeBgReplicate(cropDataUrl);
+  // Compose: prepared RGB + mask as alpha → PNG with only the garment visible.
+  const isolated = await sharp(prepared)
+    .ensureAlpha()
+    .joinChannel(await sharp(resizedMask).raw().toBuffer(), {
+      raw: { width, height, channels: 1 },
+    })
+    .png()
+    .toBuffer();
+
+  // Return as data URL — Kolors etc. will re-upload it to fal storage as HTTP.
+  const dataUrl = `data:image/png;base64,${isolated.toString('base64')}`;
+  console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB)`);
+  return dataUrl;
 }
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
@@ -204,14 +180,14 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
     await saveJob({
       operation: 'bg-remove',
-      provider: 'kontext-isolate',
+      provider: 'grounded-sam-isolate',
       inputParams: { imageUrl, removeSubject: true, garmentType },
       outputUrl: resultUrl,
       cost: ISOLATE_COST,
     });
     return NextResponse.json({
       success: true,
-      data: { url: proxyReplicateUrl(resultUrl), provider: 'kontext-isolate' },
+      data: { url: proxyReplicateUrl(resultUrl), provider: 'grounded-sam-isolate' },
       cost: ISOLATE_COST,
     });
   }

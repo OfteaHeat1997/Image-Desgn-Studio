@@ -194,7 +194,53 @@ const MODULE_ICONS: Record<string, string> = {
   "ad-create": "📱",
   infographic: "📋",
   "ghost-mannequin": "👻",
+  "analyze-image": "🔎",
 };
+
+/**
+ * User-friendly one-line explanations for each module, shown in the UI during
+ * execution so users (who aren't devs) understand what's happening and why.
+ * For lingerie specifically we use distinct copy for bg-remove vs. tryon.
+ */
+function getStepExplanation(module: string, params: Record<string, unknown>): string {
+  const removeSubject = !!params.removeSubject;
+  switch (module) {
+    case "bg-remove":
+      return removeSubject
+        ? "Separamos tu prenda de la modelo original — queda solo el producto sobre fondo transparente."
+        : "Quitamos el fondo para aislar el producto sobre transparencia.";
+    case "bg-generate":
+      return "Generamos un fondo nuevo con IA para el escenario que pediste.";
+    case "enhance":
+      return "Ajustamos brillo, contraste y nitidez para un acabado profesional.";
+    case "shadows":
+      return "Agregamos una sombra realista para que el producto no parezca flotar.";
+    case "outpaint":
+      return "Extendemos la imagen al formato que necesita la plataforma (Instagram, Amazon, etc.).";
+    case "upscale":
+      return "Subimos la resolución para impresión o uso en pantallas grandes.";
+    case "model-create":
+      return "Creamos una modelo IA nueva con ropa base neutral — en el siguiente paso le pondremos tu prenda.";
+    case "tryon":
+      return "Ponemos TU prenda sobre la modelo IA que acabamos de crear.";
+    case "jewelry-tryon":
+      return "Colocamos la joyería sobre la modelo (aretes, collar, anillo, etc.).";
+    case "inpaint":
+      return "Borramos o reemplazamos una parte específica de la imagen.";
+    case "video":
+      return "Convertimos la imagen en un video corto para redes sociales.";
+    case "ad-create":
+      return "Damos formato de anuncio al resultado final (IG Reel, TikTok, etc.).";
+    case "infographic":
+      return "Armamos la infografía con texto estilo catálogo.";
+    case "ghost-mannequin":
+      return "Quitamos el maniquí manteniendo la forma 3D de la prenda.";
+    case "analyze-image":
+      return "Analizamos la foto para detectar color, material y si hay una modelo dentro.";
+    default:
+      return "Procesando paso.";
+  }
+}
 
 /** Modules available for "add step" in plan editor */
 const ADDABLE_MODULES: { module: AgentModule; label: string; cost: number }[] = [
@@ -1354,6 +1400,11 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                     <span className="text-[10px] text-emerald-400/60 shrink-0">Gratis</span>
                   )}
                 </div>
+
+                {/* User-friendly explanation so non-devs understand each step */}
+                <p className="px-2 pb-1 text-[10px] leading-snug text-gray-500">
+                  {getStepExplanation(step.module, step.params)}
+                </p>
 
                 {/* BEFORE/AFTER PREVIEW — side by side comparison */}
                 {isCompleted && stepExec.resultUrl && (
