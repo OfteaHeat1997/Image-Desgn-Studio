@@ -23,6 +23,24 @@
     },
     "src/app/api/batch/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/bg-remove/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/inpaint/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/outpaint/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/bg-generate/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/jewelry-tryon/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/analyze-image/route.ts": {
+      "maxDuration": 120
     }
   }
 }
