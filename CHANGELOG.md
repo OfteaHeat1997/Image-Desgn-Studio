@@ -1,5 +1,67 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Lingerie Pipeline Overhaul (18 commits)
+
+Intense day: fought through the full lingerie flow from broken (Flux Kontext E005 moderation) to working (grounded_sam + SeedDream + Kolors), then shipped the first round of UX features on top.
+
+### AI Agent — Lingerie Pipeline Rewrite
+
+| Commit | Change |
+|---|---|
+| `28c7e22` | Modelo generada tenía blazer+pantalón por default — cambiado a ropa base neutral para lingerie |
+| `a664c09` | Phase A: add `removeSubject` flag + seed sharing between catalog angles + force kolors for lingerie |
+| `0ce2e49` | `/api/bg-remove` 500 — Kontext rejected data URIs, added `ensureHttpUrl` |
+| `68f25ff` | **Big switch**: Flux Kontext Pro rejected lingerie with E005 content policy (non-disableable). Replaced garment isolation with `schananas/grounded_sam` segmentation + Claude Vision fallback + Sharp composite. No moderated endpoints involved. |
+| `3f99643` | save-result 413 fixed + better mask selection (purity heuristic) |
+| `0741f5e` | fal.ai storage URL obsoleta (`fal.ai/api/storage/upload/url` → returned HTML 404). Migrated to `rest.alpha.fal.ai/storage/upload/initiate` (2-step signed URL flow). Also routed tryon to receive falUrl instead of data URI. |
+| `a813444` | Wider mask coverage range (0.5%–75%) for close-up bra crops + `garmentType` forwarded to tryon so Kolors is guaranteed for lingerie |
+| `73a47a5` | `useAgentPipeline` uploads input via `/api/upload` instead of posting a base64 data URL — Vercel was returning HTML error pages when bodies exceeded ~4.5MB |
+| `c82b4bd` | Purity-based mask selector (≥0.9 pure B/W) to reject the grounded_sam annotated-overlay image that was passing the old coverage heuristic |
+| `d51c7b9` | **Bra vs panty differentiation**: dedicated labels ("Aislar brasier" / "Aislar panty"), different grounded_sam vocabulary per type, kolors category routing (`tops` for bra, `bottoms` for panty, `one-pieces` for set). Driven by `imageAnalysis.garmentType`. |
+| `d51c7b9` | Modelo IA base = simple beige swim top + swim briefs (safer than "bikini" / "nude" which ByteDance's partner filter blocks) |
+| `77a8972` | Lingerie pipeline now ends with a 3-second 9:16 video of the AI model wearing the garment (kenburns gratis / wan-2.2-fast $0.05 on premium) |
+| `77a8972` | `saveAiModel` records real provider (fal/SeedDream vs replicate/Flux) + seed in metadata so the same face can be regenerated later |
+| `212690b` | Expanded grounded_sam vocabulary per garment type — added bralette / sports bra / wireless / soft bra / briefs / thong / bikini bottom to catch Grounding DINO's blind spots |
+
+### UX & Infrastructure
+
+| Commit | Change |
+|---|---|
+| `20d862c` | Canvas central auto-updates with each completed step instead of waiting until the pipeline finishes |
+| `8fce1bd` | Per-step user-friendly Spanish explanation rendered under each step label (`getStepExplanation()`) |
+| `06916a3` | `ImageCompare` stopped hanging on "Cargando preview..." when one side fails to load — tracks errored state per side |
+| `d51c7b9` | "← Volver al inicio" button visible during execution/results to reset the pipeline at any time |
+| `d51c7b9` | `autoSaveResult` no longer skips large payloads — uploads blob/data to fal storage first, then saves the resulting URL |
+| `ec78b76` | `.vercelignore` to keep `vercel --prod` under the 10MB upload cap (60+ `.claude/worktrees/` were being bundled) |
+| `a5c07de` | Raised per-route `maxDuration` for bg-remove (300s), bg-generate/inpaint/outpaint (120s), analyze-image (120s), jewelry-tryon (300s) |
+| `c02355d` | Shrank bg-remove runtime to fit in 60s (resize 1024px + JPEG, parallel mask fetch, upload result direct to fal) in case Hobby-tier caps still hit |
+
+### Docs & Rules
+
+- `CLAUDE.md` updated: deploy/build now allowed provided there is no concurrent `next build` / `vercel --prod` / `.next/lock` — always pre-check before running.
+- `docs/LINGERIE_PIPELINE_PLAN.md` (rewrite) reflects the current working pipeline (grounded_sam + SeedDream + Kolors), cost table, and 5 phases pending (model reuse picker, bra/panty UI split, video after tryon — now done, folder batch, inpaint repair).
+- Memory tightened: "changelog + docs stay current" rule now covers every code change, not only daily notes.
+
+### Pending (not shipped today)
+
+- **G — Repair "Quitar y Reemplazar" (inpaint) module**: waiting on the exact error message from user to reproduce.
+- **H — Folder-based inventory batch processing**: full-day scope, reserved for a dedicated session. Foundation exists (`/api/inventory/scan`, `/api/inventory/load`, `AiModel` table with seed persistence).
+- **Saved-model picker UI**: backend saves everything with provider+seed; the UI to pick an existing model and skip `model-create` is not built yet.
+
+### Current deployment status
+
+- Production: `https://unistudio.vercel.app` on commit `212690b`.
+- Health check: `https://unistudio.vercel.app/api/health` — should report `replicate: connected`, `fal: connected`, env keys `ok`.
+
+### What to test next
+
+1. Lingerie flow with a bra photo — expect "Aislar brasier" label, Kolors try-on on a swim-top AI model, short video at the end.
+2. Lingerie flow with a panty photo — expect "Aislar panty" label, kolors category `bottoms`.
+3. "← Volver al inicio" button resets the flow mid-execution and mid-results.
+4. Gallery should contain the step results (they now go through fal storage instead of being dropped for size).
+
+---
+
 ## 2026-04-09 — Bug Fixes, New Features & Mobile Responsive
 
 ### Production Bug Fixes (12 bugs)
