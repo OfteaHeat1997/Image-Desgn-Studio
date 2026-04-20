@@ -312,18 +312,36 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
   // Subject removal path: isolate ONLY the garment, drop the model entirely.
   // Used by the lingerie pipeline when the input photo contains a person wearing
   // the garment — so the subsequent try-on receives just the prenda.
+  //
+  // SAFETY NET: wrapeamos isolateGarment entero en try/catch. Si CUALQUIER parte
+  // falla (Replicate upload, grounded_sam, Sharp composite, fal upload), caemos
+  // a rembg plano con el imageUrl original. No ideal pero la pipeline sigue.
+  // La usuaria reportó 401 en prod repetidamente — este catch evita que el 401
+  // haga que toda la pipeline muera.
   if (removeSubject) {
-    const resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+    let resultUrl: string;
+    let usedProvider = 'grounded-sam-isolate';
+    try {
+      resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[bg-remove:removeSubject] isolateGarment falló (${msg}) — fallback a rembg plano sobre imagen completa. ` +
+        `El resultado NO aislará la prenda (la modelo seguirá en la foto), pero la pipeline continúa.`,
+      );
+      resultUrl = await removeBgReplicate(imageUrl);
+      usedProvider = 'rembg-fallback';
+    }
     await saveJob({
       operation: 'bg-remove',
-      provider: 'grounded-sam-isolate',
+      provider: usedProvider,
       inputParams: { imageUrl, removeSubject: true, garmentType },
       outputUrl: resultUrl,
       cost: ISOLATE_COST,
     });
     return NextResponse.json({
       success: true,
-      data: { url: proxyReplicateUrl(resultUrl), provider: 'grounded-sam-isolate' },
+      data: { url: proxyReplicateUrl(resultUrl), provider: usedProvider },
       cost: ISOLATE_COST,
     });
   }
