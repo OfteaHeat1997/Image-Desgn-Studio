@@ -251,8 +251,12 @@ export default function StaticProductPipelinePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: currentUrl,
-          prompt: config.prompt,
           mode: config.bgMode,
+          // The route requires `style`. We pass "custom" (not in the preset list)
+          // so the validator falls through to `customPrompt` — our adaptive matrix prompt.
+          style: "custom",
+          customPrompt: config.prompt,
+          aspectRatio: "1:1",
         }),
       });
       const genData = await safeJson(genRes);

@@ -257,8 +257,11 @@ export default function JewelryPipelinePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: isolatedUrl,
-          prompt: config.estantePrompt,
           mode: "precise",
+          // "custom" triggers the customPrompt fallback path in the route validator.
+          style: "custom",
+          customPrompt: config.estantePrompt,
+          aspectRatio: "1:1",
         }),
       });
       const estanteData = await safeJson(estanteRes);
@@ -273,11 +276,17 @@ export default function JewelryPipelinePage() {
         updateJob(job.id, { status: "generating-model" });
         try {
           // 5a. Create model photo
+          // /api/model-create expects ModelCreateOptions (gender/ageRange/skinTone/bodyType
+          // required, plus optional customDetails that get appended to the generated prompt).
           const modelRes = await fetch("/api/model-create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              prompt: config.modelPrompt,
+              gender: "female",
+              ageRange: "26-35",
+              skinTone: "medium",
+              bodyType: "average",
+              customDetails: config.modelPrompt,
             }),
           });
           const modelData = await safeJson(modelRes);
@@ -286,14 +295,16 @@ export default function JewelryPipelinePage() {
           totalCost += modelData.cost ?? 0.055;
 
           // 5b. Place jewelry on the model
+          // /api/jewelry-tryon JSON mode expects: modelImage, jewelryImage, type, mode.
+          // The sub-type (job.subType) doubles as the "type" hint for the route.
           const tryonRes = await fetch("/api/jewelry-tryon", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              modelImageUrl: modelPhotoUrl,
-              jewelryImageUrl: isolatedUrl,
-              prompt: config.tryonPrompt,
-              bodyPart: config.bodyPart,
+              modelImage: modelPhotoUrl,
+              jewelryImage: isolatedUrl,
+              type: job.subType,
+              mode: "modelo",
             }),
           });
           const tryonData = await safeJson(tryonRes);

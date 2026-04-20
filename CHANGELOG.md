@@ -1,5 +1,50 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Fix backend/frontend param mismatches in Static + Jewelry pipelines (commit 6 of pipeline rewrite)
+
+Ran a full integration audit after commit 5. Three param-shape mismatches between the new pipeline pages (commits 3 and 4) and the underlying module routes were detected. All three are fixed in this commit — the pipelines still shipped because of soft-fail handling, but the outputs were degraded or outright failing.
+
+Audit result summary: **3 issues found — 2 ROTO + 1 RIESGO. All fixed here.** Redirect mechanism from inventory scan was confirmed working correctly.
+
+### Fixed
+
+#### 1. `/api/bg-generate` body shape (affected Static + Jewelry)
+
+The route requires `{ mode, style }` with optional `customPrompt` that wins over `style` when `style` is not in `BACKGROUND_PRESETS`. The pipelines were sending `{ imageUrl, prompt, mode }` — the `prompt` field was silently dropped, and missing `style` would have failed validation at `api/bg-generate/route.ts:51` (`if (!style) return 400`).
+
+- `unistudio/src/app/pipelines/static-product/page.tsx` line ~245: now sends `{ imageUrl, mode, style: "custom", customPrompt: config.prompt, aspectRatio: "1:1" }`.
+- `unistudio/src/app/pipelines/jewelry/page.tsx` line ~255: same shape with `customPrompt: config.estantePrompt` and `mode: "precise"`.
+
+#### 2. `/api/model-create` body shape (affected Jewelry)
+
+The route expects `ModelCreateOptions` with at least `{ gender, ageRange, skinTone, bodyType }` — sending only `{ prompt }` would have failed at `api/model-create/route.ts:301` (`if (!gender) return 400`). The jewelry page's sub-type-specific model prompt was also being lost.
+
+- `unistudio/src/app/pipelines/jewelry/page.tsx` line ~280: now sends full ModelCreateOptions with `customDetails: config.modelPrompt`. The route appends `customDetails` to the generated prompt at line 138-139, so the sub-type routing (portrait for earrings, bust for necklace, hand for ring, etc.) comes through.
+
+#### 3. `/api/jewelry-tryon` field names (affected Jewelry)
+
+JSON mode of the route reads `body.modelImage` and `body.jewelryImage`. The jewelry page was passing `modelImageUrl` and `jewelryImageUrl`, which would have failed validation at lines 91 (`if (!jewelryImage) return 400`). Additionally, `prompt` and `bodyPart` fields are not accepted by the route.
+
+- `unistudio/src/app/pipelines/jewelry/page.tsx` line ~295: now sends `{ modelImage, jewelryImage, type: job.subType, mode: "modelo" }`. `type` doubles as the sub-type hint; `mode: "modelo"` is the "place on person" flow.
+
+### Redirect + integration — confirmed OK (no change)
+
+- `/api/inventory/scan` returns `{ pipeline, pipelineParams }` in response.
+- `batch/page.tsx` `startAutoMode` reads them and does `window.location.assign(cat.pipeline + qs)` correctly.
+- All 3 pipelines read URL params in `useEffect`:
+  - lingerie/page.tsx:598 — `URLSearchParams.get("productType")`
+  - static-product/page.tsx:154 — reads `productType`, `brand`
+  - jewelry/page.tsx:165 — reads `subType`
+- All env vars across module routes use `.trim()` (regla `CLAUDE.md`).
+
+### Not yet addressed (still in the original roadmap)
+
+- **`/agent` page** (commit 7 now, was 6): still has `modelo` / `social` / `ecommerce` workflow cards that duplicate the new pipelines. Convert AI Agent into a router (detect category → redirect to canonical pipeline).
+- **Final cleanup** (commit 8 now, was 7): `AGENT_PRESETS` empty-array removal, historical comment in `api/ai-agent/plan/route.ts:280`, dead `?agent=modelo` links.
+- **Sidebar + homepage polish** (commit 9 now, was 8).
+
+---
+
 ## 2026-04-20 — Inventory auto-routing + lingerie URL params (commit 5 of pipeline rewrite)
 
 Finishes the folder → pipeline auto-routing for the 2 remaining lingerie categories. Fixes a bug in `/pipelines/lingerie` that was silently ignoring the `?productType=` URL param — detected while preparing this commit. Deletes the last 2 batch presets (`agent-lenceria`, `agent-pantys`), which are now orphaned since their inventory categories redirect elsewhere.
