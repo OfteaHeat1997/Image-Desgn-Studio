@@ -18,6 +18,7 @@ import {
 import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
+import { modelToGhost } from '@/lib/processing/ghost-mannequin';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
@@ -313,25 +314,47 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
   // Used by the lingerie pipeline when the input photo contains a person wearing
   // the garment — so the subsequent try-on receives just the prenda.
   //
-  // SAFETY NET: wrapeamos isolateGarment entero en try/catch. Si CUALQUIER parte
-  // falla (Replicate upload, grounded_sam, Sharp composite, fal upload), caemos
-  // a rembg plano con el imageUrl original. No ideal pero la pipeline sigue.
-  // La usuaria reportó 401 en prod repetidamente — este catch evita que el 401
-  // haga que toda la pipeline muera.
+  // Cascada de 3 niveles:
+  //   1. grounded_sam (Grounding DINO + SAM) — segmentación precisa, $0.01, rápida.
+  //   2. SeedDream 4 edit vía modelToGhost() — quita modelo completa (cuerpo,
+  //      piel, cara, brazos, pelo), deja la prenda con efecto ghost mannequin 3D.
+  //      $0.04. Reusa ghost-mannequin.ts:176 (ya en producción, mismo prompt).
+  //   3. rembg plano — último recurso. Resultado degradado (mantiene modelo) pero
+  //      no mata la pipeline. Solo si los dos anteriores fallan los dos.
   if (removeSubject) {
     let resultUrl: string;
     let usedProvider = 'grounded-sam-isolate';
+
     try {
+      // 1. PRIMARIO — grounded_sam.
       resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(
-        `[bg-remove:removeSubject] isolateGarment falló (${msg}) — fallback a rembg plano sobre imagen completa. ` +
-        `El resultado NO aislará la prenda (la modelo seguirá en la foto), pero la pipeline continúa.`,
+        `[bg-remove:removeSubject] grounded_sam falló (${msg}) — fallback a SeedDream ghost`,
       );
-      resultUrl = await removeBgReplicate(imageUrl);
-      usedProvider = 'rembg-fallback';
+
+      try {
+        // 2. FALLBACK INTERMEDIO — SeedDream 4 edit (fal.ai, no content filter).
+        //    Prompt interno en ghost-mannequin.ts:186-192 (ya probado en producción):
+        //    "Isolate only the ${noun} from this photo and remove the person
+        //     completely. The ${noun} should float on a pure white background with
+        //     a 3D invisible-mannequin hollow-man effect... Preserve the exact
+        //     same color, pattern, texture, fabric, and construction details..."
+        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined);
+        resultUrl = ghost.url;
+        usedProvider = `seedream-ghost-fallback (${ghost.provider})`;
+      } catch (ghostErr) {
+        const ghostMsg = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
+        console.warn(
+          `[bg-remove:removeSubject] SeedDream ghost también falló (${ghostMsg}) — último recurso rembg plano`,
+        );
+        // 3. ÚLTIMO RECURSO — rembg plano. Resultado degradado pero pipeline sigue.
+        resultUrl = await removeBgReplicate(imageUrl);
+        usedProvider = 'rembg-last-resort';
+      }
     }
+
     await saveJob({
       operation: 'bg-remove',
       provider: usedProvider,
