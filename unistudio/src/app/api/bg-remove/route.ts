@@ -179,18 +179,37 @@ async function isolateGarment(
     }
   }
 
-  // Score every candidate and pick the one with between 2% and 60% white
-  // pixels — a valid garment mask. If both mask + inverted_mask come back,
-  // prefer the one with coverage in this sane range.
+  // Score every candidate and pick the one with plausible garment coverage.
+  // Range 0.5%–75% covers both close-up bra shots (small mask) and full-body
+  // outfits. Below 0.5% means the model found nothing; above 75% almost
+  // always means we got an inverted or debug image by mistake.
   let bestMask: Buffer | null = null;
   let bestScore = 0;
+  const candidates: Array<{ buffer: Buffer; score: number; idx: number }> = [];
   for (let i = 0; i < Math.min(urls.length, 4); i++) {
     const candidate = await tryMask(urls[i], `idx${i}`);
     if (!candidate) continue;
-    const inRange = candidate.score >= 0.02 && candidate.score <= 0.6;
+    candidates.push({ ...candidate, idx: i });
+    const inRange = candidate.score >= 0.005 && candidate.score <= 0.75;
     if (inRange && candidate.score > bestScore) {
       bestMask = candidate.buffer;
       bestScore = candidate.score;
+    }
+  }
+
+  // If nothing scored in range but we DID get masks, try the one with the
+  // smallest non-zero coverage — it's likely the real garment mask, just
+  // tiny. Better than falling back to rembg which keeps the model.
+  if (!bestMask && candidates.length) {
+    const nonZero = candidates
+      .filter((c) => c.score > 0.001 && c.score < 0.9)
+      .sort((a, b) => a.score - b.score)[0];
+    if (nonZero) {
+      console.warn(
+        `[bg-remove:isolate] no mask in primary range, using smallest non-zero: idx${nonZero.idx} score=${nonZero.score.toFixed(4)}`,
+      );
+      bestMask = nonZero.buffer;
+      bestScore = nonZero.score;
     }
   }
 

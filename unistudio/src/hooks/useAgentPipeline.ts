@@ -342,6 +342,11 @@ async function executeStep(
           modelImage: modelUrl,
           garmentImage: garmentHttpUrl,
           category: mappedCategory,
+          // Pass garmentType so the tryon route's lingerie/swimwear detection
+          // (tryon/route.ts ~line 171) can force Kolors. Without this the
+          // route may fall through to smartTryOn and pick FASHN for
+          // "one-pieces", which rejects intimate garments.
+          garmentType: (params.garmentType as string | undefined) ?? ctx.garmentType ?? undefined,
           provider: params.provider ?? "idm-vton",
         }),
       });
