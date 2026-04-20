@@ -9,7 +9,7 @@ import {
   removeBgWithoutBg,
 } from '@/lib/processing/bg-remove';
 import { isWithoutBgHealthy } from '@/lib/api/withoutbg';
-import { runModel, extractOutputUrl } from '@/lib/api/replicate';
+import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { proxyReplicateUrl } from '@/lib/utils/image';
@@ -34,10 +34,14 @@ async function isolateGarment(
   garmentType: string | null,
 ): Promise<string> {
   const garmentWord = garmentType && garmentType !== 'other' ? garmentType : 'garment';
+  // Kontext Pro needs an HTTP URL — data URIs get rejected by the Replicate
+  // client for this model. ensureHttpUrl uploads data URIs to Replicate file
+  // hosting and returns the resulting HTTP URL; HTTP inputs pass through.
+  const httpInputUrl = await ensureHttpUrl(imageUrl);
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
     prompt:
       `Isolate only the ${garmentWord} in this photo. Remove the person completely — no body, no skin, no hair, no face. Keep ONLY the ${garmentWord} itself, centered, on a pure clean white background. Professional product catalog photo, flat-lay style, preserve the exact shape, color, fabric, lace detail, and texture of the ${garmentWord}.`,
-    input_image: imageUrl,
+    input_image: httpInputUrl,
     aspect_ratio: '3:4',
   });
   const kontextUrl = await extractOutputUrl(output);
