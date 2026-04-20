@@ -70,7 +70,7 @@ export interface ImageAnalysis {
   colorBalance: 'good' | 'warm' | 'cool' | 'oversaturated' | 'desaturated';
 
   /** Lingerie/garment detection (requires Vision API) */
-  hasModel?: boolean;
+  hasModel?: boolean | null;
   garmentType?: 'bra' | 'panty' | 'set' | 'other' | null;
   estimatedColor?: string | null;
   material?: 'lace' | 'cotton' | 'satin' | 'other' | null;
