@@ -286,6 +286,31 @@ Prioridad absoluta al arrancar: leer este doc entero + ejecutar los comandos de 
 
 ---
 
+# 🔴 BUG REPORT URGENTE — Aislar Producto falla en producción (2026-04-21, screenshot enviado)
+
+La usuaria reportó con screenshot (`/mnt/c/Users/maria/Downloads/Screenshot 2026-04-21 004944.png`) que en `/pipelines/lingerie` el paso 1 "Aislar Producto" devuelve Error sin imagen. Los demás pasos quedan pendientes.
+
+**Posible causa 1:** Vercel estuvo fallando el build desde commit 8 hasta que commit 9 (`9f1b0eb`) lo arregló (2026-04-21 ~00:45). Si la screenshot fue ANTES del redeploy, era versión vieja. Primera cosa a probar: hard reload + retest.
+
+**Posible causa 2:** el `/api/bg-remove` con `removeSubject:true` + `garmentType:"bra"` puede estar fallando por:
+- `grounded_sam` model de Replicate caído o reasignado (ver `schananas/grounded_sam:ee871c19...`)
+- Input URL demasiado grande (payload limit de Vercel 4.5MB)
+- Env var `REPLICATE_API_TOKEN` con `\n` al final (debería estar arreglado con .trim() en commit 9, pero health/route.ts aún chequea)
+
+**Debug steps para próxima sesión:**
+1. Abrir `/api/health` en prod — ¿muestra Replicate "connected"?
+2. Abrir DevTools Network en `/pipelines/lingerie` — ver response exacto de `/api/bg-remove` cuando falla (status code + error message)
+3. Revisar logs de Vercel Functions para `/api/bg-remove` — qué error devuelve grounded_sam
+4. Si grounded_sam está caído, el fallback en `src/lib/processing/bg-remove.ts` (Claude Vision + rembg) debería activarse — verificar que esa cascade funciona
+5. Probar con imagen más chica (<1MB) para descartar payload limit
+
+**Archivos a inspeccionar:**
+- `unistudio/src/app/api/bg-remove/route.ts` — handler
+- `unistudio/src/lib/processing/bg-remove.ts` — lógica de isolateGarment + grounded_sam
+- `unistudio/src/app/pipelines/lingerie/page.tsx:448-460` — donde se hace el fetch a bg-remove
+
+---
+
 # 🚨 PRIORIDAD #0 — REGRESIÓN UX en static-product + jewelry (reportada 2026-04-21)
 
 **Texto exacto de la usuaria:** "pipeline estatico horible todo mal todos los avances que hicimos en los otros viejos pipeline lo borraste y esto está peor que antes. No estoy viendo live qué pasó. Procesó, hizo, puso, la foto se ve horrible, el fondo no se ve realístico, no se ve HD. No supe cuánto costó, no supe qué pasó, no supe cuánto gasté."
@@ -364,6 +389,74 @@ Posibles causas de baja calidad:
 ### Tiempo estimado con context fresco
 
 **4-6h** (copiar+adaptar es más rápido que escribir desde cero cuando tenés el template).
+
+### ✅ Work-in-progress ya iniciado en `static-product/page.tsx` (commit pendiente)
+
+La sesión de commit 9 empezó a instrumentar el step-tracking antes de quedarse sin contexto. Ya está en el archivo:
+
+- Types nuevos: `StepKey` = "isolate" | "normalize" | "bg" | "shadow" | "finish"
+- Type `StepSnapshot` con `{ resultUrl?, cost, status, error? }`
+- Const `INITIAL_STEPS` (5 steps en estado "idle")
+- Const `STEP_META` con label + icon emoji + costHint por step
+- Job interface extendida con `steps: Record<StepKey, StepSnapshot>`
+- Helper `updateStep(id, key, patch)` ya agregado al componente
+- `handleFiles` ya incluye `steps: { ...INITIAL_STEPS }` al crear Jobs
+
+**Lo que FALTA wire-up (próxima sesión):**
+
+1. **Llamar `updateStep` dentro de cada paso de `processJob`:**
+   ```ts
+   // Al inicio del paso bg-remove:
+   updateStep(job.id, "isolate", { status: "running" });
+   // Después de recibir el resultado:
+   updateStep(job.id, "isolate", {
+     status: "done",
+     resultUrl: bgData.data.url || bgData.data.imageUrl,
+     cost: bgData.cost ?? 0.01,
+   });
+   // Si falla:
+   updateStep(job.id, "isolate", { status: "error", error: message });
+   ```
+   Replicar para: `normalize` (paso 3), `bg` (paso 4), `shadow` (paso 5), `finish` (paso 6).
+   El upload y el bg-remove se consideran paso "isolate" juntos (primer step visible).
+
+2. **Agregar render de timeline de steps** en la tarjeta del job (después del preview, antes del status pill final). Pattern:
+   ```tsx
+   <div className="flex items-center gap-1 mt-2">
+     {(Object.keys(STEP_META) as StepKey[]).map((key) => {
+       const step = job.steps[key];
+       const meta = STEP_META[key];
+       return (
+         <div key={key} className={cn(
+           "flex-1 min-w-0 p-2 rounded text-xs border",
+           step.status === "done" && "bg-emerald-500/10 border-emerald-500/30",
+           step.status === "running" && "bg-amber-500/10 border-amber-500/30 animate-pulse",
+           step.status === "error" && "bg-red-500/10 border-red-500/30",
+           step.status === "idle" && "bg-white/[0.02] border-white/10",
+         )}>
+           <div className="flex items-center gap-1">
+             <span>{meta.icon}</span>
+             <span className="truncate">{meta.label}</span>
+           </div>
+           {step.resultUrl && (
+             <img src={step.resultUrl} alt={meta.label}
+                  className="mt-1 w-full h-12 object-contain rounded bg-black" />
+           )}
+           <div className="mt-1 text-[10px] text-gray-400">
+             {step.status === "done" && `✓ $${step.cost.toFixed(3)}`}
+             {step.status === "running" && "..."}
+             {step.status === "idle" && meta.costHint}
+             {step.status === "error" && "Error"}
+           </div>
+         </div>
+       );
+     })}
+   </div>
+   ```
+
+3. **Replicar todo en `/pipelines/jewelry/page.tsx`** con las keys jewelry-specific (isolate, upscale, estante, modelo, video).
+
+4. **Emojis en UI:** la usuaria confirmó implícitamente que OK para visuals ("como app de niños"). Usarlos libremente en step icons, status indicators, tooltips. NO poner emojis en código/commits/docs (regla previa `3743cba Kill all emojis`).
 
 ### Resultado esperado tras el fix
 

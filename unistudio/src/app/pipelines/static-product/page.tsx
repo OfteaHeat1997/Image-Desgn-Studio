@@ -31,6 +31,19 @@ import {
 
 type JobStatus = "idle" | "uploading" | "isolating" | "normalizing" | "generating-bg" | "shadowing" | "finishing" | "done" | "error";
 
+type StepKey = "isolate" | "normalize" | "bg" | "shadow" | "finish";
+
+interface StepSnapshot {
+  /** URL después de completar este paso */
+  resultUrl?: string;
+  /** Costo incurrido en este paso */
+  cost: number;
+  /** Estado del paso específico */
+  status: "idle" | "running" | "done" | "skipped" | "error";
+  /** Mensaje de error si falló */
+  error?: string;
+}
+
 interface Job {
   id: string;
   file: File;
@@ -41,7 +54,25 @@ interface Job {
   resultUrl?: string;
   error?: string;
   cost: number;
+  /** Snapshot por paso para mostrar progreso visual en vivo */
+  steps: Record<StepKey, StepSnapshot>;
 }
+
+const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
+  isolate: { cost: 0, status: "idle" },
+  normalize: { cost: 0, status: "idle" },
+  bg: { cost: 0, status: "idle" },
+  shadow: { cost: 0, status: "idle" },
+  finish: { cost: 0, status: "idle" },
+};
+
+const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string }> = {
+  isolate: { label: "Quitar fondo", icon: "✂️", costHint: "$0.01" },
+  normalize: { label: "Centrar en cuadrado", icon: "📐", costHint: "Gratis" },
+  bg: { label: "Fondo adaptativo", icon: "🎨", costHint: "$0.003–$0.05" },
+  shadow: { label: "Sombra", icon: "🌒", costHint: "Gratis" },
+  finish: { label: "Ajustes finales", icon: "✨", costHint: "Gratis" },
+};
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -182,6 +213,7 @@ export default function StaticProductPipelinePage() {
           brand: defaultBrand,
           status: "idle",
           cost: 0,
+          steps: { ...INITIAL_STEPS },
         };
       });
       setJobs((prev) => [...prev, ...newJobs]);
@@ -191,6 +223,16 @@ export default function StaticProductPipelinePage() {
 
   const updateJob = (id: string, patch: Partial<Job>) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+  };
+
+  const updateStep = (id: string, key: StepKey, patch: Partial<StepSnapshot>) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === id
+          ? { ...j, steps: { ...j.steps, [key]: { ...j.steps[key], ...patch } } }
+          : j,
+      ),
+    );
   };
 
   const removeJob = (id: string) => {
