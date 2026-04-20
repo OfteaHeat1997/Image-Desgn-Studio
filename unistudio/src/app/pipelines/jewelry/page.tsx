@@ -39,6 +39,15 @@ type JobStatus =
   | "done"
   | "error";
 
+type StepKey = "isolate" | "upscale" | "estante" | "modelo" | "video";
+
+interface StepSnapshot {
+  resultUrl?: string;
+  cost: number;
+  status: "idle" | "running" | "done" | "skipped" | "error";
+  error?: string;
+}
+
 interface Job {
   id: string;
   file: File;
@@ -50,7 +59,24 @@ interface Job {
   videoUrl?: string;
   error?: string;
   cost: number;
+  steps: Record<StepKey, StepSnapshot>;
 }
+
+const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
+  isolate: { cost: 0, status: "idle" },
+  upscale: { cost: 0, status: "idle" },
+  estante: { cost: 0, status: "idle" },
+  modelo: { cost: 0, status: "idle" },
+  video: { cost: 0, status: "idle" },
+};
+
+const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string }> = {
+  isolate: { label: "Quitar fondo", icon: "✂️", costHint: "$0.01" },
+  upscale: { label: "Upscale 2x", icon: "🔍", costHint: "$0.02" },
+  estante: { label: "Estante lujoso", icon: "🎭", costHint: "$0.05" },
+  modelo: { label: "En modelo", icon: "👤", costHint: "$0.10" },
+  video: { label: "Video 360°", icon: "🎥", costHint: "Gratis" },
+};
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -188,6 +214,7 @@ export default function JewelryPipelinePage() {
           subType: defaultSubType,
           status: "idle",
           cost: 0,
+          steps: { ...INITIAL_STEPS },
         };
       });
       setJobs((prev) => [...prev, ...newJobs]);
@@ -197,6 +224,16 @@ export default function JewelryPipelinePage() {
 
   const updateJob = (id: string, patch: Partial<Job>) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+  };
+
+  const updateStep = (id: string, key: StepKey, patch: Partial<StepSnapshot>) => {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === id
+          ? { ...j, steps: { ...j.steps, [key]: { ...j.steps[key], ...patch } } }
+          : j,
+      ),
+    );
   };
 
   const removeJob = (id: string) => {
@@ -217,20 +254,27 @@ export default function JewelryPipelinePage() {
       if (!upData.success) throw new Error(upData.error || "Upload failed");
       let workingUrl: string = upData.data.url;
 
-      // 2. Remove background (jewelry usually isolated, but safe to re-run)
+      // 2. Remove background → step "isolate"
       updateJob(job.id, { status: "isolating" });
+      updateStep(job.id, "isolate", { status: "running" });
       const bgRes = await fetch("/api/bg-remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: workingUrl, provider: "replicate" }),
       });
       const bgData = await safeJson(bgRes);
-      if (!bgData.success) throw new Error(bgData.error || "Background removal failed");
+      if (!bgData.success) {
+        updateStep(job.id, "isolate", { status: "error", error: bgData.error || "Falló quitar fondo" });
+        throw new Error(bgData.error || "Background removal failed");
+      }
       workingUrl = bgData.data.url || bgData.data.imageUrl;
-      totalCost += bgData.cost ?? 0.01;
+      const isolateCost = bgData.cost ?? 0.01;
+      totalCost += isolateCost;
+      updateStep(job.id, "isolate", { status: "done", resultUrl: workingUrl, cost: isolateCost });
 
-      // 3. Upscale 2x — ALWAYS required for jewelry detail
+      // 3. Upscale 2x → step "upscale"
       updateJob(job.id, { status: "upscaling" });
+      updateStep(job.id, "upscale", { status: "running" });
       const upsRes = await fetch("/api/upscale", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -243,41 +287,47 @@ export default function JewelryPipelinePage() {
       const upsData = await safeJson(upsRes);
       if (upsData.success) {
         workingUrl = upsData.data.url || upsData.data.imageUrl || workingUrl;
-        totalCost += upsData.cost ?? 0.02;
+        const upsCost = upsData.cost ?? 0.02;
+        totalCost += upsCost;
+        updateStep(job.id, "upscale", { status: "done", resultUrl: workingUrl, cost: upsCost });
       } else {
         console.warn("[jewelry] upscale soft-failed:", upsData.error);
+        updateStep(job.id, "upscale", { status: "skipped", error: upsData.error });
       }
 
       const isolatedUrl = workingUrl;
 
-      // 4. Generate ESTANTE (display shot) — always
+      // 4. Generate ESTANTE → step "estante"
       updateJob(job.id, { status: "generating-estante" });
+      updateStep(job.id, "estante", { status: "running" });
       const estanteRes = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: isolatedUrl,
           mode: "precise",
-          // "custom" triggers the customPrompt fallback path in the route validator.
           style: "custom",
           customPrompt: config.estantePrompt,
           aspectRatio: "1:1",
         }),
       });
       const estanteData = await safeJson(estanteRes);
-      if (!estanteData.success) throw new Error(estanteData.error || "Estante generation failed");
+      if (!estanteData.success) {
+        updateStep(job.id, "estante", { status: "error", error: estanteData.error || "Falló estante" });
+        throw new Error(estanteData.error || "Estante generation failed");
+      }
       const estanteUrl: string = estanteData.data.url || estanteData.data.imageUrl;
-      totalCost += estanteData.cost ?? 0.05;
+      const estanteCost = estanteData.cost ?? 0.05;
+      totalCost += estanteCost;
       updateJob(job.id, { estanteUrl });
+      updateStep(job.id, "estante", { status: "done", resultUrl: estanteUrl, cost: estanteCost });
 
-      // 5. Optional: Generate MODELO (jewelry on a person)
+      // 5. Optional: Generate MODELO → step "modelo"
       let modelUrl: string | undefined;
       if (includeModel) {
         updateJob(job.id, { status: "generating-model" });
+        updateStep(job.id, "modelo", { status: "running" });
         try {
-          // 5a. Create model photo
-          // /api/model-create expects ModelCreateOptions (gender/ageRange/skinTone/bodyType
-          // required, plus optional customDetails that get appended to the generated prompt).
           const modelRes = await fetch("/api/model-create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -292,11 +342,9 @@ export default function JewelryPipelinePage() {
           const modelData = await safeJson(modelRes);
           if (!modelData.success) throw new Error(modelData.error || "Model create failed");
           const modelPhotoUrl: string = modelData.data.url || modelData.data.imageUrl;
-          totalCost += modelData.cost ?? 0.055;
+          const modelCreateCost = modelData.cost ?? 0.055;
+          totalCost += modelCreateCost;
 
-          // 5b. Place jewelry on the model
-          // /api/jewelry-tryon JSON mode expects: modelImage, jewelryImage, type, mode.
-          // The sub-type (job.subType) doubles as the "type" hint for the route.
           const tryonRes = await fetch("/api/jewelry-tryon", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -310,23 +358,32 @@ export default function JewelryPipelinePage() {
           const tryonData = await safeJson(tryonRes);
           if (tryonData.success) {
             modelUrl = tryonData.data.url || tryonData.data.imageUrl;
-            totalCost += tryonData.cost ?? 0.05;
+            const tryonCost = tryonData.cost ?? 0.05;
+            totalCost += tryonCost;
             updateJob(job.id, { modelUrl });
+            updateStep(job.id, "modelo", {
+              status: "done",
+              resultUrl: modelUrl,
+              cost: modelCreateCost + tryonCost,
+            });
           } else {
             console.warn("[jewelry] tryon soft-failed:", tryonData.error);
             toast.error(`Modelo para ${job.file.name} falló — estante OK.`);
+            updateStep(job.id, "modelo", { status: "error", error: tryonData.error, cost: modelCreateCost });
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn("[jewelry] model step soft-failed:", msg);
           toast.error(`Modelo para ${job.file.name}: ${msg}`);
+          updateStep(job.id, "modelo", { status: "error", error: msg });
         }
       }
 
-      // 6. Optional: Generate VIDEO (Ken Burns 360° over estante)
+      // 6. Optional: Generate VIDEO → step "video"
       let videoUrl: string | undefined;
       if (includeVideo) {
         updateJob(job.id, { status: "generating-video" });
+        updateStep(job.id, "video", { status: "running" });
         try {
           const videoRes = await fetch("/api/video", {
             method: "POST",
@@ -342,12 +399,15 @@ export default function JewelryPipelinePage() {
           if (videoData.success) {
             videoUrl = videoData.data.url || videoData.data.videoUrl;
             updateJob(job.id, { videoUrl });
+            updateStep(job.id, "video", { status: "done", resultUrl: videoUrl, cost: 0 });
           } else {
             console.warn("[jewelry] video soft-failed:", videoData.error);
+            updateStep(job.id, "video", { status: "error", error: videoData.error });
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn("[jewelry] video step soft-failed:", msg);
+          updateStep(job.id, "video", { status: "error", error: msg });
         }
       }
 
@@ -535,6 +595,60 @@ export default function JewelryPipelinePage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Step timeline — live preview de cada paso con thumbnails + costo */}
+                    {job.status !== "idle" && (
+                      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+                        {(Object.keys(STEP_META) as StepKey[]).map((key) => {
+                          const step = job.steps[key];
+                          const meta = STEP_META[key];
+                          const isOptional = (key === "modelo" && !includeModel) || (key === "video" && !includeVideo);
+                          if (isOptional && step.status === "idle") return null;
+                          const activeClass =
+                            step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
+                            step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
+                            step.status === "error" ? "bg-red-500/10 border-red-500/40" :
+                            step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
+                            "bg-white/[0.02] border-white/10";
+                          return (
+                            <div
+                              key={key}
+                              className={cn("flex flex-col rounded border p-2 text-[10px]", activeClass)}
+                              title={step.error ?? meta.label}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span className="text-sm">{meta.icon}</span>
+                                <span className="truncate font-medium text-gray-200">{meta.label}</span>
+                              </div>
+                              {step.resultUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={step.resultUrl}
+                                  alt={meta.label}
+                                  className="mt-1 h-14 w-full rounded bg-black object-contain"
+                                />
+                              ) : (
+                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 text-gray-600">
+                                  {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
+                                </div>
+                              )}
+                              <div className="mt-1 flex items-center justify-between gap-1 text-gray-400">
+                                <span>
+                                  {step.status === "done" && <CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" />}
+                                  {step.status === "error" && <AlertCircle className="inline h-2.5 w-2.5 text-red-400" />}
+                                  {step.status === "skipped" && "saltado"}
+                                  {step.status === "running" && "..."}
+                                  {step.status === "idle" && meta.costHint}
+                                </span>
+                                {step.status === "done" && step.cost > 0 && (
+                                  <span className="font-mono text-[9px] text-amber-300">${step.cost.toFixed(3)}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Results row */}
                     {job.status === "done" && (
