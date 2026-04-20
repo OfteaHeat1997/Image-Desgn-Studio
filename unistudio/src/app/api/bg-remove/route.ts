@@ -78,9 +78,12 @@ async function getGarmentBbox(
               {
                 type: 'text',
                 text:
-                  `This is an e-commerce catalog photo (${width}x${height} pixels). Return ONLY valid JSON with the pixel bounding box of the ${productWord} product shown (ignore any person/model who may be wearing it — return the box around the product item itself): ` +
-                  `{"x": number, "y": number, "width": number, "height": number}. ` +
-                  `Coordinates are in pixels, origin top-left. Be tight but include the full item.`,
+                  `This is an e-commerce catalog photo (${width} wide x ${height} tall pixels). ` +
+                  `I need the TIGHT pixel bounding box of JUST the ${productWord} garment itself (cups, band, straps). ` +
+                  `DO NOT include the person's head, neck, shoulders, arms, torso skin, or waist — only the fabric of the ${productWord}. ` +
+                  `Return ONLY valid JSON: {"x": number, "y": number, "width": number, "height": number}. ` +
+                  `Coordinates are in pixels, origin top-left. x+width must be <= ${width}, y+height must be <= ${height}. ` +
+                  `Be as tight as possible around the garment fabric only.`,
               },
             ],
           },
@@ -151,10 +154,14 @@ async function isolateGarment(
   // 1) bbox around the garment (Vision, or fallback to center crop)
   const base64 = prepared.toString('base64');
   const bbox = await getGarmentBbox(base64, 'image/jpeg', garmentType, width, height);
+  console.log(
+    `[bg-remove:isolate] image=${width}x${height} bbox=${bbox.x},${bbox.y},${bbox.width}x${bbox.height} garmentType=${garmentType}`,
+  );
 
-  // 2) crop with ~10% padding, clamped to the image
-  const padX = Math.round(bbox.width * 0.1);
-  const padY = Math.round(bbox.height * 0.1);
+  // 2) crop with ~3% padding. Tight padding matters: the bigger the padding,
+  //    the more body/skin rembg will retain as "foreground".
+  const padX = Math.round(bbox.width * 0.03);
+  const padY = Math.round(bbox.height * 0.03);
   const left = Math.max(0, bbox.x - padX);
   const top = Math.max(0, bbox.y - padY);
   const cropW = Math.min(width - left, bbox.width + 2 * padX);
@@ -163,6 +170,9 @@ async function isolateGarment(
     .extract({ left, top, width: cropW, height: cropH })
     .png()
     .toBuffer();
+  console.log(
+    `[bg-remove:isolate] cropped to ${cropW}x${cropH} (${(croppedBuffer.length / 1024).toFixed(0)} KB)`,
+  );
 
   // 3) rembg (no content moderation) strips the remaining bg → PNG cutout
   const cropDataUrl = `data:image/png;base64,${croppedBuffer.toString('base64')}`;

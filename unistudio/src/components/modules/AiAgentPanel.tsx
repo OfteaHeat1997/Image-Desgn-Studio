@@ -486,16 +486,28 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
     onProcess(finalResultUrl, undefined, execution?.totalCost ?? 0);
   }, [finalResultUrl, execution, onProcess]);
 
-  // Auto-push the final result to the editor canvas when the pipeline finishes,
-  // so the big central canvas shows the result instead of the original input.
+  // Live-update the big central canvas as each pipeline step completes.
+  // Previously we only pushed the final result at the end, so users stared at
+  // their original image the whole run and only saw tiny thumbnails in the
+  // sidebar. Now every newly-completed step pushes its resultUrl to the editor
+  // canvas so you watch the image evolve step by step.
   const autoPushedRef = useRef<string | null>(null);
+  const latestCompletedUrl = useMemo(() => {
+    if (!execution) return null;
+    // Most recent completed step (sequential — last index that is done)
+    for (let i = execution.steps.length - 1; i >= 0; i--) {
+      const s = execution.steps[i];
+      if (s.status === "completed" && s.resultUrl) return s.resultUrl;
+    }
+    return null;
+  }, [execution]);
   useEffect(() => {
-    if (phase !== "results") return;
-    if (!finalResultUrl) return;
-    if (autoPushedRef.current === finalResultUrl) return;
-    autoPushedRef.current = finalResultUrl;
-    onProcess(finalResultUrl, undefined, execution?.totalCost ?? 0);
-  }, [phase, finalResultUrl, execution, onProcess]);
+    if (phase !== "executing" && phase !== "results") return;
+    if (!latestCompletedUrl) return;
+    if (autoPushedRef.current === latestCompletedUrl) return;
+    autoPushedRef.current = latestCompletedUrl;
+    onProcess(latestCompletedUrl, undefined, execution?.totalCost ?? 0);
+  }, [phase, latestCompletedUrl, execution, onProcess]);
 
   const handleReset = useCallback(() => {
     pipeline.reset();
