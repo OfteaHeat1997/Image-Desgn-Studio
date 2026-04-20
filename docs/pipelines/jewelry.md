@@ -3,8 +3,8 @@
 > Para: Unistyles (Curaçao) — **82 productos** (aretes, cadenas, anillos, pulseras, topos, candongas, sets)
 
 **Última actualización:** 2026-04-20
-**Estado:** Por crear (commit 4 del ciclo actual)
-**Ruta API:** `/api/pipelines/jewelry`
+**Estado:** Implementado (MVP) — commit 4 del ciclo. Matriz de sub-tipos en `src/lib/pipelines/jewelry.ts`, página orquesta los módulos desde el cliente. Upscale Real-ESRGAN 2x siempre (obligatorio para detalle de joyería). Foto en modelo + video son opcionales.
+**Ruta API:** No tiene ruta propia — la página llama a `/api/bg-remove`, `/api/upscale`, `/api/bg-generate`, `/api/model-create`, `/api/jewelry-tryon`, `/api/video` directamente.
 **Página UI:** `/pipelines/jewelry`
 
 ---

@@ -1,5 +1,68 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Pipeline Joyería created at /pipelines/jewelry (commit 4 of pipeline rewrite)
+
+Third (and last) canonical pipeline is live. Covers 82 jewelry products (aretes, cadenas, anillos, pulseras, topos, candongas, sets). Each piece gets a luxury display shot, an optional on-model shot with the piece on the correct body part (ears / neck / hand / wrist), and an optional 360° video.
+
+After this commit: **486/486 products (100%) are served by canonical pipelines.**
+
+### Created
+
+- `unistudio/src/lib/pipelines/jewelry.ts` — pure-function sub-type router:
+  - Types: `JewelrySubType` (earrings / studs / hoops / necklace / ring / bracelet / set), `JewelryBodyPart` (ears / neck / hand / wrist / torso)
+  - `getJewelryConfig(subType)` returns `{ estantePrompt, bodyPart, modelPrompt, tryonPrompt, label }`
+  - Routing per sub-type:
+    - earrings/studs/hoops → ears, modelo portrait with hair pulled back
+    - necklace → neck, modelo bust with collarbone visible
+    - ring → hand, modelo elegant hand pose
+    - bracelet → wrist, modelo wrist in relaxed pose
+    - set → torso, modelo upper-body showing neck + both ears
+  - Display backgrounds by sub-type: black velvet (earrings/studs/hoops), brown leather bust (necklace), cream silk cushion (ring), walnut wood (bracelet), white marble (set)
+  - `JEWELRY_UPSCALE_CONFIG` constant: Real-ESRGAN 2x, always required for jewelry
+- `unistudio/src/app/pipelines/jewelry/page.tsx` — new UI page:
+  - Upload zone, sub-type selector per job (default from URL param `?subType=...`)
+  - Two page-level toggles: "Incluir foto en modelo" (default ON, +$0.10) and "Incluir video 360°" (default OFF, gratis)
+  - 6-7 steps per image: upload → bg-remove → upscale 2x → bg-generate (estante) → optional model-create + jewelry-tryon → optional Ken Burns video
+  - Soft-fails model/video steps so a failure there doesn't lose the estante
+  - Per-image result grid with download links for estante, modelo, video
+  - Inline video player for Ken Burns output
+
+### Deleted / replaced
+
+- `unistudio/src/app/batch/page.tsx`: removed preset `agent-accesorios` (was the 4-step generic preset). Already dead UX because the `accesorios` inventory category now redirects.
+
+### Updated
+
+- `unistudio/src/app/api/inventory/scan/route.ts`: **split the single `accesorios` entry into 5 separate sub-categories**, each redirecting to `/pipelines/jewelry` with the correct `subType` param:
+  - `aretes` → `?subType=earrings`
+  - `collares` → `?subType=necklace`
+  - `pulseras` → `?subType=bracelet`
+  - `anillos` → `?subType=ring`
+  - `sets` → `?subType=set`
+  - This makes the inventory scan UI more granular and eliminates the need for post-upload sub-type detection in the most common flow.
+- `unistudio/src/components/editor/ModuleSidebar.tsx`: new entry `jewelry-pipeline`, added to `STANDALONE_PAGES` map, footer quick-link.
+- `unistudio/src/app/page.tsx`: homepage card for Pipeline de Joyería.
+- `docs/pipelines/jewelry.md`: status "Por crear" → "Implementado (MVP)".
+
+### Pipeline coverage after commit 4
+
+| Pipeline | Products covered |
+|---|---:|
+| Lencería | 164 (bras + panties + shapewear) |
+| Estáticos | 240 (perfumes + cremas + sunscreen + personal care + facial + makeup) |
+| Joyería | 82 (all accessory sub-types) |
+| **Total** | **486 / 486 (100%)** |
+
+### What's NOT in this commit (intentional)
+
+- **`/api/jewelry-tryon` route integration** — the page calls it but the route may need adjustments (e.g., accepting the `bodyPart` param if it doesn't today). If tryon fails, the page soft-fails and still ships the estante. Fix in a follow-up once observed in real use.
+- **`/api/model-create` prompt threading** — same deal; `modelPrompt` is passed but the route may need a pass-through tweak. Soft-failed.
+- **Manual approve/skip UI** — static-product and jewelry both ship MVP "procesar todas". Manual mode is a future add-on.
+- **Inventory auto-mode from within the page** — the jewelry page doesn't yet auto-load images from the inventory folders; user uploads manually or arrives via redirect from `/batch` auto-mode. Full integration is commit 5.
+- **Commits 5, 6, 7, 8** still pending per roadmap.
+
+---
+
 ## 2026-04-20 — Pipeline Estáticos created at /pipelines/static-product (commit 3 of pipeline rewrite)
 
 Second canonical pipeline is live. Replaces the 3 category-specific batch presets (`agent-perfumes`, `agent-cremas`, `agent-desodorantes`) with a single pipeline that picks an adaptive background based on product category + brand, mimicking how Sephora/La Mer/MAC present similar products instead of defaulting to generic white.

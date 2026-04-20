@@ -189,17 +189,9 @@ const PIPELINE_PRESETS: PresetDef[] = [
 const AGENT_PRESETS: PresetDef[] = [
   // agent-perfumes, agent-cremas: removed in commit 3 — these flows migrated to /pipelines/static-product.
   // Inventory scan redirects the "colonias" and "cremas" categories there automatically.
-  {
-    id: "agent-accesorios",
-    name: "Accesorios / Joyas",
-    description: "Quitar fondo oscuro y texto, mejorar, sombra suave, 1:1",
-    steps: [
-      { id: "a1", operation: "bg-remove", provider: "replicate", label: "Quitar Fondo + Texto" },
-      { id: "a2", operation: "enhance", provider: "auto", label: "Mejorar Calidad", params: { preset: "product-clean" } },
-      { id: "a3", operation: "shadows", provider: "auto", label: "Sombra Suave", params: { type: "drop", offsetX: 3, offsetY: 6, blur: 15, opacity: 0.25, color: "#000000", spread: 0 } },
-      { id: "a4", operation: "outpaint", provider: "auto", label: "Fondo Blanco 1:1", params: { targetAspectRatio: "1:1", prompt: "pure white background, professional jewelry photography, product centered, clean" } },
-    ],
-  },
+  // agent-accesorios: removed in commit 4 — migrated to /pipelines/jewelry.
+  // The inventory scan now splits jewelry into 5 sub-categories (aretes, collares,
+  // pulseras, anillos, sets), each redirecting to /pipelines/jewelry with subType param.
   {
     id: "agent-lenceria",
     name: "Lenceria (Producto Solo)",

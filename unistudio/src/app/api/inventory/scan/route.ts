@@ -45,16 +45,48 @@ const INVENTORY_FOLDERS: FolderConfig[] = [
     ],
   },
   {
-    id: "accesorios",
-    name: "Accesorios / Joyas",
-    // Commit 4 will redirect this to /pipelines/jewelry
-    agentPreset: "agent-accesorios",
+    id: "aretes",
+    name: "Aretes",
+    pipeline: "/pipelines/jewelry",
+    pipelineParams: { subType: "earrings" },
     paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Aretes",
+    ],
+  },
+  {
+    id: "collares",
+    name: "Cadenas / Collares",
+    pipeline: "/pipelines/jewelry",
+    pipelineParams: { subType: "necklace" },
+    paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Collares",
+    ],
+  },
+  {
+    id: "pulseras",
+    name: "Pulseras",
+    pipeline: "/pipelines/jewelry",
+    pipelineParams: { subType: "bracelet" },
+    paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Pulseras",
-      "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Sets",
+    ],
+  },
+  {
+    id: "anillos",
+    name: "Anillos",
+    pipeline: "/pipelines/jewelry",
+    pipelineParams: { subType: "ring" },
+    paths: [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Anillos",
+    ],
+  },
+  {
+    id: "sets",
+    name: "Sets de joyería",
+    pipeline: "/pipelines/jewelry",
+    pipelineParams: { subType: "set" },
+    paths: [
+      "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\Accesorrios\\CATALOGADOS\\Sets",
     ],
   },
   {

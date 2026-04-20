@@ -69,6 +69,10 @@ export default function HomePage() {
               <h3 className="font-medium">Pipeline de Estáticos</h3>
               <p className="text-xs text-zinc-500">Perfumes, cremas, skincare, maquillaje — fondo adaptativo por marca</p>
             </a>
+            <a href="/pipelines/jewelry" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-yellow-500/50 transition-all">
+              <h3 className="font-medium">Pipeline de Joyería</h3>
+              <p className="text-xs text-zinc-500">Aretes, cadenas, anillos, pulseras — estante + foto en modelo + video 360°</p>
+            </a>
             <a href="/brand-kit" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
               <h3 className="font-medium">Kit de Marca</h3>
               <p className="text-xs text-zinc-500">Tu logo, colores, y marca de agua</p>

@@ -239,6 +239,16 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
         example: "Perfume Esika → fondo gradient premium con reflejo · Desodorante → degradado gris neutro · Crema Yanbal → mármol blanco",
         useWhen: "Tenés fotos de envase estático (perfume/crema/spray) y querés e-commerce con estética profesional tipo Sephora/La Mer/MAC",
       },
+      {
+        id: "jewelry-pipeline",
+        label: "Joyería (Aretes · Cadenas · Anillos · Pulseras · Sets)",
+        icon: Package,
+        cost: "$0.08–$0.20/pieza",
+        kind: "pipeline",
+        description: "Pieza sobre fondo de lujo + foto en modelo (orejas / cuello / mano / muñeca) + video 360°",
+        example: "Arete → sobre terciopelo negro + modelo mostrando ambas orejas con el arete + video",
+        useWhen: "Tenés fotos de joyería (aretes, cadenas, anillos, pulseras, topos, sets) y querés catálogo e-commerce completo",
+      },
     ],
   },
   {
@@ -369,6 +379,7 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
                     const STANDALONE_PAGES: Record<string, string> = {
                       "lingerie-pipeline": "/pipelines/lingerie",
                       "static-product-pipeline": "/pipelines/static-product",
+                      "jewelry-pipeline": "/pipelines/jewelry",
                     };
                     const standaloneHref = STANDALONE_PAGES[mod.id];
 
@@ -514,6 +525,14 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
         >
           <Package className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
           Pipeline Estáticos
+        </a>
+        <a
+          href="/pipelines/jewelry"
+          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all hover:bg-white/[0.04]"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <Package className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+          Pipeline Joyería
         </a>
       </div>
     </div>
