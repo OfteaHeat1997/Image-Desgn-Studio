@@ -234,7 +234,12 @@ function AgentRouterContent() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/analyze-image", { method: "POST", body: form });
+      // Timeout 20s — if analyze-image hangs, the UI doesn't freeze forever.
+      const res = await fetch("/api/analyze-image", {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(20000),
+      });
       const json = await res.json();
       if (json.success && json.data?.garmentType) {
         const gt = json.data.garmentType as string;
@@ -248,8 +253,12 @@ function AgentRouterContent() {
           toast.success(`Detectado: ${CATEGORY_OPTIONS.find((c) => c.id === matchedId)?.label}`);
         }
       }
-    } catch {
-      // Silent — user will pick manually.
+    } catch (err) {
+      // Timeout or network fail — tell user to pick manually
+      if (err instanceof Error && err.name === "TimeoutError") {
+        toast.info("La detección automática tardó demasiado — elegí la categoría manualmente abajo.");
+      }
+      // Silent for other errors (e.g. no ANTHROPIC_API_KEY) — manual select still works
     } finally {
       setIsDetecting(false);
     }

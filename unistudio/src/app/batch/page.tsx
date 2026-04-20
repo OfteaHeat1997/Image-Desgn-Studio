@@ -240,17 +240,32 @@ export default function BatchPage() {
   const [autoBatchTotal, setAutoBatchTotal] = useState(0);
 
   /* ---- Scan inventory on mount ---- */
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+
   useEffect(() => {
     setScanningInventory(true);
-    fetch("/api/inventory/scan")
-      .then((r) => r.json())
+    setInventoryError(null);
+    fetch("/api/inventory/scan", { signal: AbortSignal.timeout(15000) })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         if (data.success) {
           setInventory(data.data.categories);
           setInventoryTotal(data.data.totalImages);
+        } else {
+          setInventoryError(data.error ?? "El scan del inventario falló.");
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : "Error desconocido";
+        setInventoryError(
+          msg.includes("TimeoutError") || msg.includes("aborted")
+            ? "El scan tardó demasiado. Revisá la conexión y recargá."
+            : `No se pudo escanear el inventario (${msg}).`,
+        );
+      })
       .finally(() => setScanningInventory(false));
   }, []);
 
@@ -798,6 +813,20 @@ export default function BatchPage() {
           <div className="flex items-center gap-2 py-4">
             <Loader2 className="h-4 w-4 animate-spin text-accent-light" />
             <span className="text-sm text-gray-400">Escaneando inventario...</span>
+          </div>
+        ) : inventoryError ? (
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+            <XCircle className="h-4 w-4 flex-shrink-0 text-red-400" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-300">Error al escanear</p>
+              <p className="mt-1 text-xs text-red-200/80">{inventoryError}</p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded border border-red-400/40 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
+            >
+              Reintentar
+            </button>
           </div>
         ) : inventory.length === 0 ? (
           <p className="py-4 text-sm text-gray-500">

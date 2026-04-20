@@ -528,21 +528,36 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       // If background is NOT white and NOT transparent, we need to remove it
       (bgType !== "transparent" && bgType !== "white");
 
-    // Skip auto bg-remove for modelo/cambiar-modelo — IDM-VTON extracts garment from original photo automatically
-    if (needsBgRemove && !hasBgRemove && req.agentType !== "modelo" && req.agentType !== "cambiar-modelo") {
+    // Skip auto bg-remove for modelo/cambiar-modelo EXCEPT for lingerie.
+    //
+    // For non-lingerie: IDM-VTON extracts the garment from the original photo automatically,
+    //                   so adding bg-remove first actually hurts the result.
+    //
+    // For LINGERIE: Kolors (the only lingerie-safe try-on) CANNOT extract a garment from
+    //               a photo with a model — the garment MUST be pre-isolated. bg-remove with
+    //               removeSubject:true is MANDATORY first step. (getModeloPipeline already
+    //               handles this for known lingerie category; this block is the catch-all.)
+    const isLingerieModelo =
+      (req.agentType === "modelo" || req.agentType === "cambiar-modelo") &&
+      req.productCategory === "lingerie";
+    const skipBgForNonLingerieModelo =
+      (req.agentType === "modelo" || req.agentType === "cambiar-modelo") && !isLingerieModelo;
+
+    if (needsBgRemove && !hasBgRemove && !skipBgForNonLingerieModelo) {
       // Insert bg-remove as the first step (or after inpaint if watermark removal is first)
       const insertIdx = steps.findIndex((s) => s.module === "inpaint") >= 0 ? 1 : 0;
-      steps.splice(
-        insertIdx,
-        0,
-        makeStep(
-          "bg-remove",
-          "Quitar fondo (detectado automaticamente)",
-          { provider: "browser" },
-          0,
-          `Fondo ${analysis.backgroundType} detectado — lo removemos primero para mejor resultado.`,
-        ),
-      );
+      // For lingerie modelo, use removeSubject:true (isolate garment, strip model).
+      // For everyone else, plain bg removal (strip background only).
+      const bgParams = isLingerieModelo
+        ? { provider: "replicate", removeSubject: true, garmentType: req.imageAnalysis?.garmentType ?? "bra" }
+        : { provider: "browser" };
+      const label = isLingerieModelo
+        ? "Aislar prenda (quita modelo + fondo)"
+        : "Quitar fondo (detectado automaticamente)";
+      const reasoning = isLingerieModelo
+        ? "Kolors requiere la prenda aislada antes del try-on — no puede extraerla de una foto con modelo."
+        : `Fondo ${analysis.backgroundType} detectado — lo removemos primero para mejor resultado.`;
+      steps.splice(insertIdx, 0, makeStep("bg-remove", label, bgParams, 0, reasoning));
     }
 
     // Skip bg-remove ONLY if background is already transparent or white AND agent is e-commerce

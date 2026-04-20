@@ -291,8 +291,10 @@ export default function JewelryPipelinePage() {
         totalCost += upsCost;
         updateStep(job.id, "upscale", { status: "done", resultUrl: workingUrl, cost: upsCost });
       } else {
-        console.warn("[jewelry] upscale soft-failed:", upsData.error);
-        updateStep(job.id, "upscale", { status: "skipped", error: upsData.error });
+        // HARD FAIL — upscale is critical for jewelry detail (gem/metal clarity).
+        // Without it the estante comes out blurry. Better to fail loud than ship bad output.
+        updateStep(job.id, "upscale", { status: "error", error: upsData.error || "Falló el upscale" });
+        throw new Error(upsData.error || "Upscale falló — joyería necesita detalle nítido para verse profesional");
       }
 
       const isolatedUrl = workingUrl;
