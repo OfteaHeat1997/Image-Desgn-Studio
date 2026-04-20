@@ -1,5 +1,40 @@
 # UniStudio — Changelog
 
+## 2026-04-21 (late) — Segunda ola de fixes: step timeline + H-fixes + reuso de modelos + HD quality
+
+Después del commit 9 de producción, la usuaria reportó varios problemas con screenshot y pidió seguir arreglando todo mientras estaba disponible. Sprint de 7 commits consecutivos en pocas horas:
+
+### `ae88990` — Step timeline live en /pipelines/static-product
+Regresión UX del commit 3 resuelta. Cada job ahora muestra 5 cards de timeline debajo (Quitar fondo > Centrar > Fondo adaptativo > Sombra > Ajustes finales). Cada card se pinta en vivo (amarillo pulsante, verde con check al completar, rojo con alerta si error, gris opaco si skipped). Thumbnail del resultado aparece en tiempo real. Costo por paso visible en mono amber.
+
+### `7a4a8dd` — Step timeline live en /pipelines/jewelry
+Mismo patrón en joyería. 5 cards: Quitar fondo / Upscale 2x / Estante lujoso / En modelo / Video 360°. Los pasos opcionales (modelo, video) solo aparecen si el toggle está activado.
+
+### `64779e1` — Batch de 4 fixes H:
+- H2 Jewelry upscale ahora hard-fail (antes soft silente → estante borroso sin aviso)
+- H4 AI Agent prompt contradicción resuelta en api/ai-agent/plan/route.ts:531 — isLingerieModelo check agrega bg-remove con removeSubject:true para lingerie, skipea para non-lingerie (IDM-VTON extract)
+- H5 /agent auto-detect con AbortSignal.timeout(20s) + toast.info si timeout
+- H6 Inventory scan distingue error vs empty — card roja con botón Reintentar cuando /api/inventory/scan falla
+
+### `8d75735` — D1 cross-session AI model reuse
+Ahorro $0.055 por cada color extra de la misma REF procesada en sesión diferente. Pipeline de lencería ahora:
+1. Cuando user tipea REF-71332 (debounced 600ms) → fetch /api/ai-models?referenceNumber=X
+2. Si existe → toast 'Modelo IA encontrada — ahorro $0.055' + setSharedModelUrl(savedModel.previewUrl)
+3. model-create step skipea porque ya hay sharedModelUrl (lógica preexistente)
+
+Backend: /api/model-create acepta body.referenceNumber, lo guarda en AiModel.metadata. /api/ai-models GET acepta ?referenceNumber=X filter. Todo opcional — sin breaking changes.
+
+### `774d3ca` — HD quality upgrade
+Causa de 'fotos horribles no HD': 5 de 8 configs de static-product usaban bgMode:'fast' (Flux Schnell). Upgrade:
+- Todos los configs ahora bgMode:'precise' (Flux Kontext Pro HD)
+- Suffijo HD común (8K, sharp focus, crystal clear, professional commercial, no blur, no artifacts) en 15 prompts
+- Prompts específicos con texturas ('Carrara marble with subtle veining', 'visible wood grain', 'linen weave'), aesthetic de marca referente (Tiffany, Cartier, Sephora, La Mer, La Roche-Posay), lighting direccional explícito
+- Tryon prompts de joyería upgraded con 'preserve gem color, metal tone, every decorative detail exactly'
+
+Tradeoff económico: deodorantes/cremas-non-premium/perfumes-non-premium ahora cuestan $0.05 vs $0.003 — 16x más. Pero calidad es usable para catálogo real, antes no.
+
+---
+
 ## 2026-04-21 — Production fix + critical hardening (commit 9)
 
 Vercel production build failed after commit 8 because `AiAgentPanel`'s stub had a type mismatch (`onProcess: (result: unknown) => void` vs the editor registry expecting `(result: string, beforeImage?, cost?) => void`). Fixed + shipped the remaining critical fixes from the 4-audit review in the same commit.
