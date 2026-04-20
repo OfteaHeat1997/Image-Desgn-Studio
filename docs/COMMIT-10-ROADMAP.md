@@ -283,3 +283,101 @@ Si estás retomando esto: la base está sólida. Los 3 pipelines funcionan, el b
 Lo que viene es **visual + mobile**, NO estructural. Resistí la tentación de refactorizar: la usuaria dijo literalmente "mejorar no dañar". Si un archivo te tienta a reescribirlo, preguntate: ¿esto mejora UX? Si no, no lo toques.
 
 Prioridad absoluta al arrancar: leer este doc entero + ejecutar los comandos de "Ver estado actual" + confirmar con la usuaria cuál de Parte 1 (dashboard) o Parte 2 (mobile) arranca primero. Si vas bien de contexto, hacer ambas. Si no, Parte 2 primero (mobile es más alto impacto para su caso — probablemente usa celular para ver resultados mientras trabaja desde Curaçao).
+
+---
+
+# NORTE UX — instrucción directa de la usuaria (2026-04-21, fin commit 9)
+
+**Texto exacto:** "quiero que te enfoques en la experiencia, que en los módulos pueda ver cada paso, todo se pueda editar, optimizar, sea visual, importantísimo se vean los cambios. Necesito que todo sea interactivo. Mi user son personas que no manejan en absoluto tecnología pero quiero usar esta app para entender fácil y que se pueda ver todo los procesos visualmente. Que sea botón interactivo que explique ejemplo. Hablo por ejemplo CSS, no lo sé, como visuales. Ejemplo como si fuera un app de niños, algo así."
+
+## Qué significa esto en la práctica
+
+**Target user: NO técnico.** Paula vende a clientes finales (no devs). La app tiene que ser como Canva para niños — cada acción obvia, cada cambio visible al instante, cada botón se explica solo.
+
+### 10 principios de diseño (honrar en cualquier commit futuro)
+
+1. **Cada paso de un pipeline tiene que verse en vivo** — no más "procesando..." opaco. Muestra thumbnails de ANTES y DESPUÉS mientras corre.
+2. **Botones con preview hover** — al pasar el mouse, muestra ejemplo visual de lo que hace (miniatura animada).
+3. **Tooltips con ejemplo, no solo texto** — un arete sobre terciopelo negro, no "estante de terciopelo negro".
+4. **Slider before/after en cada resultado** — se ve el input a la izquierda, el output a la derecha, drag para comparar.
+5. **Iconos grandes + palabras en español simple** — "Quitar fondo" no "bg-remove", "Poner en modelo" no "try-on".
+6. **Colores + emojis contextuales** — cada módulo con su paleta (lencería rosa/violeta, joyería dorado, perfumes beige). Iconos literales: 🩱 para lencería, 💎 para joyería, 🧴 para perfumes. (La usuaria ya removió emojis del código en un commit anterior, pero los quiere PARA UI visual — confirmar con ella si los emojis inline son OK).
+7. **Progreso visible con animación** — step 2 de 6, barra de progreso llenándose, check verde cuando completa.
+8. **"¿Qué va a pasar?" preview antes de ejecutar** — muestra los 6 pasos con iconos + costo de cada uno, así el usuario sabe qué va a suceder.
+9. **Errors en castellano humano** — no "HTTP 500", sino "No pude conectar con la IA de fondos. ¿Querés reintentar?". Pattern: `humanizeError()` ya existe en `src/lib/utils/humanize-error.ts`, usarlo en todos los toast.
+10. **Deshacer fácil** — cada paso debería tener "rehacer" o "saltar" visible. Ya existe en lingerie page pero necesita ser más prominente.
+
+### Patrones de UI a implementar/extender
+
+- **Step card con 3 zonas visibles**: [Input thumbnail] → [Iconito del paso + nombre en español] → [Output thumbnail con botón download + rehacer]
+- **Hero CTA en cada pipeline**: "Subí tu foto de brassiere aquí" con drag-zone gigante + ícono animado de cámara, no "Arrastra archivos"
+- **Progress tracker arriba**: 6 dots con icono de cada paso, el actual pulsa, los previos en verde, los futuros en gris
+- **Panel de "Configurar antes de empezar"**: solo 2-3 campos visibles (tipo de producto, marca, modelo opcional), todo lo demás como "Ajustes avanzados" colapsable
+- **Resultado final = pantalla grande**: grilla de todos los outputs (estante/modelo/video) con botón "Descargar todo" enorme + share buttons
+- **Onboarding first-time**: la primera vez que alguien entra a un pipeline, overlay paso a paso con tooltips animados explicando cada zona de la UI
+
+### Componentes reusables nuevos a crear (commit 10+)
+
+Ninguno existe todavía. Candidatos (basar en shadcn/ui o crear custom):
+
+| Componente | Dónde | Reemplaza |
+|---|---|---|
+| `<BeforeAfterSlider>` | Results de cada pipeline + gallery | Que no hay — usuaria pidió esto explícitamente |
+| `<StepProgressBar steps={[...]} current={n}>` | Top de cada pipeline page | Los step-cards sueltos actuales |
+| `<UploadHero>` | Start de cada pipeline | UploadZone actual (muy chiquita) |
+| `<HoverPreviewButton>` | Sidebar + category grids | Botones actuales sin preview |
+| `<CostBadge amount={0.15} tier="economic">` | Cada step definido | Texto "$0.15" suelto |
+| `<ResultGrid outputs={{estante, modelo, video}}>` | Final de jewelry/lingerie pipeline | ResultCard sueltos actuales |
+| `<ExplainTooltip example={<img/>}>` | Cada botón no-obvio | Los `title=` attributes actuales |
+
+### Comportamientos interactivos esperados
+
+- **Hover en un step futuro**: muestra tooltip "Este paso va a poner el bra en una modelo IA" con mini GIF/imagen de ejemplo.
+- **Click en un step completado**: abre modal con el resultado full-size + "Rehacer este paso" + "Descargar".
+- **Drag en foto cargada**: permite reordenar orden de procesamiento (en batch).
+- **Shift+click en categorías**: selecciona varias (para batch).
+- **Escape**: cierra cualquier modal o menú.
+- **Cmd/Ctrl+Z**: deshace último paso (ya existe en editor, extender a pipelines).
+
+### Mobile-first implicaciones
+
+Esto amplifica la necesidad de mobile del plan original:
+- Los step cards tienen que apilarse verticalmente en móvil
+- El slider before/after tiene que funcionar con touch (no solo mouse)
+- Los tooltips se convierten en tap-to-expand en lugar de hover
+- El upload zone cubre toda la pantalla en móvil
+- El progress bar se vuelve vertical en pantallas estrechas
+
+## Reorden de prioridades para commit 10
+
+**Parte 1 (antes era "dashboard redesign"): AHORA ES LA INTERACTIVIDAD VISUAL**
+
+Reordenar así:
+1. `<BeforeAfterSlider>` — el componente más pedido, reusable en gallery + los 3 pipelines
+2. `<StepProgressBar>` — visible al top de cada pipeline, muestra paso por paso
+3. Humanizar todos los toast con `humanizeError()`
+4. Tooltips con ejemplo visual en sidebar + categorías
+5. Dashboard redesign (lo que era Parte 1 original)
+6. Mobile responsive sweep (lo que era Parte 2 original)
+
+**Tiempo estimado con este ángulo: 8-12h** (más que las 5-6h originales porque agrega componentes reusables).
+
+## Cómo evitar romper nada mientras agregamos interactividad
+
+- **NUEVOS componentes** en `src/components/ui/` (before-after-slider, step-progress, etc.) — aditivos, no modifican nada existente
+- **Integrar los componentes nuevos en las páginas existentes** reemplazando bloques UI pequeños (no re-escribir páginas enteras)
+- Ejemplo: en `pipelines/lingerie/page.tsx`, reemplazar SOLO el render de step cards actuales con el nuevo `<StepProgressBar>`. El resto de la página queda igual.
+- Cada commit del ciclo 10 toca 1 componente + la integración mínima para probarlo en 1 sola página. Luego extender a las otras.
+
+## Métrica de éxito (cómo sabemos que mejoró)
+
+Si una persona que NUNCA usó la app puede:
+- Entrar al dashboard → entender qué pipeline usar en 5 segundos ✓
+- Subir una foto sin leer instrucciones ✓
+- Ver QUÉ va a pasar antes de apretar "empezar" ✓
+- Ver cada paso ejecutándose con feedback visual ✓
+- Comparar antes/después con un slider sin explicación ✓
+- Descargar el resultado sin buscar el botón ✓
+
+Entonces cumplimos "app para niños". Antes de cerrar commit 10, probar el flujo completo con esa checklist.
+
