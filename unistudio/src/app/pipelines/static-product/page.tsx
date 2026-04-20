@@ -254,20 +254,27 @@ export default function StaticProductPipelinePage() {
       if (!upData.success) throw new Error(upData.error || "Upload failed");
       currentUrl = upData.data.url;
 
-      // 2. Remove background
+      // 2. Remove background → step "isolate"
       updateJob(job.id, { status: "isolating" });
+      updateStep(job.id, "isolate", { status: "running" });
       const bgRes = await fetch("/api/bg-remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: currentUrl, provider: "replicate" }),
       });
       const bgData = await safeJson(bgRes);
-      if (!bgData.success) throw new Error(bgData.error || "Background removal failed");
+      if (!bgData.success) {
+        updateStep(job.id, "isolate", { status: "error", error: bgData.error || "Falló quitar fondo" });
+        throw new Error(bgData.error || "Background removal failed");
+      }
       currentUrl = bgData.data.url || bgData.data.imageUrl;
-      totalCost += bgData.cost ?? 0.01;
+      const isolateCost = bgData.cost ?? 0.01;
+      totalCost += isolateCost;
+      updateStep(job.id, "isolate", { status: "done", resultUrl: currentUrl, cost: isolateCost });
 
-      // 3. Normalize canvas (center in 2000x2000 1:1)
+      // 3. Normalize canvas → step "normalize"
       updateJob(job.id, { status: "normalizing" });
+      updateStep(job.id, "normalize", { status: "running" });
       const normRes = await fetch("/api/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -279,35 +286,40 @@ export default function StaticProductPipelinePage() {
       });
       const normData = await safeJson(normRes);
       if (!normData.success) {
-        // enhance has a resize fallback — if preset is unknown, it falls back to identity.
-        // Don't fail the pipeline; keep currentUrl as-is.
         console.warn("[static-product] normalize step soft-failed:", normData.error);
+        updateStep(job.id, "normalize", { status: "skipped", error: normData.error });
       } else {
         currentUrl = normData.data.url || normData.data.imageUrl || currentUrl;
+        updateStep(job.id, "normalize", { status: "done", resultUrl: currentUrl, cost: 0 });
       }
 
-      // 4. Generate adaptive background
+      // 4. Generate adaptive background → step "bg"
       updateJob(job.id, { status: "generating-bg" });
+      updateStep(job.id, "bg", { status: "running" });
       const genRes = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: currentUrl,
           mode: config.bgMode,
-          // The route requires `style`. We pass "custom" (not in the preset list)
-          // so the validator falls through to `customPrompt` — our adaptive matrix prompt.
           style: "custom",
           customPrompt: config.prompt,
           aspectRatio: "1:1",
         }),
       });
       const genData = await safeJson(genRes);
-      if (!genData.success) throw new Error(genData.error || "Background generation failed");
+      if (!genData.success) {
+        updateStep(job.id, "bg", { status: "error", error: genData.error || "Falló generar fondo" });
+        throw new Error(genData.error || "Background generation failed");
+      }
       currentUrl = genData.data.url || genData.data.imageUrl;
-      totalCost += genData.cost ?? (config.bgMode === "precise" ? 0.05 : 0.003);
+      const bgCost = genData.cost ?? (config.bgMode === "precise" ? 0.05 : 0.003);
+      totalCost += bgCost;
+      updateStep(job.id, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost });
 
-      // 5. Shadows
+      // 5. Shadows → step "shadow"
       updateJob(job.id, { status: "shadowing" });
+      updateStep(job.id, "shadow", { status: "running" });
       const shRes = await fetch("/api/shadows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -319,13 +331,17 @@ export default function StaticProductPipelinePage() {
       const shData = await safeJson(shRes);
       if (shData.success) {
         currentUrl = shData.data.url || shData.data.imageUrl || currentUrl;
-        totalCost += shData.cost ?? 0;
+        const shCost = shData.cost ?? 0;
+        totalCost += shCost;
+        updateStep(job.id, "shadow", { status: "done", resultUrl: currentUrl, cost: shCost });
       } else {
         console.warn("[static-product] shadow step soft-failed:", shData.error);
+        updateStep(job.id, "shadow", { status: "skipped", error: shData.error });
       }
 
-      // 6. Final color pop enhance
+      // 6. Final color pop enhance → step "finish"
       updateJob(job.id, { status: "finishing" });
+      updateStep(job.id, "finish", { status: "running" });
       const finRes = await fetch("/api/enhance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -337,6 +353,9 @@ export default function StaticProductPipelinePage() {
       const finData = await safeJson(finRes);
       if (finData.success) {
         currentUrl = finData.data.url || finData.data.imageUrl || currentUrl;
+        updateStep(job.id, "finish", { status: "done", resultUrl: currentUrl, cost: 0 });
+      } else {
+        updateStep(job.id, "finish", { status: "skipped", error: finData.error });
       }
 
       updateJob(job.id, { status: "done", resultUrl: currentUrl, cost: totalCost });
@@ -449,14 +468,14 @@ export default function StaticProductPipelinePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
               {jobs.map((job) => {
                 const cfg = getAdaptiveBgConfig(job.productType, job.brand);
                 return (
                   <div
                     key={job.id}
-                    className="flex gap-3 rounded-lg border border-white/8 bg-black/30 p-3"
-                  >
+                    className="rounded-lg border border-white/8 bg-black/30 p-3"
+                  ><div className="flex gap-3">
                     {/* Preview */}
                     <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded border border-white/10 bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -533,6 +552,59 @@ export default function StaticProductPipelinePage() {
                         </p>
                       )}
                     </div>
+                    </div>
+
+                    {/* Step timeline — live preview de cada paso con thumbnails + costo */}
+                    {job.status !== "idle" && (
+                      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+                        {(Object.keys(STEP_META) as StepKey[]).map((key) => {
+                          const step = job.steps[key];
+                          const meta = STEP_META[key];
+                          const activeClass =
+                            step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
+                            step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
+                            step.status === "error" ? "bg-red-500/10 border-red-500/40" :
+                            step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
+                            "bg-white/[0.02] border-white/10";
+                          return (
+                            <div
+                              key={key}
+                              className={cn("flex flex-col rounded border p-2 text-[10px]", activeClass)}
+                              title={step.error ?? meta.label}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span className="text-sm">{meta.icon}</span>
+                                <span className="truncate font-medium text-gray-200">{meta.label}</span>
+                              </div>
+                              {step.resultUrl ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={step.resultUrl}
+                                  alt={meta.label}
+                                  className="mt-1 h-14 w-full rounded bg-black object-contain"
+                                />
+                              ) : (
+                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 text-gray-600">
+                                  {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
+                                </div>
+                              )}
+                              <div className="mt-1 flex items-center justify-between gap-1 text-gray-400">
+                                <span>
+                                  {step.status === "done" && <CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" />}
+                                  {step.status === "error" && <AlertCircle className="inline h-2.5 w-2.5 text-red-400" />}
+                                  {step.status === "skipped" && "saltado"}
+                                  {step.status === "running" && "..."}
+                                  {step.status === "idle" && meta.costHint}
+                                </span>
+                                {step.status === "done" && step.cost > 0 && (
+                                  <span className="font-mono text-[9px] text-violet-300">${step.cost.toFixed(3)}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
