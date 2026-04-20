@@ -162,63 +162,86 @@ async function isolateGarment(
   const urls = await toUrlArray(rawOutput);
   console.log(`[bg-remove:isolate] grounded_sam returned ${urls.length} urls: ${urls.map(u => u.slice(0, 60)).join(' | ')}`);
 
-  // Helper: download + verify mask. Score = fraction of white pixels (garment coverage).
-  async function tryMask(url: string, label: string): Promise<{ buffer: Buffer; score: number } | null> {
+  // Helper: download + verify mask. Returns both coverage (fraction of white
+  // pixels — garment area) and purity (fraction of pixels that are near-black
+  // or near-white — how "mask-like" it is). A real SAM mask is ~99% pure
+  // black/white; the annotated debug overlay has labels + colored bbox lines
+  // over the original photo and scores low on purity.
+  async function tryMask(
+    url: string,
+    label: string,
+  ): Promise<{ buffer: Buffer; coverage: number; purity: number } | null> {
     try {
       const resp = await fetch(url, { headers: replicateHeaders(url) });
       if (!resp.ok) return null;
       const buf = Buffer.from(await resp.arrayBuffer());
       const gray = await sharp(buf).resize(width, height, { fit: 'fill' }).grayscale().raw().toBuffer();
       let white = 0;
-      for (let i = 0; i < gray.length; i++) if (gray[i] > 128) white++;
-      const score = white / gray.length;
-      console.log(`[bg-remove:isolate] candidate ${label} score=${score.toFixed(3)}`);
-      return { buffer: gray, score };
+      let pure = 0;
+      for (let i = 0; i < gray.length; i++) {
+        if (gray[i] > 128) white++;
+        if (gray[i] < 20 || gray[i] > 235) pure++;
+      }
+      const coverage = white / gray.length;
+      const purity = pure / gray.length;
+      console.log(
+        `[bg-remove:isolate] candidate ${label} coverage=${coverage.toFixed(3)} purity=${purity.toFixed(3)}`,
+      );
+      return { buffer: gray, coverage, purity };
     } catch (err) {
       console.warn(`[bg-remove:isolate] candidate ${label} failed:`, err);
       return null;
     }
   }
 
-  // Download + score all candidates in parallel (sequential was wasting 4-8s
-  // per run against Vercel's 60s cap).
+  // Download + score all candidates in parallel
   const maxCandidates = Math.min(urls.length, 4);
   const settled = await Promise.all(
     Array.from({ length: maxCandidates }, (_, i) => tryMask(urls[i], `idx${i}`)),
   );
-  const candidates: Array<{ buffer: Buffer; score: number; idx: number }> = [];
+  const candidates: Array<{
+    buffer: Buffer;
+    coverage: number;
+    purity: number;
+    idx: number;
+  }> = [];
   for (let i = 0; i < settled.length; i++) {
     const candidate = settled[i];
     if (candidate) candidates.push({ ...candidate, idx: i });
   }
 
-  // Score every candidate and pick the one with plausible garment coverage.
-  // Range 0.5%–75% covers both close-up bra shots (small mask) and full-body
-  // outfits. Below 0.5% means the model found nothing; above 75% almost
-  // always means we got an inverted or debug image by mistake.
+  // Pick the mask. Real SAM masks are ~99% pure black/white; annotated
+  // debug overlays (with bounding boxes drawn on the source photo) score
+  // below ~0.5 purity. Require purity >= 0.9 AND plausible coverage
+  // (0.3%–80%). Without purity, the old heuristic kept picking the
+  // annotated image because a high-contrast photo has many "white" pixels.
   let bestMask: Buffer | null = null;
-  let bestScore = 0;
+  let bestCoverage = 0;
   for (const candidate of candidates) {
-    const inRange = candidate.score >= 0.005 && candidate.score <= 0.75;
-    if (inRange && candidate.score > bestScore) {
+    const isMaskLike = candidate.purity >= 0.9;
+    const inRange = candidate.coverage >= 0.003 && candidate.coverage <= 0.8;
+    // Prefer the mask with the largest plausible coverage among mask-like
+    // candidates — grounded_sam sometimes returns two valid masks
+    // (foreground + refined); bigger one is usually cleaner.
+    if (isMaskLike && inRange && candidate.coverage > bestCoverage) {
       bestMask = candidate.buffer;
-      bestScore = candidate.score;
+      bestCoverage = candidate.coverage;
     }
   }
 
-  // If nothing scored in range but we DID get masks, try the one with the
-  // smallest non-zero coverage — it's likely the real garment mask, just
-  // tiny. Better than falling back to rembg which keeps the model.
+  // No mask passed purity: try the candidate with the HIGHEST purity as long
+  // as it's still reasonably high (>=0.75) — sometimes JPEG compression
+  // drags purity down. Better than the annotated overlay.
   if (!bestMask && candidates.length) {
-    const nonZero = candidates
-      .filter((c) => c.score > 0.001 && c.score < 0.9)
-      .sort((a, b) => a.score - b.score)[0];
-    if (nonZero) {
+    const byPurity = [...candidates]
+      .filter((c) => c.purity >= 0.75 && c.coverage >= 0.001 && c.coverage <= 0.9)
+      .sort((a, b) => b.purity - a.purity)[0];
+    if (byPurity) {
       console.warn(
-        `[bg-remove:isolate] no mask in primary range, using smallest non-zero: idx${nonZero.idx} score=${nonZero.score.toFixed(4)}`,
+        `[bg-remove:isolate] no high-purity mask, using top purity candidate idx${byPurity.idx} purity=${byPurity.purity.toFixed(3)}`,
       );
-      bestMask = nonZero.buffer;
-      bestScore = nonZero.score;
+      bestMask = byPurity.buffer;
+      bestCoverage = byPurity.coverage;
     }
   }
 
@@ -227,7 +250,7 @@ async function isolateGarment(
     return await removeBgReplicate(preparedDataUrl);
   }
 
-  console.log(`[bg-remove:isolate] using mask with coverage=${bestScore.toFixed(3)}`);
+  console.log(`[bg-remove:isolate] using mask coverage=${bestCoverage.toFixed(3)}`);
 
   // Compose: prepared RGB + mask as alpha → PNG with only the garment visible.
   const isolated = await sharp(prepared)
