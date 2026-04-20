@@ -7,6 +7,7 @@ export type AgentType = 'ecommerce' | 'modelo' | 'social' | 'catalogo' | 'cambia
 
 /** Modules the agent can orchestrate */
 export type AgentModule =
+  | 'analyze-image'
   | 'bg-remove'
   | 'bg-generate'
   | 'enhance'

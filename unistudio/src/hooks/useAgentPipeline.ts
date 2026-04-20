@@ -118,6 +118,15 @@ async function executeStep(
   const { module, params } = step;
 
   switch (module) {
+    // ----- Analyze Image -----
+    // Image analysis already runs automatically in AiAgentPanel before the
+    // plan is executed. If the plan includes an explicit "analyze-image" step
+    // we just pass through — the ctx keeps the current image unchanged so the
+    // next step sees the same input.
+    case "analyze-image": {
+      return { resultUrl: ctx.currentUrl, cost: 0, updatedCtx: {} };
+    }
+
     // ----- Background Remove -----
     case "bg-remove": {
       const provider = (params.provider as string) ?? "browser";
