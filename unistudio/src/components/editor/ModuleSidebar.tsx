@@ -220,14 +220,14 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
         useWhen: "Tenés muchas fotos que necesitan EXACTAMENTE el mismo proceso (ej: toda la colección)",
       },
       {
-        id: "catalog-pipeline",
-        label: "1 Referencia — Catálogo Completo",
+        id: "lingerie-pipeline",
+        label: "Lencería (Bras · Panties · Shapewear)",
         icon: Package,
-        cost: "$0.18+/ref",
+        cost: "$0.15+/foto",
         kind: "pipeline",
-        description: "1 foto + número de ref → 4 ángulos + 2 videos + infografía",
-        example: "REF-123 rojo → catálogo completo con vista frontal, espalda, lateral, lifestyle + 2 videos",
-        useWhen: "Querés el catálogo e-commerce COMPLETO de una sola referencia lista para publicar",
+        description: "Quita la modelo original, crea una modelo IA con licencia libre, y la viste con la prenda (+ videos opcionales)",
+        example: "Foto de bra Leonisa con modelo original → modelo nueva vistiendo el bra + video 360° de la prenda",
+        useWhen: "Tenés fotos de bras, panties o shapewear con modelo original y necesitas copyright-free",
       },
     ],
   },
@@ -357,7 +357,7 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
 
                     // Standalone pages — navigate instead of loading in editor
                     const STANDALONE_PAGES: Record<string, string> = {
-                      "catalog-pipeline": "/catalog-pipeline",
+                      "lingerie-pipeline": "/pipelines/lingerie",
                     };
                     const standaloneHref = STANDALONE_PAGES[mod.id];
 
@@ -489,12 +489,12 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
           Batch Masivo
         </a>
         <a
-          href="/catalog-pipeline"
+          href="/pipelines/lingerie"
           className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all hover:bg-white/[0.04]"
           style={{ color: "var(--text-secondary)" }}
         >
           <Package className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
-          Pipeline Catálogo
+          Pipeline Lencería
         </a>
       </div>
     </div>

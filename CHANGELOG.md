@@ -1,5 +1,46 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Pipeline Lencería moved to /pipelines/lingerie (commit 2 of pipeline rewrite)
+
+Migrated the working lingerie catalog flow from `/catalog-pipeline` to the canonical location `/pipelines/lingerie`. Deleted the dead server-side orchestrator at `/api/catalog-pipeline`. No functional regression — the page's local-state orchestration continues to work as it did; only the URL and branding changed.
+
+### Moved
+
+- `src/app/catalog-pipeline/page.tsx` → `src/app/pipelines/lingerie/page.tsx`
+  - Function renamed: `CatalogPipelinePage` → `LingeriePipelinePage`
+  - Breadcrumb label: "Pipeline de Catálogo" → "Pipeline de Lencería"
+  - Badge: "Leonisa Lencería" → "Bras · Panties · Shapewear"
+  - H1: "Configura tu Pipeline de Catálogo" → "Configura tu Pipeline de Lencería"
+  - Description rewritten to explain the flow (quitar modelo → crear modelo IA → tryon → videos opcionales)
+  - `lingerieTypes` array extended to include `shapewear` and `bodysuit` (user confirmed shapewear belongs in this pipeline)
+  - `garmentTypeForApi` mapping updated so `shapewear` passes through directly instead of collapsing to `lingerie`
+
+### Deleted (2 directories)
+
+- `src/app/catalog-pipeline/` — the old page location (UI was moved, old URL retired).
+- `src/app/api/catalog-pipeline/` — dead server-side orchestrator. Confirmed by grep: nothing in the codebase was calling `/api/catalog-pipeline`. The only remaining reference is a historical code comment in `api/ai-agent/plan/route.ts:280`, which is harmless and will be removed naturally when the AI Agent is refactored in commit 6.
+
+### Updated references
+
+- `src/components/editor/ModuleSidebar.tsx`
+  - Sidebar item id: `catalog-pipeline` → `lingerie-pipeline`, label: "1 Referencia — Catálogo Completo" → "Lencería (Bras · Panties · Shapewear)"
+  - `STANDALONE_PAGES` URL: `/catalog-pipeline` → `/pipelines/lingerie`
+  - Footer quick-link: `/catalog-pipeline` → `/pipelines/lingerie`, label "Pipeline Catálogo" → "Pipeline Lencería"
+- `src/app/page.tsx` — homepage card href + label + description updated
+- `docs/pipelines/lingerie.md` — status changed from "Por crear" to "Implementado"; clarified it has no own API route because the per-step UI is client-orchestrated
+
+### Why no server-side `/api/pipelines/lingerie` route
+
+The lingerie flow needs per-step UI with manual approve/skip/rerun — this only works with client-side orchestration. The page calls `/api/<module>` directly for each step. A server-side orchestrator like the old `/api/catalog-pipeline` blocks until all steps complete, which prevents the UI from showing intermediate results. This is intentional and documented in `docs/pipelines/lingerie.md`.
+
+### What is NOT in this commit (intentionally — future commits)
+
+- **AI Agent `/agent` page** still has a "Reemplazar Modelo" workflow (`agentType: modelo`) that also does lingerie. It stays for now — will be consolidated in commit 6 when AI Agent becomes a router.
+- **Batch preset `agent-lenceria`** in `src/app/batch/page.tsx:220` still exists — simpler product-only flow for bulk, not a duplicate of this pipeline. Will be re-evaluated in commit 7.
+- **`/api/inventory/scan/route.ts:48`** still maps folder `lenceria` → `agentPreset: "agent-lenceria"`. Will be updated in commit 5 (auto-routing from folders to pipelines).
+
+---
+
 ## 2026-04-20 — Docs consolidation: 3 canonical pipelines structure (commit 1 of pipeline rewrite)
 
 Set up the documentation foundation for the pipeline rewrite cycle. Before touching any code, established a single source of truth for which pipelines exist, what modules they reuse, and the sync rules that prevent future duplication.

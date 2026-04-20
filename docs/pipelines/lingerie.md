@@ -3,8 +3,8 @@
 > Para: Unistyles (Curaçao) — **164 productos** (77 bras + 72 panties + 15 shapewear)
 
 **Última actualización:** 2026-04-20
-**Estado:** En migración desde `/catalog-pipeline` → `/pipelines/lingerie` (commit 2 del ciclo actual)
-**Ruta API:** `/api/pipelines/lingerie`
+**Estado:** Implementado — migrado desde `/catalog-pipeline` (commit 2 del ciclo, merge preservando la orquestación local que ya funcionaba)
+**Ruta API:** No tiene ruta propia — la página orquesta los módulos directamente desde el cliente (`fetch('/api/<modulo>')`). Es intencional: permite per-step UI con aprobación manual.
 **Página UI:** `/pipelines/lingerie`
 
 ---

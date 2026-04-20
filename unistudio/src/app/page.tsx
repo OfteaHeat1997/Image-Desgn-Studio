@@ -61,9 +61,9 @@ export default function HomePage() {
               <h3 className="font-medium">Procesamiento Masivo</h3>
               <p className="text-xs text-zinc-500">Procesa 50+ imágenes con un pipeline configurable</p>
             </a>
-            <a href="/catalog-pipeline" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 transition-all">
-              <h3 className="font-medium">Pipeline de Catálogo</h3>
-              <p className="text-xs text-zinc-500">Genera catálogo completo de una referencia</p>
+            <a href="/pipelines/lingerie" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 transition-all">
+              <h3 className="font-medium">Pipeline de Lencería</h3>
+              <p className="text-xs text-zinc-500">Bras, panties, shapewear — quita la modelo y crea una nueva</p>
             </a>
             <a href="/brand-kit" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
               <h3 className="font-medium">Kit de Marca</h3>

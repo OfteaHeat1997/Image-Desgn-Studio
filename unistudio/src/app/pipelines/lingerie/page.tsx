@@ -433,14 +433,13 @@ async function runStep(
   productType: string,
   sharedModelUrl?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string }> {
-  // Map the catalog productType ("bra" | "panty" | "set" | "other") to the
-  // garmentType the AI Agent routes expect. This unlocks:
+  // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
   // - tryon's forced Kolors for lingerie
-  const lingerieTypes = ['bra', 'panty', 'set', 'lingerie'];
+  const lingerieTypes = ['bra', 'panty', 'set', 'shapewear', 'bodysuit', 'lingerie'];
   const garmentTypeForApi =
-    productType === 'bra' || productType === 'panty' || productType === 'set'
+    productType === 'bra' || productType === 'panty' || productType === 'set' || productType === 'shapewear'
       ? productType
       : lingerieTypes.includes(productType) ? 'lingerie' : 'other';
   const isLingerieFlow = garmentTypeForApi !== 'other';
@@ -572,7 +571,7 @@ async function runStep(
 /*  Main Page                                                           */
 /* ------------------------------------------------------------------ */
 
-export default function CatalogPipelinePage() {
+export default function LingeriePipelinePage() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [productType, setProductType] = useState("bra");
@@ -885,11 +884,11 @@ export default function CatalogPipelinePage() {
           <span className="text-gray-700">/</span>
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-violet-400" />
-            <span className="text-sm font-semibold text-white">Pipeline de Catálogo</span>
+            <span className="text-sm font-semibold text-white">Pipeline de Lencería</span>
           </div>
           <div className="ml-auto">
             <span className="rounded-full bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300">
-              Leonisa Lencería
+              Bras · Panties · Shapewear
             </span>
           </div>
         </header>
@@ -897,9 +896,9 @@ export default function CatalogPipelinePage() {
         <div className="mx-auto max-w-5xl px-6 py-8">
           {/* Page title */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">Configura tu Pipeline de Catálogo</h1>
+            <h1 className="text-2xl font-bold text-white">Configura tu Pipeline de Lencería</h1>
             <p className="mt-1 text-sm text-gray-400">
-              Sube todas las fotos de una referencia (diferentes colores/ángulos) y genera todo el contenido de e-commerce de una vez.
+              Bras, panties y shapewear. Sube fotos de una referencia con modelo original, y el pipeline quita la modelo, crea una nueva con licencia libre, y la viste con la prenda. Opcionalmente genera videos de producto y de modelo.
             </p>
           </div>
 
