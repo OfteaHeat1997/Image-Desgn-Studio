@@ -80,6 +80,48 @@ export const INPAINT_PRESETS: Record<string, InpaintPreset> = {
     prompt: 'clear surface without reflections, clean glass or metal, no unwanted mirror effects, matching surrounding area, natural transparent or opaque surface',
     negativePrompt: 'reflection, mirror, glare, lens flare, bright spot, light artifact',
   },
+  'product-fix': {
+    name: 'Product Fix',
+    description: 'Clean product surface, fix imperfections while keeping original material',
+    prompt: 'Clean, seamless product surface. Fix imperfections while maintaining original material texture and color. Professional product photography quality.',
+    negativePrompt: 'blurry, distorted, different color, different material, low quality',
+  },
+  'seamless-fill': {
+    name: 'Seamless Fill',
+    description: 'Fill the area matching surrounding texture, color, and lighting',
+    prompt: 'Fill the area seamlessly with the surrounding content. Match texture, color, lighting, and perspective perfectly. Natural and undetectable.',
+    negativePrompt: 'visible seam, different texture, mismatched lighting, obvious edit',
+  },
+  'texture-match': {
+    name: 'Texture Match',
+    description: 'Extend the existing texture pattern consistently',
+    prompt: 'Extend and match the existing texture pattern exactly. Maintain consistent grain, weave, or material appearance throughout.',
+    negativePrompt: 'different pattern, wrong texture, misaligned, blurry, warped',
+  },
+  'remove-text': {
+    name: 'Remove Text',
+    description: 'Remove all text, labels, and markings from the area',
+    prompt: 'Remove all text, labels, and markings from this area. Fill with the underlying surface material seamlessly.',
+    negativePrompt: 'text, letters, numbers, symbols, watermark, label',
+  },
+  'remove-logo': {
+    name: 'Remove Logo',
+    description: 'Remove logos or branding from the area',
+    prompt: 'Remove the logo/branding from this area. Replace with clean, matching surface material.',
+    negativePrompt: 'logo, brand, text, watermark, emblem',
+  },
+  'add-reflection': {
+    name: 'Add Reflection',
+    description: 'Add a subtle, realistic reflection under the product',
+    prompt: 'Add a subtle, realistic reflection to the surface beneath the product. Match the lighting angle and product shape.',
+    negativePrompt: 'unrealistic, too strong, wrong angle, distorted reflection',
+  },
+  'surface-repair': {
+    name: 'Surface Repair',
+    description: 'Repair scratches, dents, and damage while keeping material authentic',
+    prompt: 'Repair scratches, dents, and damage. Restore to pristine condition while keeping material authentic.',
+    negativePrompt: 'scratch, dent, damage, stain, imperfection',
+  },
 };
 
 // ---------------------------------------------------------------------------

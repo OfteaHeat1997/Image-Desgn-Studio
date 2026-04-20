@@ -1,5 +1,31 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Dead-code sweep: drop unused hook, utils file, deps; dedup inpaint presets
+
+Result of a dead-code audit across `unistudio/src/`. Deleted three kinds of waste and applied the modules-first rule to inpaint presets so the route no longer duplicates the module.
+
+### Deleted
+
+- `unistudio/src/lib/processing/sharp-utils.ts` — 5 exported utilities, zero importers in `src/`.
+- `unistudio/src/hooks/useApiCost.ts` — hook with zero call sites.
+- `unistudio/package.json` dependencies removed: `@xyflow/react`, `browser-image-compression`, `jszip`. None imported anywhere in `src/`. Kept `ffmpeg-static` — declared in `next.config.ts:serverExternalPackages` and used by planned video routes.
+
+### Deduped (modules-first rule)
+
+- `unistudio/src/app/api/inpaint/route.ts` — removed the local `INPAINT_PRESETS` object (7 presets: `product-fix`, `seamless-fill`, `texture-match`, `remove-text`, `remove-logo`, `add-reflection`, `surface-repair`). The route now imports `INPAINT_PRESETS` from `@/lib/processing/inpaint`, which is the single source of truth.
+- `unistudio/src/lib/processing/inpaint.ts` — `INPAINT_PRESETS` now holds 17 presets (the existing 10 + the 7 merged from the route). All preset keys that callers previously used remain valid.
+
+### Preserved
+
+- Documentation entries in `unistudio/src/app/docs/page.tsx` and `unistudio/src/app/workflows/page.tsx` that listed the deleted files (`sharp-utils.ts`, `useApiCost.ts`, `AgentChat.tsx`) were left untouched per user direction — do not delete references from docs.
+
+### Why
+
+- Modules are the reusable blocks; pipelines and routes compose them. Duplicated presets between the route and the processing module would drift. Fixed at the source.
+- Installed-but-unused packages add lockfile weight and supply-chain surface for nothing.
+
+---
+
 ## 2026-04-21 — AI Agent cleanup: stub panel, delete chat, strip dead fallbacks (commit 8 of pipeline rewrite)
 
 Removed the last pieces of the old Agent orchestration system. AiAgentPanel collapsed from 2025 lines to 96, AgentChat (964 lines, zero imports) deleted entirely, `/api/ai-agent/plan` fallbacks `getCatalogoPipeline` + `getCambiarModeloPipeline` removed (285 lines), batch's AGENT_PRESETS-driven UI grid gone. Total reduction in this commit: ~3300 lines.

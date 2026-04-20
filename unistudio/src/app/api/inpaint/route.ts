@@ -8,38 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
-
-// Inpainting presets with specialized prompts
-const INPAINT_PRESETS: Record<string, { prompt: string; negativePrompt: string }> = {
-  'product-fix': {
-    prompt: 'Clean, seamless product surface. Fix imperfections while maintaining original material texture and color. Professional product photography quality.',
-    negativePrompt: 'blurry, distorted, different color, different material, low quality',
-  },
-  'seamless-fill': {
-    prompt: 'Fill the area seamlessly with the surrounding content. Match texture, color, lighting, and perspective perfectly. Natural and undetectable.',
-    negativePrompt: 'visible seam, different texture, mismatched lighting, obvious edit',
-  },
-  'texture-match': {
-    prompt: 'Extend and match the existing texture pattern exactly. Maintain consistent grain, weave, or material appearance throughout.',
-    negativePrompt: 'different pattern, wrong texture, misaligned, blurry, warped',
-  },
-  'remove-text': {
-    prompt: 'Remove all text, labels, and markings from this area. Fill with the underlying surface material seamlessly.',
-    negativePrompt: 'text, letters, numbers, symbols, watermark, label',
-  },
-  'remove-logo': {
-    prompt: 'Remove the logo/branding from this area. Replace with clean, matching surface material.',
-    negativePrompt: 'logo, brand, text, watermark, emblem',
-  },
-  'add-reflection': {
-    prompt: 'Add a subtle, realistic reflection to the surface beneath the product. Match the lighting angle and product shape.',
-    negativePrompt: 'unrealistic, too strong, wrong angle, distorted reflection',
-  },
-  'surface-repair': {
-    prompt: 'Repair scratches, dents, and damage. Restore to pristine condition while keeping material authentic.',
-    negativePrompt: 'scratch, dent, damage, stain, imperfection',
-  },
-};
+import { INPAINT_PRESETS } from '@/lib/processing/inpaint';
 
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
