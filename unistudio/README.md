@@ -48,6 +48,16 @@ Live URL: https://unistudio.vercel.app
 
 For detailed docs, see the [`docs/`](../docs/) folder:
 
+### Pipelines (read these first)
+| Document | Description |
+|---|---|
+| [Pipelines Index](../docs/pipelines/README.md) | The 3 canonical pipelines + sync rules + auto-routing |
+| [Lingerie Pipeline](../docs/pipelines/lingerie.md) | Bras + panties + shapewear (164 products) |
+| [Static Product Pipeline](../docs/pipelines/static-product.md) | Perfumes + creams + skincare + makeup (240 products) |
+| [Jewelry Pipeline](../docs/pipelines/jewelry.md) | Earrings + necklaces + rings + bracelets (82 products) |
+| [Modules Index](../docs/modules/README.md) | 18 modules + pipeline usage map |
+
+### Reference
 | Document | Description |
 |---|---|
 | [Architecture & API Reference](../docs/architecture.md) | Project structure, 29 API routes, DB schema, video system, key patterns |

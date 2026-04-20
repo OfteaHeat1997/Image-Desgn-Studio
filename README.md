@@ -47,6 +47,17 @@ After starting, visit `http://localhost:3000/api/health` to verify all services 
 
 ## Documentation
 
+### Pipelines (3 canonical, covering all 486 products)
+| Pipeline | Products | Doc |
+|---|---|---|
+| **Lencería** | 164 (bras + panties + shapewear) | [docs/pipelines/lingerie.md](./docs/pipelines/lingerie.md) |
+| **Estáticos** | 240 (perfumes + creams + sunscreen + deodorants + facial + makeup) | [docs/pipelines/static-product.md](./docs/pipelines/static-product.md) |
+| **Joyería** | 82 (earrings + necklaces + rings + bracelets + sets) | [docs/pipelines/jewelry.md](./docs/pipelines/jewelry.md) |
+
+- **[Pipelines Index](./docs/pipelines/README.md)** — rules, auto-routing from folders, consolidation history
+- **[Modules Index](./docs/modules/README.md)** — 18 modules + which pipelines use each
+
+### Reference
 | Document | Purpose |
 |---|---|
 | **[Developer Setup](./unistudio/README.md)** | Quick start, env vars, build & deploy |

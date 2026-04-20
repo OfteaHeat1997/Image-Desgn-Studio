@@ -32,10 +32,34 @@ All user-facing text must be in Spanish. Code comments can be in English.
 When the user asks for multiple things in a session, you MUST:
 
 1. **Keep a running list** of every request made in the chat (not just the current message). Scan back through the conversation at the start of each turn to confirm nothing is lost.
-2. **Before writing code**, reply with a concise status table — one row per request — with ✅ done / 🟡 in progress / ❌ pending / ❓ blocked (with the blocker). The user has said she feels work gets left behind; this table is the cure.
+2. **Before writing code**, reply with a concise status table — one row per request — with done / in progress / pending / blocked (with the blocker). The user has said she feels work gets left behind; this table is the cure.
 3. **At the end of each session**, post an honest recap: what was shipped, what was deployed, what's still pending, and for pending items the next concrete step. If a request is blocked (needs an error message, needs a design decision, needs external access), say so explicitly instead of silently skipping.
-4. **Never say "done" for a request that was only partially delivered.** If you shipped the backend but not the UI, say so. If you shipped a fix but haven't tested it, say so.
+4. **Never say "done" for a request that was only partially delivered.** If you shipped the backend but not the UI, say so. If you shipped a fix but haven't tested it, say so. At the end of every task post a verified log: `ls` each file created, `git log` the hash, `git status` for clean tree — no unverified "done" claims.
 5. **When a new deploy lands, update `CHANGELOG.md`** with a dated entry covering commits since the last entry (see the "Changelog + docs stay current" memory rule).
+
+### Three canonical pipelines — no duplicates allowed
+The project has exactly 3 pipelines, each for a disjoint product category from `docs/inventory.md`:
+
+| Pipeline | Products | Folder | Doc |
+|---|---|---|---|
+| **Lencería** | bras, panties, shapewear, bodysuits, fajas | `src/app/pipelines/lingerie/` + `/api/pipelines/lingerie` | `docs/pipelines/lingerie.md` |
+| **Estáticos** | perfumes, cremas, bloqueador, desodorantes, facial, maquillaje | `src/app/pipelines/static-product/` + `/api/pipelines/static-product` | `docs/pipelines/static-product.md` |
+| **Joyería** | aretes, cadenas, anillos, pulseras, topos, candongas, sets | `src/app/pipelines/jewelry/` + `/api/pipelines/jewelry` | `docs/pipelines/jewelry.md` |
+
+**Rules:**
+- NEVER create a 4th pipeline. If a new product type appears, it fits into one of the 3 or we redesign the 3 — never fork.
+- NEVER duplicate a step between pipelines. Shared logic lives in modules (`src/app/api/<module>/route.ts`).
+- NEW pipeline commits DELETE their duplicates in the same commit. Prohibited to leave two routes doing the same thing.
+- Before creating anything that looks pipeline-ish, grep existing routes and check `docs/pipelines/README.md` for what's already covered.
+
+### Pipeline ↔ module sync rule
+If a pipeline changes its provider for a step (e.g. Kolors → FASHN for try-on), in the SAME commit:
+1. Update the pipeline route (`/api/pipelines/<name>/route.ts`).
+2. Update the underlying module route (`/api/<module>/route.ts`) so it supports the new provider as an option.
+3. Update the pipeline doc (`docs/pipelines/<name>.md`).
+4. Update the modules index (`docs/modules/README.md`).
+
+Never split these into separate commits. What you change, you document — in the same commit.
 
 ## Commands
 
@@ -135,6 +159,11 @@ These are non-obvious and have bitten us before — preserve them exactly:
 
 ## Useful Reference Docs
 
+- `docs/pipelines/README.md` — index of the 3 canonical pipelines + sync rules
+- `docs/pipelines/lingerie.md` — lingerie pipeline flow, providers, costs, troubleshooting
+- `docs/pipelines/static-product.md` — static product pipeline + adaptive background matrix
+- `docs/pipelines/jewelry.md` — jewelry pipeline with sub-type routing
+- `docs/modules/README.md` — index of the 18 modules + which pipelines use each
 - `docs/architecture.md` — full API route + DB schema reference
 - `docs/guia-completa.md` — Spanish walkthrough
 - `docs/ai-agent-analysis.md` — agent design + roadmap

@@ -1,5 +1,55 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Docs consolidation: 3 canonical pipelines structure (commit 1 of pipeline rewrite)
+
+Set up the documentation foundation for the pipeline rewrite cycle. Before touching any code, established a single source of truth for which pipelines exist, what modules they reuse, and the sync rules that prevent future duplication.
+
+### Deleted (8 obsolete docs)
+
+- `docs/README-TESTING.md`
+- `docs/READMETESTING v3.md`
+- `docs/TESTING-REPORT.md`
+- `docs/TESTINGREPORT.md`
+- `docs/TESTINGREPORT agente ai v3.md`
+- `docs/PLANREORGANIZACIONUNISTUDIO.md` (from Apr 14 — superseded)
+- `docs/PLANDASHBOARDv2.md` (references old 4-agent model — superseded)
+- `docs/LINGERIE_PIPELINE_PLAN.md` (consolidated into `docs/pipelines/lingerie.md`)
+
+### Created (5 new docs)
+
+- `docs/pipelines/README.md` — index of the 3 canonical pipelines + sync rules + auto-routing table from inventory folders
+- `docs/pipelines/lingerie.md` — 164 products (77 bras + 72 panties + 15 shapewear), 7-step flow, grounded_sam + SeedDream + Kolors providers
+- `docs/pipelines/static-product.md` — 240 products (perfumes + creams + sunscreen + deodorants + facial + makeup), adaptive background matrix by category/brand (no always-white)
+- `docs/pipelines/jewelry.md` — 82 products with sub-type routing (aretes→orejas, cadenas→cuello, anillos→dedo, pulseras→muñeca), produces estante + modelo + detalle + video per SKU
+- `docs/modules/README.md` — 18 modules with pipeline-usage map + gotchas
+
+### Updated
+
+- `CLAUDE.md` — added "Three canonical pipelines — no duplicates allowed" rule + "Pipeline ↔ module sync rule" (both in Mandatory Rules). Reference docs section now lists pipelines first.
+- `README.md` (root) — documentation section now opens with pipeline table before reference docs.
+- `unistudio/README.md` — same treatment.
+
+### Why this commit
+
+User was frustrated that earlier cycles created parallel pipelines (`/catalog-pipeline` page, `agent-lenceria` preset in Batch, `getCatalogoPipeline()` fallback in AI Agent) that claimed to do similar things but diverged silently. The code changes to consolidate happen in commits 2-7; this commit (commit 1) establishes the rules and documentation so the consolidation work has a fixed target. No code touched.
+
+### Pipeline audit results (what gets consolidated in commits 2-7)
+
+| Existing (to be removed) | Consolidated into |
+|---|---|
+| `/app/catalog-pipeline/page.tsx` + `/api/catalog-pipeline` (1313 lines) | `/pipelines/lingerie` (commit 2) |
+| `agent-lenceria` preset in `/lib/batch/pipeline.ts` | Pipeline Lencería |
+| `agent-perfumes`, `agent-cremas`, `agent-desodorantes` presets | Pipeline Estáticos (commit 3) |
+| `agent-accesorios` preset | Pipeline Joyería (commit 4) |
+| `getCatalogoPipeline()` fallback in `/api/ai-agent/plan` | Removed — AI Agent becomes router only (commit 6) |
+| `getCambiarModeloPipeline()` fallback in same route | Removed — covered by Lencería |
+
+### Next up
+
+Commit 2 of this cycle: create `/pipelines/lingerie` + `/api/pipelines/lingerie`, migrating the useful parts of `/catalog-pipeline` (shared model reuse, AUTO/MANUAL execution modes, STEP_DEFS, cost estimator, product video), and delete the old route in the same commit.
+
+---
+
 ## 2026-04-20 — Ghost Mannequin module fix for real humans
 
 The "Quitar Maniqui" module was assuming input photos had a real mannequin. When the input was a real woman wearing lingerie (bra, panty, shapewear), Flux Kontext Pro just edited the clothing (e.g., added long sleeves to a bra) instead of removing the person. Added a new operation that actually removes the person.
