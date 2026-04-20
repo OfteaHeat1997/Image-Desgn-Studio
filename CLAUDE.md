@@ -11,13 +11,31 @@ The Next.js app lives in the `unistudio/` subdirectory — **not** the repo root
 ### Git push after every change
 After any code modification (bug fix, feature, refactor): `git add` → `git commit` → `git push origin main`. Do not wait for the user to ask, and do not leave uncommitted changes at the end of a task.
 
-### Never auto-build or auto-deploy
-- Do **not** run `next build` automatically on init or as a check — it may already be running on Vercel or in another terminal. Only build when the user explicitly asks.
-- Before any manual build, check `ls unistudio/.next/lock 2>/dev/null` — if the lock file exists, do not build.
-- Do **not** run `vercel --prod` or any deploy command. The user deploys from their own terminal.
+### Build / deploy only when the machine is clear
+Build and deploy are allowed, but NEVER start one while another is already running — that collides with Vercel or with another terminal and breaks. Before `next build` or `vercel --prod`, run these checks and abort if any is non-empty:
+
+```bash
+ls unistudio/.next/lock 2>/dev/null         # local build in progress
+pgrep -af "next build"                       # other next build running
+pgrep -af "vercel.*--prod|vercel.*deploy"    # other vercel deploy running
+```
+
+- If all three are clear → proceed.
+- If any has output → stop and tell the user what's already running.
+- On "init" or generic exploration, do NOT build — only build/deploy when the user explicitly asks.
+- Deploys must run from the repo root (`vercel --prod --yes`). The repo-root `.vercelignore` keeps the upload under Vercel's 10MB limit.
 
 ### Language
 All user-facing text must be in Spanish. Code comments can be in English.
+
+### Track every request — never drop work on the floor
+When the user asks for multiple things in a session, you MUST:
+
+1. **Keep a running list** of every request made in the chat (not just the current message). Scan back through the conversation at the start of each turn to confirm nothing is lost.
+2. **Before writing code**, reply with a concise status table — one row per request — with ✅ done / 🟡 in progress / ❌ pending / ❓ blocked (with the blocker). The user has said she feels work gets left behind; this table is the cure.
+3. **At the end of each session**, post an honest recap: what was shipped, what was deployed, what's still pending, and for pending items the next concrete step. If a request is blocked (needs an error message, needs a design decision, needs external access), say so explicitly instead of silently skipping.
+4. **Never say "done" for a request that was only partially delivered.** If you shipped the backend but not the UI, say so. If you shipped a fix but haven't tested it, say so.
+5. **When a new deploy lands, update `CHANGELOG.md`** with a dated entry covering commits since the last entry (see the "Changelog + docs stay current" memory rule).
 
 ## Commands
 
