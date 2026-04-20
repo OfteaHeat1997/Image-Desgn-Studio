@@ -1,5 +1,37 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — AI Agent reduced to router (commit 7 of pipeline rewrite)
+
+Rewrote `/agent/page.tsx` from a 686-line workflow executor to a 370-line pipeline router. The old page duplicated the canonical pipelines via 3 hardcoded workflows (`ecommerce`, `modelo`, `social`) that wrapped `useAgentPipeline`. Every flow already exists as a dedicated pipeline, so the agent page's only legitimate job is to **detect the product category and redirect**.
+
+### Changed
+
+- `unistudio/src/app/agent/page.tsx` — full rewrite:
+  - **Removed:** `WORKFLOWS` array (ecommerce/modelo/social cards), `CATEGORIES` constant, all `useAgentPipeline` imports and usage, orchestration state, execution controls, retry logic, plan editor — 400+ lines of duplicated functionality
+  - **Added:** `CATEGORY_OPTIONS` array mapping 14 product categories to `{ family, params }` pairs that redirect to the 3 canonical pipelines:
+    - 3 lingerie options (bra / panty / shapewear) → `/pipelines/lingerie?productType=...`
+    - 6 static-product options (perfume / cream / sunscreen / deodorant / facial / makeup) → `/pipelines/static-product?productType=...`
+    - 5 jewelry options (earrings / necklace / ring / bracelet / set) → `/pipelines/jewelry?subType=...`
+  - **Kept:** upload flow with soft `/api/analyze-image` auto-detect — only detects lingerie garments (bra/panty/set), displays "AUTO" badge on the matching category, user can override
+  - Supports `?cat=<id>` URL param for deep-linking (homepage cards can land on a pre-selected category)
+
+### Post-commit coverage
+
+User's two entry points to trigger a pipeline:
+1. **Direct** — Homepage card or sidebar → `/pipelines/<name>` (no auto-detect)
+2. **Via agent** — Homepage "Agente IA" → `/agent` → upload (auto-detect for lencería) or pick category manually → redirect to pipeline
+
+Both entry points end at the same 3 canonical pipelines. No orchestration code runs in the agent page anymore.
+
+### Known follow-ups (intentional — next commits)
+
+- **`useAgentPipeline` hook** (~1081 lines) still used by `AiAgentPanel` (in `/editor?module=ai-agent`) and `AgentChat` (dashboard). Those are the "in-editor" Agent UI, separate from `/agent`. Commit 8 evaluates whether they should also be reduced to router components or removed, and whether the hook itself can be deleted.
+- **`/api/ai-agent/plan/route.ts`** — still has `getCatalogoPipeline()` + `getCambiarModeloPipeline()` fallbacks. Dead code after this commit (no caller). Commit 8.
+- **`docs/ai-agent-analysis.md`** — references the 3 workflow cards that no longer exist. Commit 8 updates it.
+- **Sidebar entry `ai-agent`** still points to `AiAgentPanel` (in-editor). Commit 9 reorganizes the sidebar.
+
+---
+
 ## 2026-04-20 — Fix backend/frontend param mismatches in Static + Jewelry pipelines (commit 6 of pipeline rewrite)
 
 Ran a full integration audit after commit 5. Three param-shape mismatches between the new pipeline pages (commits 3 and 4) and the underlying module routes were detected. All three are fixed in this commit — the pipelines still shipped because of soft-fail handling, but the outputs were degraded or outright failing.
