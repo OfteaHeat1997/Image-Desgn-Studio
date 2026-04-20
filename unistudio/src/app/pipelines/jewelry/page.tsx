@@ -542,12 +542,16 @@ export default function JewelryPipelinePage() {
                         {job.estanteUrl && (
                           <ResultCard label="Estante" url={job.estanteUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}-estante.jpg`} />
                         )}
-                        {job.modelUrl && (
+                        {job.modelUrl ? (
                           <ResultCard label="En modelo" url={job.modelUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}-modelo.jpg`} />
-                        )}
-                        {job.videoUrl && (
+                        ) : includeModel ? (
+                          <MissingOutput label="En modelo" reason="La IA no pudo poner la pieza en la modelo. Probá otra foto más nítida o desactivá esta opción." />
+                        ) : null}
+                        {job.videoUrl ? (
                           <ResultCard label="Video 360°" url={job.videoUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}.mp4`} isVideo />
-                        )}
+                        ) : includeVideo ? (
+                          <MissingOutput label="Video 360°" reason="No se pudo generar el video. Abrí la consola para ver el error o reintentá." />
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -582,6 +586,16 @@ export default function JewelryPipelinePage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MissingOutput({ label, reason }: { label: string; reason: string }) {
+  return (
+    <div className="flex h-full min-h-[8rem] flex-col items-center justify-center gap-2 rounded border border-red-500/30 bg-red-500/10 p-3 text-center">
+      <AlertCircle className="h-5 w-5 text-red-400" />
+      <p className="text-[11px] font-semibold text-red-300">{label} falló</p>
+      <p className="text-[10px] leading-tight text-red-200/80">{reason}</p>
     </div>
   );
 }
