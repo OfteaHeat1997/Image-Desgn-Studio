@@ -15,6 +15,7 @@ import {
   extractOutputUrl,
   ensureHttpUrl,
 } from '@/lib/api/replicate';
+import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
@@ -85,12 +86,12 @@ async function isolateGarment(
     inputBuffer = Buffer.from(await res.arrayBuffer());
   }
 
-  // Normalize the input: rotate via EXIF, cap at 1600px, re-encode as PNG so
-  // the mask aligns pixel-for-pixel with what we send to the model.
+  // Normalize the input: rotate via EXIF, cap at 1024px (smaller = faster
+  // grounded_sam inference), re-encode as JPEG for a lighter upload.
   const prepared = await sharp(inputBuffer)
     .rotate()
-    .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-    .png()
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 90 })
     .toBuffer();
   const meta = await sharp(prepared).metadata();
   const width = meta.width ?? 0;
@@ -100,8 +101,8 @@ async function isolateGarment(
   const maskPrompt = garmentTypeToPrompt(garmentType);
   console.log(`[bg-remove:isolate] running grounded_sam prompt="${maskPrompt}" size=${width}x${height}`);
 
-  // Upload the prepared PNG so Replicate can fetch it by URL
-  const preparedDataUrl = `data:image/png;base64,${prepared.toString('base64')}`;
+  // Upload the prepared JPEG so Replicate can fetch it by URL
+  const preparedDataUrl = `data:image/jpeg;base64,${prepared.toString('base64')}`;
   const httpInput = await ensureHttpUrl(preparedDataUrl);
 
   // schananas/grounded_sam returns four images. Different runs can return
@@ -179,17 +180,25 @@ async function isolateGarment(
     }
   }
 
+  // Download + score all candidates in parallel (sequential was wasting 4-8s
+  // per run against Vercel's 60s cap).
+  const maxCandidates = Math.min(urls.length, 4);
+  const settled = await Promise.all(
+    Array.from({ length: maxCandidates }, (_, i) => tryMask(urls[i], `idx${i}`)),
+  );
+  const candidates: Array<{ buffer: Buffer; score: number; idx: number }> = [];
+  for (let i = 0; i < settled.length; i++) {
+    const candidate = settled[i];
+    if (candidate) candidates.push({ ...candidate, idx: i });
+  }
+
   // Score every candidate and pick the one with plausible garment coverage.
   // Range 0.5%–75% covers both close-up bra shots (small mask) and full-body
   // outfits. Below 0.5% means the model found nothing; above 75% almost
   // always means we got an inverted or debug image by mistake.
   let bestMask: Buffer | null = null;
   let bestScore = 0;
-  const candidates: Array<{ buffer: Buffer; score: number; idx: number }> = [];
-  for (let i = 0; i < Math.min(urls.length, 4); i++) {
-    const candidate = await tryMask(urls[i], `idx${i}`);
-    if (!candidate) continue;
-    candidates.push({ ...candidate, idx: i });
+  for (const candidate of candidates) {
     const inRange = candidate.score >= 0.005 && candidate.score <= 0.75;
     if (inRange && candidate.score > bestScore) {
       bestMask = candidate.buffer;
@@ -227,13 +236,20 @@ async function isolateGarment(
     .png()
     .toBuffer();
 
-  // Upload the result to Replicate file hosting so downstream routes receive
-  // an https:// URL instead of a multi-megabyte data URI (that was causing
-  // /api/save-result to fail with 413 Request Body Too Large).
-  const resultDataUrl = `data:image/png;base64,${isolated.toString('base64')}`;
-  const httpResultUrl = await ensureHttpUrl(resultDataUrl);
-  console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB) -> ${httpResultUrl.slice(0, 80)}`);
-  return httpResultUrl;
+  // Upload the result directly to fal storage — it's where Kolors needs to
+  // read the URL from anyway, and it's faster than uploading to Replicate
+  // and re-uploading later. Falls back to Replicate if fal upload fails.
+  try {
+    const falUrl = await uploadToFalStorage(isolated, 'image/png', 'isolated.png');
+    console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB) -> ${falUrl.slice(0, 80)} [fal]`);
+    return falUrl;
+  } catch (err) {
+    console.warn('[bg-remove:isolate] fal upload failed, falling back to Replicate:', err);
+    const resultDataUrl = `data:image/png;base64,${isolated.toString('base64')}`;
+    const httpResultUrl = await ensureHttpUrl(resultDataUrl);
+    console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB) -> ${httpResultUrl.slice(0, 80)} [replicate]`);
+    return httpResultUrl;
+  }
 }
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
