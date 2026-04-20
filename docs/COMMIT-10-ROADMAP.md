@@ -389,6 +389,48 @@ UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-proce
 
 ---
 
+# ✅ SHIPPED en esta sesión (commits ae88990 → b0f2a7b) — 9 commits consecutivos
+
+La sesión de commit 9 continuó arreglando después del primer handoff. Progreso final:
+
+| Commit | Qué | Estado |
+|---|---|---|
+| `ae88990` | Step timeline live en static-product | ✓ |
+| `7a4a8dd` | Step timeline live en jewelry | ✓ |
+| `64779e1` | H2 jewelry upscale hard-fail + H4 AI Agent prompt + H5 analyze-image timeout + H6 inventory error UI | ✓ |
+| `8d75735` | D1 cross-session AI model reuse (ahorro $0.055/color) | ✓ |
+| `774d3ca` | HD quality: Flux Pro + prompts 8K en 15 configs | ✓ |
+| `fabee23` | CHANGELOG con la ola | ✓ |
+| `b0f2a7b` | H1 manual-mode timeout + S1 garment-types a constants/ | ✓ |
+
+## Gaps restantes después de esta sesión
+
+### Prioridad alta (próxima sesión):
+- **S3** — Borrar `src/hooks/useAgentPipeline.ts` (1081 líneas, 0 consumers runtime). Solo quedan strings en workflows/docs/architecture pages. Cuando se borre, actualizar esas referencias también.
+- **Bug aislar en lencería** — VERIFICAR si `9f1b0eb` lo arregló. Si sigue fallando, inspeccionar `/api/bg-remove` Network tab + logs Vercel Functions.
+- **F7 Brand Kit auto-apply** — agregar watermark/logo al final de cada pipeline. Brand store ya existe en `src/stores/brand-store.ts`. Modulo brand-kit/watermark existe.
+
+### Prioridad media:
+- **F2 Multi-format export** — generar 1:1 + 4:5 + 9:16 en el mismo run llamando `/api/outpaint` 2 veces extra sobre el resultado final. ~2h.
+- **F3 Macro close-up automático** en joyería — crop + upscale 4x del detalle central. ~1h.
+- **S2 Response shape consistency** — todas las rutas devolver `data.url` uniforme.
+- **S4 Actualizar docs stale** — `docs/architecture.md`, `docs/guia-completa.md`, `docs/UX_UI_GUIDE.md` tienen referencias a código borrado.
+
+### Features nice-to-have:
+- F1 Color variant swap en lencería (reusa modelo + swap color prenda, $0.02 por variante)
+- F5 Multi-angle desde 1 foto (front/back/side/lifestyle)
+- F6 Seasonal themes (Navidad/DíaMadre/Verano)
+- F8 Template saving ("mi look Yanbal")
+- F9 Text overlays con módulo infographic
+- F10 Lifestyle scenes (mano sosteniendo perfume, flat-lay)
+
+### Data persistence deferred:
+- D2 Brand Kit DB↔localStorage timestamp merge
+- D3 Cost tracker a DB
+- D4 FAL storage retention docs
+
+---
+
 # 🔴 BUG REPORT URGENTE — Aislar Producto falla en producción (2026-04-21, screenshot enviado)
 
 La usuaria reportó con screenshot (`/mnt/c/Users/maria/Downloads/Screenshot 2026-04-21 004944.png`) que en `/pipelines/lingerie` el paso 1 "Aislar Producto" devuelve Error sin imagen. Los demás pasos quedan pendientes.
