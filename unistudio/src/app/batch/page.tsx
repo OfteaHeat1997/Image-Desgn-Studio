@@ -182,21 +182,11 @@ const PIPELINE_PRESETS: PresetDef[] = [
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  AI Agent Presets — Inventory-specific pipelines                     */
-/* ------------------------------------------------------------------ */
-
-const AGENT_PRESETS: PresetDef[] = [
-  // agent-perfumes, agent-cremas: removed in commit 3 — these flows migrated to /pipelines/static-product.
-  // Inventory scan redirects the "colonias" and "cremas" categories there automatically.
-  // agent-accesorios: removed in commit 4 — migrated to /pipelines/jewelry.
-  // The inventory scan now splits jewelry into 5 sub-categories (aretes, collares,
-  // pulseras, anillos, sets), each redirecting to /pipelines/jewelry with subType param.
-  // agent-lenceria, agent-pantys: removed in commit 5 — the "lenceria" and "pantys"
-  // inventory categories now redirect to /pipelines/lingerie with productType=bra|panty.
-  // agent-desodorantes: removed in commit 3 — migrated to /pipelines/static-product.
-  // The "desodorantes" and "limpieza" inventory categories redirect there automatically.
-];
+// AGENT_PRESETS (category-specific batch presets) is empty after commit 8.
+// Inventory scan now routes every category to a canonical pipeline directly
+// via `cat.pipeline` (see startAutoMode redirect below). The array stays
+// declared so the legacy UI grid renders nothing instead of crashing.
+const AGENT_PRESETS: PresetDef[] = [];
 
 /* ------------------------------------------------------------------ */
 /*  Status Icon                                                         */
@@ -326,8 +316,7 @@ export default function BatchPage() {
   }, []);
 
   const loadPreset = useCallback((presetId: string) => {
-    const preset = PIPELINE_PRESETS.find((p) => p.id === presetId)
-      ?? AGENT_PRESETS.find((p) => p.id === presetId);
+    const preset = PIPELINE_PRESETS.find((p) => p.id === presetId);
     if (preset) {
       setSteps(preset.steps.map((s) => ({ ...s, id: `step-${Date.now()}-${Math.random()}` })));
       setActivePresetId(presetId);
@@ -624,10 +613,12 @@ export default function BatchPage() {
     setAutoBatchTotal(cat.imageCount);
     setOverallProgress(0);
 
-    // 1. Load the right batch preset (legacy path — for categories not yet migrated to a pipeline)
+    // After commit 5, every inventory category has `cat.pipeline` set and is
+    // redirected above. AGENT_PRESETS is empty (commit 8), so this .find()
+    // always returns undefined — the defensive branch below catches it.
     const preset = AGENT_PRESETS.find((p) => p.id === cat.agentPreset);
     if (!preset) {
-      toast.error(`No hay preset configurado para "${cat.name}".`);
+      toast.error(`La categoría "${cat.name}" no tiene pipeline configurado — revisá inventory/scan.`);
       setAutoProcessing(null);
       setLoadingCategory(null);
       return;
@@ -1011,42 +1002,10 @@ export default function BatchPage() {
 
         {/* ---------- Right: Pipeline Builder ---------- */}
         <div className="space-y-6">
-          {/* AI Agent Presets — Unistyles Inventory */}
-          <div className="rounded-xl border border-accent/20 bg-accent/5 p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-accent-light">AI Agent — Por Categoria</h2>
-            </div>
-            <p className="mb-3 text-[10px] text-gray-400">
-              Pipelines optimizados para cada tipo de producto del inventario Unistyles.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {AGENT_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => loadPreset(preset.id)}
-                  className={cn(
-                    "flex flex-col rounded-lg border p-3 text-left transition-all",
-                    activePresetId === preset.id
-                      ? "border-accent bg-accent/15 ring-1 ring-accent/30"
-                      : "border-accent/20 bg-surface hover:border-accent/50 hover:bg-accent/10",
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-3 w-3 text-accent-light" />
-                    <span className="text-xs font-semibold text-gray-200">
-                      {preset.name}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-gray-500">{preset.description}</p>
-                  <div className="mt-1.5 flex items-center gap-1">
-                    <Badge variant="default" size="sm">{preset.steps.length} pasos</Badge>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* "AI Agent — Por Categoria" grid was removed in commit 8 —
+              category-specific batch presets were consolidated into the 3
+              canonical pipelines. Users reach them via the inventory-scan
+              redirect from the sidebar on the left. */}
 
           {/* Standard Presets */}
           <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">

@@ -1,5 +1,58 @@
 # UniStudio — Changelog
 
+## 2026-04-21 — AI Agent cleanup: stub panel, delete chat, strip dead fallbacks (commit 8 of pipeline rewrite)
+
+Removed the last pieces of the old Agent orchestration system. AiAgentPanel collapsed from 2025 lines to 96, AgentChat (964 lines, zero imports) deleted entirely, `/api/ai-agent/plan` fallbacks `getCatalogoPipeline` + `getCambiarModeloPipeline` removed (285 lines), batch's AGENT_PRESETS-driven UI grid gone. Total reduction in this commit: ~3300 lines.
+
+### Rewritten
+
+- `unistudio/src/components/modules/AiAgentPanel.tsx`: **2025 → 96 lines (95% reduction)**. The in-editor "AI Agent" module is now a thin panel showing 3 pipeline links + a CTA to `/agent`. Removed 4-phase state machine (input / plan / execute / results), `useAgentPipeline` wiring, agent-type selectors (ecommerce / modelo / social / catalogo / cambiar-modelo), plan editor, cost confirmation, retry UI, catalog-mode download grid.
+
+### Deleted
+
+- `unistudio/src/components/dashboard/AgentChat.tsx` (964 lines) — zero importers in the codebase (`grep -n "import.*AgentChat|<AgentChat"` returns empty). Dead code since at least commit 7 and probably earlier.
+- `unistudio/src/components/dashboard/` — empty directory removed.
+- `unistudio/src/app/api/ai-agent/plan/route.ts`:
+  - `getCatalogoPipeline()` function (~226 lines) — dead after AiAgentPanel stub ships.
+  - `getCambiarModeloPipeline()` function (~39 lines) — same reason.
+  - Switch cases for `"catalogo"` and `"cambiar-modelo"` in `buildFallbackPlan` — now fall through to the `default` (ecommerce) branch.
+  - File: **1130 → 845 lines**.
+- `docs/ai-agent-analysis.md` — March 2026 doc describing the old 5-agent / Phase 1+2 model; fully superseded by `docs/pipelines/`. User had explicitly asked to delete stale READMEs.
+
+### Cleaned
+
+- `unistudio/src/app/batch/page.tsx`:
+  - Removed "AI Agent — Por Categoría" UI grid (~35 lines of dead JSX that mapped over `AGENT_PRESETS`)
+  - Removed `?? AGENT_PRESETS.find(...)` fallback from `loadPreset` — PIPELINE_PRESETS is sole source
+  - `AGENT_PRESETS: PresetDef[] = []` kept as empty array (defensive — `.find()` in `startAutoMode` returns `undefined` and triggers the error toast for unconfigured categories)
+- `README.md`, `unistudio/README.md`, `CLAUDE.md` — removed the `ai-agent-analysis.md` table row from docs index (file no longer exists).
+
+### Integration invariants preserved
+
+- `useAgentPipeline` hook file is **still on disk** but no runtime caller imports it. The remaining mentions (`workflows/page.tsx`, `docs/page.tsx`, `architecture/page.tsx`) are all string references inside docs/architecture explainer pages — harmless. Full deletion evaluated in commit 9 polish.
+- Sidebar still has an `ai-agent` module entry that routes to the stubbed AiAgentPanel. Commit 9 decides whether to rename it to "Abrir Agente IA" and link directly to `/agent`, or remove it entirely since the 3 pipelines are already in the sidebar.
+
+### Coverage after commit 8
+
+| Layer | State |
+|---|---|
+| Inventory scan (11 categories) | 100% routed to canonical pipelines |
+| Pipelines (3 canonical) | Working, params matched to module routes |
+| `/agent` standalone page | Router only, no orchestration |
+| `/editor?module=ai-agent` | Stubbed — just redirects/links |
+| Dashboard chat | Deleted |
+| Batch `/batch` | Only generic presets remain (quick-clean, amazon-ready, etc.) |
+
+### What's next (commit 9 — final polish)
+
+- Evaluate full deletion of `useAgentPipeline` hook (1081 lines — no runtime consumers left)
+- Sidebar reorganization: pipelines at top, modules below, `ai-agent` entry resolves
+- Homepage card reordering
+- `docs/architecture.md` + `docs/guia-completa.md` + `docs/UX_UI_GUIDE.md` audit for stale references
+- Update `docs/modules/README.md` — `useAgentPipeline` no longer used by pipelines
+
+---
+
 ## 2026-04-20 — AI Agent reduced to router (commit 7 of pipeline rewrite)
 
 Rewrote `/agent/page.tsx` from a 686-line workflow executor to a 370-line pipeline router. The old page duplicated the canonical pipelines via 3 hardcoded workflows (`ecommerce`, `modelo`, `social`) that wrapped `useAgentPipeline`. Every flow already exists as a dedicated pipeline, so the agent page's only legitimate job is to **detect the product category and redirect**.
@@ -7,7 +60,7 @@ Rewrote `/agent/page.tsx` from a 686-line workflow executor to a 370-line pipeli
 ### Changed
 
 - `unistudio/src/app/agent/page.tsx` — full rewrite:
-  - **Removed:** `WORKFLOWS` array (ecommerce/modelo/social cards), `CATEGORIES` constant, all `useAgentPipeline` imports and usage, orchestration state, execution controls, retry logic, plan editor — 400+ lines of duplicated functionality
+  - **Removed:** `WORKFLOWS` array (ecommerce/modelo/social cards), `CATEGORIES` constant, all `useAgentPipeline` imports and usage, orchestration state, execution controls, retry logic, plan editor okay no quoero duplucados y wueiero usar los modulos — 400+ lines of duplicated functionality
   - **Added:** `CATEGORY_OPTIONS` array mapping 14 product categories to `{ family, params }` pairs that redirect to the 3 canonical pipelines:
     - 3 lingerie options (bra / panty / shapewear) → `/pipelines/lingerie?productType=...`
     - 6 static-product options (perfume / cream / sunscreen / deodorant / facial / makeup) → `/pipelines/static-product?productType=...`

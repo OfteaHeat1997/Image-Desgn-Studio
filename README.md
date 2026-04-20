@@ -63,7 +63,6 @@ After starting, visit `http://localhost:3000/api/health` to verify all services 
 | **[Developer Setup](./unistudio/README.md)** | Quick start, env vars, build & deploy |
 | **[Architecture & API Reference](./docs/architecture.md)** | Project structure, 29 API routes, DB schema, video system, key patterns |
 | **[Guia Completa (ES)](./docs/guia-completa.md)** | Full project explanation in Spanish (beginner-friendly) |
-| **[AI Agent Analysis](./docs/ai-agent-analysis.md)** | Deep analysis + improvement roadmap (Phase 1+2 complete) |
 | **[Product Inventory](./docs/inventory.md)** | Complete Unistyles product catalog (486 products, 9 categories) |
 
 ---

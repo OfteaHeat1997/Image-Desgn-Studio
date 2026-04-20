@@ -62,5 +62,4 @@ For detailed docs, see the [`docs/`](../docs/) folder:
 |---|---|
 | [Architecture & API Reference](../docs/architecture.md) | Project structure, 29 API routes, DB schema, video system, key patterns |
 | [Guia Completa (ES)](../docs/guia-completa.md) | Beginner-friendly guide in Spanish — data flow, patterns, testing |
-| [AI Agent Analysis](../docs/ai-agent-analysis.md) | Deep analysis + improvement roadmap (Phase 1+2 complete) |
 | [Product Inventory](../docs/inventory.md) | Complete Unistyles product catalog (486 products, 9 categories) |

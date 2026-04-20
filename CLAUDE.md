@@ -166,5 +166,4 @@ These are non-obvious and have bitten us before — preserve them exactly:
 - `docs/modules/README.md` — index of the 18 modules + which pipelines use each
 - `docs/architecture.md` — full API route + DB schema reference
 - `docs/guia-completa.md` — Spanish walkthrough
-- `docs/ai-agent-analysis.md` — agent design + roadmap
 - `docs/inventory.md` — Unistyles product catalog (486 products)
