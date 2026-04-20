@@ -37,14 +37,19 @@ export function ImageCompare({
   const [sliderPos, setSliderPos] = useState(position);
   const [dragging, setDragging] = useState(false);
   const [loaded, setLoaded] = useState({ before: false, after: false });
+  const [errored, setErrored] = useState({ before: false, after: false });
   const [hasInteracted, setHasInteracted] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
 
-  const bothLoaded = loaded.before && loaded.after;
+  // Show the compare view as soon as BOTH sides have either loaded or errored
+  // (errored = we know we can't show it, but stop hanging the UI forever).
+  const bothResolved =
+    (loaded.before || errored.before) && (loaded.after || errored.after);
 
   // Reset all transient state when sources change
   useEffect(() => {
     setLoaded({ before: false, after: false });
+    setErrored({ before: false, after: false });
     setSliderPos(position);
     setHasInteracted(false);
     setAspectRatio(null);
@@ -121,7 +126,7 @@ export function ImageCompare({
       }}
     >
       {/* Loading overlay */}
-      {!bothLoaded && (
+      {!bothResolved && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-surface-light" style={{ minHeight: 300 }}>
           <div className="flex flex-col items-center gap-2">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
@@ -142,6 +147,7 @@ export function ImageCompare({
         alt={afterAlt}
         draggable={false}
         onLoad={handleAfterLoad}
+        onError={() => setErrored((s) => ({ ...s, after: true }))}
         className="block w-full h-auto object-contain"
       />
 
@@ -151,6 +157,7 @@ export function ImageCompare({
         alt={beforeAlt}
         draggable={false}
         onLoad={handleBeforeLoad}
+        onError={() => setErrored((s) => ({ ...s, before: true }))}
         className="absolute top-0 left-0 w-full h-full object-contain"
         style={{
           clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
@@ -158,7 +165,7 @@ export function ImageCompare({
       />
 
       {/* Slider line + draggable handle */}
-      {bothLoaded && (
+      {bothResolved && !errored.before && !errored.after && (
         <div
           className="absolute top-0 bottom-0 z-20 pointer-events-none"
           style={{ left: `${sliderPos}%` }}
@@ -182,7 +189,7 @@ export function ImageCompare({
       )}
 
       {/* Header labels (ANTES / DESPUES) */}
-      {bothLoaded && showHeaderLabels && (
+      {bothResolved && showHeaderLabels && (
         <>
           <span className="absolute top-3 left-3 z-10 rounded-md bg-black/70 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-sm pointer-events-none">
             {beforeLabel}
@@ -194,7 +201,7 @@ export function ImageCompare({
       )}
 
       {/* Bottom labels (hidden when header labels are used) */}
-      {bothLoaded && !showHeaderLabels && (
+      {bothResolved && !showHeaderLabels && (
         <>
           <span className="absolute bottom-3 left-3 z-10 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm pointer-events-none">
             {beforeLabel}
@@ -206,7 +213,7 @@ export function ImageCompare({
       )}
 
       {/* Drag hint — disappears after first interaction */}
-      {bothLoaded && showDragHint && !hasInteracted && (
+      {bothResolved && showDragHint && !hasInteracted && (
         <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 pointer-events-none animate-pulse">
           <span className="rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-medium text-gray-200 backdrop-blur-sm">
             ← {dragHintText} →
