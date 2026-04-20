@@ -10,7 +10,7 @@ import sharp from "sharp";
 import type { ImageAnalysis, AgentModule, BudgetTier } from "@/types/agent";
 import { CLAUDE_HAIKU } from "@/lib/utils/constants";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY?.trim();
 
 // Minimum resolution for e-commerce (most platforms need 1000px+)
 const MIN_ECOMMERCE_WIDTH = 1000;

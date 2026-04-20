@@ -246,7 +246,13 @@ async function toPersistentDataUrl(url: string): Promise<string> {
   });
 }
 
-/** Auto-save a processed result to the output folder (fire and forget) */
+/**
+ * Auto-save a processed result to the output folder with retry + user-visible error.
+ *
+ * Commit 9 hardening: was previously fire-and-forget; if /api/save-result failed,
+ * the result only survived in localStorage and would be lost on browser cache clear.
+ * Now retries 3× with exponential backoff and surfaces a toast to the user if all fail.
+ */
 async function autoSaveResult(
   imageUrl: string,
   module: string,
@@ -290,17 +296,39 @@ async function autoSaveResult(
       }
     }
 
-    await fetch("/api/save-result", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageUrl: sendableUrl,
-        module,
-        filename,
-      }),
-    });
+    // Retry 3× with exponential backoff (0ms, 500ms, 1500ms) before surfacing error
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch("/api/save-result", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: sendableUrl,
+            module,
+            filename,
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        // Success — return without surfacing anything
+        return;
+      } catch (saveErr) {
+        lastError = saveErr;
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1) * (attempt + 1)));
+        }
+      }
+    }
+    // All 3 attempts failed — surface to user so they know the result may only live in localStorage
+    const msg = lastError instanceof Error ? lastError.message : String(lastError);
+    console.warn("[auto-save] Failed after 3 attempts:", lastError);
+    toast.error(
+      `No se pudo guardar el resultado en la galería (${msg}). Descargalo manualmente antes de cerrar el navegador.`,
+    );
   } catch (err) {
-    // Never block the UI — just log if auto-save fails
+    // Never block the UI — just log if auto-save fails before even getting to save-result
     console.warn("[auto-save] Failed:", err);
   }
 }

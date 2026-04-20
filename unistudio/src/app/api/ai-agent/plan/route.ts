@@ -17,7 +17,7 @@ import type {
 // Uses Claude Haiku when ANTHROPIC_API_KEY is set, otherwise local fallback.
 // =============================================================================
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY?.trim();
 
 // -----------------------------------------------------------------------------
 // Local fallback templates

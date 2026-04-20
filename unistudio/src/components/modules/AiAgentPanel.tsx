@@ -17,7 +17,11 @@ import { Wand2, ArrowRight, ExternalLink, Shirt, Package, Gem } from "lucide-rea
 
 interface AiAgentPanelProps {
   imageFile?: File | null;
-  onProcess?: (result: unknown) => void;
+  /** Signature matches the rest of the editor's module panels — the stub
+   *  ignores the callback (it only renders redirect links), but the type
+   *  has to match `onProcess: (result: string, beforeImage?, cost?) => void`
+   *  expected by editor/page.tsx so the panel registry typechecks. */
+  onProcess?: (result: string, beforeImage?: string, cost?: number) => void;
 }
 
 const PIPELINE_CARDS = [

@@ -64,40 +64,113 @@ function createThumbnail(dataUrl: string, maxSize = 200): Promise<string> {
 }
 
 // -----------------------------------------------------------------------------
-// Safe localStorage wrapper — evicts old entries on quota error
+// IndexedDB tier-2 backup — survives localStorage overflow & manual clearing
+//
+// Commit 9 hardening: localStorage quota (5-10MB) would silently drop the
+// gallery when exceeded. Now every write is ALSO mirrored to IndexedDB (50MB+
+// quota typical), and reads fall back to IDB if localStorage was cleared.
+// -----------------------------------------------------------------------------
+
+const IDB_NAME = "unistudio-fallback";
+const IDB_STORE = "gallery";
+
+function idbOpen(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IDB_STORE);
+    };
+  });
+}
+
+async function idbGet(key: string): Promise<string | null> {
+  try {
+    if (typeof indexedDB === "undefined") return null;
+    const db = await idbOpen();
+    return await new Promise<string | null>((resolve) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve((req.result as string) ?? null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function idbSet(key: string, value: string): Promise<void> {
+  try {
+    if (typeof indexedDB === "undefined") return;
+    const db = await idbOpen();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      const req = tx.objectStore(IDB_STORE).put(value, key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+    });
+  } catch {
+    /* silent — IDB unavailable (private browsing, old browser) */
+  }
+}
+
+async function idbDelete(key: string): Promise<void> {
+  try {
+    if (typeof indexedDB === "undefined") return;
+    const db = await idbOpen();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      const req = tx.objectStore(IDB_STORE).delete(key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+    });
+  } catch {
+    /* silent */
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Safe storage wrapper: localStorage (tier 1, fast sync) + IDB (tier 2, backup)
+// Writes go to both; reads prefer localStorage, fall back to IDB if missing.
 // -----------------------------------------------------------------------------
 
 const safeStorage: StateStorage = {
-  getItem: (name) => {
-    return localStorage.getItem(name);
+  getItem: async (name) => {
+    const ls = typeof localStorage !== "undefined" ? localStorage.getItem(name) : null;
+    if (ls) return ls;
+    // localStorage was cleared (or never had it) — hydrate from IDB backup
+    return await idbGet(name);
   },
-  setItem: (name, value) => {
+  setItem: async (name, value) => {
+    // Mirror to IDB first so the full payload is safe even if localStorage evicts.
+    void idbSet(name, value);
+    // Try localStorage for fast sync access; evict on quota.
     try {
       localStorage.setItem(name, value);
     } catch {
-      // QuotaExceededError — evict oldest images and retry
       try {
         const parsed = JSON.parse(value);
         if (parsed?.state?.images) {
-          // Keep only the newest 15 images
+          // Keep only the newest 15 and strip full-size data URLs
           parsed.state.images = parsed.state.images.slice(0, 15);
-          // Strip any full-size data URLs that leaked into persistence
           parsed.state.images = parsed.state.images.map((img: GalleryImage) => ({
             ...img,
             resultUrl: img.resultUrl?.startsWith("data:") ? (img.thumbnailUrl || "") : img.resultUrl,
             originalUrl: img.originalUrl?.startsWith("data:") ? "" : img.originalUrl,
           }));
-          const reduced = JSON.stringify(parsed);
-          localStorage.setItem(name, reduced);
+          localStorage.setItem(name, JSON.stringify(parsed));
         }
       } catch {
-        // Last resort: clear this key entirely
-        localStorage.removeItem(name);
+        // Couldn't even fit slimmed — localStorage stays empty, but IDB has
+        // the full payload so getItem will recover on next load.
+        try { localStorage.removeItem(name); } catch { /* ignore */ }
       }
     }
   },
   removeItem: (name) => {
-    localStorage.removeItem(name);
+    try { localStorage.removeItem(name); } catch { /* ignore */ }
+    void idbDelete(name);
   },
 };
 

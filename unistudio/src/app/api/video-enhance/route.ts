@@ -152,7 +152,7 @@ function enhanceLocal(req: VideoEnhanceRequest): VideoEnhanceResponse {
 // ---------------------------------------------------------------------------
 
 async function enhanceWithClaude(req: VideoEnhanceRequest): Promise<VideoEnhanceResponse> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const { description, category = 'product', duration = 5, platform, budget } = req;

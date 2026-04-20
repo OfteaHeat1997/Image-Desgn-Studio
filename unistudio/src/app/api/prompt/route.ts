@@ -144,7 +144,7 @@ async function optimizePromptWithClaude(
   description: string,
   context?: PromptContext,
 ): Promise<OptimizedPrompt> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const systemPrompt = `You are an expert AI prompt engineer specializing in product photography and image generation.
@@ -216,7 +216,7 @@ Return JSON: { "prompt": "...", "negativePrompt": "..." }`;
 async function creativeDirectorClaude(
   context: PromptContext,
 ): Promise<PhotoConcept[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
   const systemPrompt = `Eres un director creativo profesional de fotografia de producto para e-commerce y redes sociales.

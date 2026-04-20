@@ -38,10 +38,11 @@ export async function GET() {
 
   // Check Replicate connectivity
   let replicateStatus = "not checked";
-  if (process.env.REPLICATE_API_TOKEN) {
+  const replicateToken = process.env.REPLICATE_API_TOKEN?.trim();
+  if (replicateToken) {
     try {
       const res = await fetch("https://api.replicate.com/v1/account", {
-        headers: { Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}` },
+        headers: { Authorization: `Bearer ${replicateToken}` },
         signal: AbortSignal.timeout(5000),
       });
       replicateStatus = res.ok ? "connected" : `error: HTTP ${res.status}`;
@@ -52,10 +53,11 @@ export async function GET() {
 
   // Check fal.ai connectivity
   let falStatus = "not checked";
-  if (process.env.FAL_KEY) {
+  const falKey = process.env.FAL_KEY?.trim();
+  if (falKey) {
     try {
       const res = await fetch("https://queue.fal.run/fal-ai/fast-sdxl/status", {
-        headers: { Authorization: `Key ${process.env.FAL_KEY}` },
+        headers: { Authorization: `Key ${falKey}` },
         signal: AbortSignal.timeout(5000),
       });
       // 404/422 is fine — it means the API responded (no job ID given)
