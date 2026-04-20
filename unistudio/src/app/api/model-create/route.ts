@@ -347,8 +347,12 @@ export async function POST(request: NextRequest) {
     // "minimal base layer", "seamless", etc. — ByteDance's partner content
     // checker (used by SeedDream on fal.ai) flags them even when the actual
     // SFW safety checker is disabled.
+    //
+    // For lingerie we want a base that looks like the eventual garment so
+    // Kolors has a clean canvas — a simple beige swim two-piece is ideal
+    // (same silhouette as a bra + briefs without the trigger word "bikini").
     const promptClothing = (garmentImage || isLingerie)
-      ? 'a simple beige athletic crop top and matching beige athletic shorts, plain activewear, solid color, suitable base for virtual try-on'
+      ? 'a simple beige swim top and matching beige swim briefs, plain solid-color two-piece swimwear, suitable base for virtual try-on'
       : clothing;
 
     // Build the prompt
@@ -394,7 +398,7 @@ export async function POST(request: NextRequest) {
         if (errMsg.includes('content_policy_violation') || errMsg.includes('partner_validation_failed') || errMsg.includes('flagged')) {
           console.warn('[model-create] SeedDream content checker fired — retrying with safer prompt');
           const genderWord = gender === 'female' ? 'woman' : gender === 'male' ? 'man' : 'person';
-          const safePrompt = `E-commerce catalog photo of a ${genderWord} wearing a simple beige athletic crop top and matching shorts, standing facing the camera, clean white studio background, professional fashion photography, full body visible.`;
+          const safePrompt = `E-commerce catalog photo of a ${genderWord} wearing a simple beige swim top and matching beige swim briefs, standing facing the camera, clean white studio background, professional fashion photography, full body visible.`;
           const falResult = await runFal('fal-ai/bytedance/seedream/v4.5/text-to-image', {
             prompt: safePrompt,
             image_size: 'portrait_4_3',

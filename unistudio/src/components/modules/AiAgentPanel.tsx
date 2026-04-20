@@ -1286,6 +1286,17 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
               Cancelar Todo
             </button>
           )}
+          {/* Back-to-start button — always available to restart from zero */}
+          {execution.status !== "running" && (
+            <button
+              type="button"
+              onClick={handleReset}
+              title="Volver al inicio (subir otra imagen / cambiar card)"
+              className="flex items-center gap-1.5 rounded-lg border border-surface-lighter px-2.5 py-1.5 text-[11px] text-gray-300 hover:border-accent/60 hover:text-accent-light transition-all"
+            >
+              ← Volver al inicio
+            </button>
+          )}
         </div>
 
         {/* Manual mode label */}

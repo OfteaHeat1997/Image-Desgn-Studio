@@ -152,10 +152,16 @@ function getModeloPipeline(
   category: ProductCategory,
   budget: BudgetTier,
   prefs?: AgentPlanRequest["preferences"],
+  garmentType?: 'bra' | 'panty' | 'set' | 'other' | null,
 ): PipelineStep[] {
   const isJewelry = ["earrings", "rings", "necklace", "bracelet", "watch", "sunglasses"].includes(category);
   const isLingerie = category === "lingerie";
   const garmentDescription = GARMENT_DESCRIPTIONS[category] ?? 'Prenda de moda';
+  // E-commerce sells bras and panties separately — each needs a different
+  // grounded_sam prompt (done in bg-remove) and a different kolors category.
+  const isPanty = isLingerie && garmentType === 'panty';
+  const isBra = isLingerie && (garmentType === 'bra' || !garmentType); // default to bra for lingerie
+  const isSet = isLingerie && garmentType === 'set';
 
   const steps: PipelineStep[] = [];
 
@@ -163,11 +169,22 @@ function getModeloPipeline(
   // cannot extract a prenda from a photo that has a model, so we must strip the
   // person out before the try-on step.
   if (isLingerie) {
+    const isolateLabel = isPanty
+      ? "Aislar panty"
+      : isSet
+        ? "Aislar set"
+        : "Aislar brasier";
     steps.push(
       makeStep(
         "bg-remove",
-        "Aislar prenda",
-        { provider: "replicate", removeSubject: true },
+        isolateLabel,
+        {
+          provider: "replicate",
+          removeSubject: true,
+          // Tell bg-remove exactly what to segment — different grounded_sam
+          // prompts for bra vs panty lock the mask onto the right region.
+          garmentType: isPanty ? "panty" : isSet ? "set" : "bra",
+        },
         budget === "free" ? 0 : 0.055,
         "Quitamos la modelo original y dejamos solo la prenda para el try-on.",
       ),
@@ -215,17 +232,34 @@ function getModeloPipeline(
       ),
     );
   } else {
-    const garmentCategory =
-      category === "lingerie" ? "one-pieces" : "tops";
+    // Route kolors category by garment type: panty → bottoms, bra/set → tops
+    // or one-pieces so Kolors applies the garment to the right body region.
+    const garmentCategory = isPanty
+      ? "bottoms"
+      : isBra
+        ? "tops"
+        : isLingerie
+          ? "one-pieces"
+          : "tops";
     const tryonProvider = isLingerie ? "kolors" : "idm-vton";
+    const tryonLabel = isPanty
+      ? "Poner panty en modelo"
+      : isBra
+        ? "Poner brasier en modelo"
+        : "Poner ropa en modelo";
     const tryonReasoning = isLingerie
       ? "Kolors sobrepone la prenda ya aislada sobre la modelo IA — es el único try-on que no bloquea lencería."
       : "IDM-VTON extrae la prenda de la foto original y la transfiere a la modelo nueva. No necesitas aislar la ropa primero.";
     steps.push(
       makeStep(
         "tryon",
-        "Poner ropa en modelo",
-        { provider: tryonProvider, category: garmentCategory, garmentDescription },
+        tryonLabel,
+        {
+          provider: tryonProvider,
+          category: garmentCategory,
+          garmentType: isPanty ? "panty" : isBra ? "bra" : undefined,
+          garmentDescription,
+        },
         budget === "free" ? 0 : 0.02,
         tryonReasoning,
       ),
@@ -670,7 +704,12 @@ function buildFallbackPlan(req: AgentPlanRequest): AgentPlan {
       description = `Pipeline de producto ${req.productCategory} para tienda online. Fondo blanco, uniforme, HD.`;
       break;
     case "modelo":
-      steps = getModeloPipeline(req.productCategory, budget, req.preferences);
+      steps = getModeloPipeline(
+        req.productCategory,
+        budget,
+        req.preferences,
+        req.imageAnalysis?.garmentType ?? null,
+      );
       name = "Agente Modelo";
       description = `Crear modelo IA con ${req.productCategory}. Evita copyright, genera variantes originales.`;
       break;

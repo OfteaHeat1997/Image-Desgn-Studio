@@ -253,25 +253,41 @@ async function autoSaveResult(
   filename: string,
 ) {
   try {
-    // If the URL is already http/https (most step results — Replicate, fal,
-    // our own upload CDN), send it as-is. No need to fetch the bytes and
-    // re-encode to a multi-megabyte data URL that blows past Vercel's 10MB
-    // request body limit (→ 413).
     let sendableUrl: string;
+
     if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      // Already an HTTP URL — save directly.
       sendableUrl = imageUrl;
     } else {
-      // blob: / data: — re-encode to a JPEG data URL. If it's still too big,
-      // skip the save instead of hitting 413 for every step.
-      const encoded = await blobUrlToDataUrl(imageUrl);
-      // 9MB ceiling leaves slack under Vercel's 10MB body limit
-      if (encoded.length > 9 * 1024 * 1024) {
-        console.warn(
-          `[auto-save] Skipping save — payload ${(encoded.length / 1024 / 1024).toFixed(1)}MB over 9MB limit`,
-        );
-        return;
+      // blob: / data: — we want to SAVE these too. Upload via /api/upload to
+      // get a persistent fal/Replicate URL, then save that URL instead of
+      // squeezing the base64 through Vercel's 10MB request body limit.
+      try {
+        const res = await fetch(imageUrl);
+        const blob = await res.blob();
+        const ext = (blob.type.split("/")[1] ?? "png").split(";")[0];
+        const file = new File([blob], `step.${ext}`, { type: blob.type || "image/png" });
+        const form = new FormData();
+        form.append("file", file);
+        const up = await fetch("/api/upload", { method: "POST", body: form });
+        const upJson = await up.json();
+        if (!upJson.success) throw new Error(upJson.error ?? "upload failed");
+        sendableUrl =
+          upJson.data.falUrl ?? upJson.data.replicateUrl ?? upJson.data.url;
+      } catch (uploadErr) {
+        // Final fallback: try to encode as JPEG data URL. If still too big,
+        // at least don't block the UI — better to have a partial log than
+        // nothing.
+        console.warn("[auto-save] upload fallback -> dataUrl:", uploadErr);
+        const encoded = await blobUrlToDataUrl(imageUrl);
+        if (encoded.length > 9 * 1024 * 1024) {
+          console.warn(
+            `[auto-save] payload ${(encoded.length / 1024 / 1024).toFixed(1)}MB too large, skipping save for ${module}`,
+          );
+          return;
+        }
+        sendableUrl = encoded;
       }
-      sendableUrl = encoded;
     }
 
     await fetch("/api/save-result", {
