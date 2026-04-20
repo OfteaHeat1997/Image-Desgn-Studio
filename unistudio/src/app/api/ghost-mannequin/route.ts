@@ -9,6 +9,7 @@ import {
   removeMannequin,
   flatToModel,
   modelToFlat,
+  modelToGhost,
   GHOST_MANNEQUIN_COSTS,
 } from '@/lib/processing/ghost-mannequin';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
@@ -21,17 +22,20 @@ export const POST = withApiErrorHandler('ghost-mannequin', async (request: NextR
     operation,
     modelImage,
     category = 'tops',
+    garmentType,
   } = body as {
     imageUrl: string;
-    operation: 'remove-mannequin' | 'flat-to-model' | 'model-to-flat';
+    operation: 'remove-mannequin' | 'flat-to-model' | 'model-to-flat' | 'model-to-ghost';
     modelImage?: string;
     category?: string;
+    garmentType?: string;
   };
 
   const validationError = requireFields(body, ['imageUrl', 'operation']);
   if (validationError) return validationError;
 
   let resultUrl: string;
+  let usedProvider = 'flux-kontext-pro';
   const cost = GHOST_MANNEQUIN_COSTS[operation] ?? 0.05;
 
   switch (operation) {
@@ -48,6 +52,7 @@ export const POST = withApiErrorHandler('ghost-mannequin', async (request: NextR
         );
       }
       resultUrl = await flatToModel(imageUrl, modelImage, category);
+      usedProvider = 'idm-vton';
       break;
     }
 
@@ -56,24 +61,31 @@ export const POST = withApiErrorHandler('ghost-mannequin', async (request: NextR
       break;
     }
 
+    case 'model-to-ghost': {
+      const result = await modelToGhost(imageUrl, garmentType);
+      resultUrl = result.url;
+      usedProvider = result.provider;
+      break;
+    }
+
     default:
       return NextResponse.json(
-        { success: false, error: `Unsupported operation "${operation}". Use "remove-mannequin", "flat-to-model", or "model-to-flat".` },
+        { success: false, error: `Unsupported operation "${operation}". Use "remove-mannequin", "flat-to-model", "model-to-flat", or "model-to-ghost".` },
         { status: 400 },
       );
   }
 
   await saveJob({
     operation: `ghost-mannequin:${operation}`,
-    provider: operation === 'flat-to-model' ? 'idm-vton' : 'flux-kontext-pro',
-    inputParams: { imageUrl, operation, modelImage, category },
+    provider: usedProvider,
+    inputParams: { imageUrl, operation, modelImage, category, garmentType },
     outputUrl: resultUrl,
     cost,
   });
 
   return NextResponse.json({
     success: true,
-    data: { url: proxyReplicateUrl(resultUrl), operation, cost },
+    data: { url: proxyReplicateUrl(resultUrl), operation, cost, provider: usedProvider },
     cost,
   });
 });

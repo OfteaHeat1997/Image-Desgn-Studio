@@ -479,7 +479,7 @@ Debe responder:
 ║  ├── Inpaint - Kontext Pro .............. $0.05               ║
 ║  ├── Upscale - Clarity .................. $0.05               ║
 ║  ├── Model Create ....................... $0.055              ║
-║  └── Ghost Mannequin .................... $0.05-$0.08         ║
+║  └── Ghost Mannequin .................... $0.04-$0.08         ║
 ║                                                               ║
 ║  PREMIUM ($0.05+):                                            ║
 ║  ├── Try-On - IDM VTON .................. $0.015              ║

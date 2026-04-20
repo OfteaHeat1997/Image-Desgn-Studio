@@ -127,6 +127,7 @@ These are non-obvious and have bitten us before — preserve them exactly:
 - **Upscale (Clarity)**: `resemblance: 0.85`, `creativity: 0.25`; use `replicateUrl` helper for model references.
 - **Avatar**: validate script length, provider, and TTS provider at the route boundary before calling fal.
 - **Video results**: save to gallery via the URL flow (not `toPersistentThumbnail`, which fails on `.mp4`).
+- **Ghost Mannequin — `model-to-ghost`**: the operation for removing a REAL HUMAN and leaving just the product floating 3D. NOT `remove-mannequin` (which assumes an actual mannequin in the input — Kontext cannot "see" a human as a mannequin and will just edit the clothing). Routes to SeedDream edit (`fal-ai/bytedance/seedream/v4/edit`, no content filter) when `garmentType ∈ {lingerie, bra, panty, shapewear, bodysuit, swimwear, bikini, underwear, intimate, faja}`; otherwise falls back to Flux Kontext Pro. Prompts MUST be color-agnostic — never hardcode a color, products come in any color.
 
 ## Deployment
 

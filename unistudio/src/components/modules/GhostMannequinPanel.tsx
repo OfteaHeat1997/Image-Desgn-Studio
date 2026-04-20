@@ -19,9 +19,17 @@ interface GhostMannequinPanelProps {
   onProcess: (result: string, beforeImage?: string, cost?: number) => void;
 }
 
-type Operation = "remove-mannequin" | "flat-to-model" | "model-to-flat";
+type Operation = "remove-mannequin" | "flat-to-model" | "model-to-flat" | "model-to-ghost";
 
-type GarmentCategory = "tops" | "bottoms" | "dresses";
+type GarmentCategory =
+  | "tops"
+  | "bottoms"
+  | "dresses"
+  | "bra"
+  | "panty"
+  | "shapewear"
+  | "bodysuit"
+  | "swimwear";
 
 interface OperationDef {
   id: Operation;
@@ -29,6 +37,7 @@ interface OperationDef {
   description: string;
   cost: string;
   needsModel: boolean;
+  needsGarmentType: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -37,11 +46,20 @@ interface OperationDef {
 
 const OPERATIONS: OperationDef[] = [
   {
+    id: "model-to-ghost",
+    name: "Quitar Modelo (Ghost 3D)",
+    description: "Elimina la persona de la foto y deja solo el producto flotando con forma 3D (ideal para bras, pantys, fajas, bodysuits)",
+    cost: "$0.04",
+    needsModel: false,
+    needsGarmentType: true,
+  },
+  {
     id: "remove-mannequin",
     name: "Quitar Maniqui",
-    description: "Elimina el maniqui y crea el efecto 3D hollow-man profesional",
+    description: "Elimina el maniqui y crea el efecto 3D hollow-man profesional (solo si la foto es con maniqui, no con persona)",
     cost: "$0.05",
     needsModel: false,
+    needsGarmentType: false,
   },
   {
     id: "flat-to-model",
@@ -49,18 +67,25 @@ const OPERATIONS: OperationDef[] = [
     description: "Convierte una foto flat lay en un look puesto sobre modelo",
     cost: "$0.08",
     needsModel: true,
+    needsGarmentType: true,
   },
   {
     id: "model-to-flat",
     name: "Modelo a Flat Lay",
-    description: "Convierte una foto con modelo en vista flat lay",
+    description: "Convierte una foto con modelo en vista flat lay (prenda acostada)",
     cost: "$0.05",
     needsModel: false,
+    needsGarmentType: false,
   },
 ];
 
 const GARMENT_CATEGORIES: { value: GarmentCategory; label: string }[] = [
-  { value: "tops", label: "Parte Superior (camisas, chaquetas, blusas)" },
+  { value: "bra", label: "Bra / Sujetador" },
+  { value: "panty", label: "Panty / Ropa Interior" },
+  { value: "shapewear", label: "Faja / Shapewear" },
+  { value: "bodysuit", label: "Bodysuit / Body" },
+  { value: "swimwear", label: "Traje de Bano / Bikini" },
+  { value: "tops", label: "Parte Superior (camisas, blusas, chaquetas)" },
   { value: "bottoms", label: "Parte Inferior (pantalones, faldas)" },
   { value: "dresses", label: "Vestidos / Enterizos" },
 ];
@@ -70,8 +95,8 @@ const GARMENT_CATEGORIES: { value: GarmentCategory; label: string }[] = [
 /* ------------------------------------------------------------------ */
 
 export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPanelProps) {
-  const [operation, setOperation] = useState<Operation>("remove-mannequin");
-  const [category, setCategory] = useState<GarmentCategory>("tops");
+  const [operation, setOperation] = useState<Operation>("model-to-ghost");
+  const [category, setCategory] = useState<GarmentCategory>("bra");
   const [modelImage, setModelImage] = useState<string | null>(null);
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -134,6 +159,7 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
           operation,
           modelImage: modelImageUrl,
           category,
+          garmentType: category,
         }),
       });
       const data = await safeJson(res);
@@ -157,27 +183,27 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
     <div className="space-y-5">
       <ModuleHeader
         icon={<Shirt className="h-4 w-4" />}
-        title="Maniqui Invisible"
-        description="Fotografiaste tu prenda en un maniqui? Este modulo elimina el maniqui y deja la prenda flotando con forma 3D — el efecto 'hollow-man' que usan Zara, H&M y las grandes marcas. Tambien convierte fotos planas (flat lay) a vista en modelo."
-        whyNeeded="Los maniquis se ven poco profesionales en una tienda online — distraen al comprador. El efecto invisible muestra la prenda con volumen y forma, como si la vistiera una persona invisible. Es el estandar de la industria de moda."
-        costLabel="$0.05/img"
+        title="Quitar Modelo / Maniqui (Ghost 3D)"
+        description="Quita la persona o el maniqui de tu foto y deja solo el producto flotando con forma 3D — el efecto 'hollow-man' que usan Zara, H&M y las grandes marcas. Funciona con bras, pantys, fajas, bodysuits, swimwear y ropa en general. Tambien convierte entre vista flat lay y vista en modelo."
+        whyNeeded="Las fotos con modelo o maniqui se ven menos profesionales para ciertos catalogos. El efecto invisible muestra la prenda con volumen y forma, como si la vistiera una persona invisible — estandar de la industria para e-commerce y marketplaces."
+        costLabel="desde $0.04/img"
         steps={[
-          "Sube la foto de tu prenda sobre maniqui",
-          "Elige la operacion: Quitar Maniqui, Flat to Model, o Model to Flat",
-          "Para 'Flat to Model', opcionalmente sube una foto de modelo de referencia",
-          "Haz clic en \"Procesar\" y la IA elimina el maniqui manteniendo la forma",
+          "Sube la foto de tu prenda (con modelo, con maniqui, o flat lay)",
+          "Elige la operacion segun tu caso: Quitar Modelo (Ghost 3D) si es una persona real, Quitar Maniqui si es un maniqui, o convertir a/desde flat lay",
+          "Selecciona el tipo de prenda (bra, panty, faja, etc.) para mejor precision",
+          "Haz clic en \"Procesar\" y la IA aisla el producto",
         ]}
         tips={[
-          "Funciona mejor con prendas de parte superior (camisas, chaquetas, vestidos) que muestran volumen claro.",
-          "\"Flat to Model\" es genial si solo tienes fotos de la prenda acostada y quieres verla puesta.",
-          "Usa fotos con buena iluminacion uniforme y fondo simple para mejores resultados.",
-          "Despues de quitar el maniqui, puedes agregarle sombra con el modulo de Sombras para un look mas profesional.",
+          "Quitar Modelo (Ghost 3D) esta optimizado para lenceria (bra, panty, faja, bodysuit) — usa SeedDream sin filtro de contenido.",
+          "Quitar Maniqui solo funciona si la foto realmente tiene un maniqui (no una persona).",
+          "El color y patron del producto se preservan automaticamente — funciona con cualquier color.",
+          "Despues de quitar la modelo, puedes agregar sombras con el modulo de Sombras para mas realismo.",
         ]}
       />
 
       {/* Quick instruction */}
       <p className="text-xs text-gray-500">
-        Crea el efecto de maniqui invisible para mostrar tu ropa de forma profesional en tu catalogo.
+        Quita la persona (o maniqui) y deja solo el producto con forma 3D — ideal para catalogo profesional.
       </p>
 
       {/* Error card */}
@@ -224,11 +250,11 @@ export function GhostMannequinPanel({ imageFile, onProcess }: GhostMannequinPane
         </div>
       </div>
 
-      {/* Garment category selector (only shown for flat-to-model) */}
-      {selectedOp.needsModel && (
+      {/* Garment category selector — shown whenever the op needs a garment type */}
+      {selectedOp.needsGarmentType && (
         <div>
           <label className="mb-2 block text-xs font-medium text-gray-400">
-            Categoria de Prenda
+            Tipo de Prenda
           </label>
           <div className="space-y-1.5">
             {GARMENT_CATEGORIES.map((cat) => (

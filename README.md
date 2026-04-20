@@ -88,7 +88,7 @@ After starting, visit `http://localhost:3000/api/health` to verify all services 
 | 6 | Outpaint | $0.05 | Extend images for 14 platform formats |
 | 7 | Try-On | $0.015-0.15 | Virtual try-on (IDM-VTON / Kolors / FASHN) |
 | 8 | Model Create | $0.05 | Generate AI fashion models (gender/age/skin/pose) |
-| 9 | Ghost Mannequin | $0.05-0.08 | Remove mannequin / flat-to-model / model-to-flat |
+| 9 | Ghost Mannequin | $0.04-0.08 | Remove model (real human) → product 3D ghost / remove mannequin / flat-to-model / model-to-flat. Lingerie-aware (bra, panty, shapewear, bodysuit) via SeedDream edit. |
 | 10 | Jewelry Try-On | $0.05 | Apply earrings, necklaces, rings, bracelets, watches |
 | 11 | Video Studio | $0-0.80 | 7 video + 5 avatar + 2 TTS providers |
 | 12 | Batch Processing | varies | Process multiple images through configurable pipeline |

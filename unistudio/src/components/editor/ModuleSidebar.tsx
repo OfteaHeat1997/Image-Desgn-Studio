@@ -41,11 +41,20 @@ interface ModuleItem {
   example?: string;
   /** When this module is the right choice. Shown on hover. */
   useWhen?: string;
+  /**
+   * "single" = one operation on one image.
+   * "pipeline" = multi-step flow that chains several operations.
+   * Shown as a small badge so users know instantly whether this is a single
+   * action or a whole flow.
+   */
+  kind?: 'single' | 'pipeline';
 }
 
 interface ModuleCategory {
   name: string;
   color: string;
+  /** One-line hint that helps the user decide which module in this category fits their case */
+  hint?: string;
   modules: ModuleItem[];
 }
 
@@ -188,42 +197,37 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
   {
     name: "AUTOMATIZACIÓN",
     color: "#A78BFA",
+    hint: "Elegí por cantidad de fotos: 1 foto y no sé qué hacer → IA Decide. Muchas fotos mismo proceso → Batch. Una referencia completa → Catálogo.",
     modules: [
       {
         id: "ai-agent",
-        label: "Agente IA (Automático)",
+        label: "1 Foto — IA Decide Pasos",
         icon: Bot,
         cost: "Variable",
-        description: "Escoges tu producto y el IA hace TODO solo",
-        example: "Subes foto de brasier → IA decide: aislar, crear modelo, vestirla, mejorar, hacer video. Todo automático.",
-        useWhen: "Eres mamá (o cualquier persona) y no quieres pensar en los pasos — solo el resultado final",
+        kind: "pipeline",
+        description: "Subís 1 foto, el IA elige todos los pasos y ejecuta",
+        example: "1 foto de brasier → IA decide: aislar + crear modelo + vestir + video. Todo automático.",
+        useWhen: "Tenés 1 foto y no sabés por dónde empezar — dejá que el IA elija",
       },
       {
         id: "batch",
-        label: "Procesar Muchas Fotos",
+        label: "Muchas Fotos — Mismo Pipeline",
         icon: Layers,
         cost: "Variable",
-        description: "50+ imágenes con el mismo pipeline, sin repetir clicks",
-        example: "Tienes 50 fotos de brasieres de distintos colores → todas salen procesadas igual",
-        useWhen: "Tienes muchas fotos que necesitan EL MISMO tratamiento",
-      },
-      {
-        id: "brand-kit",
-        label: "Kit de Marca (Logo/Colores)",
-        icon: Palette,
-        cost: "Gratis",
-        description: "Guarda tu logo, colores y marca de agua",
-        example: "Guardas el logo de 'Unistyles' → después aparece automáticamente en todas las fotos",
-        useWhen: "Cada foto tuya debe llevar tu logo o colores de marca",
+        kind: "pipeline",
+        description: "Subís 50+ fotos y aplicás el mismo proceso a todas",
+        example: "50 fotos de brasieres distintos colores → todas salen con el mismo tratamiento",
+        useWhen: "Tenés muchas fotos que necesitan EXACTAMENTE el mismo proceso (ej: toda la colección)",
       },
       {
         id: "catalog-pipeline",
-        label: "Pipeline de Catálogo Completo",
+        label: "1 Referencia — Catálogo Completo",
         icon: Package,
         cost: "$0.18+/ref",
-        description: "Todo el contenido de una referencia en 1 clic",
-        example: "Una referencia (ej: REF-123 rojo) → 4 ángulos + 2 videos + infografía",
-        useWhen: "Quieres el catálogo COMPLETO listo de una vez",
+        kind: "pipeline",
+        description: "1 foto + número de ref → 4 ángulos + 2 videos + infografía",
+        example: "REF-123 rojo → catálogo completo con vista frontal, espalda, lateral, lifestyle + 2 videos",
+        useWhen: "Querés el catálogo e-commerce COMPLETO de una sola referencia lista para publicar",
       },
     ],
   },
@@ -231,6 +235,15 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     name: "HERRAMIENTAS",
     color: "#5B9CF6",
     modules: [
+      {
+        id: "brand-kit",
+        label: "Kit de Marca (Logo/Colores)",
+        icon: Palette,
+        cost: "Gratis",
+        description: "Guardá tu logo, colores y marca de agua",
+        example: "Guardás el logo de Unistyles → después aparece automáticamente en todas las fotos",
+        useWhen: "Una configuración inicial — setéalo al principio y olvídate",
+      },
       {
         id: "shadows",
         label: "Sombra bajo Producto",
@@ -320,6 +333,21 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
                 <div className="flex-1 h-px ml-1" style={{ background: `${cat.color}20` }} />
               </button>
 
+              {/* Category hint — guidance for picking the right module when
+                  several inside the same category serve similar purposes */}
+              {!isCollapsed && cat.hint && (
+                <div
+                  className="mx-2 mb-1 rounded-lg border px-2.5 py-1.5 text-[10px] leading-snug"
+                  style={{
+                    borderColor: `${cat.color}30`,
+                    background: `${cat.color}0A`,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {cat.hint}
+                </div>
+              )}
+
               {/* Modules */}
               {!isCollapsed && (
                 <div className="space-y-0.5 px-2">
@@ -358,11 +386,25 @@ export function ModuleSidebar({ selectedModule, onModuleChange }: ModuleSidebarP
                             style={{ color: isActive ? cat.color : "var(--text-muted)" }}
                           />
                           <span className="flex-1 min-w-0">
-                            <span className={cn(
-                              "block text-[13px] font-medium truncate transition-colors",
-                              isActive ? "text-white" : "text-[var(--text-secondary)] group-hover:text-white",
-                            )}>
-                              {mod.label}
+                            <span className="flex items-center gap-1.5">
+                              <span className={cn(
+                                "block text-[13px] font-medium truncate transition-colors",
+                                isActive ? "text-white" : "text-[var(--text-secondary)] group-hover:text-white",
+                              )}>
+                                {mod.label}
+                              </span>
+                              {mod.kind === "pipeline" && (
+                                <span
+                                  className="shrink-0 rounded px-1.5 py-px text-[8px] font-bold uppercase tracking-wider"
+                                  style={{
+                                    background: `${cat.color}30`,
+                                    color: cat.color,
+                                  }}
+                                  title="Este módulo encadena varios pasos automáticamente"
+                                >
+                                  Pipeline
+                                </span>
+                              )}
                             </span>
                             <span className="text-[10px] text-zinc-500 block mt-0.5 leading-tight truncate">
                               {mod.description}

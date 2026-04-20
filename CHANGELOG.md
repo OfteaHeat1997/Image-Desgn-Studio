@@ -1,5 +1,40 @@
 # UniStudio — Changelog
 
+## 2026-04-20 — Ghost Mannequin module fix for real humans
+
+The "Quitar Maniqui" module was assuming input photos had a real mannequin. When the input was a real woman wearing lingerie (bra, panty, shapewear), Flux Kontext Pro just edited the clothing (e.g., added long sleeves to a bra) instead of removing the person. Added a new operation that actually removes the person.
+
+### Changes
+
+| File | Change |
+|---|---|
+| `src/lib/processing/ghost-mannequin.ts` | New `modelToGhost(imageUrl, garmentType?)` function with cascade: SeedDream edit (`fal-ai/bytedance/seedream/v4/edit`, no content filter) for lingerie → Flux Kontext Pro fallback → SeedDream retry. Color-agnostic prompts (works for any color). |
+| `src/lib/processing/ghost-mannequin.ts` | Added `LINGERIE_TYPES` set + `GARMENT_NOUN` map for type-aware prompting. |
+| `src/app/api/ghost-mannequin/route.ts` | New `model-to-ghost` case in switch. Accepts `garmentType` param. Returns `provider` in response. |
+| `src/components/modules/GhostMannequinPanel.tsx` | New "Quitar Modelo (Ghost 3D)" operation (default). Garment-type selector now shows for model-to-ghost and flat-to-model. Added lingerie categories: bra, panty, shapewear, bodysuit, swimwear. Sends `garmentType` to the route. Updated module header copy to clarify when to use which operation. |
+| `CLAUDE.md` | Added Ghost Mannequin gotcha: use `model-to-ghost` for real humans (NOT `remove-mannequin`), color-agnostic prompts. |
+| `docs/architecture.md` | Updated `/api/ghost-mannequin` signature (garmentType param, $0.04-0.08 range) and file tree comment. |
+
+### Why this was failing
+
+`remove-mannequin` prompt says "Remove the mannequin from this garment image." Kontext Pro looks for a mannequin, finds a human model, ignores the instruction, and reinterprets the request as "edit the clothing." Result: bra gets sleeves added instead of the person being removed. Screenshot evidence attached in the investigation thread.
+
+### Provider routing
+
+```
+model-to-ghost + garmentType ∈ LINGERIE_TYPES
+  → SeedDream edit (fal.ai, no content filter, ~$0.04)
+  → fallback to Flux Kontext Pro
+  → fallback to SeedDream retry with minimal prompt
+
+model-to-ghost + non-lingerie garment
+  → Flux Kontext Pro directly (~$0.04)
+```
+
+`LINGERIE_TYPES = { lingerie, bra, panty, shapewear, bodysuit, swimwear, bikini, underwear, intimate, faja, fajas }`
+
+---
+
 ## 2026-04-20 — Lingerie Pipeline Overhaul (18 commits)
 
 Intense day: fought through the full lingerie flow from broken (Flux Kontext E005 moderation) to working (grounded_sam + SeedDream + Kolors), then shipped the first round of UX features on top.

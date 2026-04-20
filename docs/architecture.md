@@ -22,7 +22,7 @@ src/
 │   │   ├── brand-kit/          # Brand kit CRUD
 │   │   ├── db/history/         # Processing history from DB
 │   │   ├── enhance/            # Color/brightness/contrast (Sharp)
-│   │   ├── ghost-mannequin/    # Mannequin remove/flat-to-model
+│   │   ├── ghost-mannequin/    # Mannequin remove / model-to-ghost / flat-to-model / model-to-flat
 │   │   ├── health/             # System health check
 │   │   ├── inpaint/            # Watermark/defect removal (3 providers)
 │   │   ├── inventory/          # Product catalog (scan + load)
@@ -143,7 +143,7 @@ src/
 |---|---|---|---|---|
 | `/api/model-create` | POST | JSON (gender, age, skinTone, bodyType, pose) | AI model image URL | $0.05 |
 | `/api/tryon` | POST | JSON (modelImage, garmentImage, category, provider?) | Try-on result URL | $0.015-0.15 |
-| `/api/ghost-mannequin` | POST | JSON (imageUrl, operation) | Processed image URL | $0.05-0.08 |
+| `/api/ghost-mannequin` | POST | JSON (imageUrl, operation, garmentType?, category?) | Processed image URL | $0.04-0.08 |
 | `/api/jewelry-tryon` | POST | JSON (modelImage, accessoryImage, type) | Try-on result URL | $0.05 |
 | `/api/ai-models` | GET/POST | GET: list models, POST: create model entry | Model data | $0 |
 
