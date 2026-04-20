@@ -276,26 +276,55 @@ function getModeloPipeline(
     ),
   );
 
-  // Lingerie: append a short social-ready video AFTER the try-on result so
-  // users get a posing clip for WhatsApp / IG / TikTok without running a
-  // second pipeline. Uses kenburns by default (gratis) unless budget =
-  // premium, then wan-2.2-fast ($0.05).
+  // Lingerie: append TWO short videos AFTER the try-on result — this is the
+  // proven copy from catalog-pipeline that works well for Unistyles / Leonisa
+  // style catalogs. One video shows the isolated product in 360° rotation
+  // (for WhatsApp / marketplace listings); the other shows the AI model
+  // posing with the prenda on (for IG / TikTok).
+  //
+  // kenburns is gratis and produces smooth motion from a still image. On
+  // budget:"premium" we upgrade to wan-2.2-fast ($0.05 each) for real AI
+  // motion. Under budget:"free" we still produce both (they're gratis).
   if (isLingerie) {
     const videoProvider = budget === "premium" ? "wan-2.2-fast" : "kenburns";
     const videoCost = budget === "premium" ? 0.05 : 0;
     const garmentWord = isPanty ? "panty" : isBra ? "brasier" : "prenda";
+    const garmentEN = isPanty ? "panty" : isBra ? "bra" : "lingerie";
+
+    // Video 1 — modelo posando con la prenda (formato 9:16 vertical para redes)
     steps.push(
       makeStep(
         "video",
-        `Video de la modelo (${garmentWord})`,
+        `Video de la modelo con ${garmentWord}`,
         {
           provider: videoProvider,
-          prompt: `Model showcasing the ${isPanty ? "panty" : isBra ? "bra" : "lingerie"}, subtle pose rotation, catalog style, soft studio lighting`,
+          prompt: `Fashion model wearing the ${garmentEN}, subtle natural movement, confident elegant pose, soft studio lighting, editorial fashion photography`,
           aspectRatio: "9:16",
-          duration: 3,
+          duration: 5,
         },
         budget === "free" ? 0 : videoCost,
-        "Creamos un video corto de la modelo con la prenda puesta — listo para IG/TikTok/WhatsApp.",
+        "Creamos un video vertical 9:16 de la modelo con la prenda — listo para IG Reels / TikTok / WhatsApp Status.",
+      ),
+    );
+
+    // Video 2 — producto 360° (formato 1:1 cuadrado para Amazon / Shopify)
+    // Uses the isolated garment result (from step 1 bg-remove) as source so
+    // this is a flat-lay rotation, not a model video.
+    steps.push(
+      makeStep(
+        "video",
+        `Video 360° del ${garmentWord}`,
+        {
+          provider: videoProvider,
+          prompt: `Smooth slow 360 degree rotation of this ${garmentEN} garment on pure white background, professional product photography, clean studio lighting`,
+          aspectRatio: "1:1",
+          duration: 5,
+          // Tell the pipeline to use the ISOLATED product (from the aislar step)
+          // as input, not the final tryon result.
+          _useResult: "isolate",
+        },
+        budget === "free" ? 0 : videoCost,
+        "Video cuadrado 1:1 del producto rotando solo — ideal para Amazon / Shopify / páginas de producto.",
       ),
     );
   }

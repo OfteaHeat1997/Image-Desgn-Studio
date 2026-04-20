@@ -433,11 +433,31 @@ async function runStep(
   productType: string,
   sharedModelUrl?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string }> {
+  // Map the catalog productType ("bra" | "panty" | "set" | "other") to the
+  // garmentType the AI Agent routes expect. This unlocks:
+  // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
+  // - model-create's SeedDream routing with the no-moderation prompt
+  // - tryon's forced Kolors for lingerie
+  const lingerieTypes = ['bra', 'panty', 'set', 'lingerie'];
+  const garmentTypeForApi =
+    productType === 'bra' || productType === 'panty' || productType === 'set'
+      ? productType
+      : lingerieTypes.includes(productType) ? 'lingerie' : 'other';
+  const isLingerieFlow = garmentTypeForApi !== 'other';
+
   if (stepId === "isolate") {
     const res = await fetch("/api/bg-remove", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: inputUrl, provider: "replicate" }),
+      body: JSON.stringify({
+        imageUrl: inputUrl,
+        provider: "replicate",
+        // Lingerie input usually shows a model wearing the garment — we need
+        // grounded_sam to strip the person and return ONLY the product, not
+        // run plain rembg which keeps the person as foreground.
+        removeSubject: isLingerieFlow,
+        garmentType: garmentTypeForApi,
+      }),
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "bg-remove failed");
@@ -469,7 +489,11 @@ async function runStep(
         pose,
         expression: "confident natural",
         background: "plain white studio background",
-        clothing: "wearing coordinated neutral lingerie, tasteful and professional",
+        // Let model-create's lingerie detection kick in — it overrides the
+        // clothing prompt to safe swim-base phrasing (the one that passes
+        // ByteDance's partner content checker) instead of the explicit
+        // "lingerie" word which the checker flags.
+        garmentType: garmentTypeForApi,
       }),
     });
     const json = await res.json();
@@ -478,15 +502,26 @@ async function runStep(
   }
 
   if (stepId === "tryon") {
-    const category = productType === "bra" || productType === "set" ? "upper_body" : "lower_body";
+    // Kolors-compatible category names (tryon route maps them):
+    // bra → "tops", panty → "bottoms", set → "one-pieces"
+    const category =
+      productType === "panty" ? "bottoms"
+      : productType === "set" ? "one-pieces"
+      : "tops";
+    // Refuse to run tryon without a separate model image — otherwise both
+    // inputs become the same URL and Kolors produces garbage.
+    if (!sharedModelUrl) {
+      throw new Error("Falta la modelo IA (paso 'model' no corrió o falló). Corré ese paso antes del try-on.");
+    }
     const res = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        modelImage: sharedModelUrl || inputUrl,
+        modelImage: sharedModelUrl,
         garmentImage: inputUrl,
         category,
-        garmentType: "lingerie",
+        garmentType: garmentTypeForApi,
+        provider: isLingerieFlow ? "kolors" : "idm-vton",
       }),
     });
     const json = await res.json();

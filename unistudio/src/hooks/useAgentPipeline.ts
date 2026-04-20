@@ -410,13 +410,20 @@ async function executeStep(
 
     // ----- Video (terminal step) -----
     case "video": {
-      // If currentUrl is already http/https (tryon/kolors output on fal.media
-      // for example), send it directly — avoids a 2-4MB round-trip of re-
-      // encoding the image as base64 just to POST it back to our server.
-      const isHttp = ctx.currentUrl.startsWith("http://") || ctx.currentUrl.startsWith("https://");
+      // Pick the source image. Default is the current flowing URL (usually
+      // the tryon/enhance result). `_useResult: "isolate"` tells us to use
+      // the product-only cutout from the earlier bg-remove step — useful
+      // for 360° flat-lay rotation videos. `_useResult: "tryon"` grabs the
+      // model-with-garment output explicitly.
+      const useResultKey = params._useResult as string | undefined;
+      let sourceUrl = ctx.currentUrl;
+      if (useResultKey === "isolate" && ctx.garmentUrl) {
+        sourceUrl = ctx.garmentUrl;
+      }
+      const isHttp = sourceUrl.startsWith("http://") || sourceUrl.startsWith("https://");
       const imageUrlForVideo = isHttp
-        ? ctx.currentUrl
-        : await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
+        ? sourceUrl
+        : await fileToDataUrl(await urlToFile(sourceUrl, "input.png"));
       const res = await fetch("/api/video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
