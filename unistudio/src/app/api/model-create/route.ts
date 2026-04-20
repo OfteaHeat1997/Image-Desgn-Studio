@@ -465,18 +465,39 @@ export async function POST(request: NextRequest) {
       cost: totalCost,
     });
 
-    // Save to AI models library
+    // Save to AI models library. Record the actual generator + seed so the
+    // model can be recreated identically later (multi-angle catalogs reuse
+    // the same face by passing the same seed back to SeedDream).
+    const actualProvider = isLingerie ? 'fal' : 'replicate';
+    const actualModelId = isLingerie
+      ? 'fal-ai/bytedance/seedream/v4.5/text-to-image'
+      : 'black-forest-labs/flux-kontext-pro';
+    const generationSeed = isLingerie
+      ? (typeof seed === 'number' ? seed : undefined)
+      : undefined;
     const savedModel = await saveAiModel({
-      name: `${gender} model – ${ageRange}, ${skinTone}`,
-      provider: 'replicate',
-      modelId: 'black-forest-labs/flux-kontext-pro',
+      name: `${gender} model – ${ageRange}, ${skinTone}${garmentType ? ` (${garmentType})` : ''}`,
+      provider: actualProvider,
+      modelId: actualModelId,
       gender,
       ageRange,
       skinTone,
       bodyType,
       pose,
       previewUrl: finalUrl,
-      metadata: { expression, hairStyle, hairColor, background, clothing, ethnicity, height, prompt: usedPrompt, garmentApplied: !!garmentImage },
+      metadata: {
+        expression,
+        hairStyle,
+        hairColor,
+        background,
+        clothing,
+        ethnicity,
+        height,
+        garmentType,
+        seed: generationSeed,
+        prompt: usedPrompt,
+        garmentApplied: !!garmentImage,
+      },
     });
 
     return NextResponse.json({

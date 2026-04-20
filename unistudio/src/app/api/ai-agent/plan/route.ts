@@ -276,6 +276,30 @@ function getModeloPipeline(
     ),
   );
 
+  // Lingerie: append a short social-ready video AFTER the try-on result so
+  // users get a posing clip for WhatsApp / IG / TikTok without running a
+  // second pipeline. Uses kenburns by default (gratis) unless budget =
+  // premium, then wan-2.2-fast ($0.05).
+  if (isLingerie) {
+    const videoProvider = budget === "premium" ? "wan-2.2-fast" : "kenburns";
+    const videoCost = budget === "premium" ? 0.05 : 0;
+    const garmentWord = isPanty ? "panty" : isBra ? "brasier" : "prenda";
+    steps.push(
+      makeStep(
+        "video",
+        `Video de la modelo (${garmentWord})`,
+        {
+          provider: videoProvider,
+          prompt: `Model showcasing the ${isPanty ? "panty" : isBra ? "bra" : "lingerie"}, subtle pose rotation, catalog style, soft studio lighting`,
+          aspectRatio: "9:16",
+          duration: 3,
+        },
+        budget === "free" ? 0 : videoCost,
+        "Creamos un video corto de la modelo con la prenda puesta — listo para IG/TikTok/WhatsApp.",
+      ),
+    );
+  }
+
   // Free budget: remove paid steps
   if (budget === "free") {
     return steps.filter((s) => s.estimatedCost === 0);

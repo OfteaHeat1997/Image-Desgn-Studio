@@ -410,12 +410,18 @@ async function executeStep(
 
     // ----- Video (terminal step) -----
     case "video": {
-      const dataUrl = await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
+      // If currentUrl is already http/https (tryon/kolors output on fal.media
+      // for example), send it directly — avoids a 2-4MB round-trip of re-
+      // encoding the image as base64 just to POST it back to our server.
+      const isHttp = ctx.currentUrl.startsWith("http://") || ctx.currentUrl.startsWith("https://");
+      const imageUrlForVideo = isHttp
+        ? ctx.currentUrl
+        : await fileToDataUrl(await urlToFile(ctx.currentUrl, "input.png"));
       const res = await fetch("/api/video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: dataUrl,
+          imageUrl: imageUrlForVideo,
           provider: params.provider ?? "wan-2.2-fast",
           prompt: params.prompt ?? "Cinematic product showcase, smooth camera motion",
           duration: params.duration ?? 5,
