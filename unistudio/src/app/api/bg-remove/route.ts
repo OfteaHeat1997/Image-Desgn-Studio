@@ -104,55 +104,117 @@ async function isolateGarment(
   const preparedDataUrl = `data:image/png;base64,${prepared.toString('base64')}`;
   const httpInput = await ensureHttpUrl(preparedDataUrl);
 
-  // schananas/grounded_sam returns [annotated, neg_annotated, mask, inverted_mask].
-  // Index 2 is the clean B/W mask (white = garment, black = everything else).
-  const output = await runModel(
+  // schananas/grounded_sam returns four images. Different runs can return
+  // them in different container shapes (array, AsyncIterable, object with
+  // urls keyed by name). We fetch each candidate, check which one is
+  // actually a B/W mask with enough white pixels (the garment area), and
+  // fall back to plain rembg if nothing qualifies.
+  const rawOutput = await runModel(
     'schananas/grounded_sam:ee871c19efb1941f55f66a3d7d960428c8a5afcb77449547fe8e5a3ab9ebc21c',
     {
       image: httpInput,
       mask_prompt: maskPrompt,
-      negative_mask_prompt: 'skin,body,face,hair,arm,shoulder,neck,torso,background',
+      negative_mask_prompt: 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background',
       adjustment_factor: 0,
     },
   );
 
-  // Output can be an iterator, array, or list of urls — handle all shapes.
-  const outArr: string[] = Array.isArray(output)
-    ? output.map((o) => (typeof o === 'string' ? o : (o?.url?.() ?? o?.href ?? ''))).filter(Boolean)
-    : [await extractOutputUrl(output)];
-  if (outArr.length < 3) {
-    throw new Error(`grounded_sam returned unexpected output (${outArr.length} items)`);
+  // Normalize the output shape into a flat array of URL strings
+  async function toUrlArray(out: unknown): Promise<string[]> {
+    if (!out) return [];
+    if (typeof out === 'string') return [out];
+    if (Array.isArray(out)) {
+      const urls: string[] = [];
+      for (const item of out) {
+        if (typeof item === 'string') urls.push(item);
+        else if (item && typeof item === 'object') {
+          const maybeUrl = (item as { url?: unknown }).url;
+          if (typeof maybeUrl === 'function') urls.push(String((maybeUrl as () => unknown)()));
+          else if (typeof maybeUrl === 'string') urls.push(maybeUrl);
+          else {
+            const href = (item as { href?: string }).href;
+            if (typeof href === 'string') urls.push(href);
+          }
+        }
+      }
+      return urls;
+    }
+    if (typeof out === 'object') {
+      const asObj = out as Record<string, unknown>;
+      const preferred = ['mask', 'inverted_mask', 'annotated_picture_mask', 'neg_annotated_picture_mask'];
+      const urls: string[] = [];
+      for (const key of preferred) {
+        const v = asObj[key];
+        if (typeof v === 'string') urls.push(v);
+      }
+      if (urls.length) return urls;
+    }
+    try {
+      const single = await extractOutputUrl(out);
+      if (single) return [single];
+    } catch {
+      /* ignore */
+    }
+    return [];
   }
-  const maskUrl = outArr[2];
-  console.log(`[bg-remove:isolate] mask url=${maskUrl.slice(0, 80)}`);
 
-  // Download the mask
-  const maskResp = await fetch(maskUrl, { headers: replicateHeaders(maskUrl) });
-  if (!maskResp.ok) throw new Error(`mask download ${maskResp.status}`);
-  const maskBuffer = Buffer.from(await maskResp.arrayBuffer());
+  const urls = await toUrlArray(rawOutput);
+  console.log(`[bg-remove:isolate] grounded_sam returned ${urls.length} urls: ${urls.map(u => u.slice(0, 60)).join(' | ')}`);
 
-  // The mask comes back at the model's processing resolution — resize it to
-  // match our prepared image before compositing.
-  const resizedMask = await sharp(maskBuffer)
-    .resize(width, height, { fit: 'fill' })
-    .grayscale()
-    .toColorspace('b-w')
-    .png()
-    .toBuffer();
+  // Helper: download + verify mask. Score = fraction of white pixels (garment coverage).
+  async function tryMask(url: string, label: string): Promise<{ buffer: Buffer; score: number } | null> {
+    try {
+      const resp = await fetch(url, { headers: replicateHeaders(url) });
+      if (!resp.ok) return null;
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const gray = await sharp(buf).resize(width, height, { fit: 'fill' }).grayscale().raw().toBuffer();
+      let white = 0;
+      for (let i = 0; i < gray.length; i++) if (gray[i] > 128) white++;
+      const score = white / gray.length;
+      console.log(`[bg-remove:isolate] candidate ${label} score=${score.toFixed(3)}`);
+      return { buffer: gray, score };
+    } catch (err) {
+      console.warn(`[bg-remove:isolate] candidate ${label} failed:`, err);
+      return null;
+    }
+  }
+
+  // Score every candidate and pick the one with between 2% and 60% white
+  // pixels — a valid garment mask. If both mask + inverted_mask come back,
+  // prefer the one with coverage in this sane range.
+  let bestMask: Buffer | null = null;
+  let bestScore = 0;
+  for (let i = 0; i < Math.min(urls.length, 4); i++) {
+    const candidate = await tryMask(urls[i], `idx${i}`);
+    if (!candidate) continue;
+    const inRange = candidate.score >= 0.02 && candidate.score <= 0.6;
+    if (inRange && candidate.score > bestScore) {
+      bestMask = candidate.buffer;
+      bestScore = candidate.score;
+    }
+  }
+
+  if (!bestMask) {
+    console.warn('[bg-remove:isolate] no usable mask from grounded_sam — falling back to rembg on whole image');
+    return await removeBgReplicate(preparedDataUrl);
+  }
+
+  console.log(`[bg-remove:isolate] using mask with coverage=${bestScore.toFixed(3)}`);
 
   // Compose: prepared RGB + mask as alpha → PNG with only the garment visible.
   const isolated = await sharp(prepared)
     .ensureAlpha()
-    .joinChannel(await sharp(resizedMask).raw().toBuffer(), {
-      raw: { width, height, channels: 1 },
-    })
+    .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
     .png()
     .toBuffer();
 
-  // Return as data URL — Kolors etc. will re-upload it to fal storage as HTTP.
-  const dataUrl = `data:image/png;base64,${isolated.toString('base64')}`;
-  console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB)`);
-  return dataUrl;
+  // Upload the result to Replicate file hosting so downstream routes receive
+  // an https:// URL instead of a multi-megabyte data URI (that was causing
+  // /api/save-result to fail with 413 Request Body Too Large).
+  const resultDataUrl = `data:image/png;base64,${isolated.toString('base64')}`;
+  const httpResultUrl = await ensureHttpUrl(resultDataUrl);
+  console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB) -> ${httpResultUrl.slice(0, 80)}`);
+  return httpResultUrl;
 }
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
