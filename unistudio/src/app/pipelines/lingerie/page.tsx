@@ -432,6 +432,7 @@ async function runStep(
   modelConfig: ModelConfig,
   productType: string,
   sharedModelUrl?: string,
+  referenceNumber?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -488,11 +489,9 @@ async function runStep(
         pose,
         expression: "confident natural",
         background: "plain white studio background",
-        // Let model-create's lingerie detection kick in — it overrides the
-        // clothing prompt to safe swim-base phrasing (the one that passes
-        // ByteDance's partner content checker) instead of the explicit
-        // "lingerie" word which the checker flags.
         garmentType: garmentTypeForApi,
+        // Tag the saved AiModel with this reference so future runs for same SKU can reuse
+        referenceNumber: referenceNumber || undefined,
       }),
     });
     const json = await res.json();
@@ -602,6 +601,39 @@ export default function LingeriePipelinePage() {
     }
   }, []);
 
+  // Cross-session AI model reuse: when referenceNumber is typed/changed,
+  // lookup saved models with that tag. If found, reuse it and skip $0.055 regen.
+  const [reusedModelFound, setReusedModelFound] = useState(false);
+  useEffect(() => {
+    setReusedModelFound(false);
+    const ref = referenceNumber.trim();
+    if (!ref) {
+      setSharedModelUrl(undefined);
+      return;
+    }
+    // Debounce 600ms so we don't spam the API on every keystroke
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/ai-models?referenceNumber=${encodeURIComponent(ref)}`,
+          { signal: AbortSignal.timeout(10000) },
+        );
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const saved = json.data[0];
+          if (saved?.previewUrl) {
+            setSharedModelUrl(saved.previewUrl);
+            setReusedModelFound(true);
+            toast.success(`Modelo IA de REF ${ref} encontrada — se va a reusar (ahorro $0.055).`);
+          }
+        }
+      } catch {
+        // Silent — user can still run the pipeline, just won't reuse
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [referenceNumber]);
+
   /* ---- Setup: add images ---- */
   const handleFiles = useCallback((files: File[]) => {
     const newJobs: ImageJob[] = files.map((file) => {
@@ -651,7 +683,8 @@ export default function LingeriePipelinePage() {
       job.falUrl,
       modelConfig,
       productType,
-      step.id === "tryon" ? currentSharedModel : currentSharedModel,
+      currentSharedModel,
+      referenceNumber || undefined,
     );
   }, [modelConfig, productType]);
 

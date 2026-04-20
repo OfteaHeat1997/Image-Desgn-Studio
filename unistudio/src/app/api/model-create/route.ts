@@ -290,11 +290,14 @@ export async function POST(request: NextRequest) {
       garmentCategory,
       garmentType,
       seed,
+      referenceNumber,
     } = body as ModelCreateOptions & {
       garmentImage?: string;
       garmentCategory?: string;
       garmentType?: string;
       seed?: number;
+      /** Optional Unistyles product reference (e.g. REF-71332) — enables cross-session model reuse */
+      referenceNumber?: string;
     };
 
     // Validate required fields
@@ -497,6 +500,8 @@ export async function POST(request: NextRequest) {
         seed: generationSeed,
         prompt: usedPrompt,
         garmentApplied: !!garmentImage,
+        /** Tag for cross-session reuse — /api/ai-models?referenceNumber=X filters on this */
+        referenceNumber: referenceNumber ?? null,
       },
     });
 
