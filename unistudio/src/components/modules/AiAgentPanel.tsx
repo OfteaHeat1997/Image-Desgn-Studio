@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { safeJson } from "@/lib/utils/safe-json";
+import { humanizeError } from "@/lib/utils/humanize-error";
 import {
   ShoppingBag,
   User,
@@ -179,22 +180,27 @@ const AGE_OPTIONS = [
   { value: "46-55", label: "46-55" },
 ];
 
+/**
+ * Compact single-letter tokens rendered with a color pill per module, so the
+ * UI reads as "[AP] Aislar prenda" instead of relying on emoji glyphs.
+ * Rule (UX_UI_GUIDE §1.4 & §11): no emojis anywhere — color + icon + label only.
+ */
 const MODULE_ICONS: Record<string, string> = {
-  "bg-remove": "✂️",
-  "bg-generate": "🎨",
-  enhance: "✨",
-  shadows: "💡",
-  outpaint: "↔️",
-  upscale: "🔍",
-  "model-create": "👤",
-  tryon: "👗",
-  "jewelry-tryon": "💎",
-  inpaint: "🖌️",
-  video: "🎬",
-  "ad-create": "📱",
-  infographic: "📋",
-  "ghost-mannequin": "👻",
-  "analyze-image": "🔎",
+  "bg-remove": "BG",
+  "bg-generate": "BG+",
+  enhance: "EH",
+  shadows: "SH",
+  outpaint: "OP",
+  upscale: "HD",
+  "model-create": "M",
+  tryon: "T",
+  "jewelry-tryon": "JW",
+  inpaint: "IN",
+  video: "VD",
+  "ad-create": "AD",
+  infographic: "IG",
+  "ghost-mannequin": "GM",
+  "analyze-image": "?",
 };
 
 /**
@@ -1474,10 +1480,15 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
                   </div>
                 )}
 
-                {/* Failed message */}
+                {/* Failed message — humanized copy with raw detail in a title hover */}
                 {isFailed && stepExec.error && (
                   <div className="px-2.5 pb-2">
-                    <p className="text-[10px] text-red-400">{stepExec.error}</p>
+                    <p
+                      className="text-[10px] text-red-400 leading-snug"
+                      title={humanizeError(stepExec.error).raw}
+                    >
+                      {humanizeError(stepExec.error).message}
+                    </p>
                   </div>
                 )}
 
@@ -1589,8 +1600,11 @@ export function AiAgentPanel({ imageFile, onProcess }: AiAgentPanelProps) {
         {/* Failed step error + retry */}
         {failedIndex >= 0 && (
           <div className="space-y-2">
-            <p className="text-[10px] text-red-400">
-              {execution.steps[failedIndex].error}
+            <p
+              className="text-[10px] text-red-400 leading-snug"
+              title={humanizeError(execution.steps[failedIndex].error).raw}
+            >
+              {humanizeError(execution.steps[failedIndex].error).message}
             </p>
             <div className="flex gap-2">
               <Button

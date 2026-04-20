@@ -60,7 +60,7 @@ interface ModuleSidebarProps {
 
 const MODULE_CATEGORIES: ModuleCategory[] = [
   {
-    name: "📸 PREPARAR FOTO",
+    name: "PREPARAR FOTO",
     color: "#50C878",
     modules: [
       {
@@ -111,7 +111,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     ],
   },
   {
-    name: "👗 MODELOS Y MODA",
+    name: "MODELOS Y MODA",
     color: "#F5A623",
     modules: [
       {
@@ -153,7 +153,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     ],
   },
   {
-    name: "🎥 VIDEO Y ADS",
+    name: "VIDEO Y ADS",
     color: "#E06BDF",
     modules: [
       {
@@ -186,12 +186,12 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     ],
   },
   {
-    name: "🤖 AUTOMATIZACIÓN",
+    name: "AUTOMATIZACIÓN",
     color: "#A78BFA",
     modules: [
       {
         id: "ai-agent",
-        label: "Agente IA (Automático) ⭐",
+        label: "Agente IA (Automático)",
         icon: Bot,
         cost: "Variable",
         description: "Escoges tu producto y el IA hace TODO solo",
@@ -228,7 +228,7 @@ const MODULE_CATEGORIES: ModuleCategory[] = [
     ],
   },
   {
-    name: "⚙️ HERRAMIENTAS",
+    name: "HERRAMIENTAS",
     color: "#5B9CF6",
     modules: [
       {

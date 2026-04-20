@@ -14,6 +14,8 @@ interface ModuleHeaderProps {
   title: string;
   /** One-paragraph description of what the module does */
   description: string;
+  /** Concrete real-world example. Shown as a callout chip — "brasier sobre mesa → brasier sin la mesa" */
+  example?: string;
   /** "Por que lo necesitas" — explains the business value */
   whyNeeded?: string;
   /** Numbered "Como usar" steps */
@@ -24,6 +26,8 @@ interface ModuleHeaderProps {
   videoUrl?: string;
   /** Cost label, shown in a subtle badge — e.g. "Gratis", "$0.02/img" */
   costLabel?: string;
+  /** Category accent color — matches the sidebar category the module belongs to */
+  accentColor?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -34,25 +38,34 @@ export function ModuleHeader({
   icon,
   title,
   description,
+  example,
   whyNeeded,
   steps,
   tips,
   videoUrl,
   costLabel,
+  accentColor,
 }: ModuleHeaderProps) {
   const [showTips, setShowTips] = useState(false);
+  const accent = accentColor ?? "var(--accent)";
 
   return (
     <div className="space-y-3">
-      {/* Title + cost badge */}
-      <div className="flex items-center gap-2.5">
+      {/* Title + cost badge — category-colored accent bar on the left, big icon */}
+      <div
+        className="flex items-center gap-2.5 rounded-lg border-l-4 pl-2.5 py-1"
+        style={{ borderColor: accent }}
+      >
         {icon && (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/20 text-accent-light">
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+            style={{ background: `${accent}22`, color: accent }}
+          >
             {icon}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-white">{title}</h3>
+          <h3 className="text-[15px] font-bold text-white leading-tight">{title}</h3>
           {costLabel && (
             <span className="inline-block mt-0.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
               {costLabel}
@@ -65,6 +78,22 @@ export function ModuleHeader({
       <p className="text-xs text-gray-300 leading-relaxed">
         {description}
       </p>
+
+      {/* Concrete example — the fastest way to understand what this does */}
+      {example && (
+        <div
+          className="rounded-lg border px-3 py-2.5"
+          style={{ borderColor: `${accent}40`, background: `${accent}0A` }}
+        >
+          <span
+            className="mb-1 block text-[9px] font-bold uppercase tracking-wider"
+            style={{ color: accent }}
+          >
+            Ejemplo
+          </span>
+          <p className="text-[11px] text-gray-200 leading-snug">{example}</p>
+        </div>
+      )}
 
       {/* Why you need it — business value explanation */}
       {whyNeeded && (
