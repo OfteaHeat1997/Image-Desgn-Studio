@@ -114,15 +114,27 @@ async function isolateGarment(
   // urls keyed by name). We fetch each candidate, check which one is
   // actually a B/W mask with enough white pixels (the garment area), and
   // fall back to plain rembg if nothing qualifies.
-  const rawOutput = await runModel(
-    'schananas/grounded_sam:ee871c19efb1941f55f66a3d7d960428c8a5afcb77449547fe8e5a3ab9ebc21c',
-    {
-      image: httpInput,
-      mask_prompt: maskPrompt,
-      negative_mask_prompt: 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background',
-      adjustment_factor: 0,
-    },
-  );
+  //
+  // HARD FAILURE FALLBACK: if grounded_sam itself throws (model 404, auth error,
+  // rate limit, timeout), we catch that here and also fall back to rembg so the
+  // lingerie pipeline doesn't die entirely. User gets background removed but model
+  // stays — not ideal but better than a blank error.
+  let rawOutput: unknown;
+  try {
+    rawOutput = await runModel(
+      'schananas/grounded_sam:ee871c19efb1941f55f66a3d7d960428c8a5afcb77449547fe8e5a3ab9ebc21c',
+      {
+        image: httpInput,
+        mask_prompt: maskPrompt,
+        negative_mask_prompt: 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background',
+        adjustment_factor: 0,
+      },
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[bg-remove:isolate] grounded_sam threw (${msg}) — falling back to plain rembg on whole image`);
+    return await removeBgReplicate(preparedDataUrl);
+  }
 
   // Normalize the output shape into a flat array of URL strings
   async function toUrlArray(out: unknown): Promise<string[]> {
