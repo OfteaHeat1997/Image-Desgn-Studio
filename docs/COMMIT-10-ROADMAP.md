@@ -286,6 +286,95 @@ Prioridad absoluta al arrancar: leer este doc entero + ejecutar los comandos de 
 
 ---
 
+# 🚨 PRIORIDAD #0 — REGRESIÓN UX en static-product + jewelry (reportada 2026-04-21)
+
+**Texto exacto de la usuaria:** "pipeline estatico horible todo mal todos los avances que hicimos en los otros viejos pipeline lo borraste y esto está peor que antes. No estoy viendo live qué pasó. Procesó, hizo, puso, la foto se ve horrible, el fondo no se ve realístico, no se ve HD. No supe cuánto costó, no supe qué pasó, no supe cuánto gasté."
+
+## Qué rompí (y por qué)
+
+Commit 2 (`/catalog-pipeline` → `/pipelines/lingerie`) fue RENAME con `cp` — preservó el 98% del UI rico de catalog-pipeline (StepCard en vivo, antes/después, costo por paso, progress visible, manual/auto mode).
+
+Commits 3 y 4 (**static-product** y **jewelry**) los **escribí desde cero con UX minimal**: `UploadZone`, select dropdowns, un botón "Procesar todas", un `StatusPill` chiquito, y un grid de resultados al final. **NO tienen:**
+
+- ❌ Step cards visibles con preview de cada paso
+- ❌ Antes/después por paso
+- ❌ Live updates durante ejecución (la usuaria solo ve "done" al final)
+- ❌ Costo por paso + costo acumulado visible
+- ❌ Modo manual (aprobar/saltar/rehacer cada paso)
+- ❌ Preview de qué va a pasar antes de ejecutar
+- ❌ Output HD/premium (usa `style: "custom"` que puede estar cayendo a fallback genérico del route)
+
+Comparado al `lingerie` que tiene ~1350 líneas de UX rico, los otros dos son ~500 líneas de formulario simple.
+
+## Regla violada
+
+`feedback_no_duplicate_pipelines.md` dice explícitamente: "Merge, no borrado — ver qué funciona bien y rescatarlo". Se violó al construir desde cero en lugar de copiar+adaptar la estructura de `/pipelines/lingerie`.
+
+## Fix propuesto para la próxima sesión
+
+**Approach:** copiar la estructura de UI de `/pipelines/lingerie/page.tsx` a los otros dos, adaptando solo la lógica de steps. NO reescribir desde cero.
+
+### Pasos concretos
+
+1. **Leer `/pipelines/lingerie/page.tsx` completo** — identificar:
+   - `StepCard` component (líneas ~179-366)
+   - `STEP_DEFS` array (líneas ~77-84)
+   - Estado `jobs[]` con `steps[]` por job
+   - Lógica de `runStep(step, inputUrl, ...)` que devuelve `{ resultUrl, cost }`
+   - Manual mode con event listener + botones accept/skip/rerun
+   - Progress tracker + cost accumulator visibles
+   - `StatusBadge` + `ImageThumb` helpers
+
+2. **Refactorizar `/pipelines/static-product/page.tsx`:**
+   - Mantener la lib (`src/lib/pipelines/static-product.ts`) como está — el adaptive bg matrix ES bueno
+   - Reemplazar la UI minimalista por el patrón de lingerie:
+     - STEP_DEFS para los 6 pasos: isolate, normalize, adaptive-bg, shadow, enhance-final (con iconos + labels en español)
+     - StepCard por cada paso mostrando input/output thumbnails
+     - Costo por step + acumulado (ej: bg-remove $0.01, bg-generate $0.05 en precise mode, shadows gratis, enhance gratis → total $0.06 por foto)
+     - Manual mode toggle
+   - Fix de calidad: verificar que `bg-generate` con `mode: "precise"` + `customPrompt` está usando Flux Pro (no fallback). Probar en `/api/bg-generate/route.ts` qué hace con `style: "custom"`.
+
+3. **Refactorizar `/pipelines/jewelry/page.tsx`:**
+   - Mismo approach que static
+   - STEP_DEFS: upload, isolate, upscale (obligatorio), estante, modelo (opcional), video (opcional)
+   - Toggle de model/video permanece pero integrado a la step view
+   - Mostrar los 3 outputs con preview grande + before/after slider
+
+### Archivos NO tocar
+
+- `src/lib/pipelines/static-product.ts` — matrix adaptativo está bien
+- `src/lib/pipelines/jewelry.ts` — sub-type routing está bien
+- `src/app/pipelines/lingerie/page.tsx` — este ES el template a copiar, funciona
+
+### Fix de calidad HD (bug secundario pero importante)
+
+La usuaria dice "la foto se ve horrible, el fondo no se ve realístico, no se ve HD". Auditar en `src/app/api/bg-generate/route.ts`:
+
+1. ¿`style: "custom"` realmente hace fall-through a `customPrompt` con `mode: "precise"`?
+2. ¿`mode: "precise"` invoca Flux Pro o cae a Flux Schnell por algún fallback?
+3. ¿El output es HD (2048x2048+) o baja res?
+4. ¿El prompt adaptativo de la matriz produce resultados decentes o es demasiado genérico?
+
+Posibles causas de baja calidad:
+- El prompt generado es demasiado corto/simple → Flux no tiene suficiente dirección
+- `mode: "fast"` se usa por error cuando debería ser "precise"
+- El imageUrl enviado es una data URL muy grande y el proveedor la redimensiona
+- El aspectRatio "1:1" no es el mejor para productos verticales (perfumes)
+
+### Tiempo estimado con context fresco
+
+**4-6h** (copiar+adaptar es más rápido que escribir desde cero cuando tenés el template).
+
+### Resultado esperado tras el fix
+
+- Subir foto de perfume → ver los 6 pasos en cards grandes
+- Cada paso se procesa en vivo, aparece el resultado al lado del input
+- Usuaria puede rehacer cualquier paso si no le gusta
+- Costo total visible en tiempo real
+- Resultado final en HD con fondo adaptativo realístico
+
+---
+
 # NORTE UX — instrucción directa de la usuaria (2026-04-21, fin commit 9)
 
 **Texto exacto:** "quiero que te enfoques en la experiencia, que en los módulos pueda ver cada paso, todo se pueda editar, optimizar, sea visual, importantísimo se vean los cambios. Necesito que todo sea interactivo. Mi user son personas que no manejan en absoluto tecnología pero quiero usar esta app para entender fácil y que se pueda ver todo los procesos visualmente. Que sea botón interactivo que explique ejemplo. Hablo por ejemplo CSS, no lo sé, como visuales. Ejemplo como si fuera un app de niños, algo así."
