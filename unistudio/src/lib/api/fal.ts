@@ -309,6 +309,31 @@ export async function ensureFalHttpUrl(url: string): Promise<string> {
  *      REPLICATE_API_TOKEN auth and re-uploaded to fal.ai storage
  *   3. Any other HTTP URL → returned as-is (assumed publicly accessible)
  */
+/**
+ * Valida que un Buffer sea imagen real chequeando magic bytes (file signature).
+ * JPEG: FF D8 FF. PNG: 89 50 4E 47. WebP: 52 49 46 46 ... 57 45 42 50. GIF: 47 49 46.
+ * Devuelve false si el buffer es muy corto, JSON, o cualquier cosa que no sea
+ * una imagen de formato común. Usado por ensureFalAccessibleUrl para detectar
+ * cuando Replicate devolvió JSON metadata en vez de bytes de imagen.
+ */
+function isValidImageBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  // JPEG
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
+  // PNG
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
+  // GIF ("GIF87a" o "GIF89a")
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return true;
+  // WebP: "RIFF"...."WEBP"
+  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46
+      && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return true;
+  // BMP
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return true;
+  // HEIC/HEIF (ftypheic/ftypmif1 etc)
+  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) return true;
+  return false;
+}
+
 export async function ensureFalAccessibleUrl(url: string): Promise<string> {
   if (!url) throw new FalApiError('Empty URL provided', 'INVALID_URL');
 
@@ -342,12 +367,13 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
     // ciertos file IDs), extraer la URL real del JSON y re-fetchear.
     // Sin este fix, subíamos JSON a fal.media con extensión .json → Kolors/Wan
     // fallan con 422 image_load_error.
-    if (contentType.includes('application/json')) {
+    if (contentType.includes('application/json') || !isValidImageBuffer(buffer)) {
       try {
         const json = JSON.parse(buffer.toString('utf-8'));
+        // Replicate file API responses typically have: { url, urls: { get }, ... }
         const realUrl: string | undefined =
-          json?.url || json?.download_url || json?.urls?.get || json?.output;
-        if (typeof realUrl === 'string' && realUrl.startsWith('http')) {
+          json?.url || json?.urls?.get || json?.download_url || json?.output;
+        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url) {
           const realResponse = await fetch(realUrl, {
             headers: { Authorization: `Bearer ${replicateToken}` },
           });
@@ -357,15 +383,21 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
           }
         }
       } catch {
-        // Si el parse falla, dejamos el buffer como estaba — fallthrough a upload
+        // Si el parse falla, verificamos magic bytes abajo
       }
     }
 
-    // Forzar content-type y extensión de imagen si sigue siendo JSON (protección
-    // de último recurso para evitar que Kolors reciba archivos .json).
-    if (contentType.includes('application/json')) {
-      contentType = 'image/jpeg';
+    // VALIDACIÓN CRÍTICA: los bytes DEBEN ser imagen real antes de subir.
+    // Si no lo son (sigue siendo JSON corrupto), throw para que el llamador
+    // (modelToGhost o quien sea) caiga al siguiente fallback. Subir JSON con
+    // extensión .jpeg es peor que fallar — Kolors/Wan tiran 422 despues.
+    if (!isValidImageBuffer(buffer)) {
+      throw new FalApiError(
+        `Replicate URL returned non-image content (likely JSON metadata we couldn't resolve). Url: ${url}. First 100 bytes: ${buffer.toString('utf-8').slice(0, 100)}`,
+        'DOWNLOAD_NOT_IMAGE',
+      );
     }
+
     const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
     return uploadToFalStorage(buffer, contentType, `replicate-upload.${ext}`);
   }
