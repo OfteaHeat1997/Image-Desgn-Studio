@@ -190,10 +190,25 @@ function StatusBadge({ status }: { status: StepStatus }) {
 /* ------------------------------------------------------------------ */
 
 function ImageThumb({ url, label, className }: { url?: string; label: string; className?: string }) {
-  if (!url) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!url || hasError) {
+    // Placeholder visual decente en lugar del texto 'Sin imagen' plano.
+    // Muestra icono + mensaje contextual con el background checkerboard típico de transparencia.
     return (
-      <div className={cn("flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-xs text-gray-500", className)}>
-        {label}
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center gap-2 rounded-lg border border-white/10 text-center px-3",
+          className,
+        )}
+        style={{
+          background: "repeating-conic-gradient(#1a1a1a 0% 25%, #141414 0% 50%) 0 0 / 16px 16px",
+        }}
+      >
+        <ImageIcon className="h-6 w-6 text-gray-600" />
+        <span className="text-[11px] text-gray-500 leading-tight">
+          {hasError ? "No pudimos cargar la imagen" : "Esperando paso anterior"}
+        </span>
       </div>
     );
   }
@@ -207,6 +222,7 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
         loop
         autoPlay
         playsInline
+        onError={() => setHasError(true)}
       />
     );
   }
@@ -216,6 +232,7 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
       alt={label}
       className={cn("rounded-lg object-contain", className)}
       style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
+      onError={() => setHasError(true)}
     />
   );
 }
@@ -237,7 +254,10 @@ interface StepCardProps {
 
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode }: StepCardProps) {
   const Icon = step.icon;
-  const inputUrl = step.inputUrl || previousResultUrl;
+  // Fallback chain: step's own captured input > chain input > empty. Si los
+  // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
+  // en lugar del texto crudo "Sin imagen".
+  const inputUrl = step.inputUrl || previousResultUrl || undefined;
   const canInteract = step.status === "done" && !autoMode;
   const isVideo = step.resultUrl && (step.resultUrl.includes(".mp4") || step.resultUrl.includes(".webm") || step.resultUrl.includes("video"));
 
