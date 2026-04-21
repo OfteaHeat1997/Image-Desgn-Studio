@@ -1015,24 +1015,31 @@ export default function LingeriePipelinePage() {
         if (json?.success && Array.isArray(json.data)) {
           // Extraer seed de metadata (donde model-create lo guardó para reuso
           // entre poses). Modelos viejos pre-Phase-2a no tienen seed → undefined.
+          //
+          // NOTA: /api/ai-models devuelve AiModelRecord con snake_case
+          // (preview_url, skin_tone, body_type). El código anterior leía
+          // camelCase (previewUrl) → siempre undefined → todas las previews
+          // rotas.
           type ModelWithMeta = {
             id: string;
             name: string;
-            previewUrl: string;
+            preview_url: string | null;
             gender?: string;
-            skinTone?: string;
-            bodyType?: string;
+            skin_tone?: string;
+            body_type?: string;
             metadata?: Record<string, unknown> | null;
           };
-          const mapped = (json.data as ModelWithMeta[]).map((m) => ({
-            id: m.id,
-            name: m.name,
-            previewUrl: m.previewUrl,
-            gender: m.gender,
-            skinTone: m.skinTone,
-            bodyType: m.bodyType,
-            seed: typeof m.metadata?.seed === 'number' ? (m.metadata.seed as number) : undefined,
-          }));
+          const mapped = (json.data as ModelWithMeta[])
+            .filter((m) => !!m.preview_url)
+            .map((m) => ({
+              id: m.id,
+              name: m.name,
+              previewUrl: m.preview_url!,
+              gender: m.gender,
+              skinTone: m.skin_tone,
+              bodyType: m.body_type,
+              seed: typeof m.metadata?.seed === 'number' ? (m.metadata.seed as number) : undefined,
+            }));
           setSavedModels(mapped);
         }
       })
@@ -1075,8 +1082,8 @@ export default function LingeriePipelinePage() {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           const saved = json.data[0];
-          if (saved?.previewUrl) {
-            setSharedModelUrl(saved.previewUrl);
+          if (saved?.preview_url) {
+            setSharedModelUrl(saved.preview_url);
             setReusedModelFound(true);
             toast.success(`Modelo IA de REF ${ref} encontrada — se va a reusar (ahorro $0.055).`);
           }
