@@ -391,6 +391,41 @@ UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-proce
 
 # 🚨 PRIORIDAD #-1 — Lo que la usuaria pidió y NO pude completar (contexto al límite)
 
+## A.-1) CRÍTICO — Modelo aparece con bra/panty DEFAULT en lugar de la prenda del usuario
+
+### Reporte de la usuaria (2026-04-21)
+"Cuando creo la modelo no me puso el bra — simplemente vino con otro bra y panty. No es lo que quiero, el mismo color etc."
+
+### Causas probables (en orden de probabilidad)
+
+**1. El 422 del tryon hasta `898bf11` (probablemente resuelto):**
+Hasta commit `898bf11`, el URL de la prenda aislada llegaba a Kolors con sufijo `.json` (error `image_load_error` 422). El tryon fallaba silenciosamente (soft-fail catch en lingerie page), y el resultado final mostraba a la modelo con su ropa BASE (unos shorts/top beige simple que ponemos para pasar filtro ByteDance) en lugar de la bra del usuario.
+
+**Verificar primero:** con `898bf11` deployado, reintentar. Si el tryon corre OK ahora, el issue se va.
+
+**2. Si sigue fallando — Kolors puede "competir" con la ropa base de la modelo:**
+El prompt a SeedDream para crear la modelo dice: "simple beige athletic crop top and matching shorts" para pasar el filtro de contenido. La modelo generada YA viene vistiendo eso. Kolors después ENCIMA agrega la prenda del usuario via try-on. A veces Kolors mezcla los dos (mantiene el top beige Y pone encima el bra → resultado raro).
+
+**Fix en model-create/route.ts:**
+- Cambiar el prompt base para lingerie a algo MÁS neutro que no tenga garment detectable ("woman standing in studio, plain neutral pose, no accessories, no garment visible in frame"). Riesgo: filtro ByteDance la puede rechazar.
+- O: pedir que la modelo venga con ropa BASE muy minimal (bikini beige pegado al cuerpo) para que Kolors reemplace limpio.
+
+**3. Color preservation — Kolors a veces simplifica:**
+Si la prenda aislada sale bien pero el color cambia, Kolors está interpretando la textura/estampado mal. Opciones:
+- Pasar `garmentDescription` a Kolors con color exacto ("red lace bra with black trim")
+- Probar FASHN v1.6 como fallback si Kolors no preserva bien (pero FASHN bloquea lencería — no viable)
+
+**4. Para PRESERVAR la prenda 100% (cambio de paradigma):**
+En lugar de generar modelo + aplicar try-on, usar **SeedDream edit directamente** con prompt: "Take this isolated bra/panty and place it on a photorealistic AI fashion model in {pose}. The model should be wearing ONLY this garment, no other clothing. Preserve the bra exactly — same color, pattern, texture, construction." SeedDream edit acepta 2 imágenes (prenda + pose ref) y genera directamente. Más control sobre preservation.
+
+### Tareas concretas para próxima sesión
+
+1. **Verificar con `898bf11` deployado:** si el tryon corre correctamente ahora (mostrando la bra del usuario en la modelo).
+2. **Si sí funciona:** solo queda el problema de "color no idéntico" si aparece — abordar con garmentDescription explícita.
+3. **Si NO funciona:** refactor del flow → usar SeedDream edit directo en lugar de model-create + tryon. Menos pasos, más control.
+
+---
+
 ## A.0) CRÍTICO — Multi-ángulo estilo Leonisa (lo borré por error en commit 8)
 
 ### Lo que había antes y la usuaria pidió recuperar
