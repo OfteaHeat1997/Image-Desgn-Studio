@@ -276,20 +276,24 @@ async function isolateGarment(
     .png()
     .toBuffer();
 
-  // Upload the result directly to fal storage — it's where Kolors needs to
-  // read the URL from anyway, and it's faster than uploading to Replicate
-  // and re-uploading later. Falls back to Replicate if fal upload fails.
-  try {
-    const falUrl = await uploadToFalStorage(isolated, 'image/png', 'isolated.png');
-    console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB) -> ${falUrl.slice(0, 80)} [fal]`);
-    return falUrl;
-  } catch (err) {
-    console.warn('[bg-remove:isolate] fal upload failed, falling back to Replicate:', err);
-    const resultDataUrl = `data:image/png;base64,${isolated.toString('base64')}`;
-    const httpResultUrl = await ensureHttpUrl(resultDataUrl);
-    console.log(`[bg-remove:isolate] done (${(isolated.length / 1024).toFixed(0)} KB) -> ${httpResultUrl.slice(0, 80)} [replicate]`);
-    return httpResultUrl;
+  // Upload the result directly to fal storage — Kolors/Wan se alimentan de fal.
+  // Retry 3× antes de fallar. NO caer a Replicate — las URLs api.replicate.com/v1/files/*
+  // devuelven JSON metadata en vez de binario, causan 422/404 downstream en tryon.
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const falUrl = await uploadToFalStorage(isolated, 'image/png', 'isolated.png');
+      console.log(`[bg-remove:isolate] done attempt ${attempt} (${(isolated.length / 1024).toFixed(0)} KB) -> ${falUrl.slice(0, 80)} [fal]`);
+      return falUrl;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[bg-remove:isolate] fal upload attempt ${attempt}/3 failed:`, err instanceof Error ? err.message : err);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
   }
+  // Si 3 intentos de fal fallan, throw — el caller cae al fallback SeedDream (modelToGhost)
+  // en el route handler, que devuelve URL de fal nativa también.
+  throw new Error(`fal upload failed 3 times: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
 }
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
