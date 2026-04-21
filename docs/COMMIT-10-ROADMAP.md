@@ -391,6 +391,61 @@ UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-proce
 
 # 🚨 PRIORIDAD #-1 — Lo que la usuaria pidió y NO pude completar (contexto al límite)
 
+## A.0) CRÍTICO — Multi-ángulo estilo Leonisa (lo borré por error en commit 8)
+
+### Lo que había antes y la usuaria pidió recuperar
+
+En el commit 8 `f8f081a` borré `getCatalogoPipeline()` del plan/route.ts porque parecía duplicado del pipeline de Lencería. **Era un error.** Esa función generaba el SET COMPLETO de fotos por referencia que Leonisa (y todo e-commerce serio de lencería) produce:
+
+- **Foto frontal** (3/4 frente, modelo mirando cámara)
+- **Foto espalda** (3/4 espalda, muestra detalle trasero del bra — tirantes, broche)
+- **Foto lateral** (perfil, muestra forma y soporte)
+- **Foto lifestyle** (pose más relajada, contexto ambiental)
+- Opcional: 2 infografías con texto sobre features (copas, aro, compresión)
+
+Para cada REFERENCE → los 4 ángulos. Multiplicado por colores/tallas de la REF.
+
+### Estándar Leonisa / competencia
+
+Referencia a buscar en próxima sesión: leonisa.com, savagex.com, victoria's secret, ThirdLove. Todas muestran:
+- 4-6 fotos por SKU (front, back, 3/4, side, lifestyle, detail crop)
+- Consistencia de modelo entre poses (mismo cuerpo/cara en toda la referencia)
+- Consistencia de fondo blanco estudio con lighting uniforme
+- Tallas y colores variantes reusan la modelo (no regenerar cara)
+
+### Implementación propuesta (próxima sesión)
+
+**En `/pipelines/lingerie/page.tsx`:** después de crear modelo (step 3) y antes de videos, generar **4 try-ons en paralelo** con diferentes poses:
+- `pose: "upper-body front-facing, confident smile"`
+- `pose: "back view, 3/4 turn, showing shoulders and back strap"`
+- `pose: "side profile, arms relaxed at sides"`
+- `pose: "lifestyle, casual pose, natural lighting, clean background"`
+
+La MISMA modelo IA (reuso vía sharedModelUrl + seed) vestida con la MISMA prenda aislada, en 4 poses. Resultado: 4 fotos listas para publicar.
+
+### Cost estimado por REF
+
+| Step | Veces | Costo |
+|---|---|---|
+| Aislar prenda | 1 | $0.01 |
+| Crear modelo IA | 1 (reusada) | $0.055 |
+| Try-on (frontal) | 1 | $0.02 |
+| Try-on (espalda) | 1 | $0.02 |
+| Try-on (lateral) | 1 | $0.02 |
+| Try-on (lifestyle) | 1 | $0.02 |
+| Video 360° | 1 | gratis (kenburns) |
+| Video modelo combo | 1 | $0.05 (wan-2.2-fast) |
+| Video textura zoom | 1 | gratis (kenburns) |
+| **Total por REF** | | **~$0.195** |
+
+Para una REF con 3 colores que reusa modelo: **$0.195 × 3 = $0.585 por REF completa**. Mejor: la usuaria tiene ahora 4 fotos + 2 videos profesionales por color.
+
+### Código de referencia para resucitar
+
+El código exacto de multi-ángulo está en git: `git show f8f081a^ -- unistudio/src/app/api/ai-agent/plan/route.ts | grep -A 100 getCatalogoPipeline`. Ese fue el delete commit. Se puede recuperar la lógica y portarla al lingerie page.
+
+---
+
 ## A) Rework flow del Pipeline Lencería (reportado 2026-04-21)
 
 Texto literal: "el bra funciona perfectamente ahora el flujo pero... nesecito es hacer el video 3d rotacion despues crear a la modelo con el bra puesto... despues ya tenemos a modelo con el bra puesto entonces se hace un video tipo ella con unos keams mostrando o unos pantys del mismo color modelando pude ser y otro video mostra textura detalles especificas zoom in zoom out como un video profesional"
