@@ -319,7 +319,7 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
 
   // Private Replicate file URL → download with auth and re-upload to fal storage
   if (url.includes('api.replicate.com/v1/files/')) {
-    const replicateToken = process.env.REPLICATE_API_TOKEN;
+    const replicateToken = process.env.REPLICATE_API_TOKEN?.trim();
     if (!replicateToken) {
       throw new FalApiError(
         'REPLICATE_API_TOKEN is not set — cannot download private Replicate file',
@@ -335,8 +335,37 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
         'DOWNLOAD_FAILED',
       );
     }
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    const buffer = Buffer.from(await response.arrayBuffer());
+    let contentType = response.headers.get('content-type') || 'image/jpeg';
+    let buffer = Buffer.from(await response.arrayBuffer());
+
+    // BUGFIX: si Replicate devuelve JSON metadata en vez del archivo (pasa con
+    // ciertos file IDs), extraer la URL real del JSON y re-fetchear.
+    // Sin este fix, subíamos JSON a fal.media con extensión .json → Kolors/Wan
+    // fallan con 422 image_load_error.
+    if (contentType.includes('application/json')) {
+      try {
+        const json = JSON.parse(buffer.toString('utf-8'));
+        const realUrl: string | undefined =
+          json?.url || json?.download_url || json?.urls?.get || json?.output;
+        if (typeof realUrl === 'string' && realUrl.startsWith('http')) {
+          const realResponse = await fetch(realUrl, {
+            headers: { Authorization: `Bearer ${replicateToken}` },
+          });
+          if (realResponse.ok) {
+            contentType = realResponse.headers.get('content-type') || 'image/jpeg';
+            buffer = Buffer.from(await realResponse.arrayBuffer());
+          }
+        }
+      } catch {
+        // Si el parse falla, dejamos el buffer como estaba — fallthrough a upload
+      }
+    }
+
+    // Forzar content-type y extensión de imagen si sigue siendo JSON (protección
+    // de último recurso para evitar que Kolors reciba archivos .json).
+    if (contentType.includes('application/json')) {
+      contentType = 'image/jpeg';
+    }
     const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
     return uploadToFalStorage(buffer, contentType, `replicate-upload.${ext}`);
   }
