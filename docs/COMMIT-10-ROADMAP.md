@@ -389,7 +389,57 @@ UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-proce
 
 ---
 
-# ✅ SHIPPED en esta sesión (commits ae88990 → b0f2a7b) — 9 commits consecutivos
+# 🚨 PRIORIDAD #-1 — Lo que la usuaria pidió y NO pude completar (contexto al límite)
+
+## A) Rework flow del Pipeline Lencería (reportado 2026-04-21)
+
+Texto literal: "el bra funciona perfectamente ahora el flujo pero... nesecito es hacer el video 3d rotacion despues crear a la modelo con el bra puesto... despues ya tenemos a modelo con el bra puesto entonces se hace un video tipo ella con unos keams mostrando o unos pantys del mismo color modelando pude ser y otro video mostra textura detalles especificas zoom in zoom out como un video profesional"
+
+**Flow actual:** Aislar → Fondo Profesional → Crear Modelo → Tryon → Video Producto → Video Modelo
+
+**Flow que PIDIÓ:**
+1. Aislar (prenda sola, ghost 3D) — ✓ ya funciona con SeedDream fallback
+2. **Video 1 — Rotación 360°** de la prenda aislada (antes de modelo)
+3. Crear Modelo IA
+4. Tryon (vestir modelo con prenda)
+5. **Video 2 — Modelo con combo**: modelo vistiendo el bra + un jean o panty del mismo color, modelando
+6. **Video 3 — Textura/detalle**: zoom in/out sobre la prenda mostrando textura, construcción, detalles específicos, "como un video profesional"
+
+**Cambios requeridos en `src/app/pipelines/lingerie/page.tsx`:**
+- REORDER `STEP_DEFS` para que video rotación 360° vaya antes de crear modelo
+- ELIMINAR el paso "Fondo Profesional" (ya no lo quiere)
+- AGREGAR nuevo paso "Video textura/detalle" al final con prompt específico para Ken Burns zoom
+- Para Video 2 (modelo con combo): modificar el prompt de wan-2.2-fast para pedir explícitamente "modelo con bra y jeans del mismo color, posando, mostrando la combinación"
+
+## B) UI mejoras urgentes
+
+Texto literal: "ui no esta bien no veo botones de edit, zoom in, download, botones esenciales... analiza qué botones esenciales necesito para UI y el usuario tenga todo en la mano"
+
+**Botones/features que la usuaria pidió explícitamente:**
+1. **Edit** — editar una imagen resultado (¿mandar al editor?)
+2. **Zoom in** (click en thumbnail → abre full-size / modal con zoom)
+3. **Download** — ya existe en algunos resultados pero no en todos los step cards
+4. "Todo en la mano" — no tener que buscar
+
+**Dónde agregarlos:**
+- En cada step card del timeline: botones Download + Zoom
+- En el resultado final de cada pipeline: Edit + Download + Compartir
+- Al hover sobre cualquier thumbnail: botones aparecen
+- Modal de preview full-size clickeable desde cualquier imagen
+
+## C) Verificar que imágenes SE ESTÉN guardando en /gallery
+
+La usuaria preguntó: "espero que las imagenes se esten guardando en gallery". Necesita verificación. Flujo actual:
+- `/editor/page.tsx` llama a `autoSaveResult()` que fue arreglado con retry + toast en commit 9
+- PERO los pipelines (`/pipelines/lingerie`, `/pipelines/static-product`, `/pipelines/jewelry`) **NO llaman a autoSaveResult** — sus resultados solo quedan en `job.resultUrl` en memoria + localStorage de gallery-store cuando se descarga
+- **Fix:** agregar `addToGallery({ ... })` en cada pipeline cuando `job.status === "done"` para que el resultado aparezca en `/gallery` sin necesidad de descargar
+- Revisar `src/stores/gallery-store.ts` → función `addImage` o `addImages`
+
+---
+
+# ✅ SHIPPED en esta sesión (commits ae88990 → 898bf11) — 12 commits consecutivos
+
+Actualizado: agregar d385532 (SeedDream fallback para ghost extraction) y 898bf11 (fix 422 proxyReplicateUrl con fal.media).
 
 La sesión de commit 9 continuó arreglando después del primer handoff. Progreso final:
 
