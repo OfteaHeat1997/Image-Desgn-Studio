@@ -1069,7 +1069,16 @@ export default function LingeriePipelinePage() {
           updateStep(jobId, stepDef.id, { status: "accepted" });
         }
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "Error desconocido";
+        const rawMsg = err instanceof Error ? err.message : "Error desconocido";
+        // "Failed to fetch" / "NetworkError" / "Load failed" son TypeErrors del
+        // browser cuando fetch() falla antes de recibir respuesta (conexión móvil
+        // intermitente, red caída, request cortado). Traducimos a español para
+        // que la usuaria entienda qué hacer (reintentar con mejor señal) en vez
+        // de ver un string técnico en inglés.
+        const isNetworkError = /failed to fetch|networkerror|load failed|network request failed/i.test(rawMsg);
+        const errorMsg = isNetworkError
+          ? "Error de conexión. Revisá tu internet y reintentá."
+          : rawMsg;
         updateStep(jobId, stepDef.id, { status: "error", error: errorMsg });
 
         if (!autoMode) {
