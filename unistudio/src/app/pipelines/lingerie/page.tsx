@@ -189,6 +189,37 @@ function StatusBadge({ status }: { status: StepStatus }) {
 /*  Image thumbnail                                                     */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Thumbnail para el picker de modelos reusables. Si la previewUrl no carga
+ * (URL vieja de Replicate expirada, fal URL borrada, CORS), muestra icono +
+ * nombre corto en vez del icono roto <img> que el browser pone por default.
+ * La usuaria reportó "hay imágenes pero no se ven las modelos" — esto lo arregla.
+ */
+function ModelThumb({ url, alt, name }: { url: string; alt: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div
+        className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-1 bg-white/5 text-center px-2"
+        style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #141414 0% 50%) 0 0 / 10px 10px" }}
+      >
+        <ImageIcon className="h-5 w-5 text-gray-600" />
+        <span className="text-[9px] text-gray-500 leading-tight line-clamp-2">{name}</span>
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={alt}
+      className="aspect-[3/4] w-full object-cover bg-white/5"
+      onError={() => setFailed(true)}
+      loading="lazy"
+    />
+  );
+}
+
 function ImageThumb({ url, label, className }: { url?: string; label: string; className?: string }) {
   const [hasError, setHasError] = useState(false);
 
@@ -537,6 +568,15 @@ async function runStep(
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "bg-remove failed");
+    // Hard-fail en lencería cuando isolate cayó al último recurso rembg plano:
+    // ese provider solo quita el fondo pero DEJA A LA MODELO como foreground.
+    // Downstream productVideo genera rotación de la modelo en vez de la prenda.
+    // Mejor fallar acá con mensaje claro que generar un video 360° inútil.
+    if (isLingerieFlow && json.data?.provider === 'rembg-last-resort') {
+      throw new Error(
+        "No se pudo aislar la prenda sola (grounded_sam y SeedDream fallaron). El resultado incluye a la modelo, así que el Video 360° del Producto no serviría. Reintentá con otra foto o desactivá el paso 'Aislar Prenda' si querés continuar con la foto original."
+      );
+    }
     return { resultUrl: json.data.url, cost: json.cost ?? 0.01 };
   }
 
@@ -808,25 +848,35 @@ export default function LingeriePipelinePage() {
     // Get fresh step list with only enabled steps
     const enabledSteps = job.steps.filter((s) => s.enabled);
 
+    // Local map de resultados por step — evita leer job.steps (snapshot stale
+    // del useState inicial, que NO se actualiza durante el loop por ser una
+    // closure). Se populate abajo cada vez que un step completa.
+    const stepResults: Partial<Record<StepId, string>> = {};
+
     for (const stepDef of enabledSteps) {
       // Determine input: for tryon use sharedModelUrl is handled in runStep
       let inputForStep = lastResultUrl;
       if (stepDef.id === "modelVideo") {
-        // model video uses tryon result
-        const tryonStep = job.steps.find((s) => s.id === "tryon");
-        inputForStep = tryonStep?.resultUrl || lastResultUrl;
+        // modelVideo usa tryon result (modelo + prenda). Si tryon no corrió,
+        // cae a la modelo IA sola (sharedModel) — es un fallback razonable.
+        inputForStep = stepResults.tryon || newSharedModel || lastResultUrl;
       } else if (stepDef.id === "tryon") {
         // tryon → Kolors (fal.ai). Preferir URLs de fal nativas para evitar
-        // el round-trip Replicate→fal en ensureFalAccessibleUrl, que descarga
-        // JSON metadata en vez de bytes de imagen (api.replicate.com/v1/files/{id})
-        // y sube un archivo corrupto a fal.media → Kolors 422 image_load_error.
+        // el round-trip Replicate→fal en ensureFalAccessibleUrl que descarga
+        // JSON metadata en vez de bytes de imagen (fix de commit 1e63a40).
         // Prioridad: isolate result (fal URL) → falUrl pre-subida → uploadedUrl.
-        const isolateStep = job.steps.find((s) => s.id === "isolate");
-        inputForStep = isolateStep?.resultUrl || falUrl || uploadedUrl;
+        inputForStep = stepResults.isolate || falUrl || uploadedUrl;
       } else if (stepDef.id === "productVideo") {
-        // product video → wan-2.2-fast (fal.ai). Misma razón que tryon.
-        const isolateStep = job.steps.find((s) => s.id === "isolate");
-        inputForStep = isolateStep?.resultUrl || falUrl || uploadedUrl;
+        // productVideo REQUIERE la prenda aislada (prenda sola, fondo limpio).
+        // Caer a falUrl/uploadedUrl daría video de la foto original (modelo
+        // con prenda puesta) → lo opuesto del objetivo. Mejor fallar con
+        // mensaje claro pidiendo activar el paso 'Aislar Prenda'.
+        if (!stepResults.isolate) {
+          throw new Error(
+            "Video 360° del Producto necesita la prenda aislada. Activá el paso 'Aislar Prenda' o desactivá este video."
+          );
+        }
+        inputForStep = stepResults.isolate;
       }
 
       updateStep(jobId, stepDef.id, { status: "processing", inputUrl: inputForStep });
@@ -858,6 +908,10 @@ export default function LingeriePipelinePage() {
           resultUrl: result.resultUrl,
           cost_actual: result.cost,
         });
+
+        // Populate local map para que el próximo step pueda leer este resultUrl
+        // sin depender del useState (que es stale en esta closure).
+        stepResults[stepDef.id] = result.resultUrl;
 
         if (stepDef.id !== "productVideo" && stepDef.id !== "modelVideo" && stepDef.id !== "model") {
           lastResultUrl = result.resultUrl;
@@ -1132,12 +1186,7 @@ export default function LingeriePipelinePage() {
                           )}
                           title={`${m.name} — ${m.gender ?? 'female'}, ${m.skinTone ?? 'medium'}, ${m.bodyType ?? 'average'}`}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={m.previewUrl}
-                            alt={m.name}
-                            className="aspect-[3/4] w-full object-cover"
-                          />
+                          <ModelThumb url={m.previewUrl} alt={m.name} name={m.name ?? 'Modelo'} />
                           <div className="bg-black/60 px-1.5 py-1 text-[10px] text-gray-300 truncate">
                             {m.name?.slice(0, 20) ?? 'Modelo'}
                           </div>
