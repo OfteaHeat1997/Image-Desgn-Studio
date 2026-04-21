@@ -1,5 +1,23 @@
 # UniStudio — Changelog
 
+## 2026-04-21 (deploy: `1e63a40`) — Fix definitivo 422 image_load_error en tryon Kolors (lencería)
+
+Bug persistente desde hace varias sesiones: Kolors devolvía `Failed to load the image` en el `garment_image_url` con URL `https://v3b.fal.media/.../upload.jpeg`. La raíz real: `ensureFalAccessibleUrl` descargaba `api.replicate.com/v1/files/{id}` (que con Bearer auth devuelve **JSON metadata**, no bytes de imagen) y subía ese JSON a fal.media con extensión `.jpeg` → Kolors intentaba decodificar JSON como JPEG. Commits `74abcee` → `b789018` → `cb61537` → `2a59f66` → `d80265a` intentaron arreglarlo y fueron revertidos.
+
+4 frentes en 1 commit:
+
+1. **`src/app/pipelines/lingerie/page.tsx:738-752`** — tryon y productVideo ahora prefieren la `falUrl` pre-subida en `/api/upload` antes del fallback a `uploadedUrl` (Replicate/data). Corta el round-trip Replicate→fal que estaba roto.
+
+2. **`src/lib/api/fal.ts:313-427`** — `isValidImageBuffer()` + `detectImageMime()` con magic bytes (JPEG/PNG/GIF/WebP/BMP/HEIC). `ensureFalAccessibleUrl` ahora sigue el campo `url`/`urls.get` del JSON para llegar a los bytes reales, y si después de seguir el link los bytes siguen sin ser imagen hace throw explícito con los primeros 120 bytes para debug en Vercel logs.
+
+3. **`src/app/api/upload/route.ts:67-102`** — re-encode siempre vía sharp (EXIF-rotate + resize 2048px). Garantiza que `outputMime` coincide con los magic bytes del buffer aunque el `file.type` del browser mintiera (iOS Safari manda HEIC como `image/jpeg`). PNG preserva alpha; todo lo demás → JPEG 85.
+
+4. **`src/app/api/tryon/route.ts:74-104`** — log diagnóstico temporal en `tryOnKolors` imprimiendo URLs antes/después de `ensureFalAccessibleUrl` y el error completo si `runFal` falla. Quitar cuando no haya más 422 en prod.
+
+Pendiente post-verificación: `docs/pipelines/lingerie.md` debería mencionar que tryon prefiere `falUrl`, y revisar si `jewelry-tryon` usa el mismo patrón roto.
+
+---
+
 ## 2026-04-21 (late) — Segunda ola de fixes: step timeline + H-fixes + reuso de modelos + HD quality
 
 Después del commit 9 de producción, la usuaria reportó varios problemas con screenshot y pidió seguir arreglando todo mientras estaba disponible. Sprint de 7 commits consecutivos en pocas horas:
