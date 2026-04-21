@@ -85,3 +85,24 @@
 ## Notas de la sesión 2026-04-21
 
 - Error visto en mobile: `Failed to fetch` en el paso "Crear Modelo IA" del pipeline de lencería. Este mensaje proviene del navegador cuando `fetch()` falla a nivel de red (no respuesta del servidor). Causas típicas: conexión móvil intermitente, timeout del edge, o conexión cortada a mitad de request. La UI ya muestra un mensaje amigable en español ("No pudimos generar la modelo IA. Reintentá o probá con otras configuraciones.") con el detalle técnico oculto bajo "Ver detalle técnico".
+
+### Iteración 1 de Phase 2f (multi-foto + comprensión del producto) — en branch `claude/multi-photo-producto`
+
+**Problema que resuelve:** la IA reinterpretaba el producto en cada paso (color ligeramente distinto, broche inventado, textura perdida). La usuaria reportó que para ecommerce esto es **fatal** — el cliente recibiría un producto distinto a la foto.
+
+**Shipped en esta iteración:**
+
+1. **Nuevo endpoint `/api/analyze-product`** — acepta 1-4 fotos (frontal obligatoria + espalda/detalle/flat opcionales) y usa Claude Vision (Sonnet) para extraer una ficha técnica estructurada: color primario/secundario, tela, textura, tipo de prenda, copa, tirantes, broche frontal/trasero, banda, padding, varilla, detalles, notas libres. Costo ~$0.01 por análisis.
+2. **Auto-análisis al iniciar pipeline** — antes del primer step se corre `analyzeProductPhotos` sobre la foto frontal. Si falla, el pipeline continúa sin ficha (comportamiento legacy).
+3. **ProductSpecPanel editable** — panel colapsable arriba de los StepCards. La usuaria ve exactamente qué entendió Claude y puede corregir cualquier campo (ej: si Claude dijo "negro" pero era "gris oscuro").
+4. **Fix bug shaper shorts** — el prompt de `photoFullBody` mezclaba "nude seamless shaper shorts" en el campo `background`, que `/api/model-create` embutía en "against a X background" produciendo una frase maltrecha que SeedDream interpretaba como pantalones marrones. Ahora el background queda limpio ("plain white studio background, clean minimalist") y los briefs beige del prompt base de lingerie hacen el trabajo.
+
+**Pendiente iteración 2 (después de que la usuaria mande el folder de fotos):**
+
+- **UI de subida múltiple** — actualmente el análisis solo usa la foto frontal. Falta UI para adjuntar 2-4 fotos extra con role picker (espalda/detalle/flat) y pasarlas todas a `/api/analyze-product`.
+- **Inyección de la ficha en prompts** — hoy la ficha se muestra pero no se usa para generar. Iter 2: pasar `specToCustomDetails(spec)` al campo `customDetails` de `/api/model-create` en `photoBack`/`photoFullBody` para que la IA preserve color/textura reales.
+
+**Pendiente iteración 3:**
+
+- Cuando el usuario sube foto de espalda real, usar esa foto directamente como referencia de prenda en el paso `photoBack` (en vez de reconstruir desde la frontal).
+- Idem cuerpo completo.

@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
 import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
+import type { ProductSpec } from "@/app/api/analyze-product/route";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -62,6 +63,15 @@ interface ImageJob {
   steps: PipelineStep[];
   status: "idle" | "active" | "done" | "error";
   totalCost: number;
+  // Ficha técnica del producto extraída por Claude Vision antes de correr los
+  // steps. Se inyecta en photoBack/photoFullBody/tryon para que no inventen
+  // color/textura/broche. Nullable: si falla el análisis, el pipeline sigue
+  // con el comportamiento legacy (invención libre).
+  productSpec?: ProductSpec | null;
+  // Estado del análisis: "pending" = no empezó, "analyzing" = en curso,
+  // "done" = ya hay spec, "error" = falló (seguimos sin spec).
+  analysisStatus?: "pending" | "analyzing" | "done" | "error";
+  analysisError?: string;
 }
 
 interface ModelConfig {
@@ -485,6 +495,179 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 }
 
 /* ------------------------------------------------------------------ */
+/*  Product spec panel (ficha técnica leída por Claude Vision)          */
+/* ------------------------------------------------------------------ */
+
+interface ProductSpecPanelProps {
+  status: ImageJob["analysisStatus"];
+  spec: ProductSpec | null | undefined;
+  error?: string;
+  onChange: (updated: ProductSpec) => void;
+  onReanalyze?: () => void;
+}
+
+/**
+ * Campos que Claude lee del producto. Se mantienen string/null y se editan
+ * inline; el resultado queda pegado al `job.productSpec` para iteraciones
+ * futuras (hoy solo se muestran al usuario — iteración 2 los inyecta en los
+ * prompts de generación).
+ */
+const SPEC_FIELDS: {
+  group: "Identidad" | "Construcción" | "Detalles";
+  key: string;
+  label: string;
+  placeholder: string;
+  getter: (s: ProductSpec) => string | null | undefined;
+  setter: (s: ProductSpec, v: string) => ProductSpec;
+}[] = [
+  { group: "Identidad", key: "color", label: "Color principal", placeholder: "ej. negro satinado",
+    getter: (s) => s.color?.primary,
+    setter: (s, v) => ({ ...s, color: { ...s.color, primary: v } }) },
+  { group: "Identidad", key: "material", label: "Tela", placeholder: "ej. satén con elastano",
+    getter: (s) => s.material,
+    setter: (s, v) => ({ ...s, material: v }) },
+  { group: "Identidad", key: "texture", label: "Textura", placeholder: "ej. lisa con brillo suave",
+    getter: (s) => s.texture,
+    setter: (s, v) => ({ ...s, texture: v }) },
+  { group: "Identidad", key: "type", label: "Tipo de prenda", placeholder: "ej. bra deportivo con broche frontal",
+    getter: (s) => s.garment?.type,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, type: v } }) },
+  { group: "Construcción", key: "cup", label: "Copa", placeholder: "ej. preformada, costura en V",
+    getter: (s) => s.garment?.cup,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, cup: v || null } }) },
+  { group: "Construcción", key: "strapStyle", label: "Tirantes", placeholder: "ej. anchos ajustables",
+    getter: (s) => s.garment?.strapStyle,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, strapStyle: v || null } }) },
+  { group: "Construcción", key: "frontClosure", label: "Broche frontal", placeholder: "ej. 5 ganchos centrales o sin cierre",
+    getter: (s) => s.garment?.frontClosure,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, frontClosure: v || null } }) },
+  { group: "Construcción", key: "backClosure", label: "Cierre trasero", placeholder: "ej. 3 ganchos y gancho",
+    getter: (s) => s.garment?.backClosure,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, backClosure: v || null } }) },
+  { group: "Construcción", key: "band", label: "Banda", placeholder: "ej. ancha 5cm",
+    getter: (s) => s.garment?.band,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, band: v || null } }) },
+  { group: "Detalles", key: "padding", label: "Padding", placeholder: "ej. removible / sin padding",
+    getter: (s) => s.garment?.padding,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, padding: v || null } }) },
+  { group: "Detalles", key: "underwire", label: "Varilla", placeholder: "ej. sin varilla",
+    getter: (s) => s.garment?.underwire,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, underwire: v || null } }) },
+  { group: "Detalles", key: "details", label: "Otros detalles", placeholder: "ej. encaje, transparencias, bordados",
+    getter: (s) => s.garment?.details,
+    setter: (s, v) => ({ ...s, garment: { ...s.garment, details: v || null } }) },
+];
+
+function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: ProductSpecPanelProps) {
+  const [open, setOpen] = useState(true);
+
+  // Estado de análisis en curso
+  if (status === "analyzing") {
+    return (
+      <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.05] p-4">
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+          <div>
+            <p className="text-sm font-semibold text-white">Entendiendo el producto…</p>
+            <p className="text-xs text-gray-400">Claude Vision está leyendo la foto para extraer color, textura y detalles reales.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error en el análisis — el pipeline sigue pero sin spec
+  if (status === "error") {
+    return (
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.04] p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-200">No se pudo leer la ficha técnica</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {error || "Claude Vision no respondió."} El pipeline continúa igual que antes — los pasos siguientes van a inferir los detalles del producto.
+            </p>
+            {onReanalyze && (
+              <button
+                onClick={onReanalyze}
+                className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-200 hover:bg-amber-500/20"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reintentar análisis
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No spec todavía (pending o antes de correr el pipeline)
+  if (!spec) return null;
+
+  return (
+    <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.03]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="h-4 w-4 text-violet-400" />
+          <div>
+            <p className="text-sm font-semibold text-white">Ficha técnica del producto</p>
+            <p className="text-[11px] text-gray-500">Leída por Claude Vision — podés editar cualquier campo antes de que corra el resto.</p>
+          </div>
+        </div>
+        <ChevronRight className={cn("h-4 w-4 text-gray-400 transition-transform", open && "rotate-90")} />
+      </button>
+
+      {open && (
+        <div className="space-y-4 border-t border-violet-500/15 px-5 py-4">
+          {(["Identidad", "Construcción", "Detalles"] as const).map((group) => {
+            const fields = SPEC_FIELDS.filter((f) => f.group === group);
+            return (
+              <div key={group}>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-violet-300/70">{group}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {fields.map((field) => {
+                    const value = field.getter(spec) ?? "";
+                    return (
+                      <label key={field.key} className="flex flex-col gap-1">
+                        <span className="text-[11px] text-gray-400">{field.label}</span>
+                        <input
+                          type="text"
+                          value={value}
+                          placeholder={field.placeholder}
+                          onChange={(e) => onChange(field.setter(spec, e.target.value))}
+                          className="rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-violet-500/50"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {spec.notes && (
+            <div>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-violet-300/70">Notas</p>
+              <textarea
+                value={spec.notes}
+                onChange={(e) => onChange({ ...spec, notes: e.target.value })}
+                rows={2}
+                className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-violet-500/50"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Upload zone                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -534,6 +717,42 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Convierte un File a dataURL base64 para mandar a /api/analyze-product.
+ * Claude Vision necesita el contenido inline (no URLs externas accesibles
+ * desde el server).
+ */
+async function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error(`No se pudo leer el archivo ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Analiza las fotos de un producto con Claude Vision y devuelve la ficha
+ * técnica. Por ahora solo usa la foto frontal (la que subiste inicialmente).
+ * Cuando agreguemos multi-foto, el caller puede pasar más entradas.
+ */
+async function analyzeProductPhotos(
+  photos: { file: File; role: "frontal" | "back" | "detail" | "flat" }[],
+  productType: string,
+): Promise<ProductSpec> {
+  const dataUrls = await Promise.all(
+    photos.map(async (p) => ({ dataUrl: await fileToDataUrl(p.file), role: p.role })),
+  );
+  const res = await fetch("/api/analyze-product", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ photos: dataUrls, productType }),
+  });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || "analyze-product failed");
+  return json.data.productSpec as ProductSpec;
+}
 
 async function uploadFile(file: File): Promise<{ url: string; falUrl?: string }> {
   const formData = new FormData();
@@ -637,10 +856,16 @@ async function runStep(
       throw new Error("Estas fotos extra solo aplican a lencería.");
     }
     const newPose = stepId === "photoBack" ? "back-view" : "standing";
-    const newBackground =
-      stepId === "photoFullBody"
-        ? "plain white studio background, full body shot showing legs with nude seamless shaper shorts"
-        : "plain white studio background, clean minimalist";
+    // Bug histórico: para photoFullBody se mandaba
+    //   "plain white studio background, full body shot showing legs with nude seamless shaper shorts"
+    // al campo `background`. /api/model-create lo embute en "against a X
+    // background", produciendo "against a plain white studio background, full
+    // body shot showing legs with nude seamless shaper shorts background" —
+    // SeedDream interpretaba mal esa frase hyper-poblada y generaba pantalones
+    // marrones en vez de briefs nude. Ahora usamos background limpio y dejamos
+    // que el prompt base de model-create (beige swim briefs para lencería) se
+    // encargue del lower body; Kolors reemplaza el top con la prenda real.
+    const newBackground = "plain white studio background, clean minimalist";
     // Fase 1: generar modelo en la nueva pose con el MISMO seed
     const modelRes = await fetch("/api/model-create", {
       method: "POST",
@@ -944,6 +1169,31 @@ export default function LingeriePipelinePage() {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
         toast.error(`Error de carga — ${job.file.name}: ${err instanceof Error ? err.message : "Error desconocido"}`);
         return {};
+      }
+    }
+
+    // Análisis de producto con Claude Vision — corre UNA sola vez por job antes
+    // del primer step. Produce una ProductSpec que se muestra al usuario
+    // (editable) y que iteraciones siguientes inyectarán en los prompts. Si
+    // falla, el pipeline sigue igual que antes (sin spec). No es bloqueante.
+    if (!job.productSpec && job.analysisStatus !== "done") {
+      setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, analysisStatus: "analyzing" } : j));
+      try {
+        const spec = await analyzeProductPhotos(
+          [{ file: job.file, role: "frontal" }],
+          productType,
+        );
+        setJobs((prev) => prev.map((j) =>
+          j.id === jobId ? { ...j, productSpec: spec, analysisStatus: "done" } : j,
+        ));
+      } catch (analyzeErr) {
+        const msg = analyzeErr instanceof Error ? analyzeErr.message : "Análisis falló";
+        console.warn(`[lingerie] analyze-product failed for ${job.file.name}:`, msg);
+        setJobs((prev) => prev.map((j) =>
+          j.id === jobId ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg } : j,
+        ));
+        // No bloquea el pipeline — solo warnea y seguimos como antes.
+        toast.warning(`No se pudo leer la ficha técnica de ${job.file.name}. Sigo con los pasos normales.`);
       }
     }
 
@@ -1697,6 +1947,45 @@ export default function LingeriePipelinePage() {
                   </button>
                 </div>
               </div>
+
+              {/* Ficha técnica del producto — leída por Claude Vision antes
+                  del primer step. Editable; los valores se guardan en el job
+                  (iteraciones siguientes los inyectan en los prompts). */}
+              <ProductSpecPanel
+                status={activeJob.analysisStatus}
+                spec={activeJob.productSpec}
+                error={activeJob.analysisError}
+                onChange={(updated) => {
+                  setJobs((prev) => prev.map((j) =>
+                    j.id === activeJob.id ? { ...j, productSpec: updated } : j,
+                  ));
+                }}
+                onReanalyze={async () => {
+                  setJobs((prev) => prev.map((j) =>
+                    j.id === activeJob.id
+                      ? { ...j, analysisStatus: "analyzing", analysisError: undefined }
+                      : j,
+                  ));
+                  try {
+                    const spec = await analyzeProductPhotos(
+                      [{ file: activeJob.file, role: "frontal" }],
+                      productType,
+                    );
+                    setJobs((prev) => prev.map((j) =>
+                      j.id === activeJob.id
+                        ? { ...j, productSpec: spec, analysisStatus: "done", analysisError: undefined }
+                        : j,
+                    ));
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : "Análisis falló";
+                    setJobs((prev) => prev.map((j) =>
+                      j.id === activeJob.id
+                        ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg }
+                        : j,
+                    ));
+                  }
+                }}
+              />
 
               {/* Step cards */}
               {activeJob.steps.filter((s) => s.enabled).map((step, idx, arr) => {
