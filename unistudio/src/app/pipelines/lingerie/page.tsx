@@ -35,7 +35,7 @@ import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StepId = "isolate" | "background" | "model" | "tryon" | "productVideo" | "modelVideo";
+type StepId = "isolate" | "model" | "tryon" | "productVideo" | "modelVideo";
 type StepStatus = "idle" | "pending" | "processing" | "done" | "error" | "skipped" | "accepted";
 type Phase = "setup" | "pipeline";
 
@@ -75,13 +75,16 @@ interface ModelConfig {
 /*  Step definitions                                                    */
 /* ------------------------------------------------------------------ */
 
+// Flow lencería actualizado 2026-04-21: se quitó "Fondo Profesional" porque ese
+// step es para pipeline Estáticos (perfumes/cremas), no para lencería — el tryon
+// Kolors ya provee fondo estudio blanco naturalmente. Orden final:
+// 1. Aislar → 2. Crear Modelo → 3. Tryon → 4. Video 360° prenda → 5. Video modelo
 const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error" | "cost_actual">[] = [
-  { id: "isolate",      label: "Aislar Producto",       description: "Eliminar modelo/fondo, dejar solo la prenda", icon: Scissors,  cost: "$0.01",  enabled: true  },
-  { id: "background",   label: "Fondo Profesional",      description: "Fondo blanco/luxury para e-commerce",         icon: ImageIcon, cost: "$0.003", enabled: true  },
-  { id: "model",        label: "Crear Modelo IA",        description: "Generar modelo personalizado (se reutiliza)", icon: User,      cost: "$0.055", enabled: true  },
-  { id: "tryon",        label: "Prueba Virtual",         description: "Vestir el modelo con la prenda",              icon: Shirt,     cost: "$0.02",  enabled: true  },
-  { id: "productVideo", label: "Video del Producto",     description: "Rotación 360° de la prenda aislada (5s)",     icon: Film,      cost: "$0.10",  enabled: true  },
-  { id: "modelVideo",   label: "Video del Modelo",       description: "Modelo con movimiento natural (5s, 9:16)",    icon: Film,      cost: "$0.10",  enabled: false },
+  { id: "isolate",      label: "Aislar Producto",       description: "Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D", icon: Scissors,  cost: "$0.01-$0.04",  enabled: true  },
+  { id: "model",        label: "Crear Modelo IA",        description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
+  { id: "tryon",        label: "Prueba Virtual",         description: "Vestir la modelo IA con TU prenda exacta",              icon: Shirt,     cost: "$0.02",  enabled: true  },
+  { id: "productVideo", label: "Video 360° del Producto",     description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
+  { id: "modelVideo",   label: "Video de la Modelo",       description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
 ];
 
 function makeSteps(): PipelineStep[] {
@@ -94,12 +97,11 @@ function makeSteps(): PipelineStep[] {
 
 function estimateCost(steps: PipelineStep[], imageCount: number): number {
   const perImage: Record<StepId, number> = {
-    isolate: 0.01,
-    background: 0.003,
+    isolate: 0.04,      // rango $0.01-$0.04 — SeedDream ghost fallback cuando grounded_sam falla
     model: 0.055,
     tryon: 0.02,
-    productVideo: 0.10,
-    modelVideo: 0.10,
+    productVideo: 0.05,
+    modelVideo: 0.05,
   };
   const enabledSteps = steps.filter((s) => s.enabled);
   let cost = 0;
@@ -462,16 +464,10 @@ async function runStep(
     return { resultUrl: json.data.url, cost: json.cost ?? 0.01 };
   }
 
-  if (stepId === "background") {
-    const res = await fetch("/api/bg-generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: inputUrl, mode: "fast", style: "studio-white", aspectRatio: "1:1" }),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || "bg-generate failed");
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.003 };
-  }
+  // Step "background" (Fondo Profesional) removed 2026-04-21 — era para pipeline
+  // Estáticos (perfumes/cremas), no para lencería. El tryon Kolors ya provee
+  // fondo blanco estudio. Dead code — cualquier legacy stepId "background" que
+  // llegue acá cae al throw del final de runStep.
 
   if (stepId === "model") {
     if (sharedModelUrl) return { resultUrl: sharedModelUrl, cost: 0 };
