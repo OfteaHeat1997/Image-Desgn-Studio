@@ -391,6 +391,72 @@ UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-proce
 
 # 🚨 PRIORIDAD #-1 — Lo que la usuaria pidió y NO pude completar (contexto al límite)
 
+## A.-2) ÚLTIMO REPORTE (2026-04-21 late night) — Estado real por paso
+
+| Paso | Status |
+|---|---|
+| 1. Aislar bra | ✓ FUNCIONA (SeedDream fallback commits d385532/898bf11) |
+| 2. Crear Modelo | ✓ FUNCIONA |
+| 3. **Tryon (modelo + bra)** | ✗ FALLA — ver diagnóstico abajo |
+| 4. **Video (productVideo / modelVideo)** | ✗ FALLA — ver diagnóstico abajo |
+
+### Diagnóstico Tryon (`stepId === "tryon"` en lingerie/page.tsx:500)
+
+Código que corre:
+```ts
+fetch("/api/tryon", body: {
+  modelImage: sharedModelUrl,        // del step "model" — funciona
+  garmentImage: inputUrl,            // del step "isolate" — funciona post-898bf11
+  category: "tops" | "bottoms" | "one-pieces",
+  garmentType,
+  provider: "kolors",
+})
+```
+
+Posibles causas si sigue fallando con `898bf11` deployado:
+1. **URL de fal.media del ghost-fallback NO es accesible desde Kolors** — aunque Kolors está en fal también, puede requerir que el URL sea accesible públicamente (no private). Verificar si `seedream-ghost-fallback` devuelve URL pública o firmada temporal.
+2. **Kolors mismo rate-limited o caído** — `/api/health` dice fal "connected" genéricamente pero el modelo `fal-ai/kling/v1-5/kolors-virtual-try-on` podría estar caído específico.
+3. **Category mismatch** — si productType="bra", category="tops" (OK). Si la usuaria usó "panty" o "shapewear" y la route no mapea bien, Kolors falla.
+4. **Timeout** — Kolors a veces tarda 60-90s. Route tiene maxDuration 300s per vercel.json → debería estar OK.
+
+**Debug primera acción próxima sesión:**
+- Abrir DevTools → Network → click en `/api/tryon` que falla → tab "Response" → copiar el JSON error
+- Con el mensaje exacto sé si es 422 (URL problem), 504 (timeout), 401 (fal key), 500 (server error), 400 (bad params)
+
+### Diagnóstico Video
+
+Dos videos en el pipeline:
+- `productVideo` — Ken Burns o wan-2.2-fast sobre la prenda aislada (no requiere modelo)
+- `modelVideo` — sobre el resultado del tryon
+
+Si TRYON falla, `modelVideo` no puede correr (no tiene input). Pero `productVideo` usa `inputUrl` del step `isolate` → debería poder correr independiente.
+
+**Posibles causas video falla:**
+1. **Si tryon falla antes, modelVideo soft-fails (no tiene input)** — esperado
+2. **productVideo: wan-2.2-fast puede rechazar URL de fal.media del fallback SeedDream** — Wan espera HTTP URLs. Similar al bug 422 de tryon.
+3. **wan-2.2-fast cola lenta en fal** — timeouts
+4. **kenburns (gratis alternativo) podría estar caído**
+
+**Debug próxima sesión:**
+- DevTools Network → `/api/video` → Response tab → ver error
+- Probar el toggle "fallback to kenburns" si existe (gratis, más confiable)
+
+### Fix surgical propuesto para próxima sesión
+
+**Cambio 1:** en `/api/tryon/route.ts`, log explícito del URL de la prenda al hacer fetch. Si llega con formato raro (JSON/sin extensión), normalizarlo ANTES de enviar a Kolors:
+
+```ts
+// En el route, antes de llamar Kolors:
+const garmentImageNormalized = await ensureKolorsReadable(garmentImage);
+// ensureKolorsReadable: si URL es fal.media ok; si es Replicate wrapper, extraer imagen real
+```
+
+**Cambio 2:** en `/api/video/route.ts`, mismo tratamiento para wan-2.2-fast — asegurar URL sea directamente consumible.
+
+**Cambio 3:** agregar re-upload a fal.media ANTES de tryon si el URL no es de fal ya. Así Kolors siempre recibe un fal.media URL nativo.
+
+---
+
 ## A.-1) CRÍTICO — Modelo aparece con bra/panty DEFAULT en lugar de la prenda del usuario
 
 ### Reporte de la usuaria (2026-04-21)
