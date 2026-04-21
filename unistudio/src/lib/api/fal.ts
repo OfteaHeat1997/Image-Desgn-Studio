@@ -351,29 +351,31 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
         'AUTH_MISSING',
       );
     }
-    const response = await fetch(url, {
+    // CRITICAL: Replicate API /v1/files/{id} devuelve METADATA JSON, NO el binario.
+    // Para obtener los bytes reales hay que appendear /content al URL.
+    // Esto causaba el 422 en Kolors/Wan: recibíamos JSON metadata en vez de imagen.
+    const fetchUrl = url.endsWith('/content') ? url : `${url.replace(/[?#].*$/, '')}/content`;
+    const response = await fetch(fetchUrl, {
       headers: { Authorization: `Bearer ${replicateToken}` },
     });
     if (!response.ok) {
       throw new FalApiError(
-        `Failed to download private Replicate file (${response.status}): ${url}`,
+        `Failed to download private Replicate file (${response.status}): ${fetchUrl}`,
         'DOWNLOAD_FAILED',
       );
     }
     let contentType = response.headers.get('content-type') || 'image/jpeg';
     let buffer = Buffer.from(await response.arrayBuffer());
 
-    // BUGFIX: si Replicate devuelve JSON metadata en vez del archivo (pasa con
-    // ciertos file IDs), extraer la URL real del JSON y re-fetchear.
-    // Sin este fix, subíamos JSON a fal.media con extensión .json → Kolors/Wan
-    // fallan con 422 image_load_error.
+    // FALLBACK defensivo: si el URL /content aún devuelve JSON metadata (caso raro),
+    // parsear y extraer el URL real del binario. Replicate a veces tiene
+    // { urls: { get } } o { url }. La mayoría ya se resuelve con /content arriba.
     if (contentType.includes('application/json') || !isValidImageBuffer(buffer)) {
       try {
         const json = JSON.parse(buffer.toString('utf-8'));
-        // Replicate file API responses typically have: { url, urls: { get }, ... }
         const realUrl: string | undefined =
-          json?.url || json?.urls?.get || json?.download_url || json?.output;
-        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url) {
+          json?.urls?.get || json?.url || json?.download_url || json?.output;
+        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url && realUrl !== fetchUrl) {
           const realResponse = await fetch(realUrl, {
             headers: { Authorization: `Bearer ${replicateToken}` },
           });
@@ -383,7 +385,7 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
           }
         }
       } catch {
-        // Si el parse falla, verificamos magic bytes abajo
+        // Si el parse falla, magic bytes check abajo va a throw con mensaje claro
       }
     }
 
