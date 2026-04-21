@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { useGalleryStore } from "@/stores/gallery-store";
 import {
   getAdaptiveBgConfig,
   PRODUCT_TYPE_LABELS,
@@ -359,6 +360,18 @@ export default function StaticProductPipelinePage() {
       }
 
       updateJob(job.id, { status: "done", resultUrl: currentUrl, cost: totalCost });
+
+      // Auto-save a galería para que la usuaria no pierda el resultado aunque no haga click en download
+      const addToGallery = useGalleryStore.getState().addImage;
+      addToGallery({
+        id: `static-${Date.now()}-${job.id}`,
+        filename: job.file.name.replace(/\.[^.]+$/, '') + '-static.jpg',
+        resultUrl: currentUrl,
+        originalUrl: job.previewUrl,
+        date: new Date().toISOString(),
+        operations: ['bg-remove', 'enhance', 'bg-generate', 'shadows', 'enhance-final'],
+        project: `static-${job.productType}-${job.brand}`,
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(job.id, { status: "error", error: message });

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { useGalleryStore } from "@/stores/gallery-store";
 import {
   getJewelryConfig,
   SUB_TYPE_LABELS,
@@ -414,6 +415,46 @@ export default function JewelryPipelinePage() {
       }
 
       updateJob(job.id, { status: "done", cost: totalCost });
+
+      // Auto-save cada output de joyería a galería (estante + modelo + video por separado)
+      const addImages = useGalleryStore.getState().addImages;
+      const baseName = job.file.name.replace(/\.[^.]+$/, '');
+      const timestamp = Date.now();
+      const galleryItems = [];
+      if (estanteUrl) {
+        galleryItems.push({
+          id: `jewelry-estante-${timestamp}-${job.id}`,
+          filename: `${baseName}-estante.jpg`,
+          resultUrl: estanteUrl,
+          originalUrl: job.previewUrl,
+          date: new Date().toISOString(),
+          operations: ['bg-remove', 'upscale', 'bg-generate-estante'],
+          project: `jewelry-${job.subType}`,
+        });
+      }
+      if (modelUrl) {
+        galleryItems.push({
+          id: `jewelry-modelo-${timestamp}-${job.id}`,
+          filename: `${baseName}-modelo.jpg`,
+          resultUrl: modelUrl,
+          originalUrl: job.previewUrl,
+          date: new Date().toISOString(),
+          operations: ['model-create', 'jewelry-tryon'],
+          project: `jewelry-${job.subType}`,
+        });
+      }
+      if (videoUrl) {
+        galleryItems.push({
+          id: `jewelry-video-${timestamp}-${job.id}`,
+          filename: `${baseName}-video.mp4`,
+          resultUrl: videoUrl,
+          originalUrl: job.previewUrl,
+          date: new Date().toISOString(),
+          operations: ['video-kenburns'],
+          project: `jewelry-${job.subType}`,
+        });
+      }
+      if (galleryItems.length > 0) addImages(galleryItems);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(job.id, { status: "error", error: message });
