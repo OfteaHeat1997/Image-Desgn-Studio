@@ -64,15 +64,36 @@ export async function POST(request: NextRequest) {
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
 
-    // Optimize large images (max 2048px, JPEG if over 2.5MB)
-    const MAX_BUFFER_SIZE = 2.5 * 1024 * 1024;
-    let outputMime = file.type;
-    if (buffer.length > MAX_BUFFER_SIZE) {
-      buffer = Buffer.from(await sharp(buffer)
-        .resize({ width: Math.min(width, 2048), withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toBuffer());
+    // Normalize bytes → outputMime to GUARANTEE fal.media sirve archivo válido.
+    // file.type que reporta el browser a veces miente (iOS Safari manda HEIC como
+    // image/jpeg; algunos PNG con alpha llegan como image/jpeg). Sharp re-encodea
+    // según metadata.format real → el content-type que subimos a fal.media
+    // siempre coincide con los magic bytes del buffer.
+    //
+    // Reglas:
+    //   - PNG (con o sin alpha) → queda PNG, porque JPEG no soporta transparencia
+    //     y bg-remove/ghost-mannequin dependen del alpha.
+    //   - Todo lo demás → JPEG 85 quality (WebP, HEIC, GIF, BMP, etc.).
+    //   - Además: resize max 2048px para bajar el peso.
+    const MAX_DIMENSION = 2048;
+    const needsResize = width > MAX_DIMENSION || height > MAX_DIMENSION;
+    const sourceFormat = metadata.format; // 'jpeg' | 'png' | 'webp' | 'heif' | etc.
+    const keepPng = sourceFormat === 'png';
+    let outputMime: string;
+
+    // Re-encode siempre vía sharp → aplica EXIF-rotate, normaliza el formato
+    // y garantiza que los bytes del buffer coinciden con outputMime aunque el
+    // file.type del browser mintiera.
+    const pipeline = sharp(buffer).rotate();
+    if (needsResize) {
+      pipeline.resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true });
+    }
+    if (keepPng) {
+      outputMime = 'image/png';
+      buffer = Buffer.from(await pipeline.png({ compressionLevel: 8 }).toBuffer());
+    } else {
       outputMime = 'image/jpeg';
+      buffer = Buffer.from(await pipeline.jpeg({ quality: 85 }).toBuffer());
     }
 
     // Build data URL — used by local processing endpoints (enhance, shadows, upscale)

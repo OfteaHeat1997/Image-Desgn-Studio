@@ -816,13 +816,17 @@ export default function LingeriePipelinePage() {
         const tryonStep = job.steps.find((s) => s.id === "tryon");
         inputForStep = tryonStep?.resultUrl || lastResultUrl;
       } else if (stepDef.id === "tryon") {
-        // tryon garment = isolated or original
+        // tryon → Kolors (fal.ai). Preferir URLs de fal nativas para evitar
+        // el round-trip Replicate→fal en ensureFalAccessibleUrl, que descarga
+        // JSON metadata en vez de bytes de imagen (api.replicate.com/v1/files/{id})
+        // y sube un archivo corrupto a fal.media → Kolors 422 image_load_error.
+        // Prioridad: isolate result (fal URL) → falUrl pre-subida → uploadedUrl.
         const isolateStep = job.steps.find((s) => s.id === "isolate");
-        inputForStep = isolateStep?.resultUrl || uploadedUrl;
+        inputForStep = isolateStep?.resultUrl || falUrl || uploadedUrl;
       } else if (stepDef.id === "productVideo") {
-        // product video uses isolated
+        // product video → wan-2.2-fast (fal.ai). Misma razón que tryon.
         const isolateStep = job.steps.find((s) => s.id === "isolate");
-        inputForStep = isolateStep?.resultUrl || uploadedUrl;
+        inputForStep = isolateStep?.resultUrl || falUrl || uploadedUrl;
       }
 
       updateStep(jobId, stepDef.id, { status: "processing", inputUrl: inputForStep });

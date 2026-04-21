@@ -75,13 +75,34 @@ async function tryOnKolors(
   modelImage: string,
   garmentImage: string,
 ): Promise<string> {
+  // Log diagnóstico: capturar URLs antes y después de ensureFalAccessibleUrl.
+  // Mantener hasta que confirmemos que no hay más 422 image_load_error en producción.
+  console.log('[tryon:kolors] input URLs', {
+    modelImage: modelImage.slice(0, 120),
+    garmentImage: garmentImage.slice(0, 120),
+    modelIsData: modelImage.startsWith('data:'),
+    garmentIsData: garmentImage.startsWith('data:'),
+  });
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
   const garmentImageUrl = await ensureFalAccessibleUrl(garmentImage);
-  const result = await runFal('fal-ai/kling/v1-5/kolors-virtual-try-on', {
-    human_image_url: humanImageUrl,
-    garment_image_url: garmentImageUrl,
+  console.log('[tryon:kolors] resolved fal URLs', {
+    human_image_url: humanImageUrl.slice(0, 120),
+    garment_image_url: garmentImageUrl.slice(0, 120),
   });
-  return result.image.url;
+  try {
+    const result = await runFal('fal-ai/kling/v1-5/kolors-virtual-try-on', {
+      human_image_url: humanImageUrl,
+      garment_image_url: garmentImageUrl,
+    });
+    return result.image.url;
+  } catch (err) {
+    console.error('[tryon:kolors] runFal failed', {
+      human_image_url: humanImageUrl,
+      garment_image_url: garmentImageUrl,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 // Smart routing: picks the best provider based on garment type

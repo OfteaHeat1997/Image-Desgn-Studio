@@ -302,6 +302,53 @@ export async function ensureFalHttpUrl(url: string): Promise<string> {
 }
 
 /**
+ * Validate a Buffer is a real image by checking the first bytes (magic bytes
+ * / file signature). Detecta JPEG, PNG, GIF, WebP, BMP, HEIC. Rechaza JSON,
+ * HTML, buffers vacíos, y cualquier formato que Kolors/Wan no sepa decodificar.
+ *
+ * Previa: ensureFalAccessibleUrl descargaba un Replicate /v1/files/{id} URL
+ * (que devuelve JSON metadata con Bearer auth) y subía esos bytes a fal.media
+ * con extensión .jpeg → Kolors intentaba decodificar JSON como JPEG → 422.
+ */
+function isValidImageBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
+  // PNG: 89 50 4E 47
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
+  // GIF: "GIF87a" o "GIF89a"
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return true;
+  // WebP: "RIFF"..."WEBP"
+  if (
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+  ) return true;
+  // BMP: "BM"
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return true;
+  // HEIC/HEIF: "ftyp" at offset 4
+  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) return true;
+  return false;
+}
+
+/**
+ * Derivar extensión+content-type correctos a partir de los magic bytes del
+ * buffer, ignorando el content-type del header (que a veces miente — Replicate
+ * devuelve application/json incluso cuando nosotros queremos imagen).
+ */
+function detectImageMime(buffer: Buffer): { contentType: string; ext: string } {
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return { contentType: 'image/jpeg', ext: 'jpg' };
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return { contentType: 'image/png', ext: 'png' };
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return { contentType: 'image/gif', ext: 'gif' };
+  if (
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+  ) return { contentType: 'image/webp', ext: 'webp' };
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return { contentType: 'image/bmp', ext: 'bmp' };
+  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) return { contentType: 'image/heic', ext: 'heic' };
+  return { contentType: 'application/octet-stream', ext: 'bin' };
+}
+
+/**
  * Ensure a URL is accessible by fal.ai models.
  * Handles three cases:
  *   1. data: URIs → uploaded to fal.ai storage
@@ -317,7 +364,9 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
     return ensureFalHttpUrl(url);
   }
 
-  // Private Replicate file URL → download with auth and re-upload to fal storage
+  // Private Replicate file URL → download with auth and re-upload to fal storage.
+  // Replicate /v1/files/{id} devuelve JSON metadata (no bytes) — hay que seguir
+  // el campo url/urls.get del JSON para llegar a los bytes reales.
   if (url.includes('api.replicate.com/v1/files/')) {
     const replicateToken = process.env.REPLICATE_API_TOKEN;
     if (!replicateToken) {
@@ -335,9 +384,41 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
         'DOWNLOAD_FAILED',
       );
     }
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
+    const headerContentType = response.headers.get('content-type') || '';
+    let buffer = Buffer.from(await response.arrayBuffer());
+
+    // Si Replicate devolvió JSON metadata (caso común en /v1/files/{id}),
+    // extraer la URL real de bytes y re-fetchear.
+    if (headerContentType.includes('application/json') || !isValidImageBuffer(buffer)) {
+      try {
+        const json = JSON.parse(buffer.toString('utf-8'));
+        const realUrl: string | undefined =
+          json?.url || json?.urls?.get || json?.download_url || json?.output;
+        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url) {
+          const realResponse = await fetch(realUrl, {
+            headers: realUrl.includes('api.replicate.com') || realUrl.includes('replicate.delivery')
+              ? { Authorization: `Bearer ${replicateToken}` }
+              : undefined,
+          });
+          if (realResponse.ok) {
+            buffer = Buffer.from(await realResponse.arrayBuffer());
+          }
+        }
+      } catch {
+        // Si el parse falla, cae en la validación de magic bytes abajo
+      }
+    }
+
+    // Validación crítica: si después de todo buffer no es imagen, throw.
+    // Subir JSON con extensión .jpeg genera 422 image_load_error downstream.
+    if (!isValidImageBuffer(buffer)) {
+      throw new FalApiError(
+        `Replicate URL returned non-image content after follow. URL: ${url}. First 120 bytes: ${buffer.toString('utf-8').slice(0, 120)}`,
+        'DOWNLOAD_NOT_IMAGE',
+      );
+    }
+
+    const { contentType, ext } = detectImageMime(buffer);
     return uploadToFalStorage(buffer, contentType, `replicate-upload.${ext}`);
   }
 
