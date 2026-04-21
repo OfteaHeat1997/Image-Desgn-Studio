@@ -82,7 +82,7 @@ interface ModelConfig {
 const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error" | "cost_actual">[] = [
   { id: "isolate",      label: "Aislar Producto",       description: "Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D", icon: Scissors,  cost: "$0.01-$0.04",  enabled: true  },
   { id: "model",        label: "Crear Modelo IA",        description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
-  { id: "tryon",        label: "Prueba Virtual",         description: "Vestir la modelo IA con TU prenda exacta",              icon: Shirt,     cost: "$0.02",  enabled: true  },
+  { id: "tryon",        label: "Prueba Virtual (opcional)", description: "Intento de vestir la modelo con TU prenda. Si falla, la pipeline sigue igual con videos del bra y de la modelo por separado.",              icon: Shirt,     cost: "$0.02",  enabled: true  },
   { id: "productVideo", label: "Video 360° del Producto",     description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
   { id: "modelVideo",   label: "Video de la Modelo",       description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
 ];
@@ -540,11 +540,15 @@ async function runStep(
   }
 
   if (stepId === "modelVideo") {
+    // Usa el URL de la modelo (sharedModelUrl) PRIORITARIAMENTE. Si tryon funcionó
+    // (inputUrl viene del tryon exitoso), usa ese. Si no, fallback al modelo alone.
+    // Así modelVideo produce algo útil incluso cuando tryon falla.
+    const modelVideoUrl = inputUrl && inputUrl !== sharedModelUrl ? inputUrl : (sharedModelUrl ?? inputUrl);
     const res = await fetch("/api/video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        imageUrl: inputUrl,
+        imageUrl: modelVideoUrl,
         falImageUrl: falUrl,
         provider: "wan-2.2-fast",
         duration: 5,
