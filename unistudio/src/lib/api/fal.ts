@@ -309,31 +309,6 @@ export async function ensureFalHttpUrl(url: string): Promise<string> {
  *      REPLICATE_API_TOKEN auth and re-uploaded to fal.ai storage
  *   3. Any other HTTP URL → returned as-is (assumed publicly accessible)
  */
-/**
- * Valida que un Buffer sea imagen real chequeando magic bytes (file signature).
- * JPEG: FF D8 FF. PNG: 89 50 4E 47. WebP: 52 49 46 46 ... 57 45 42 50. GIF: 47 49 46.
- * Devuelve false si el buffer es muy corto, JSON, o cualquier cosa que no sea
- * una imagen de formato común. Usado por ensureFalAccessibleUrl para detectar
- * cuando Replicate devolvió JSON metadata en vez de bytes de imagen.
- */
-function isValidImageBuffer(buffer: Buffer): boolean {
-  if (buffer.length < 12) return false;
-  // JPEG
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
-  // PNG
-  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
-  // GIF ("GIF87a" o "GIF89a")
-  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return true;
-  // WebP: "RIFF"...."WEBP"
-  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46
-      && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return true;
-  // BMP
-  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return true;
-  // HEIC/HEIF (ftypheic/ftypmif1 etc)
-  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) return true;
-  return false;
-}
-
 export async function ensureFalAccessibleUrl(url: string): Promise<string> {
   if (!url) throw new FalApiError('Empty URL provided', 'INVALID_URL');
 
@@ -344,15 +319,13 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
 
   // Private Replicate file URL → download with auth and re-upload to fal storage
   if (url.includes('api.replicate.com/v1/files/')) {
-    const replicateToken = process.env.REPLICATE_API_TOKEN?.trim();
+    const replicateToken = process.env.REPLICATE_API_TOKEN;
     if (!replicateToken) {
       throw new FalApiError(
         'REPLICATE_API_TOKEN is not set — cannot download private Replicate file',
         'AUTH_MISSING',
       );
     }
-    // Replicate API /v1/files/{id} devuelve METADATA JSON con el URL real del
-    // binario en json.urls.get. NO usar /content — ese path devuelve 404.
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${replicateToken}` },
     });
@@ -362,54 +335,8 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
         'DOWNLOAD_FAILED',
       );
     }
-    let contentType = response.headers.get('content-type') || 'image/jpeg';
-    let buffer = Buffer.from(await response.arrayBuffer());
-
-    // Si el response es JSON metadata de Replicate, extraer urls.get (URL del binario)
-    // y re-fetchear. Replicate actual response shape:
-    //   { id, name, content_type, size, urls: { get: "https://replicate.delivery/..." }, ... }
-    if (contentType.includes('application/json') || !isValidImageBuffer(buffer)) {
-      try {
-        const json = JSON.parse(buffer.toString('utf-8'));
-        console.log('[ensureFalAccessibleUrl] Got JSON from Replicate, keys:', Object.keys(json));
-        // Probar múltiples shapes: urls.get es el estándar actual de Replicate
-        const realUrl: string | undefined =
-          json?.urls?.get
-          || json?.urls?.public
-          || json?.url
-          || json?.download_url
-          || json?.output
-          || json?.href;
-        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url) {
-          console.log(`[ensureFalAccessibleUrl] Re-fetching binary from ${realUrl.slice(0, 80)}`);
-          const realResponse = await fetch(realUrl, {
-            headers: { Authorization: `Bearer ${replicateToken}` },
-          });
-          if (realResponse.ok) {
-            contentType = realResponse.headers.get('content-type') || 'image/jpeg';
-            buffer = Buffer.from(await realResponse.arrayBuffer());
-          } else {
-            console.warn(`[ensureFalAccessibleUrl] realUrl returned ${realResponse.status}`);
-          }
-        } else {
-          console.warn('[ensureFalAccessibleUrl] JSON has no usable URL field. Full JSON:', JSON.stringify(json).slice(0, 500));
-        }
-      } catch (parseErr) {
-        console.warn('[ensureFalAccessibleUrl] JSON parse failed:', parseErr);
-      }
-    }
-
-    // VALIDACIÓN CRÍTICA: los bytes DEBEN ser imagen real antes de subir.
-    // Si no lo son (sigue siendo JSON corrupto), throw para que el llamador
-    // (modelToGhost o quien sea) caiga al siguiente fallback. Subir JSON con
-    // extensión .jpeg es peor que fallar — Kolors/Wan tiran 422 despues.
-    if (!isValidImageBuffer(buffer)) {
-      throw new FalApiError(
-        `Replicate URL returned non-image content (likely JSON metadata we couldn't resolve). Url: ${url}. First 100 bytes: ${buffer.toString('utf-8').slice(0, 100)}`,
-        'DOWNLOAD_NOT_IMAGE',
-      );
-    }
-
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await response.arrayBuffer());
     const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg';
     return uploadToFalStorage(buffer, contentType, `replicate-upload.${ext}`);
   }
