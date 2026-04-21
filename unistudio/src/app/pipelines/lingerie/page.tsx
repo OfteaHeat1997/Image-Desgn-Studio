@@ -580,6 +580,21 @@ export default function LingeriePipelinePage() {
   const [autoMode, setAutoMode] = useState(true);
   const [sharedModelUrl, setSharedModelUrl] = useState<string | undefined>();
   const [isRunning, setIsRunning] = useState(false);
+  const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string }>>([]);
+
+  // Cargar modelos IA previamente generadas para ofrecer reuso sin costo
+  useEffect(() => {
+    fetch('/api/ai-models', { signal: AbortSignal.timeout(10000) })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.success && Array.isArray(json.data)) {
+          setSavedModels(json.data);
+        }
+      })
+      .catch(() => {
+        /* Silent — la usuaria puede crear modelo nueva igual */
+      });
+  }, []);
 
   const previewUrlsRef = useRef<string[]>([]);
   useEffect(() => {
@@ -991,6 +1006,73 @@ export default function LingeriePipelinePage() {
                   </div>
                 )}
               </section>
+
+              {/* Reuso de modelos IA ya generadas — ahorro $0.055 por REF */}
+              {savedModels.length > 0 && (
+                <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">
+                        Reusar modelo IA existente (ahorro $0.055/foto)
+                      </h2>
+                      <p className="mt-1 text-xs text-gray-400">
+                        Click una modelo ya creada en sesiones anteriores para NO pagar por generar otra. O dejá sin seleccionar para crear nueva.
+                      </p>
+                    </div>
+                    {sharedModelUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setSharedModelUrl(undefined)}
+                        className="rounded border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-gray-300 hover:border-white/20"
+                      >
+                        Usar nueva modelo ($0.055)
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                    {savedModels.slice(0, 18).map((m) => {
+                      const isSelected = sharedModelUrl === m.previewUrl;
+                      return (
+                        <button
+                          type="button"
+                          key={m.id}
+                          onClick={() => {
+                            setSharedModelUrl(m.previewUrl);
+                            toast.success(`Modelo "${m.name}" seleccionada — pipeline la reusa sin cobrar.`);
+                          }}
+                          className={cn(
+                            "group relative flex flex-col overflow-hidden rounded-lg border transition-all",
+                            isSelected
+                              ? "border-emerald-400 ring-2 ring-emerald-400/40"
+                              : "border-white/10 hover:border-white/30",
+                          )}
+                          title={`${m.name} — ${m.gender ?? 'female'}, ${m.skinTone ?? 'medium'}, ${m.bodyType ?? 'average'}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={m.previewUrl}
+                            alt={m.name}
+                            className="aspect-[3/4] w-full object-cover"
+                          />
+                          <div className="bg-black/60 px-1.5 py-1 text-[10px] text-gray-300 truncate">
+                            {m.name?.slice(0, 20) ?? 'Modelo'}
+                          </div>
+                          {isSelected && (
+                            <div className="absolute right-1 top-1 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                              ✓
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {savedModels.length > 18 && (
+                    <p className="mt-2 text-[11px] text-gray-500">
+                      Mostrando 18 de {savedModels.length} modelos guardadas. Más en /gallery.
+                    </p>
+                  )}
+                </section>
+              )}
 
               {/* Reference + product type */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
