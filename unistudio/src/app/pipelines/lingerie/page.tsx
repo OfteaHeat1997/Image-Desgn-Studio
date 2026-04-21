@@ -35,7 +35,7 @@ import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StepId = "isolate" | "model" | "tryon" | "productVideo" | "modelVideo";
+type StepId = "isolate" | "model" | "tryon" | "photoBack" | "photoFullBody" | "productVideo" | "modelVideo";
 type StepStatus = "idle" | "pending" | "processing" | "done" | "error" | "skipped" | "accepted";
 type Phase = "setup" | "pipeline";
 
@@ -75,16 +75,21 @@ interface ModelConfig {
 /*  Step definitions                                                    */
 /* ------------------------------------------------------------------ */
 
-// Flow lencería actualizado 2026-04-21: se quitó "Fondo Profesional" porque ese
-// step es para pipeline Estáticos (perfumes/cremas), no para lencería — el tryon
-// Kolors ya provee fondo estudio blanco naturalmente. Orden final:
-// 1. Aislar → 2. Crear Modelo → 3. Tryon → 4. Video 360° prenda → 5. Video modelo
+// Flow lencería — pensado para cubrir las 4 vistas que muestra un ecommerce tipo
+// Leonisa por producto (hero frontal, espalda, cuerpo completo, prenda sola) +
+// 2 videos (360 producto, modelo posando).
+//
+// photoBack y photoFullBody reusan el SEED del model step → la misma identidad
+// de modelo en distintas poses (mismo rostro, cuerpo, tono piel). Sin seed
+// compartido serían modelos diferentes en cada foto.
 const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error" | "cost_actual">[] = [
-  { id: "isolate",      label: "Aislar Producto",       description: "Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D", icon: Scissors,  cost: "$0.01-$0.04",  enabled: true  },
-  { id: "model",        label: "Crear Modelo IA",        description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
-  { id: "tryon",        label: "Prueba Virtual (opcional)", description: "Intento de vestir la modelo con TU prenda. Si falla, la pipeline sigue igual con videos del bra y de la modelo por separado.",              icon: Shirt,     cost: "$0.02",  enabled: true  },
-  { id: "productVideo", label: "Video 360° del Producto",     description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
-  { id: "modelVideo",   label: "Video de la Modelo",       description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
+  { id: "isolate",       label: "Aislar Producto",        description: "Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D", icon: Scissors,  cost: "$0.01-$0.04",  enabled: true  },
+  { id: "model",         label: "Crear Modelo IA",        description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
+  { id: "tryon",         label: "Foto Frontal (opcional)", description: "Vestir la modelo IA con TU prenda, vista frontal 3/4. Si falla, el pipeline sigue con el resto.", icon: Shirt,     cost: "$0.02",  enabled: true  },
+  { id: "photoBack",     label: "Foto Espalda",           description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
+  { id: "photoFullBody", label: "Foto Cuerpo Completo",   description: "Misma modelo de cuerpo entero con short/panty nude + bra (mismo seed, misma identidad)",         icon: User,      cost: "$0.075", enabled: true  },
+  { id: "productVideo",  label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
+  { id: "modelVideo",    label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
 ];
 
 function makeSteps(): PipelineStep[] {
@@ -130,6 +135,8 @@ function humanizeStepError(stepId: StepId, rawError?: string): string {
     isolate: "No pudimos aislar la prenda. Probá con una foto más clara donde se vea todo el producto.",
     model: "No pudimos generar la modelo IA. Reintentá o probá con otras configuraciones.",
     tryon: "No pudimos vestir la modelo con tu prenda. Reintentá — si sigue fallando podés saltar este paso y los videos se generan igual.",
+    photoBack: "No pudimos generar la foto de espalda. El resto del pipeline sigue sin problema.",
+    photoFullBody: "No pudimos generar la foto de cuerpo completo. El resto del pipeline sigue sin problema.",
     productVideo: "No pudimos generar el video 360°. Reintentá.",
     modelVideo: "No pudimos generar el video de la modelo. Reintentá.",
   };
@@ -142,9 +149,11 @@ function humanizeStepError(stepId: StepId, rawError?: string): string {
 
 function estimateCost(steps: PipelineStep[], imageCount: number): number {
   const perImage: Record<StepId, number> = {
-    isolate: 0.04,      // rango $0.01-$0.04 — SeedDream ghost fallback cuando grounded_sam falla
+    isolate: 0.04,       // rango $0.01-$0.04 — SeedDream ghost fallback cuando grounded_sam falla
     model: 0.055,
     tryon: 0.02,
+    photoBack: 0.075,    // model-create (0.055) + tryon (0.02) — nueva modelo con mismo seed + distinta pose
+    photoFullBody: 0.075,
     productVideo: 0.05,
     modelVideo: 0.05,
   };
@@ -152,7 +161,7 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
   let cost = 0;
   for (const step of enabledSteps) {
     if (step.id === "model") {
-      // model is generated ONCE and reused
+      // model is generated ONCE and reused across all color variants for the same REF
       cost += perImage[step.id];
     } else {
       cost += perImage[step.id] * imageCount;
@@ -543,7 +552,9 @@ async function runStep(
   productType: string,
   sharedModelUrl?: string,
   referenceNumber?: string,
-): Promise<{ resultUrl: string; cost: number; newModelUrl?: string }> {
+  sharedSeed?: number,
+  isolatedGarmentUrl?: string,
+): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
@@ -588,6 +599,10 @@ async function runStep(
   if (stepId === "model") {
     if (sharedModelUrl) return { resultUrl: sharedModelUrl, cost: 0 };
     const pose = productType === "bra" ? "upper-body front-facing" : "full-body front-facing";
+    // Generamos seed cliente-side y lo pasamos a model-create. Guardamos el seed
+    // para que photoBack + photoFullBody puedan reusar la misma identidad de
+    // modelo cambiando solo la pose.
+    const generatedSeed = Math.floor(Math.random() * 999999);
     const res = await fetch("/api/model-create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -600,13 +615,74 @@ async function runStep(
         expression: "confident natural",
         background: "plain white studio background",
         garmentType: garmentTypeForApi,
+        seed: generatedSeed,
         // Tag the saved AiModel with this reference so future runs for same SKU can reuse
         referenceNumber: referenceNumber || undefined,
       }),
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "model-create failed");
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.055, newModelUrl: json.data.url };
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.055, newModelUrl: json.data.url, newSeed: generatedSeed };
+  }
+
+  // photoBack y photoFullBody: generan una SEGUNDA foto reusando el seed de la
+  // modelo original → misma identidad, distinta pose. Fujo interno:
+  // 1. model-create(seed, pose=back-view|standing-full-body) → modelo en pose nueva
+  // 2. tryon Kolors(modelo nueva, garment aislado) → foto final
+  if (stepId === "photoBack" || stepId === "photoFullBody") {
+    if (!isolatedGarmentUrl) {
+      throw new Error(`${stepId === "photoBack" ? "Foto Espalda" : "Foto Cuerpo Completo"} necesita la prenda aislada. Activá el paso 'Aislar Producto'.`);
+    }
+    if (!isLingerieFlow) {
+      throw new Error("Estas fotos extra solo aplican a lencería.");
+    }
+    const newPose = stepId === "photoBack" ? "back-view" : "standing";
+    const newBackground =
+      stepId === "photoFullBody"
+        ? "plain white studio background, full body shot showing legs with nude seamless shaper shorts"
+        : "plain white studio background, clean minimalist";
+    // Fase 1: generar modelo en la nueva pose con el MISMO seed
+    const modelRes = await fetch("/api/model-create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gender: modelConfig.gender,
+        ageRange: modelConfig.ageRange,
+        skinTone: modelConfig.skinTone,
+        bodyType: modelConfig.bodyType,
+        pose: newPose,
+        expression: "confident natural",
+        background: newBackground,
+        garmentType: garmentTypeForApi,
+        seed: sharedSeed,
+        referenceNumber: referenceNumber || undefined,
+      }),
+    });
+    const modelJson = await modelRes.json();
+    if (!modelJson.success) throw new Error(modelJson.error || `${stepId}: model-create failed`);
+    const newModelImage = modelJson.data.url;
+    const modelCost = modelJson.cost ?? 0.055;
+
+    // Fase 2: vestir la nueva modelo con la MISMA prenda aislada
+    const category =
+      productType === "panty" ? "bottoms"
+      : productType === "set" ? "one-pieces"
+      : "tops";
+    const tryonRes = await fetch("/api/tryon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        modelImage: newModelImage,
+        garmentImage: isolatedGarmentUrl,
+        category,
+        garmentType: garmentTypeForApi,
+        provider: "kolors",
+      }),
+    });
+    const tryonJson = await tryonRes.json();
+    if (!tryonJson.success) throw new Error(tryonJson.error || `${stepId}: tryon failed`);
+    const tryonCost = tryonJson.cost ?? 0.02;
+    return { resultUrl: tryonJson.data.url, cost: modelCost + tryonCost };
   }
 
   if (stepId === "tryon") {
@@ -699,8 +775,12 @@ export default function LingeriePipelinePage() {
   const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [autoMode, setAutoMode] = useState(true);
   const [sharedModelUrl, setSharedModelUrl] = useState<string | undefined>();
+  // Seed compartido entre poses: photoBack + photoFullBody lo reusan para que
+  // SeedDream genere la MISMA modelo (mismo rostro + cuerpo + piel) en distinta
+  // pose. Sin seed serían modelos diferentes en cada foto.
+  const [sharedSeed, setSharedSeed] = useState<number | undefined>();
   const [isRunning, setIsRunning] = useState(false);
-  const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string }>>([]);
+  const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string; seed?: number }>>([]);
 
   // Cargar modelos IA previamente generadas para ofrecer reuso sin costo
   useEffect(() => {
@@ -708,7 +788,27 @@ export default function LingeriePipelinePage() {
       .then((r) => r.json())
       .then((json) => {
         if (json?.success && Array.isArray(json.data)) {
-          setSavedModels(json.data);
+          // Extraer seed de metadata (donde model-create lo guardó para reuso
+          // entre poses). Modelos viejos pre-Phase-2a no tienen seed → undefined.
+          type ModelWithMeta = {
+            id: string;
+            name: string;
+            previewUrl: string;
+            gender?: string;
+            skinTone?: string;
+            bodyType?: string;
+            metadata?: Record<string, unknown> | null;
+          };
+          const mapped = (json.data as ModelWithMeta[]).map((m) => ({
+            id: m.id,
+            name: m.name,
+            previewUrl: m.previewUrl,
+            gender: m.gender,
+            skinTone: m.skinTone,
+            bodyType: m.bodyType,
+            seed: typeof m.metadata?.seed === 'number' ? (m.metadata.seed as number) : undefined,
+          }));
+          setSavedModels(mapped);
         }
       })
       .catch(() => {
@@ -805,7 +905,9 @@ export default function LingeriePipelinePage() {
     step: PipelineStep,
     inputUrl: string,
     currentSharedModel: string | undefined,
-  ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string }> => {
+    currentSharedSeed: number | undefined,
+    currentIsolatedGarment: string | undefined,
+  ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> => {
     return runStep(
       step.id,
       inputUrl,
@@ -814,15 +916,18 @@ export default function LingeriePipelinePage() {
       productType,
       currentSharedModel,
       referenceNumber || undefined,
+      currentSharedSeed,
+      currentIsolatedGarment,
     );
-  }, [modelConfig, productType]);
+  }, [modelConfig, productType, referenceNumber]);
 
   /* ---- Process one job sequentially ---- */
   const processJob = useCallback(async (
     jobId: string,
     jobsSnapshot: ImageJob[],
     currentSharedModel: string | undefined,
-  ): Promise<{ newSharedModel?: string }> => {
+    currentSharedSeed: number | undefined,
+  ): Promise<{ newSharedModel?: string; newSharedSeed?: number }> => {
     const job = jobsSnapshot.find((j) => j.id === jobId);
     if (!job) return {};
 
@@ -844,6 +949,7 @@ export default function LingeriePipelinePage() {
 
     let lastResultUrl = uploadedUrl;
     let newSharedModel = currentSharedModel;
+    let newSharedSeed = currentSharedSeed;
 
     // Get fresh step list with only enabled steps
     const enabledSteps = job.steps.filter((s) => s.enabled);
@@ -896,11 +1002,17 @@ export default function LingeriePipelinePage() {
           stepDef,
           inputForStep,
           newSharedModel,
+          newSharedSeed,
+          stepResults.isolate,
         );
 
         if (result.newModelUrl) {
           newSharedModel = result.newModelUrl;
           setSharedModelUrl(result.newModelUrl);
+        }
+        if (result.newSeed !== undefined) {
+          newSharedSeed = result.newSeed;
+          setSharedSeed(result.newSeed);
         }
 
         updateStep(jobId, stepDef.id, {
@@ -913,7 +1025,12 @@ export default function LingeriePipelinePage() {
         // sin depender del useState (que es stale en esta closure).
         stepResults[stepDef.id] = result.resultUrl;
 
-        if (stepDef.id !== "productVideo" && stepDef.id !== "modelVideo" && stepDef.id !== "model") {
+        // lastResultUrl se usa como input default del siguiente step. Evitamos
+        // propagar outputs que no son imagen de producto (videos, models vacias
+        // sin vestir, y las fotos extra photoBack/photoFullBody que son fotos
+        // paralelas al hero, no un eslabón lineal).
+        const nonPropagatingSteps: StepId[] = ["productVideo", "modelVideo", "model", "photoBack", "photoFullBody"];
+        if (!nonPropagatingSteps.includes(stepDef.id)) {
           lastResultUrl = result.resultUrl;
         }
 
@@ -990,7 +1107,7 @@ export default function LingeriePipelinePage() {
     }
 
     setJobs((prev) => prev.map((j) => j.id !== jobId ? j : { ...j, status: "done" }));
-    return { newSharedModel };
+    return { newSharedModel, newSharedSeed };
   }, [autoMode, executeStep, updateStep]);
 
   /* ---- Start the full pipeline ---- */
@@ -1013,6 +1130,7 @@ export default function LingeriePipelinePage() {
     })));
 
     let currentSharedModel = sharedModelUrl;
+    let currentSharedSeed = sharedSeed;
 
     // Get fresh snapshot
     const jobsSnapshot = jobs.map((job) => ({
@@ -1030,13 +1148,14 @@ export default function LingeriePipelinePage() {
       const job = jobsSnapshot[i];
       setActiveJobIndex(i);
       setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "active" } : j));
-      const { newSharedModel } = await processJob(job.id, jobsSnapshot, currentSharedModel);
+      const { newSharedModel, newSharedSeed } = await processJob(job.id, jobsSnapshot, currentSharedModel, currentSharedSeed);
       if (newSharedModel) currentSharedModel = newSharedModel;
+      if (newSharedSeed !== undefined) currentSharedSeed = newSharedSeed;
     }
 
     setIsRunning(false);
     toast.success(`Pipeline completado — ${jobsSnapshot.length} imagen(es) procesada(s)`);
-  }, [jobs, steps, sharedModelUrl, processJob]);
+  }, [jobs, steps, sharedModelUrl, sharedSeed, processJob]);
 
   /* ---- Manual mode action dispatcher ---- */
   const dispatchAction = useCallback((jobId: string, stepId: StepId, action: "accept" | "skip" | "rerun") => {
@@ -1176,6 +1295,11 @@ export default function LingeriePipelinePage() {
                           key={m.id}
                           onClick={() => {
                             setSharedModelUrl(m.previewUrl);
+                            // Si el modelo guardado tiene seed (solo los creados post-upgrade 2a),
+                            // lo reusamos para que photoBack/photoFullBody generen la MISMA
+                            // identidad. Si no hay seed (modelos viejos), esas fotos extra
+                            // usarán seed random → identidad similar pero no idéntica.
+                            if (m.seed !== undefined) setSharedSeed(m.seed);
                             toast.success(`Modelo "${m.name}" seleccionada — pipeline la reusa sin cobrar.`);
                           }}
                           className={cn(
