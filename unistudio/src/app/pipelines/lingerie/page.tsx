@@ -91,6 +91,51 @@ function makeSteps(): PipelineStep[] {
   return STEP_DEFS.map((d) => ({ ...d, status: "idle" }));
 }
 
+/**
+ * Convierte mensajes técnicos de error en texto humano, amigable para la
+ * usuaria que no sabe lo que es un 422 o un JSON. Si no matchea ningún pattern,
+ * devuelve un mensaje genérico por step.
+ */
+function humanizeStepError(stepId: StepId, rawError?: string): string {
+  const msg = (rawError ?? '').toLowerCase();
+
+  // Patterns comunes de error → mensaje humano
+  if (msg.includes('image_load_error') || msg.includes('failed to load the image')) {
+    return "La foto se corrompió antes de llegar a la IA. Reintentá — suele funcionar la segunda vez.";
+  }
+  if (msg.includes('content policy') || msg.includes('e005') || msg.includes('flagged as sensitive')) {
+    return "La IA rechazó la prenda por su filtro de contenido. Reintentamos con otro proveedor automáticamente — dale reintentar.";
+  }
+  if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('auth')) {
+    return "Hubo un problema de autorización con el proveedor IA. Verificá que las API keys en Vercel estén activas.";
+  }
+  if (msg.includes('404') || msg.includes('not found')) {
+    return "El archivo intermedio se perdió o expiró. Reintentá para regenerar desde el paso anterior.";
+  }
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return "La IA tardó demasiado. Reintentá — suele ser cola saturada, no error de tu foto.";
+  }
+  if (msg.includes('non-image content') || msg.includes('json metadata')) {
+    return "El archivo que llegó a la IA no era una imagen válida. Reintentá.";
+  }
+  if (msg.includes('rate limit') || msg.includes('too many requests')) {
+    return "Demasiadas requests al proveedor. Esperá 30 segundos y reintentá.";
+  }
+  if (msg.includes('network') || msg.includes('fetch failed')) {
+    return "Error de conexión al proveedor. Revisá tu internet y reintentá.";
+  }
+
+  // Fallback por step
+  const byStep: Record<StepId, string> = {
+    isolate: "No pudimos aislar la prenda. Probá con una foto más clara donde se vea todo el producto.",
+    model: "No pudimos generar la modelo IA. Reintentá o probá con otras configuraciones.",
+    tryon: "No pudimos vestir la modelo con tu prenda. Reintentá — si sigue fallando podés saltar este paso y los videos se generan igual.",
+    productVideo: "No pudimos generar el video 360°. Reintentá.",
+    modelVideo: "No pudimos generar el video de la modelo. Reintentá.",
+  };
+  return byStep[stepId] ?? "Algo salió mal en este paso. Reintentá.";
+}
+
 /* ------------------------------------------------------------------ */
 /*  Cost estimate                                                       */
 /* ------------------------------------------------------------------ */
@@ -283,9 +328,21 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   </div>
                 </div>
               ) : step.status === "error" ? (
-                <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-lg border border-red-500/20 bg-red-500/[0.04] px-3">
-                  <AlertCircle className="h-5 w-5 text-red-400" />
-                  <p className="text-center text-xs text-red-400">{step.error || "Error desconocido"}</p>
+                <div className="flex h-40 w-full flex-col items-center justify-center gap-2 overflow-auto rounded-lg border border-red-500/20 bg-red-500/[0.04] px-3 py-3">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-400" />
+                  <p className="text-center text-sm font-medium text-red-300">
+                    {humanizeStepError(step.id, step.error)}
+                  </p>
+                  {step.error && (
+                    <details className="w-full">
+                      <summary className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-300">
+                        Ver detalle técnico
+                      </summary>
+                      <pre className="mt-1 max-h-20 overflow-auto rounded bg-black/40 p-2 text-[9px] leading-tight text-gray-400">
+                        {step.error}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               ) : (
                 <div className="relative">
@@ -343,21 +400,20 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             </div>
           )}
 
-          {/* Error retry */}
+          {/* Error retry — Reintentar es primario (botón grande violeta), Saltar secundario (link gris) */}
           {step.status === "error" && (
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/6 pt-4">
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/6 pt-4">
               <button
                 onClick={onSkip}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                className="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-300 hover:underline"
               >
-                <SkipForward className="h-3.5 w-3.5" />
-                Saltar paso
+                Saltar este paso
               </button>
               <button
                 onClick={onRerun}
-                className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                className="flex items-center gap-2 rounded-lg bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/30 transition-colors hover:bg-violet-400"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <RotateCcw className="h-4 w-4" />
                 Reintentar
               </button>
             </div>
