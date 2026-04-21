@@ -362,9 +362,14 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       outputUrl: resultUrl,
       cost: ISOLATE_COST,
     });
+    // proxyReplicateUrl solo se usa si el URL resultado ES de Replicate. SeedDream
+    // devuelve URLs de fal.media que NO deben envolverse — hacerlo las corrompe
+    // y tryon recibe un .json en lugar de imagen (422 image_load_error).
+    const isReplicateUrl = resultUrl.includes('replicate.delivery') || resultUrl.includes('replicate.com');
+    const outputUrl = isReplicateUrl ? proxyReplicateUrl(resultUrl) : resultUrl;
     return NextResponse.json({
       success: true,
-      data: { url: proxyReplicateUrl(resultUrl), provider: usedProvider },
+      data: { url: outputUrl, provider: usedProvider },
       cost: ISOLATE_COST,
     });
   }
