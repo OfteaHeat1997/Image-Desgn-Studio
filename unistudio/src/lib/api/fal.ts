@@ -351,41 +351,51 @@ export async function ensureFalAccessibleUrl(url: string): Promise<string> {
         'AUTH_MISSING',
       );
     }
-    // CRITICAL: Replicate API /v1/files/{id} devuelve METADATA JSON, NO el binario.
-    // Para obtener los bytes reales hay que appendear /content al URL.
-    // Esto causaba el 422 en Kolors/Wan: recibíamos JSON metadata en vez de imagen.
-    const fetchUrl = url.endsWith('/content') ? url : `${url.replace(/[?#].*$/, '')}/content`;
-    const response = await fetch(fetchUrl, {
+    // Replicate API /v1/files/{id} devuelve METADATA JSON con el URL real del
+    // binario en json.urls.get. NO usar /content — ese path devuelve 404.
+    const response = await fetch(url, {
       headers: { Authorization: `Bearer ${replicateToken}` },
     });
     if (!response.ok) {
       throw new FalApiError(
-        `Failed to download private Replicate file (${response.status}): ${fetchUrl}`,
+        `Failed to download private Replicate file (${response.status}): ${url}`,
         'DOWNLOAD_FAILED',
       );
     }
     let contentType = response.headers.get('content-type') || 'image/jpeg';
     let buffer = Buffer.from(await response.arrayBuffer());
 
-    // FALLBACK defensivo: si el URL /content aún devuelve JSON metadata (caso raro),
-    // parsear y extraer el URL real del binario. Replicate a veces tiene
-    // { urls: { get } } o { url }. La mayoría ya se resuelve con /content arriba.
+    // Si el response es JSON metadata de Replicate, extraer urls.get (URL del binario)
+    // y re-fetchear. Replicate actual response shape:
+    //   { id, name, content_type, size, urls: { get: "https://replicate.delivery/..." }, ... }
     if (contentType.includes('application/json') || !isValidImageBuffer(buffer)) {
       try {
         const json = JSON.parse(buffer.toString('utf-8'));
+        console.log('[ensureFalAccessibleUrl] Got JSON from Replicate, keys:', Object.keys(json));
+        // Probar múltiples shapes: urls.get es el estándar actual de Replicate
         const realUrl: string | undefined =
-          json?.urls?.get || json?.url || json?.download_url || json?.output;
-        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url && realUrl !== fetchUrl) {
+          json?.urls?.get
+          || json?.urls?.public
+          || json?.url
+          || json?.download_url
+          || json?.output
+          || json?.href;
+        if (typeof realUrl === 'string' && realUrl.startsWith('http') && realUrl !== url) {
+          console.log(`[ensureFalAccessibleUrl] Re-fetching binary from ${realUrl.slice(0, 80)}`);
           const realResponse = await fetch(realUrl, {
             headers: { Authorization: `Bearer ${replicateToken}` },
           });
           if (realResponse.ok) {
             contentType = realResponse.headers.get('content-type') || 'image/jpeg';
             buffer = Buffer.from(await realResponse.arrayBuffer());
+          } else {
+            console.warn(`[ensureFalAccessibleUrl] realUrl returned ${realResponse.status}`);
           }
+        } else {
+          console.warn('[ensureFalAccessibleUrl] JSON has no usable URL field. Full JSON:', JSON.stringify(json).slice(0, 500));
         }
-      } catch {
-        // Si el parse falla, magic bytes check abajo va a throw con mensaje claro
+      } catch (parseErr) {
+        console.warn('[ensureFalAccessibleUrl] JSON parse failed:', parseErr);
       }
     }
 
