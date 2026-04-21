@@ -391,6 +391,66 @@ UniStudio cubre 1 + parte de 2+3 (solo en lingerie). Gaps grandes: 4 (post-proce
 
 # 🚨 PRIORIDAD #-1 — Lo que la usuaria pidió y NO pude completar (contexto al límite)
 
+## A.-3) URGENTE $$ — Picker de modelos IA ya creadas (ahorro inmediato)
+
+### Reporte usuaria 2026-04-21 late:
+"ya hemos creado muchos modelos en testing, puede crear pre-folder con los modelos que tenemos porque gastamos mucho dinero — reutilizar los modelos"
+
+### Lo que ya existe (backend)
+- Tabla Prisma `AiModel` guarda TODO modelo generado con metadata (gender, skinTone, bodyType, previewUrl, etc.)
+- Route `/api/ai-models` GET devuelve todos
+- Ya filtrable por `?referenceNumber=X` (commit 8d75735)
+- Cada modelo tiene `previewUrl` con la foto del modelo listo para usar
+
+### Lo que falta (frontend)
+En `/pipelines/lingerie/page.tsx`, agregar:
+
+```tsx
+// Nuevo state:
+const [savedModels, setSavedModels] = useState<AiModelRecord[]>([]);
+
+// Nuevo useEffect que fetch ALL models al mount (no solo por ref):
+useEffect(() => {
+  fetch('/api/ai-models').then(r => r.json()).then(json => {
+    if (json.success) setSavedModels(json.data);
+  });
+}, []);
+
+// En el UI, sección nueva arriba del upload:
+{savedModels.length > 0 && (
+  <section className="...">
+    <h2>Elegí una modelo ya creada (ahorrá $0.055)</h2>
+    <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      {savedModels.map(m => (
+        <button key={m.id} onClick={() => {
+          setSharedModelUrl(m.previewUrl);
+          toast.success(`Modelo "${m.name}" seleccionada — se va a reusar`);
+        }} className="..." >
+          <img src={m.previewUrl} alt={m.name} />
+          <p>{m.name}</p>
+          <p>{m.gender}, {m.skinTone}, {m.bodyType}</p>
+        </button>
+      ))}
+    </div>
+    <button onClick={() => setSharedModelUrl(undefined)}>Crear nueva modelo ($0.055)</button>
+  </section>
+)}
+```
+
+Cuando la usuaria clickea un modelo del grid:
+1. `sharedModelUrl` se setea a `m.previewUrl`
+2. El step `model-create` del pipeline skipea (ya existe lógica en runStep:478: `if (sharedModelUrl) return { resultUrl: sharedModelUrl, cost: 0 };`)
+3. El tryon usa ese modelo directamente
+4. Ahorro real: $0.055 × cada REF que reusa modelo existente
+
+### Tiempo estimado
+2-3h para UI + testing. Es todo aditivo, no rompe nada.
+
+### Beneficio económico
+Si ya hay 10 modelos guardadas de testing, cualquier nueva REF puede reusar UNA de ellas (si matchea cuerpo/piel/edad). Con 77 bras × 3 colores promedio = 231 fotos, ahorro potencial = **$0.055 × 231 = $12.70** si TODAS reusan (obvio no todas matchean, pero incluso 50% = **~$6 USD por catálogo**).
+
+---
+
 ## A.-2) ÚLTIMO REPORTE (2026-04-21 late night) — Estado real por paso
 
 | Paso | Status |
