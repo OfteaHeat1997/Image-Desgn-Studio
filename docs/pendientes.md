@@ -143,7 +143,7 @@ Nuevo selector en setup con 3 opciones:
 |---|---|---|---|
 | **Modelo IA + Try-on** (default) | Seguro, legalmente limpio, funciona sin fotos extra | ~$0.15/producto | ✅ |
 | **Cambiar cara sobre foto real** (face-swap) | Cuando la usuaria tiene fotos reales del producto con modelo y quiere producto 100% idéntico, cambiando solo la cara por IA | ~$0.01/producto | ✅ |
-| **4 variantes — elegí la mejor** (multi-sample) | Máximo control, elegís entre 4 candidatos | ~$0.30/producto | ⏳ Deferido — necesita UX grid de 4 thumbs y confirmar variación en Kolors |
+| **4 variantes — elegí la mejor** (multi-sample) | Máximo control, elegís entre 4 candidatos en photoBack y photoFullBody | ~$0.60/producto | ✅ Shipped commit `5aa7b1e` |
 
 **Face-swap details:**
 - Nueva ruta `/api/face-swap` con `cdingram/face-swap` (Replicate)
@@ -153,8 +153,8 @@ Nuevo selector en setup con 3 opciones:
 
 ### P1 pendiente (siguiente sesión)
 
-- **Multi-sample** (modo 3 ya tiene UI del selector pero el handler todavía cae a default) — grid de 4 thumbnails, picker, paralelizar calls
+- Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
 - P1-1: Provider switcher (Kolors→FASHN→Kling) en retry
-- P1-2: Colorway matrix (1 REF × N colores = 1 job agrupado)
-- P1-3: Quality/Speed toggle por step
+- P1-2: Colorway matrix (1 REF × N colores = 1 job agrupado) — **el que más tiempo ahorra**
+- P1-3: Quality/Speed toggle por step (FASHN mode)
 - P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)
