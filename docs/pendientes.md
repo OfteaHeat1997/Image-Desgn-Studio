@@ -106,3 +106,29 @@
 
 - Cuando el usuario sube foto de espalda real, usar esa foto directamente como referencia de prenda en el paso `photoBack` (en vez de reconstruir desde la frontal).
 - Idem cuerpo completo.
+
+---
+
+## Sesión 2026-04-22 — Research UX + plan P0
+
+**Ver reporte completo:** `docs/ux-research-2026-04-22.md`
+
+Research de 8 herramientas (FASHN, Botika, Pebblely, Flair, ZMO, Pixelcut, Photoroom, Caimera) + DAM metadata + pause/stop/step-back patterns + AI provenance.
+
+**Hallazgo clave:** Botika (1,000+ marcas fashion) **ya resolvió el pain #1** — la usuaria sube frontal Y espalda como flat-lays, Botika usa AMBAS como referencia, **NO inventa la espalda**. Eso es estándar de industria y lo que hay que implementar acá.
+
+### Plan P0 (shipping en esta sesión)
+
+| # | Feature | Impacto |
+|---|---|---|
+| P0-1 | `viewAngle` enum por foto + dropdown en cada card + auto-detect desde filename | Muy alto — desbloquea P0-2 |
+| P0-2 | Cuando existe foto tagged `espalda`, usar directo en step photoBack | **Máximo** — el pain #1 |
+| P0-3 | Stop button por step en curso (AbortController) | Muy alto |
+| P0-4 | Tooltip "i" por step con docs (proveedor, costo, duración, falla típica) | Alto |
+
+### P1 pendiente (siguiente sesión)
+
+- P1-1: Provider switcher (Kolors→FASHN→Kling) en retry
+- P1-2: Colorway matrix (1 REF × N colores = 1 job agrupado)
+- P1-3: Quality/Speed toggle por step
+- P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)

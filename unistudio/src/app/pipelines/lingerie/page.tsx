@@ -54,6 +54,50 @@ interface PipelineStep {
   cost_actual?: number;
 }
 
+/**
+ * Ángulo / rol de una foto del producto (Phase 2f — P0-1). La usuaria lo
+ * asigna manualmente por dropdown, o se auto-detecta del nombre del archivo.
+ *
+ * - "frontal": vista de frente del bra (lo que hoy se subía como única foto)
+ * - "espalda":  vista trasera del producto (broche, banda, cruce de tirantes)
+ * - "lado":     perfil lateral
+ * - "detalle":  macro de textura, costura, encaje
+ * - "flat":     prenda sola sobre fondo plano, sin modelo
+ * - "otra":     no aplica / no clasificada
+ */
+type PhotoAngle = "frontal" | "espalda" | "lado" | "detalle" | "flat" | "otra";
+
+const PHOTO_ANGLE_OPTIONS: { value: PhotoAngle; label: string; hint: string }[] = [
+  { value: "frontal", label: "Frontal",  hint: "Vista de frente (default)" },
+  { value: "espalda", label: "Espalda",  hint: "Cuando exista, se usa directo en el paso Foto Espalda" },
+  { value: "lado",    label: "Lado",     hint: "Perfil lateral" },
+  { value: "detalle", label: "Detalle",  hint: "Macro de textura, encaje, costura" },
+  { value: "flat",    label: "Flat lay", hint: "Prenda sola, sin modelo" },
+  { value: "otra",    label: "Otra",     hint: "No clasificada" },
+];
+
+/**
+ * Heurística: mira el nombre del archivo y adivina el ángulo. Matchea tanto
+ * español (delante/patras/atras/espalda/lado/detalle) como inglés (front/back/
+ * side/detail/flat). Sin match → "frontal" por default (es lo más común).
+ *
+ * Ejemplos que mapea bien:
+ *   "bh negro patras 011473.png"       → espalda
+ *   "bh blanco delante 1.png"          → frontal
+ *   "011473_back_view.jpg"             → espalda
+ *   "product_side_left.png"            → lado
+ *   "texture_macro.jpg"                → detalle
+ */
+function detectPhotoAngle(filename: string): PhotoAngle {
+  const f = filename.toLowerCase();
+  if (/\b(patras|atras|espalda|back|rear|trasera|posterior)\b/.test(f)) return "espalda";
+  if (/\b(delante|frente|frontal|front)\b/.test(f)) return "frontal";
+  if (/\b(lado|side|perfil|lateral)\b/.test(f)) return "lado";
+  if (/\b(detalle|detail|macro|closeup|close.?up|zoom|textura)\b/.test(f)) return "detalle";
+  if (/\b(flat|flatlay|flat.?lay|packshot|ghost|mannequin|prenda.?sola)\b/.test(f)) return "flat";
+  return "frontal";
+}
+
 interface ImageJob {
   id: string;
   file: File;
@@ -72,6 +116,39 @@ interface ImageJob {
   // "done" = ya hay spec, "error" = falló (seguimos sin spec).
   analysisStatus?: "pending" | "analyzing" | "done" | "error";
   analysisError?: string;
+  // Phase 2f P0-1: ángulo de la foto. Auto-detectado del filename, editable
+  // por la usuaria en un dropdown. En P0-2, si alguna foto del batch tiene
+  // angle="espalda", se usa directo en el paso Foto Espalda (no se reconstruye
+  // desde la frontal).
+  photoAngle: PhotoAngle;
+  // Clave para agrupar fotos del MISMO producto (ej. "011473" extraído del
+  // nombre). Si dos jobs comparten referenceKey, comparten referencias
+  // cruzadas (la espalda de uno puede servir a la frontal del otro).
+  referenceKey?: string;
+}
+
+/**
+ * Extrae una clave de referencia del nombre del archivo. Soporta patrones:
+ *   "bh negro patras 011473.png"  → "011473"
+ *   "011473_802_front.png"        → "011473"
+ *   "REF-71332 blanco.jpg"        → "71332"
+ * Si no encuentra nada parseable, devuelve undefined (la usuaria puede
+ * agrupar manualmente después).
+ */
+function detectReferenceKey(filename: string): string | undefined {
+  // Busca el primer número de 4+ dígitos (típico de REFs Unistyles tipo
+  // 011473, 71332, 199307). Ignora 4 dígitos que sean claramente año/resolución.
+  const m = filename.match(/\b(\d{4,7})\b/);
+  if (!m) return undefined;
+  const num = m[1];
+  // Descarta tamaños típicos de resolución (1200, 1920, 2048, etc.)
+  if (/^(1200|1920|2048|4096|800|1080|720|480|360|240)$/.test(num)) {
+    // Buscar el siguiente número en el string
+    const all = filename.match(/\b\d{4,7}\b/g) || [];
+    const filtered = all.filter((n) => !/^(1200|1920|2048|4096|800|1080|720|480|360|240)$/.test(n));
+    return filtered[0];
+  }
+  return num;
 }
 
 interface ModelConfig {
@@ -1107,9 +1184,18 @@ export default function LingeriePipelinePage() {
         steps: makeSteps(),
         status: "idle",
         totalCost: 0,
+        // Phase 2f P0-1: auto-detect del nombre del archivo. La usuaria puede
+        // corregir con el dropdown si el heurístico se equivocó.
+        photoAngle: detectPhotoAngle(file.name),
+        referenceKey: detectReferenceKey(file.name),
       };
     });
     setJobs((prev) => [...prev, ...newJobs]);
+  }, []);
+
+  /** Phase 2f P0-1: usuaria corrigió el ángulo desde el dropdown del card. */
+  const updateJobAngle = useCallback((jobId: string, angle: PhotoAngle) => {
+    setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, photoAngle: angle } : j));
   }, []);
 
   const removeJob = useCallback((id: string) => {
@@ -1509,24 +1595,60 @@ export default function LingeriePipelinePage() {
 
                 {/* Uploaded image grid */}
                 {jobs.length > 0 && (
-                  <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-                    {jobs.map((job) => (
-                      <div key={job.id} className="group relative">
-                        <img
-                          src={job.previewUrl}
-                          alt={job.file.name}
-                          className="aspect-square w-full rounded-lg object-cover border border-white/10"
-                        />
-                        <button
-                          onClick={() => removeJob(job.id)}
-                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-white"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                        <p className="mt-1 truncate text-[10px] text-gray-500">{job.file.name}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    <div className="mt-4 mb-2 flex items-center justify-between text-[11px]">
+                      <span className="text-gray-400">
+                        {jobs.length} foto{jobs.length === 1 ? '' : 's'} · el ángulo se detecta del nombre, pero podés corregirlo abajo de cada foto
+                      </span>
+                      {jobs.some((j) => j.photoAngle === 'espalda') && (
+                        <span className="rounded-md bg-violet-500/15 px-2 py-0.5 font-medium text-violet-300">
+                          ✓ Foto de espalda detectada — se va a usar como referencia real
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                      {jobs.map((job) => (
+                        <div key={job.id} className="group relative">
+                          <div className="relative">
+                            <img
+                              src={job.previewUrl}
+                              alt={job.file.name}
+                              className="aspect-square w-full rounded-lg object-cover border border-white/10"
+                            />
+                            <button
+                              onClick={() => removeJob(job.id)}
+                              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-white"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                            {/* Badge con el ángulo detectado — siempre visible */}
+                            <div className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">
+                              {PHOTO_ANGLE_OPTIONS.find((o) => o.value === job.photoAngle)?.label ?? job.photoAngle}
+                            </div>
+                            {job.referenceKey && (
+                              <div className="absolute left-1 bottom-1 rounded-md bg-violet-500/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                                REF {job.referenceKey}
+                              </div>
+                            )}
+                          </div>
+                          <p className="mt-1 truncate text-[10px] text-gray-500">{job.file.name}</p>
+                          {/* P0-1: dropdown para corregir el ángulo */}
+                          <label className="mt-1 flex items-center gap-1">
+                            <span className="text-[9px] uppercase tracking-wider text-gray-600">Ángulo</span>
+                            <select
+                              value={job.photoAngle}
+                              onChange={(e) => updateJobAngle(job.id, e.target.value as PhotoAngle)}
+                              className="flex-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-1 text-[10px] text-white outline-none focus:border-violet-500/50"
+                            >
+                              {PHOTO_ANGLE_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value} title={o.hint}>{o.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </section>
 
