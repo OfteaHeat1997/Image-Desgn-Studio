@@ -132,6 +132,11 @@ interface ImageJob {
   // nombre). Si dos jobs comparten referenceKey, comparten referencias
   // cruzadas (la espalda de uno puede servir a la frontal del otro).
   referenceKey?: string;
+  // P1-2 colorway matrix: color detectado del filename (ej "negro", "beige").
+  // Usado para: badges visuales + agrupar colores del mismo producto + en el
+  // futuro, optimizar el isolate cuando varios colores comparten el mismo
+  // corte. Opcional — si no se detecta, queda undefined.
+  color?: string;
 }
 
 /**
@@ -176,6 +181,61 @@ const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: str
     cost: "~$0.60 / producto (4× los pasos de vista)",
   },
 ];
+
+/**
+ * Detecta el color desde el nombre del archivo. Cubre la paleta típica del
+ * catálogo Unistyles + sinónimos comunes en español y algunos en inglés.
+ * Returns undefined si no matchea — entonces la usuaria no ve badge de color
+ * pero la foto sigue funcionando normal.
+ */
+function detectColor(filename: string): string | undefined {
+  const f = filename.toLowerCase();
+  // Orden importa: palabras más específicas primero para no matchear
+  // "rojo claro" como "rojo". Mantener lowercase + sin tildes.
+  const colors: [RegExp, string][] = [
+    [/\b(berde|verde|green)\b/, "verde"],
+    [/\b(beige|beis|nude|nuda|piel)\b/, "beige"],
+    [/\b(blanco|blanca|white|hueso)\b/, "blanco"],
+    [/\b(negro|negra|black)\b/, "negro"],
+    [/\b(gris|grey|gray|plomo)\b/, "gris"],
+    [/\b(rojo|roja|red|vino|wine)\b/, "rojo"],
+    [/\b(rosa|rose|pink|fucsia|fuchsia)\b/, "rosa"],
+    [/\b(azul|blue|celeste|cielo)\b/, "azul"],
+    [/\b(morado|purple|violeta|lila|lavender)\b/, "morado"],
+    [/\b(amarillo|yellow|mostaza|mustard)\b/, "amarillo"],
+    [/\b(naranja|orange|coral|melon)\b/, "naranja"],
+    [/\b(marron|marrón|brown|cafe|café|chocolate)\b/, "marrón"],
+    [/\b(dorado|oro|gold)\b/, "dorado"],
+    [/\b(plateado|silver)\b/, "plateado"],
+    [/\b(turquesa|turquoise|menta|mint|aqua)\b/, "turquesa"],
+  ];
+  for (const [re, name] of colors) {
+    if (re.test(f)) return name;
+  }
+  return undefined;
+}
+
+/**
+ * Swatch (dot de color) para mostrar en el badge. Devuelve un HEX aproximado
+ * para cada color detectable. Si no está en el map, devuelve gris neutro.
+ */
+const COLOR_SWATCH: Record<string, string> = {
+  verde: "#2f8a4a",
+  beige: "#d4c4a0",
+  blanco: "#ffffff",
+  negro: "#1a1a1a",
+  gris: "#808080",
+  rojo: "#c02633",
+  rosa: "#e87fa7",
+  azul: "#2b5e9c",
+  morado: "#7a44a8",
+  amarillo: "#f4c400",
+  naranja: "#e08040",
+  "marrón": "#6b4226",
+  dorado: "#c99a2e",
+  plateado: "#b8b8b8",
+  turquesa: "#3db8a8",
+};
 
 /**
  * Extrae una clave de referencia del nombre del archivo. Soporta patrones:
@@ -1502,6 +1562,7 @@ export default function LingeriePipelinePage() {
         // corregir con el dropdown si el heurístico se equivocó.
         photoAngle: detectPhotoAngle(file.name),
         referenceKey: detectReferenceKey(file.name),
+        color: detectColor(file.name),
       };
     });
     setJobs((prev) => [...prev, ...newJobs]);
@@ -2070,8 +2131,47 @@ export default function LingeriePipelinePage() {
                         </span>
                       )}
                     </div>
+                    {/* P1-2: resumen de agrupación por REF + colores detectados.
+                        Muestra a la usuaria qué tantos productos únicos detectó. */}
+                    {(() => {
+                      const groups = new Map<string, Set<string>>();
+                      for (const j of jobs) {
+                        const refKey = j.referenceKey ?? "sin-ref";
+                        if (!groups.has(refKey)) groups.set(refKey, new Set());
+                        if (j.color) groups.get(refKey)!.add(j.color);
+                      }
+                      const namedGroups = Array.from(groups.entries()).filter(([k]) => k !== "sin-ref");
+                      if (namedGroups.length === 0) return null;
+                      return (
+                        <div className="mb-3 rounded-md border border-violet-500/20 bg-violet-500/[0.04] px-3 py-2 text-[11px]">
+                          <span className="font-semibold text-violet-300">
+                            {namedGroups.length} producto{namedGroups.length === 1 ? '' : 's'} detectado{namedGroups.length === 1 ? '' : 's'}:
+                          </span>{' '}
+                          {namedGroups.map(([ref, colorSet], i) => (
+                            <span key={ref} className="text-gray-300">
+                              {i > 0 && ' · '}
+                              REF {ref}
+                              {colorSet.size > 0 && (
+                                <span className="ml-1 text-gray-500">
+                                  ({colorSet.size} color{colorSet.size === 1 ? '' : 'es'})
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                          <p className="mt-1 text-[10px] text-gray-500">
+                            Las fotos con misma REF comparten la modelo IA (se paga una sola vez por REF).
+                          </p>
+                        </div>
+                      );
+                    })()}
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                      {jobs.map((job) => (
+                      {/* Ordenar jobs por referenceKey + color para que los del mismo producto
+                          aparezcan adyacentes visualmente. Jobs sin REF quedan al final. */}
+                      {[...jobs].sort((a, b) => {
+                        const rk = (a.referenceKey ?? "zzz").localeCompare(b.referenceKey ?? "zzz");
+                        if (rk !== 0) return rk;
+                        return (a.color ?? "zzz").localeCompare(b.color ?? "zzz");
+                      }).map((job) => (
                         <div key={job.id} className="group relative">
                           <div className="relative">
                             <img
@@ -2089,6 +2189,16 @@ export default function LingeriePipelinePage() {
                             <div className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">
                               {PHOTO_ANGLE_OPTIONS.find((o) => o.value === job.photoAngle)?.label ?? job.photoAngle}
                             </div>
+                            {/* P1-2: Color swatch + nombre */}
+                            {job.color && (
+                              <div className="absolute right-1 top-7 flex items-center gap-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                                <span
+                                  className="inline-block h-2 w-2 rounded-full border border-white/30"
+                                  style={{ background: COLOR_SWATCH[job.color] ?? "#666" }}
+                                />
+                                <span className="capitalize">{job.color}</span>
+                              </div>
+                            )}
                             {job.referenceKey && (
                               <div className="absolute left-1 bottom-1 rounded-md bg-violet-500/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
                                 REF {job.referenceKey}
