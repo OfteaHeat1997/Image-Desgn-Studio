@@ -130,6 +130,49 @@ interface ImageJob {
 }
 
 /**
+ * Modo de generación del pipeline (elegible por la usuaria en el setup).
+ *
+ * - "default": el flow clásico. model-create genera una modelo IA completa,
+ *   luego Kolors/FASHN viste la modelo con la prenda aislada (tryon). La
+ *   prenda se APROXIMA (reinterpreta) en cada vista. Legalmente limpio —
+ *   modelo IA original + prenda aislada tuya.
+ *
+ * - "face-swap": a las fotos reales que subiste (frontal/espalda/cuerpo) se
+ *   les cambia SOLO la cara por una modelo IA. El cuerpo, pose, prenda,
+ *   iluminación quedan INTACTOS → producto idéntico al original, 3 vistas
+ *   consistentes entre sí. Más barato y rápido. Usar con responsabilidad —
+ *   si las fotos originales tienen copyright de otro, el derivado también lo
+ *   tiene aunque cambies la cara (aclarado con la usuaria).
+ *
+ * - "multi-sample": tryon genera 4 candidatos en 1 solo request (FASHN
+ *   num_samples:4). La usuaria ve los 4 y elige la mejor. Sube la fidelidad
+ *   del producto sin cambiar el pipeline legalmente. Más caro por step pero
+ *   control total.
+ */
+type GenerationMode = "default" | "face-swap" | "multi-sample";
+
+const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: string; cost: string }[] = [
+  {
+    value: "default",
+    label: "Modelo IA + Try-on (clásico)",
+    desc: "Genera una modelo IA nueva y le pone tu prenda aislada. Legalmente limpio. La prenda se reinterpreta un poco en cada vista.",
+    cost: "~$0.15 / producto",
+  },
+  {
+    value: "face-swap",
+    label: "Cambiar cara sobre tu foto real",
+    desc: "Usa TU foto real (frontal/espalda) y solo cambia la cara. Producto idéntico al original. Más rápido y barato.",
+    cost: "~$0.01 / producto",
+  },
+  {
+    value: "multi-sample",
+    label: "4 variantes — elegí la mejor",
+    desc: "En cada vista, la IA genera 4 opciones y vos elegís la más fiel a tu producto. Más caro pero control total.",
+    cost: "~$0.30 / producto",
+  },
+];
+
+/**
  * Extrae una clave de referencia del nombre del archivo. Soporta patrones:
  *   "bh negro patras 011473.png"  → "011473"
  *   "011473_802_front.png"        → "011473"
@@ -1295,6 +1338,9 @@ export default function LingeriePipelinePage() {
   const [jobs, setJobs] = useState<ImageJob[]>([]);
   const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [autoMode, setAutoMode] = useState(true);
+  // Phase 2f: modo de generación elegible (default / face-swap / multi-sample).
+  // default = el flow legacy (model-create + tryon Kolors).
+  const [generationMode, setGenerationMode] = useState<GenerationMode>("default");
   const [sharedModelUrl, setSharedModelUrl] = useState<string | undefined>();
   // Seed compartido entre poses: photoBack + photoFullBody lo reusan para que
   // SeedDream genere la MISMA modelo (mismo rostro + cuerpo + piel) en distinta
@@ -1452,6 +1498,24 @@ export default function LingeriePipelinePage() {
     }
   }, []);
 
+  /**
+   * Busca en el batch una foto del mismo producto tagged con el ángulo
+   * solicitado. Usado por el modo face-swap para encontrar la foto real de
+   * cada vista. Prefiere match por referenceKey; cae a match cualquiera del
+   * batch si ninguna tiene referenceKey.
+   */
+  const findMatchingPhoto = useCallback((
+    job: ImageJob,
+    jobsSnapshot: ImageJob[],
+    angles: PhotoAngle[],
+  ): ImageJob | undefined => {
+    return jobsSnapshot.find((j) =>
+      angles.includes(j.photoAngle) &&
+      j.uploadedUrl &&
+      (j.referenceKey === job.referenceKey || (!j.referenceKey && !job.referenceKey))
+    );
+  }, []);
+
   const executeStep = useCallback(async (
     job: ImageJob,
     step: PipelineStep,
@@ -1466,25 +1530,58 @@ export default function LingeriePipelinePage() {
     const key = `${job.id}:${step.id}`;
     abortControllersRef.current.set(key, controller);
 
-    // P0-2: si estamos en photoBack, buscamos en el batch una foto tagged
-    // angle="espalda" de la misma REF (o del mismo batch si no hay REF). Si
-    // existe, le pasamos su uploadedUrl a runStep para que se use directo.
-    let backGarmentUrl: string | undefined;
-    if (step.id === "photoBack") {
-      const matchingBack = jobsSnapshot.find((j) =>
-        j.id !== job.id &&
-        j.photoAngle === "espalda" &&
-        // Preferencia: mismo referenceKey. Si ninguno tiene referenceKey, aceptar match del batch.
-        (j.referenceKey === job.referenceKey || (!j.referenceKey && !job.referenceKey)) &&
-        j.uploadedUrl
-      );
-      if (matchingBack?.uploadedUrl) {
-        backGarmentUrl = matchingBack.uploadedUrl;
-        console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.file.name})`);
-      }
-    }
-
     try {
+      // MODO FACE-SWAP: para tryon / photoBack / photoFullBody, si existe la
+      // foto real correspondiente Y ya tenemos una modelo IA (currentSharedModel),
+      // hacemos face-swap en vez de runStep. Cambia SOLO la cara en la foto
+      // real de la usuaria — cuerpo, pose, prenda, iluminación quedan intactos.
+      //
+      // Si no tenemos modelo IA aún o no hay foto real para esta vista, caemos
+      // al flow default (runStep).
+      if (generationMode === "face-swap" && currentSharedModel) {
+        let targetPhoto: ImageJob | undefined;
+        if (step.id === "tryon") {
+          targetPhoto = findMatchingPhoto(job, jobsSnapshot, ["frontal"]) || job;
+        } else if (step.id === "photoBack") {
+          targetPhoto = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
+        } else if (step.id === "photoFullBody") {
+          // Priorizar "flat" o "otra" (cuerpo completo); fallback a frontal si no hay.
+          targetPhoto = findMatchingPhoto(job, jobsSnapshot, ["flat", "otra"])
+            || findMatchingPhoto(job, jobsSnapshot, ["frontal"])
+            || job;
+        }
+        if (targetPhoto?.uploadedUrl) {
+          console.log(`[lingerie] ${step.id}: face-swap sobre foto real "${targetPhoto.file.name}"`);
+          const res = await fetch("/api/face-swap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              targetImage: targetPhoto.uploadedUrl,
+              sourceImage: currentSharedModel,
+            }),
+          });
+          const json = await res.json();
+          if (!json.success) throw new Error(json.error || "face-swap failed");
+          return { resultUrl: json.data.url, cost: json.cost ?? 0.003 };
+        }
+        // No hay foto real para esta vista → fallback a runStep default con warning.
+        if (step.id !== "isolate" && step.id !== "model" && step.id !== "productVideo" && step.id !== "modelVideo") {
+          toast.info(`Sin foto real para ${step.label} — usando modo clásico para este paso.`);
+        }
+      }
+
+      // P0-2: si estamos en photoBack (modo default), buscamos foto real de
+      // espalda para pasarla como garment reference a Kolors.
+      let backGarmentUrl: string | undefined;
+      if (step.id === "photoBack" && generationMode === "default") {
+        const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
+        if (matchingBack?.uploadedUrl && matchingBack.id !== job.id) {
+          backGarmentUrl = matchingBack.uploadedUrl;
+          console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.file.name})`);
+        }
+      }
+
       return await runStep(
         step.id,
         inputUrl,
@@ -1501,7 +1598,7 @@ export default function LingeriePipelinePage() {
     } finally {
       abortControllersRef.current.delete(key);
     }
-  }, [modelConfig, productType, referenceNumber]);
+  }, [modelConfig, productType, referenceNumber, generationMode, findMatchingPhoto]);
 
   /* ---- Process one job sequentially ---- */
   const processJob = useCallback(async (
@@ -2155,6 +2252,51 @@ export default function LingeriePipelinePage() {
                     <span className="text-center text-[10px] text-gray-500">Revisar cada paso</span>
                   </button>
                 </div>
+              </section>
+
+              {/* Phase 2f: modo de generación — default / face-swap / multi-sample.
+                  Elegible por la usuaria; cada uno tiene tradeoffs distintos. */}
+              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                  Modo de Generación
+                </h2>
+                <p className="mb-3 text-[11px] text-gray-500">
+                  Elegí cómo se generan las fotos. El default es el más seguro; las otras opciones son alternativas con tradeoffs distintos.
+                </p>
+                <div className="space-y-2">
+                  {GENERATION_MODE_OPTIONS.map((opt) => {
+                    const selected = generationMode === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setGenerationMode(opt.value)}
+                        className={cn(
+                          "flex w-full flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition-all",
+                          selected
+                            ? "border-violet-500/50 bg-violet-500/10"
+                            : "border-white/8 bg-white/[0.02] hover:border-white/20",
+                        )}
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <span className={cn(
+                            "text-xs font-semibold",
+                            selected ? "text-violet-200" : "text-gray-300",
+                          )}>
+                            {opt.label}
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-500">{opt.cost}</span>
+                        </div>
+                        <p className="text-[10px] leading-snug text-gray-500">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {generationMode === "face-swap" && (
+                  <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[10px] leading-snug text-amber-200">
+                    ⚠️ Requiere que etiquetes tus fotos con su ángulo (Frontal/Espalda/Cuerpo). El face-swap solo se aplica a las fotos reales que subiste; las vistas sin foto real caen al modo clásico automáticamente.
+                  </p>
+                )}
               </section>
 
               {/* Cost summary + launch */}

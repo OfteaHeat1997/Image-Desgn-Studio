@@ -30,6 +30,9 @@
     "src/app/api/inpaint/route.ts": {
       "maxDuration": 120
     },
+    "src/app/api/face-swap/route.ts": {
+      "maxDuration": 120
+    },
     "src/app/api/outpaint/route.ts": {
       "maxDuration": 120
     },
