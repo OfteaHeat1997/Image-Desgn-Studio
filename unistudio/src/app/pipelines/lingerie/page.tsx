@@ -26,6 +26,8 @@ import {
   Settings2,
   Zap,
   ZapOff,
+  Info,
+  StopCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -182,6 +184,123 @@ const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error
 function makeSteps(): PipelineStep[] {
   return STEP_DEFS.map((d) => ({ ...d, status: "idle" }));
 }
+
+/**
+ * P0-4: documentación por step mostrada en el tooltip "i". Explica qué hace,
+ * qué proveedor usa, cuánto tarda típico, cuánto cuesta, qué puede fallar y
+ * qué puede hacer la usuaria si falla. Fuente: docs/pipelines/lingerie.md.
+ */
+interface StepDoc {
+  what: string;          // qué hace este step en lenguaje humano
+  provider: string;      // qué proveedor / modelo usa
+  duration: string;      // tiempo típico
+  costDetail: string;    // detalle del costo
+  canFail: string[];     // modos típicos de falla
+  tips: string[];        // qué hacer la usuaria
+}
+
+const STEP_DOCS: Record<StepId, StepDoc> = {
+  isolate: {
+    what: "Quita la modelo y el fondo de tu foto, dejando solo la prenda flotando como si fuera un producto 3D (estilo ghost mannequin).",
+    provider: "grounded_sam + SeedDream edit (o Flux Kontext para no-lencería). Fallback: WithoutBG.",
+    duration: "15-45 s",
+    costDetail: "$0.01 si el primer proveedor funciona; hasta $0.04 si cae al fallback final.",
+    canFail: [
+      "El proveedor no identifica la prenda si hay poca iluminación o fondo complejo.",
+      "Si cae al último fallback (rembg), puede dejar a la modelo adentro — en ese caso el pipeline se detiene con error claro.",
+    ],
+    tips: [
+      "Reintenta — a veces el primer intento falla por cola saturada.",
+      "Si falla siempre, probá con una foto con fondo más limpio.",
+      "Podés saltar este paso si ya subiste la prenda flotando (flat lay).",
+    ],
+  },
+  model: {
+    what: "Genera una modelo de IA con licencia libre (el rostro no existe). Se reutiliza en toda la REF para consistencia.",
+    provider: "SeedDream v4.5 (fal.ai) — sin filtro de contenido, diseñado para lencería. Kontext Pro para no-lencería.",
+    duration: "20-60 s",
+    costDetail: "$0.055 por modelo nueva. $0 si reusás una ya creada desde el picker.",
+    canFail: [
+      "ByteDance rechaza el prompt por palabras sensibles → reintenta con prompt más seguro automáticamente.",
+      "Timeout si la cola está saturada (raro en SeedDream).",
+    ],
+    tips: [
+      "Si el resultado te gusta, aceptá y continuá — esta modelo se guarda y podés reusarla en futuras fotos sin pagar.",
+      "Si no te gusta, reintentá — el seed random da variaciones.",
+      "Ajustá tono de piel / edad / cuerpo en la configuración antes de correr.",
+    ],
+  },
+  tryon: {
+    what: "Viste la modelo de IA con TU prenda — la prenda real, preservando color y cortes.",
+    provider: "Kolors Virtual Try-On (fal.ai) para lencería. FASHN v1.6 para otras categorías.",
+    duration: "10-30 s",
+    costDetail: "$0.02 con Kolors; $0.05 con FASHN.",
+    canFail: [
+      "image_load_error: el archivo intermedio no llegó a fal.ai (suele ser URL temporal caída).",
+      "Kolors reinterpreta la prenda en ángulos raros — el frente queda fiel, los laterales varían.",
+    ],
+    tips: [
+      "Este paso es OPCIONAL — si falla, el pipeline sigue con los demás.",
+      "Reintentá una vez antes de saltarlo.",
+    ],
+  },
+  photoBack: {
+    what: "Genera una foto de la misma modelo de espaldas, mostrando broche y banda del bra. Si subiste una foto etiquetada como 'espalda', se usa esa directo; si no, la IA la infiere del frente.",
+    provider: "model-create (SeedDream con mismo seed) + Kolors Try-On. Si hay foto de espalda real, la usa como garment reference.",
+    duration: "30-90 s",
+    costDetail: "$0.075 ($0.055 modelo + $0.02 tryon).",
+    canFail: [
+      "Sin foto de espalda real, la IA inventa detalles: broche, cruce de tirantes, banda pueden diferir del producto.",
+      "Mismo seed del paso 'model' → misma cara, pero ropa y pose son nuevos.",
+    ],
+    tips: [
+      "Para mejor fidelidad, subí una foto de la espalda real del bra y etiquetala como 'Espalda' en el setup — P0-2 la usa automáticamente.",
+      "Si el resultado no sirve, saltá este paso — el pipeline sigue con los otros.",
+    ],
+  },
+  photoFullBody: {
+    what: "Genera una foto de la modelo de cuerpo entero con bra + briefs nude (shaper shorts).",
+    provider: "model-create (SeedDream con mismo seed) + Kolors Try-On.",
+    duration: "30-90 s",
+    costDetail: "$0.075 ($0.055 modelo + $0.02 tryon).",
+    canFail: [
+      "Si el prompt confunde a SeedDream, los shaper shorts pueden salir como pantalones largos marrones (bug histórico ya fixeado).",
+      "La identidad se preserva con seed — pero la iluminación puede variar vs la frontal.",
+    ],
+    tips: [
+      "Si salió mal, rehacé — el seed es el mismo pero el random de la composición cambia.",
+      "Para precisión absoluta, subí una foto real de cuerpo completo y etiquetala como 'Flat lay' o 'Otra'.",
+    ],
+  },
+  productVideo: {
+    what: "Video 360° de la prenda rotando sobre sí misma, estilo producto 3D de ecommerce.",
+    provider: "wan-2.2-fast (Replicate) — 81 frames mínimo, guidance 3.0.",
+    duration: "60-180 s",
+    costDetail: "$0.05 por video de 5s.",
+    canFail: [
+      "REQUIERE que el paso 'Aislar Producto' haya completado — si no, el video rotaría la foto original (modelo + prenda).",
+      "Si lo generás sin aislar, no sirve y el paso falla con mensaje claro.",
+    ],
+    tips: [
+      "No desactives 'Aislar Producto' si querés este video.",
+      "Si la rotación queda rara, reintentá — el random de wan-2.2 varía el motion.",
+    ],
+  },
+  modelVideo: {
+    what: "Video de la modelo posando con la prenda — movimiento natural, ideal para redes.",
+    provider: "wan-2.2-fast (Replicate). Usa el resultado del tryon; si no hay tryon, la modelo sola.",
+    duration: "60-180 s",
+    costDetail: "$0.05 por video de 5s.",
+    canFail: [
+      "Si el tryon falló, el video muestra la modelo con base beige en vez de tu bra.",
+      "wan puede generar movimientos bruscos si el prompt no es específico.",
+    ],
+    tips: [
+      "Corré primero 'Foto Frontal (tryon)' — así el video usa tu prenda real.",
+      "Reintentá si el movimiento queda feo.",
+    ],
+  },
+};
 
 /**
  * Convierte mensajes técnicos de error en texto humano, amigable para la
@@ -376,10 +495,11 @@ interface StepCardProps {
   onAccept: () => void;
   onSkip: () => void;
   onRerun: () => void;
+  onStop?: () => void;
   autoMode: boolean;
 }
 
-function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode }: StepCardProps) {
+function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop }: StepCardProps) {
   const Icon = step.icon;
   // Fallback chain: step's own captured input > chain input > empty. Si los
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
@@ -387,6 +507,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
   const inputUrl = step.inputUrl || previousResultUrl || undefined;
   const canInteract = step.status === "done" && !autoMode;
   const isVideo = step.resultUrl && (step.resultUrl.includes(".mp4") || step.resultUrl.includes(".webm") || step.resultUrl.includes("video"));
+  const [showDocs, setShowDocs] = useState(false);
+  const docs = STEP_DOCS[step.id];
 
   return (
     <div
@@ -432,6 +554,23 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             <div className="flex items-center gap-2">
               <Icon className="h-3.5 w-3.5 text-gray-400" />
               <span className="text-sm font-semibold text-white">{step.label}</span>
+              {/* P0-4: botón "i" que abre el panel de docs del step */}
+              {docs && (
+                <button
+                  type="button"
+                  onClick={() => setShowDocs((s) => !s)}
+                  className={cn(
+                    "flex h-4 w-4 items-center justify-center rounded-full transition-colors",
+                    showDocs
+                      ? "bg-violet-500/30 text-violet-200"
+                      : "bg-white/10 text-gray-400 hover:bg-violet-500/20 hover:text-violet-300",
+                  )}
+                  title="Ver detalles de este paso"
+                  aria-label="Ver detalles"
+                >
+                  <Info className="h-3 w-3" />
+                </button>
+              )}
             </div>
             <p className="mt-0.5 text-xs text-gray-500">{step.description}</p>
           </div>
@@ -439,8 +578,59 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
         <div className="flex items-center gap-3">
           <span className="text-xs font-medium text-gray-500">{step.cost}</span>
           <StatusBadge status={step.status} />
+          {/* P0-3: botón DETENER visible solo cuando está procesando y existe un handler */}
+          {step.status === "processing" && onStop && (
+            <button
+              type="button"
+              onClick={onStop}
+              className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/20"
+              title="Cancelar este paso"
+            >
+              <StopCircle className="h-3 w-3" />
+              Detener
+            </button>
+          )}
         </div>
       </div>
+
+      {/* P0-4: panel desplegable con docs del step (qué hace, proveedor, costo,
+          duración, fallas típicas, tips). Se expande al tocar el ícono "i". */}
+      {showDocs && docs && (
+        <div className="border-b border-white/6 bg-violet-500/[0.03] px-5 py-4 text-xs">
+          <div className="space-y-3">
+            <div>
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Qué hace</p>
+              <p className="text-gray-300">{docs.what}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Proveedor</p>
+                <p className="text-gray-400">{docs.provider}</p>
+              </div>
+              <div>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Duración típica</p>
+                <p className="text-gray-400">{docs.duration}</p>
+              </div>
+              <div>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Costo</p>
+                <p className="text-gray-400">{docs.costDetail}</p>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Qué puede fallar</p>
+              <ul className="list-disc space-y-0.5 pl-4 text-gray-400">
+                {docs.canFail.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">Tips</p>
+              <ul className="list-disc space-y-0.5 pl-4 text-gray-300">
+                {docs.tips.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Card body — before/after comparison */}
       {(step.status !== "idle" && step.status !== "pending") && (
