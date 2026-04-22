@@ -1040,6 +1040,19 @@ async function runStep(
   referenceNumber?: string,
   sharedSeed?: number,
   isolatedGarmentUrl?: string,
+  // P0-3: signal opcional de AbortController. Si la usuaria aprieta Detener,
+  // el controller se abort()a y todos los fetch() de este step explotan con
+  // DOMException("AbortError") → el caller en processJob marca el step como
+  // "error" con mensaje custom ("Cancelado por la usuaria").
+  abortSignal?: AbortSignal,
+  /**
+   * P0-2: URL de una foto de ESPALDA real del producto (que la usuaria subió
+   * y tagged como angle="espalda"). Cuando se pasa y el step es photoBack,
+   * en vez de reconstruir la espalda desde la frontal se usa esta foto
+   * directo como garment reference en el tryon. El resultado preserva detalles
+   * reales del broche, banda, cruce de tirantes.
+   */
+  backGarmentUrl?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -1053,6 +1066,7 @@ async function runStep(
     const res = await fetch("/api/bg-remove", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         imageUrl: inputUrl,
         provider: "replicate",
@@ -1092,6 +1106,7 @@ async function runStep(
     const res = await fetch("/api/model-create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         gender: modelConfig.gender,
         ageRange: modelConfig.ageRange,
@@ -1137,6 +1152,7 @@ async function runStep(
     const modelRes = await fetch("/api/model-create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         gender: modelConfig.gender,
         ageRange: modelConfig.ageRange,
@@ -1155,7 +1171,16 @@ async function runStep(
     const newModelImage = modelJson.data.url;
     const modelCost = modelJson.cost ?? 0.055;
 
-    // Fase 2: vestir la nueva modelo con la MISMA prenda aislada
+    // Fase 2: vestir la nueva modelo con la prenda correcta.
+    // P0-2: si el step es photoBack Y la usuaria subió una foto tagged
+    // angle="espalda" (backGarmentUrl), usamos ESA como garment reference en
+    // vez de la prenda aislada del frente. Así Kolors ve los detalles reales
+    // del broche, banda y cruce de tirantes en lugar de inventarlos.
+    const useRealBackPhoto = stepId === "photoBack" && !!backGarmentUrl;
+    const garmentForTryon = useRealBackPhoto ? backGarmentUrl! : isolatedGarmentUrl;
+    if (useRealBackPhoto) {
+      console.log(`[lingerie] photoBack usando foto REAL de espalda (${backGarmentUrl!.slice(0, 80)})`);
+    }
     const category =
       productType === "panty" ? "bottoms"
       : productType === "set" ? "one-pieces"
@@ -1163,9 +1188,10 @@ async function runStep(
     const tryonRes = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         modelImage: newModelImage,
-        garmentImage: isolatedGarmentUrl,
+        garmentImage: garmentForTryon,
         category,
         garmentType: garmentTypeForApi,
         provider: "kolors",
@@ -1192,6 +1218,7 @@ async function runStep(
     const res = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         modelImage: sharedModelUrl,
         garmentImage: inputUrl,
@@ -1209,6 +1236,7 @@ async function runStep(
     const res = await fetch("/api/video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         imageUrl: inputUrl,
         falImageUrl: falUrl,
@@ -1231,6 +1259,7 @@ async function runStep(
     const res = await fetch("/api/video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
       body: JSON.stringify({
         imageUrl: modelVideoUrl,
         falImageUrl: falUrl,
@@ -1408,6 +1437,21 @@ export default function LingeriePipelinePage() {
   }, []);
 
   /* ---- Run one step for one job ---- */
+  // P0-3: un AbortController por (jobId, stepId) en vuelo. Si la usuaria
+  // aprieta "Detener" en un step, buscamos el controller y lo abort()amos.
+  // Usamos useRef porque no queremos re-renderear al agregar/quitar entries.
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  const stopStep = useCallback((jobId: string, stepId: StepId) => {
+    const key = `${jobId}:${stepId}`;
+    const ctrl = abortControllersRef.current.get(key);
+    if (ctrl) {
+      ctrl.abort();
+      abortControllersRef.current.delete(key);
+      toast.info(`Paso "${stepId}" detenido.`);
+    }
+  }, []);
+
   const executeStep = useCallback(async (
     job: ImageJob,
     step: PipelineStep,
@@ -1415,18 +1459,48 @@ export default function LingeriePipelinePage() {
     currentSharedModel: string | undefined,
     currentSharedSeed: number | undefined,
     currentIsolatedGarment: string | undefined,
+    jobsSnapshot: ImageJob[],
   ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> => {
-    return runStep(
-      step.id,
-      inputUrl,
-      job.falUrl,
-      modelConfig,
-      productType,
-      currentSharedModel,
-      referenceNumber || undefined,
-      currentSharedSeed,
-      currentIsolatedGarment,
-    );
+    // P0-3: crear AbortController para este step específico
+    const controller = new AbortController();
+    const key = `${job.id}:${step.id}`;
+    abortControllersRef.current.set(key, controller);
+
+    // P0-2: si estamos en photoBack, buscamos en el batch una foto tagged
+    // angle="espalda" de la misma REF (o del mismo batch si no hay REF). Si
+    // existe, le pasamos su uploadedUrl a runStep para que se use directo.
+    let backGarmentUrl: string | undefined;
+    if (step.id === "photoBack") {
+      const matchingBack = jobsSnapshot.find((j) =>
+        j.id !== job.id &&
+        j.photoAngle === "espalda" &&
+        // Preferencia: mismo referenceKey. Si ninguno tiene referenceKey, aceptar match del batch.
+        (j.referenceKey === job.referenceKey || (!j.referenceKey && !job.referenceKey)) &&
+        j.uploadedUrl
+      );
+      if (matchingBack?.uploadedUrl) {
+        backGarmentUrl = matchingBack.uploadedUrl;
+        console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.file.name})`);
+      }
+    }
+
+    try {
+      return await runStep(
+        step.id,
+        inputUrl,
+        job.falUrl,
+        modelConfig,
+        productType,
+        currentSharedModel,
+        referenceNumber || undefined,
+        currentSharedSeed,
+        currentIsolatedGarment,
+        controller.signal,
+        backGarmentUrl,
+      );
+    } finally {
+      abortControllersRef.current.delete(key);
+    }
   }, [modelConfig, productType, referenceNumber]);
 
   /* ---- Process one job sequentially ---- */
@@ -1537,6 +1611,7 @@ export default function LingeriePipelinePage() {
           newSharedModel,
           newSharedSeed,
           stepResults.isolate,
+          jobsSnapshot,  // P0-2: contexto para buscar fotos de espalda tagged
         );
 
         if (result.newModelUrl) {
@@ -1603,6 +1678,16 @@ export default function LingeriePipelinePage() {
         }
       } catch (err) {
         const rawMsg = err instanceof Error ? err.message : "Error desconocido";
+        // P0-3: si la usuaria apretó "Detener" (AbortController.abort()), el
+        // fetch() tira DOMException con name "AbortError". Lo mostramos como
+        // status "skipped" con mensaje claro, no como error rojo — fue una
+        // acción deliberada de la usuaria, no un fallo.
+        const isAbort = err instanceof Error && (err.name === "AbortError" || /aborted|the user aborted/i.test(rawMsg));
+        if (isAbort) {
+          updateStep(jobId, stepDef.id, { status: "skipped", error: "Detenido por la usuaria" });
+          // Salir del loop de steps: si paró un paso es porque no quiere seguir.
+          break;
+        }
         // "Failed to fetch" / "NetworkError" / "Load failed" son TypeErrors del
         // browser cuando fetch() falla antes de recibir respuesta (conexión móvil
         // intermitente, red caída, request cortado). Traducimos a español para
@@ -2320,6 +2405,7 @@ export default function LingeriePipelinePage() {
                     onAccept={() => dispatchAction(activeJob.id, step.id, "accept")}
                     onSkip={() => dispatchAction(activeJob.id, step.id, "skip")}
                     onRerun={() => dispatchAction(activeJob.id, step.id, "rerun")}
+                    onStop={() => stopStep(activeJob.id, step.id)}
                     autoMode={autoMode}
                   />
                 );
