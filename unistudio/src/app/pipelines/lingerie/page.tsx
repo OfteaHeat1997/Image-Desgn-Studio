@@ -54,6 +54,11 @@ interface PipelineStep {
   resultUrl?: string;
   error?: string;
   cost_actual?: number;
+  // Multi-sample: lista completa de candidatos generados. resultUrl es siempre
+  // el candidato actualmente seleccionado por la usuaria; candidates es la lista
+  // para mostrar en el picker 2×2. Solo se popula cuando generationMode =
+  // "multi-sample" y el step admite variantes (tryon/photoBack/photoFullBody).
+  candidates?: string[];
 }
 
 /**
@@ -167,10 +172,8 @@ const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: str
   {
     value: "multi-sample",
     label: "4 variantes — elegí la mejor",
-    desc: "En cada vista, la IA genera 4 opciones y vos elegís la más fiel a tu producto. Más caro pero control total.",
-    cost: "~$0.30 / producto",
-    disabled: true,
-    disabledReason: "Próximamente — necesita UI de picker 4 thumbnails optimizada para mobile.",
+    desc: "Foto Espalda y Cuerpo Completo generan 4 opciones con caras/interpretaciones distintas. Vos elegís la que mejor preserva tu producto. Frontal sigue con 1 resultado.",
+    cost: "~$0.60 / producto (4× los pasos de vista)",
   },
 ];
 
@@ -541,10 +544,11 @@ interface StepCardProps {
   onSkip: () => void;
   onRerun: () => void;
   onStop?: () => void;
+  onSelectCandidate?: (url: string) => void;
   autoMode: boolean;
 }
 
-function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop }: StepCardProps) {
+function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate }: StepCardProps) {
   const Icon = step.icon;
   // Fallback chain: step's own captured input > chain input > empty. Si los
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
@@ -725,6 +729,49 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       </pre>
                     </details>
                   )}
+                </div>
+              ) : step.candidates && step.candidates.length > 1 ? (
+                // Multi-sample: grid 2×2 de candidatos. resultUrl es el
+                // seleccionado actualmente (borde violeta); click en otro lo
+                // cambia. Fit en mobile: grid-cols-2 h-20 each = 2×80px.
+                <div>
+                  <p className="mb-1.5 text-[10px] text-violet-300">
+                    {step.candidates.length} variantes — tocá la que más se parezca a tu producto
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {step.candidates.map((url, i) => {
+                      const isSelected = url === step.resultUrl;
+                      return (
+                        <button
+                          key={`${url}-${i}`}
+                          type="button"
+                          onClick={() => onSelectCandidate?.(url)}
+                          className={cn(
+                            "group relative aspect-[3/4] overflow-hidden rounded-md border transition-all",
+                            isSelected
+                              ? "border-violet-400 ring-2 ring-violet-400/50"
+                              : "border-white/15 hover:border-white/40",
+                          )}
+                          title={`Variante ${i + 1}${isSelected ? ' (seleccionada)' : ''}`}
+                        >
+                          <img
+                            src={url}
+                            alt={`Variante ${i + 1}`}
+                            className="h-full w-full object-contain"
+                            style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 10px 10px" }}
+                          />
+                          <div className="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[9px] font-bold text-white">
+                            {i + 1}
+                          </div>
+                          {isSelected && (
+                            <div className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500">
+                              <Check className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="relative">
@@ -1526,7 +1573,7 @@ export default function LingeriePipelinePage() {
     currentSharedSeed: number | undefined,
     currentIsolatedGarment: string | undefined,
     jobsSnapshot: ImageJob[],
-  ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> => {
+  ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; candidates?: string[] }> => {
     // P0-3: crear AbortController para este step específico
     const controller = new AbortController();
     const key = `${job.id}:${step.id}`;
@@ -1573,15 +1620,57 @@ export default function LingeriePipelinePage() {
         }
       }
 
-      // P0-2: si estamos en photoBack (modo default), buscamos foto real de
-      // espalda para pasarla como garment reference a Kolors.
+      // P0-2: si estamos en photoBack (modo default o multi-sample), buscamos
+      // foto real de espalda para pasarla como garment reference a Kolors.
       let backGarmentUrl: string | undefined;
-      if (step.id === "photoBack" && generationMode === "default") {
+      if (step.id === "photoBack" && generationMode !== "face-swap") {
         const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
         if (matchingBack?.uploadedUrl && matchingBack.id !== job.id) {
           backGarmentUrl = matchingBack.uploadedUrl;
           console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.file.name})`);
         }
+      }
+
+      // MODO MULTI-SAMPLE: para photoBack / photoFullBody, generar 4 candidatos
+      // en paralelo con distintos seeds → 4 caras ligeramente distintas + 4
+      // interpretaciones del tryon. La usuaria ve las 4 en un grid 2×2 y elige
+      // la que mejor preserva el producto. Costo: 4× el step normal.
+      //
+      // No se implementa para tryon porque usa un sharedModel fijo — Kolors es
+      // determinístico sobre inputs idénticos → generaría 4 veces lo mismo.
+      if (
+        generationMode === "multi-sample" &&
+        (step.id === "photoBack" || step.id === "photoFullBody")
+      ) {
+        const N_SAMPLES = 4;
+        // Cada sample usa su propio seed → modelo IA distinta en cada → face
+        // y tryon varían. La usuaria elige cuál interpretación le gusta más.
+        const seeds = Array.from({ length: N_SAMPLES }, () => Math.floor(Math.random() * 999999));
+        console.log(`[lingerie] ${step.id}: multi-sample con ${N_SAMPLES} variantes (seeds: ${seeds.join(', ')})`);
+        const results = await Promise.all(
+          seeds.map((seed) =>
+            runStep(
+              step.id,
+              inputUrl,
+              job.falUrl,
+              modelConfig,
+              productType,
+              currentSharedModel,
+              referenceNumber || undefined,
+              seed,
+              currentIsolatedGarment,
+              controller.signal,
+              backGarmentUrl,
+            ),
+          ),
+        );
+        const candidates = results.map((r) => r.resultUrl);
+        const totalCost = results.reduce((sum, r) => sum + r.cost, 0);
+        return {
+          resultUrl: candidates[0],
+          candidates,
+          cost: totalCost,
+        };
       }
 
       return await runStep(
@@ -1726,6 +1815,7 @@ export default function LingeriePipelinePage() {
           status: "done",
           resultUrl: result.resultUrl,
           cost_actual: result.cost,
+          candidates: result.candidates,
         });
 
         // Populate local map para que el próximo step pueda leer este resultUrl
@@ -2565,6 +2655,7 @@ export default function LingeriePipelinePage() {
                     onSkip={() => dispatchAction(activeJob.id, step.id, "skip")}
                     onRerun={() => dispatchAction(activeJob.id, step.id, "rerun")}
                     onStop={() => stopStep(activeJob.id, step.id)}
+                    onSelectCandidate={(url) => updateStep(activeJob.id, step.id, { resultUrl: url })}
                     autoMode={autoMode}
                   />
                 );
