@@ -119,12 +119,21 @@ Research de 8 herramientas (FASHN, Botika, Pebblely, Flair, ZMO, Pixelcut, Photo
 
 ### Plan P0 (shipping en esta sesión)
 
-| # | Feature | Impacto |
-|---|---|---|
-| P0-1 | `viewAngle` enum por foto + dropdown en cada card + auto-detect desde filename | Muy alto — desbloquea P0-2 |
-| P0-2 | Cuando existe foto tagged `espalda`, usar directo en step photoBack | **Máximo** — el pain #1 |
-| P0-3 | Stop button por step en curso (AbortController) | Muy alto |
-| P0-4 | Tooltip "i" por step con docs (proveedor, costo, duración, falla típica) | Alto |
+| # | Feature | Estado | Commit |
+|---|---|---|---|
+| P0-1 | `viewAngle` enum por foto + dropdown en cada card + auto-detect desde filename | ✅ Shipped | `43731d3` |
+| P0-2 | Cuando existe foto tagged `espalda`, usar directo en step photoBack | ✅ Shipped | `9844942` |
+| P0-3 | Stop button por step en curso (AbortController) | ✅ Shipped | `9844942` |
+| P0-4 | Tooltip "i" por step con docs (proveedor, costo, duración, falla típica) | ✅ Shipped | `93225a1` |
+
+**Cómo testear el P0 completo:**
+
+1. **Subí 2 fotos del mismo bra**: una frontal y una de espalda. Los nombres con "delante"/"patras"/"espalda"/"back" hacen el auto-detect. Si no matchea, usá el dropdown debajo de cada foto para corregir el ángulo.
+2. Fijate que aparezca el banner violeta: **"✓ Foto de espalda detectada — se va a usar como referencia real"**.
+3. Apretá **Iniciar Pipeline** y esperá a que llegue al paso "Foto Espalda".
+4. Cuando corra photoBack, el resultado debería usar la foto de espalda REAL como referencia (no inventar) → broche, banda y tirantes se preservan.
+5. En cualquier step en curso, probá el botón rojo **Detener**: cancela el request en vuelo y marca el paso como "Saltado — Detenido por la usuaria".
+6. En cualquier step, tocá el ícono **i** al lado del título: se despliega panel con qué hace, qué proveedor usa, costo, duración, fallas típicas y tips.
 
 ### P1 pendiente (siguiente sesión)
 
