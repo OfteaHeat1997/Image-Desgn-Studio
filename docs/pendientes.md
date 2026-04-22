@@ -151,10 +151,18 @@ Nuevo selector en setup con 3 opciones:
 - Fallback automático a modo default si no hay foto real para una vista
 - Toast info avisa cuando cae al fallback
 
+### Colorway matrix (shipped commit `1ddc69f`)
+
+- Detección de 15 colores desde filename (beige/negro/blanco/gris/verde/rojo/rosa/azul/morado/amarillo/naranja/marrón/dorado/plateado/turquesa) + sinónimos
+- Badge color swatch + nombre en cada foto
+- Resumen arriba de la grilla: "N productos detectados: REF X (M colores) · REF Y (P colores)"
+- Grilla ordenada por (REF, color) para visibilidad
+- sharedModelUrl ya se reusa entre jobs del mismo batch (legacy) → modelo IA se paga UNA vez por batch aunque haya 10 colores
+
 ### P1 pendiente (siguiente sesión)
 
+- Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura (requiere lift state por REF)
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
 - P1-1: Provider switcher (Kolors→FASHN→Kling) en retry
-- P1-2: Colorway matrix (1 REF × N colores = 1 job agrupado) — **el que más tiempo ahorra**
 - P1-3: Quality/Speed toggle por step (FASHN mode)
 - P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)
