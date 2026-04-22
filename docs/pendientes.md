@@ -135,8 +135,25 @@ Research de 8 herramientas (FASHN, Botika, Pebblely, Flair, ZMO, Pixelcut, Photo
 5. En cualquier step en curso, probá el botón rojo **Detener**: cancela el request en vuelo y marca el paso como "Saltado — Detenido por la usuaria".
 6. En cualquier step, tocá el ícono **i** al lado del título: se despliega panel con qué hace, qué proveedor usa, costo, duración, fallas típicas y tips.
 
+### Modo de Generación (shipped commit `1a95065`)
+
+Nuevo selector en setup con 3 opciones:
+
+| Modo | Cuándo usarlo | Costo | Shipped |
+|---|---|---|---|
+| **Modelo IA + Try-on** (default) | Seguro, legalmente limpio, funciona sin fotos extra | ~$0.15/producto | ✅ |
+| **Cambiar cara sobre foto real** (face-swap) | Cuando la usuaria tiene fotos reales del producto con modelo y quiere producto 100% idéntico, cambiando solo la cara por IA | ~$0.01/producto | ✅ |
+| **4 variantes — elegí la mejor** (multi-sample) | Máximo control, elegís entre 4 candidatos | ~$0.30/producto | ⏳ Deferido — necesita UX grid de 4 thumbs y confirmar variación en Kolors |
+
+**Face-swap details:**
+- Nueva ruta `/api/face-swap` con `cdingram/face-swap` (Replicate)
+- Se aplica en tryon/photoBack/photoFullBody cuando existe foto real con ángulo tagged
+- Fallback automático a modo default si no hay foto real para una vista
+- Toast info avisa cuando cae al fallback
+
 ### P1 pendiente (siguiente sesión)
 
+- **Multi-sample** (modo 3 ya tiene UI del selector pero el handler todavía cae a default) — grid de 4 thumbnails, picker, paralelizar calls
 - P1-1: Provider switcher (Kolors→FASHN→Kling) en retry
 - P1-2: Colorway matrix (1 REF × N colores = 1 job agrupado)
 - P1-3: Quality/Speed toggle por step

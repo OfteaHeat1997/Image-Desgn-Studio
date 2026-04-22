@@ -151,7 +151,7 @@ interface ImageJob {
  */
 type GenerationMode = "default" | "face-swap" | "multi-sample";
 
-const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: string; cost: string }[] = [
+const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: string; cost: string; disabled?: boolean; disabledReason?: string }[] = [
   {
     value: "default",
     label: "Modelo IA + Try-on (clásico)",
@@ -169,6 +169,8 @@ const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: str
     label: "4 variantes — elegí la mejor",
     desc: "En cada vista, la IA genera 4 opciones y vos elegís la más fiel a tu producto. Más caro pero control total.",
     cost: "~$0.30 / producto",
+    disabled: true,
+    disabledReason: "Próximamente — necesita UI de picker 4 thumbnails optimizada para mobile.",
   },
 ];
 
@@ -2266,28 +2268,43 @@ export default function LingeriePipelinePage() {
                 <div className="space-y-2">
                   {GENERATION_MODE_OPTIONS.map((opt) => {
                     const selected = generationMode === opt.value;
+                    const isDisabled = !!opt.disabled;
                     return (
                       <button
                         key={opt.value}
                         type="button"
-                        onClick={() => setGenerationMode(opt.value)}
+                        disabled={isDisabled}
+                        onClick={() => !isDisabled && setGenerationMode(opt.value)}
                         className={cn(
                           "flex w-full flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition-all",
-                          selected
+                          isDisabled && "cursor-not-allowed opacity-50",
+                          !isDisabled && selected
                             ? "border-violet-500/50 bg-violet-500/10"
-                            : "border-white/8 bg-white/[0.02] hover:border-white/20",
+                            : !isDisabled
+                            ? "border-white/8 bg-white/[0.02] hover:border-white/20"
+                            : "border-white/8 bg-white/[0.01]",
                         )}
                       >
                         <div className="flex w-full items-center justify-between">
-                          <span className={cn(
-                            "text-xs font-semibold",
-                            selected ? "text-violet-200" : "text-gray-300",
-                          )}>
-                            {opt.label}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(
+                              "text-xs font-semibold",
+                              selected ? "text-violet-200" : "text-gray-300",
+                            )}>
+                              {opt.label}
+                            </span>
+                            {isDisabled && (
+                              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+                                Próximamente
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] font-medium text-gray-500">{opt.cost}</span>
                         </div>
                         <p className="text-[10px] leading-snug text-gray-500">{opt.desc}</p>
+                        {isDisabled && opt.disabledReason && (
+                          <p className="text-[9px] italic leading-snug text-amber-400/70">{opt.disabledReason}</p>
+                        )}
                       </button>
                     );
                   })}
