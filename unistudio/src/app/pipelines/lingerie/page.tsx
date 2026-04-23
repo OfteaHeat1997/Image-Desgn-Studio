@@ -2295,9 +2295,12 @@ export default function LingeriePipelinePage() {
         // del paso. No es ideal pero evita que se pierda plata + el usuario
         // tenga que reintentar manualmente. Aviso por toast para transparencia.
         if (stepDef.id === "photoFullBody" || stepDef.id === "photoBack") {
+          // Usar el job original del snapshot (freshJob solo existe dentro del
+          // try block, acá estamos en el catch). Reconstruir para el matching.
+          const jobForMatching = { ...job, uploadedUrl, falUrl } as ImageJob;
           const fallback = stepDef.id === "photoBack"
-            ? findMatchingPhoto({ ...freshJob, uploadedUrl, falUrl }, jobsSnapshot, ["espalda"])
-            : findMatchingPhoto({ ...freshJob, uploadedUrl, falUrl }, jobsSnapshot, ["flat", "otra", "frontal"]);
+            ? findMatchingPhoto(jobForMatching, jobsSnapshot, ["espalda"])
+            : findMatchingPhoto(jobForMatching, jobsSnapshot, ["flat", "otra", "frontal"]);
           if (fallback?.uploadedUrl) {
             console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.file.name}" como resultado.`);
             toast.warning(
