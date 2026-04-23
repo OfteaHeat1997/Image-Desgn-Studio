@@ -1728,8 +1728,40 @@ async function runStep(
 export default function LingeriePipelinePage() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [referenceNumber, setReferenceNumber] = useState("");
-  const [productType, setProductType] = useState("bra");
-  const [modelConfig, setModelConfig] = useState<ModelConfig>({
+  // Inicializar referenceNumber desde localStorage (no se puede usar
+  // persistedSettings acá porque está declarado abajo). Lo seteo al mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("lingerie:pipeline:settings:v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.referenceNumber) setReferenceNumber(parsed.referenceNumber);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  // Persistencia: cargar settings del último uso desde localStorage. Las fotos
+  // (jobs) NO se persisten porque los File objects no serializan; solo lo que
+  // la usuaria configuró (modo, calidad, tipo, REF, modelo). Si refrescás la
+  // página, no perdés tus preferencias — solo las fotos hay que re-subir.
+  const PERSIST_KEY = "lingerie:pipeline:settings:v1";
+  const persistedSettings = (() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(PERSIST_KEY);
+      return raw ? JSON.parse(raw) as Partial<{
+        productType: string;
+        modelConfig: ModelConfig;
+        autoMode: boolean;
+        generationMode: GenerationMode;
+        fashnMode: FashnMode;
+        referenceNumber: string;
+      }> : null;
+    } catch { return null; }
+  })();
+
+  const [productType, setProductType] = useState(persistedSettings?.productType ?? "bra");
+  const [modelConfig, setModelConfig] = useState<ModelConfig>(persistedSettings?.modelConfig ?? {
     gender: "female",
     skinTone: "medium",
     bodyType: "curvy",
@@ -1738,13 +1770,13 @@ export default function LingeriePipelinePage() {
   const [steps, setSteps] = useState<PipelineStep[]>(makeSteps());
   const [jobs, setJobs] = useState<ImageJob[]>([]);
   const [activeJobIndex, setActiveJobIndex] = useState(0);
-  const [autoMode, setAutoMode] = useState(true);
+  const [autoMode, setAutoMode] = useState(persistedSettings?.autoMode ?? true);
   // Phase 2f: modo de generación elegible (default / face-swap / multi-sample).
   // default = el flow legacy (model-create + tryon Kolors).
-  const [generationMode, setGenerationMode] = useState<GenerationMode>("default");
+  const [generationMode, setGenerationMode] = useState<GenerationMode>(persistedSettings?.generationMode ?? "default");
   // P1-3: calidad FASHN — solo aplica cuando tryon usa FASHN (override manual
   // o flow non-lencería). Kolors e IDM-VTON lo ignoran.
-  const [fashnMode, setFashnMode] = useState<FashnMode>("balanced");
+  const [fashnMode, setFashnMode] = useState<FashnMode>(persistedSettings?.fashnMode ?? "balanced");
   const [sharedModelUrl, setSharedModelUrl] = useState<string | undefined>();
   // Seed compartido entre poses: photoBack + photoFullBody lo reusan para que
   // SeedDream genere la MISMA modelo (mismo rostro + cuerpo + piel) en distinta
@@ -1798,6 +1830,25 @@ export default function LingeriePipelinePage() {
   useEffect(() => {
     return () => previewUrlsRef.current.forEach(URL.revokeObjectURL);
   }, []);
+
+  // Persistencia: guardar settings cada vez que cambian. Debounce 400ms para
+  // no spamear localStorage en cada keystroke del referenceNumber.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const timer = setTimeout(() => {
+      try {
+        window.localStorage.setItem("lingerie:pipeline:settings:v1", JSON.stringify({
+          productType,
+          modelConfig,
+          autoMode,
+          generationMode,
+          fashnMode,
+          referenceNumber,
+        }));
+      } catch { /* localStorage quota o disabled — silently ignore */ }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [productType, modelConfig, autoMode, generationMode, fashnMode, referenceNumber]);
 
   // Read URL params on mount — inventory auto-mode redirects with ?productType=bra|panty
   useEffect(() => {
