@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniStudio — Testing Checklist</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#111;color:#eee;padding:16px;max-width:800px;margin:0 auto;line-height:1.5}
+h1{font-size:1.4em;margin-bottom:4px;color:#c4b5fd}
+h2{font-size:1.1em;margin:20px 0 8px;color:#a78bfa;border-bottom:1px solid #333;padding-bottom:4px}
+h3{font-size:.95em;margin:12px 0 4px;color:#818cf8}
+.date{font-size:.75em;color:#666;margin-bottom:16px}
+.section{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:12px;margin-bottom:12px}
+label{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #222;font-size:.85em;cursor:pointer;align-items:flex-start}
+label:last-child{border-bottom:none}
+input[type=checkbox]{width:18px;height:18px;accent-color:#7c3aed;flex-shrink:0;margin-top:2px}
+.checked{text-decoration:line-through;color:#555}
+.tag{display:inline-block;font-size:.65em;padding:1px 6px;border-radius:4px;margin-left:4px;font-weight:700;vertical-align:middle}
+.new{background:#7c3aed33;color:#c4b5fd}
+.fix{background:#f59e0b33;color:#fbbf24}
+.critical{background:#ef444433;color:#f87171}
+.info{color:#888;font-size:.78em;margin:4px 0 0 26px}
+.cost{color:#666;font-size:.75em}
+.summary{background:#7c3aed15;border:1px solid #7c3aed40;border-radius:8px;padding:12px;margin:16px 0}
+.summary b{color:#c4b5fd}
+</style>
+</head>
+<body>
+
+<h1>Testing Checklist — Pipeline Lencería</h1>
+<p class="date">Generado: 2026-04-23 · Sesión: 30+ commits</p>
+
+<div class="summary">
+<b>URL:</b> <a href="https://unistudio.vercel.app/pipelines/lingerie" style="color:#a78bfa">unistudio.vercel.app/pipelines/lingerie</a><br>
+<b>Qué testear:</b> 6 secciones abajo. Marcar cada checkbox cuando pase. Si falla, screenshot + mandar a Maria.<br>
+<b>Tiempo estimado:</b> ~20 min para todo (sin correr pipeline completo, solo verificar UI)
+</div>
+
+<!-- ========== SECTION 1: SETUP ========== -->
+<h2>1. Setup — Subir fotos</h2>
+<div class="section">
+
+<label><input type="checkbox"> Arrastrá 2 fotos del mismo bra (frontal + espalda, ej "bh negro delante 011473.png" + "bh negro patras 011473.png")</label>
+<p class="info">Debe detectar automáticamente: badge "Frontal" en una, "Espalda" en la otra.</p>
+
+<label><input type="checkbox"> Verificá que aparece badge de COLOR en cada foto (ej "Negro" con punto negro) <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Verificá que aparece badge de REF si el nombre tiene número (ej "REF 011473" en violeta) <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Si hay foto de espalda, debe aparecer pill verde: "✓ Espalda real lista" <span class="tag fix">ARREGLADO</span></label>
+
+<label><input type="checkbox"> Si hay 2+ fotos del mismo REF, aparece resumen arriba: "1 producto detectado: REF 011473 (2 colores)" <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Cambiá el ángulo de una foto con el dropdown "Ángulo" debajo → el badge cambia al toque</label>
+
+<label><input type="checkbox"> Borrá una foto con la X → desaparece de la grilla</label>
+
+<label><input type="checkbox"> Apretá <b>Ctrl+Z</b> → la foto vuelve (undo) <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Apretá <b>Ctrl+Shift+Z</b> o <b>Ctrl+Y</b> → vuelve a borrada (redo) <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Tocá "Comenzar de nuevo" → confirma → grilla vacía, pero settings (modo, calidad) se mantienen <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Botón "Cargar inventario BH (20 REFs, 128 fotos)" → carga todas las fotos del servidor → toast muestra cuántas cargó <span class="tag new">NUEVO</span></label>
+<p class="info">Si falla: puede ser que la carpeta public/inventory/bras/ no esté en el deploy. Anotar error exacto.</p>
+
+</div>
+
+<!-- ========== SECTION 2: MODOS ========== -->
+<h2>2. Modos de generación</h2>
+<div class="section">
+
+<h3>2.1 Selector de modo</h3>
+<label><input type="checkbox"> Aparecen 3 cards en "Modo de Generación": Default / Face-swap (experimental) / 4 variantes <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> "4 variantes" está HABILITADA (sin badge "Próximamente") <span class="tag fix">ARREGLADO</span></label>
+
+<label><input type="checkbox"> "Face-swap" dice "(experimental)" y tiene warning sobre env var <span class="tag fix">ARREGLADO</span></label>
+
+<label><input type="checkbox"> Click en Default → queda seleccionada (borde violeta). Click en otra → cambia.</label>
+
+<h3>2.2 Calidad FASHN</h3>
+<label><input type="checkbox"> Sección "Calidad de Try-on (FASHN)" con 3 botones: Rápido (~5s) / Balanceado (~8s) / Alta calidad (~17s) <span class="tag new">NUEVO</span></label>
+<p class="info">Solo importa cuando usás FASHN (via provider switcher). Kolors default lo ignora.</p>
+
+<h3>2.3 Modo automático vs manual</h3>
+<label><input type="checkbox"> Toggle Automático / Manual funciona — seleccionado se ve con borde violeta</label>
+
+</div>
+
+<!-- ========== SECTION 3: PIPELINE RUN ========== -->
+<h2>3. Pipeline en ejecución</h2>
+<div class="section">
+
+<h3>3.1 Ficha técnica (Claude Vision)</h3>
+<label><input type="checkbox"> Al iniciar pipeline, aparece panel violeta "Entendiendo el producto…" <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Después de 3-10s, aparece ficha editable: Color, Tela, Textura, Tipo, Copa, Tirantes, etc.</label>
+<label><input type="checkbox"> Podés editar cualquier campo de la ficha — los cambios se guardan</label>
+
+<h3>3.2 Progress bar</h3>
+<label><input type="checkbox"> En el header del job activo: barra violeta que avanza + "3/7 · $0.15 / ~$0.35" <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Al completar: barra se pone verde</label>
+
+<h3>3.3 Step cards — tooltip info</h3>
+<label><input type="checkbox"> Cada step tiene ícono <b>ⓘ</b> al lado del título <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Click en ⓘ → despliega panel: Qué hace / Proveedor / Duración / Costo / Fallas / Tips</label>
+<label><input type="checkbox"> Click de nuevo en ⓘ → cierra el panel</label>
+
+<h3>3.4 Botón Detener</h3>
+<label><input type="checkbox"> Cuando un step está "Procesando", aparece botón rojo "Detener" <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Click Detener → step marcado "Saltado — Detenido por la usuaria" → pipeline para</label>
+
+<h3>3.5 Botones por step (modo manual)</h3>
+<label><input type="checkbox"> Step completado muestra: Saltar / <b>Descargar</b> / Rehacer / Aceptar y continuar <span class="tag new">Descargar es NUEVO</span></label>
+<label><input type="checkbox"> "Descargar" baja la imagen directo (sin lightbox)</label>
+
+<h3>3.6 Provider switcher en retry</h3>
+<label><input type="checkbox"> Cuando un step falla (tryon/photoBack/photoFullBody): aparece dropdown "Proveedor" con Auto/Kolors/FASHN/IDM-VTON <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Al elegir FASHN: botón cambia a "Reintentar con FASHN v1.6"</label>
+
+<h3>3.7 Smart fallback</h3>
+<label><input type="checkbox"> Si "Foto Cuerpo Completo" falla Y subiste frontal: toast warning "usamos tu foto real en su lugar" + paso queda verde <span class="tag new">NUEVO</span></label>
+<p class="info">Antes salía error rojo y se perdía la plata. Ahora se recicla la foto real.</p>
+
+<h3>3.8 Multi-sample (modo "4 variantes")</h3>
+<label><input type="checkbox"> Seleccionar modo "4 variantes — elegí la mejor" en setup</label>
+<label><input type="checkbox"> En Foto Espalda o Cuerpo Completo: aparece grid 2×2 con 4 variantes <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Cada variante numerada (1, 2, 3, 4). La seleccionada tiene ring violeta + check.</label>
+<label><input type="checkbox"> Click en una variante → abre lightbox grande (no solo selecciona)</label>
+
+</div>
+
+<!-- ========== SECTION 4: LIGHTBOX ========== -->
+<h2>4. Lightbox (ver grande + descargar)</h2>
+<div class="section">
+
+<label><input type="checkbox"> Click en cualquier resultado de step → se abre modal full-screen <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Botón "Descargar" arriba a la derecha — baja la imagen</label>
+<label><input type="checkbox"> Botón X o tecla ESC → cierra</label>
+<label><input type="checkbox"> Click en el fondo oscuro → cierra</label>
+
+<h3>4.1 Multi-sample en lightbox</h3>
+<label><input type="checkbox"> Si hay 4 variantes: flechas ← → para navegar + thumbnails al pie + contador "2/4" <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Botón "Usar variante 2" abajo → selecciona esa + cierra</label>
+
+<h3>4.2 Comparar con original</h3>
+<label><input type="checkbox"> Botón "Comparar con original" arriba → split 50/50: Original a la izquierda, Resultado a la derecha <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Tecla C alterna entre vista normal y comparación</label>
+<label><input type="checkbox"> Labels "ORIGINAL" y "RESULTADO" visibles en cada lado</label>
+
+</div>
+
+<!-- ========== SECTION 5: PERSISTENCIA ========== -->
+<h2>5. Persistencia (refresh)</h2>
+<div class="section">
+
+<label><input type="checkbox"> Configurá todo: modo generación, calidad FASHN, REF number, tipo producto, modelConfig → refrescá la página → todo sigue igual <span class="tag new">NUEVO</span></label>
+
+<label><input type="checkbox"> Subí fotos + corrí el pipeline parcialmente → refrescá → las fotos y resultados aparecen <span class="tag new">NUEVO</span></label>
+<p class="info">OJO: las fotos restauradas NO se pueden re-analizar con Claude Vision (el File original se pierde). El pipeline sí puede re-correr si ya tienen uploadedUrl.</p>
+
+<label><input type="checkbox"> Después de procesar, andá a <b>/gallery</b> → los resultados aparecen ahí con nombre: "bh-negro-011473-photoBack.jpg" <span class="tag new">NUEVO</span></label>
+
+</div>
+
+<!-- ========== SECTION 6: COMPLETION ========== -->
+<h2>6. Completado</h2>
+<div class="section">
+
+<label><input type="checkbox"> Al terminar job: card verde "Imagen procesada" + costo total</label>
+
+<label><input type="checkbox"> Botón violeta "Descargar todos" → baja todas las imágenes/videos del job <span class="tag new">NUEVO</span></label>
+<p class="info">Dispara 1 download por step con 200ms de delay. Si el browser bloquea popups, permitir.</p>
+
+<label><input type="checkbox"> Si hay más jobs: "Siguiente imagen" button navega al próximo</label>
+
+</div>
+
+<!-- ========== SECTION 7: INVENTARIO ========== -->
+<h2>7. Inventario (nuevo)</h2>
+<div class="section">
+
+<label><input type="checkbox"> Botón "Cargar inventario BH" aparece debajo del upload zone <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Click → spinner "Cargando…" + toast con count → grilla se llena con fotos del servidor <span class="tag new">NUEVO</span></label>
+<label><input type="checkbox"> Las fotos aparecen agrupadas por REF + ordenadas por (REF, color)</label>
+<label><input type="checkbox"> Cada foto tiene badges de ángulo + color + REF auto-detectados</label>
+<p class="info">Requiere que public/inventory/bras/ tenga las fotos. Si el endpoint falla, verificar que el deploy incluyó la carpeta.</p>
+
+</div>
+
+<!-- ========== SECTION 8: ERRORES CONOCIDOS ========== -->
+<h2>8. Errores conocidos / limitaciones</h2>
+<div class="section" style="border-color:#f59e0b40">
+
+<label><input type="checkbox"> Face-swap modo: probablemente falla con "modelo no disponible" hasta que se configure env var FACE_SWAP_MODEL en Vercel <span class="tag critical">CONOCIDO</span></label>
+
+<label><input type="checkbox"> Thumbnails del picker de modelos: si una URL de fal.ai expiró, muestra fallback checkerboard (no es bug — es URL expirada)</label>
+
+<label><input type="checkbox"> "Failed to fetch" en mobile: debe mostrar en español "Error de conexión. Revisá tu internet y reintentá." <span class="tag fix">ARREGLADO</span></label>
+
+<label><input type="checkbox"> Foto Cuerpo Completo: ya NO debería generar pantalones marrones (el prompt de background fue limpiado) <span class="tag fix">ARREGLADO</span></label>
+
+</div>
+
+<p style="margin-top:24px;text-align:center;color:#555;font-size:.75em">
+Generado automáticamente por Claude Code · sesión 013kd8Ny7y4ziGm1ZATCfDd6
+</p>
+
+</body>
+</html>
