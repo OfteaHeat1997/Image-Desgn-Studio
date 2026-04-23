@@ -59,9 +59,11 @@ export async function POST(request: NextRequest) {
     } catch (falErr) {
       console.warn('[face-swap] fal.ai falló:', falErr instanceof Error ? falErr.message : falErr);
 
-      // Provider 2: Replicate — fallback. Necesita FACE_SWAP_MODEL env o
-      // el default 'cdingram/face-swap' (sin hash, puede fallar en community models).
-      const replicateModel = process.env.FACE_SWAP_MODEL?.trim() || 'cdingram/face-swap';
+      // Provider 2: Replicate — fallback. Hash verificado de cdingram/face-swap
+      // (2.1M+ runs, ~$0.014/run, ~11s). Params: input_image + swap_image.
+      // Override posible via env FACE_SWAP_MODEL.
+      const replicateModel = process.env.FACE_SWAP_MODEL?.trim()
+        || 'cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111';
       try {
         console.log(`[face-swap] intentando Replicate (${replicateModel})...`);
         const output = await runModel(replicateModel, {
