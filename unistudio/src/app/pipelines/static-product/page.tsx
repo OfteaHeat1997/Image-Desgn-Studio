@@ -15,6 +15,8 @@ import {
   Wand2,
   FolderOpen,
   RefreshCw,
+  RotateCw,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -253,6 +255,10 @@ export default function StaticProductPipelinePage() {
   const [batchLoadingId, setBatchLoadingId] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+
+  // Gap 5 — Per-step approval: modal para cambiar el prompt del fondo
+  const [bgPromptModal, setBgPromptModal] = useState<{ job: Job; customPrompt: string } | null>(null);
+  const [reRunningJobId, setReRunningJobId] = useState<string | null>(null);
 
   // Read URL params from auto-mode redirect (e.g., ?productType=perfume)
   useEffect(() => {
@@ -548,6 +554,168 @@ export default function StaticProductPipelinePage() {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(job.id, { status: "error", error: message });
       toast.error(`Error en ${job.file.name}: ${message}`);
+    }
+  };
+
+  /**
+   * Gap 5 — re-ejecutar el step de fondo con un prompt custom (o el de la
+   * matriz si no se pasa override) + cadena completa hacia abajo (shadow + finish).
+   * Usa el resultado de "normalize" como input de bg. Seed sigue siendo el
+   * estable por (tipo, marca) salvo que `overrideSeed` se pase.
+   */
+  const reRunBgAndBelow = async (
+    jobId: string,
+    overridePrompt?: string,
+    overrideSeed?: number,
+  ) => {
+    if (isRunning || reRunningJobId) return;
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    const inputUrl = job.steps.normalize.resultUrl || job.steps.isolate.resultUrl;
+    if (!inputUrl) {
+      toast.error("No hay imagen disponible desde el paso previo. Procesa el job completo primero.");
+      return;
+    }
+    const config = getAdaptiveBgConfig(job.productType, job.brand);
+    const finalPrompt = overridePrompt?.trim() || config.prompt;
+    const finalSeed = overrideSeed ?? config.seed;
+    setReRunningJobId(jobId);
+    // Resetear los 3 steps de abajo
+    updateStep(jobId, "bg", { status: "running", resultUrl: undefined, cost: 0, error: undefined });
+    updateStep(jobId, "shadow", { status: "idle", resultUrl: undefined, cost: 0, error: undefined });
+    updateStep(jobId, "finish", { status: "idle", resultUrl: undefined, cost: 0, error: undefined });
+    updateJob(jobId, { status: "generating-bg", error: undefined });
+
+    let currentUrl = inputUrl;
+    let addedCost = 0;
+    try {
+      // BG
+      const genRes = await fetch("/api/bg-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: currentUrl,
+          mode: config.bgMode,
+          style: "custom",
+          customPrompt: finalPrompt,
+          aspectRatio: "1:1",
+          seed: finalSeed,
+        }),
+      });
+      const genData = await safeJson(genRes);
+      if (!genData.success) {
+        updateStep(jobId, "bg", { status: "error", error: genData.error || "Falló generar fondo" });
+        throw new Error(genData.error || "Background generation failed");
+      }
+      currentUrl = genData.data.url || genData.data.imageUrl;
+      const bgCost = genData.cost ?? (config.bgMode === "precise" ? 0.05 : 0.003);
+      addedCost += bgCost;
+      updateStep(jobId, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost });
+
+      // Shadow
+      updateJob(jobId, { status: "shadowing" });
+      updateStep(jobId, "shadow", { status: "running" });
+      const shRes = await fetch("/api/shadows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: currentUrl, type: config.shadowType }),
+      });
+      const shData = await safeJson(shRes);
+      if (shData.success) {
+        currentUrl = shData.data.url || shData.data.imageUrl || currentUrl;
+        const shCost = shData.cost ?? 0;
+        addedCost += shCost;
+        updateStep(jobId, "shadow", { status: "done", resultUrl: currentUrl, cost: shCost });
+      } else {
+        updateStep(jobId, "shadow", { status: "skipped", error: shData.error });
+      }
+
+      // Finish
+      updateJob(jobId, { status: "finishing" });
+      updateStep(jobId, "finish", { status: "running" });
+      const finRes = await fetch("/api/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: currentUrl, preset: "product-clean" }),
+      });
+      const finData = await safeJson(finRes);
+      if (finData.success) {
+        currentUrl = finData.data.url || finData.data.imageUrl || currentUrl;
+        updateStep(jobId, "finish", { status: "done", resultUrl: currentUrl, cost: 0 });
+      } else {
+        updateStep(jobId, "finish", { status: "skipped", error: finData.error });
+      }
+
+      updateJob(jobId, {
+        status: "done",
+        resultUrl: currentUrl,
+        cost: job.cost + addedCost,
+      });
+      toast.success(`Fondo re-generado para ${job.file.name}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      updateJob(jobId, { status: "error", error: message });
+      toast.error(`Error re-ejecutando ${job.file.name}: ${message}`);
+    } finally {
+      setReRunningJobId(null);
+    }
+  };
+
+  /**
+   * Gap 5 — re-ejecutar solo el step de sombra + finish. Útil cuando el fondo
+   * está bien pero la sombra quedó muy dura o muy suave.
+   */
+  const reRunShadowAndBelow = async (jobId: string) => {
+    if (isRunning || reRunningJobId) return;
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    const inputUrl = job.steps.bg.resultUrl;
+    if (!inputUrl) {
+      toast.error("No hay resultado del fondo todavía.");
+      return;
+    }
+    const config = getAdaptiveBgConfig(job.productType, job.brand);
+    setReRunningJobId(jobId);
+    updateStep(jobId, "shadow", { status: "running", resultUrl: undefined, cost: 0, error: undefined });
+    updateStep(jobId, "finish", { status: "idle", resultUrl: undefined, cost: 0, error: undefined });
+    updateJob(jobId, { status: "shadowing", error: undefined });
+
+    let currentUrl = inputUrl;
+    try {
+      const shRes = await fetch("/api/shadows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: currentUrl, type: config.shadowType }),
+      });
+      const shData = await safeJson(shRes);
+      if (shData.success) {
+        currentUrl = shData.data.url || shData.data.imageUrl || currentUrl;
+        updateStep(jobId, "shadow", { status: "done", resultUrl: currentUrl, cost: 0 });
+      } else {
+        updateStep(jobId, "shadow", { status: "skipped", error: shData.error });
+      }
+      updateJob(jobId, { status: "finishing" });
+      updateStep(jobId, "finish", { status: "running" });
+      const finRes = await fetch("/api/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: currentUrl, preset: "product-clean" }),
+      });
+      const finData = await safeJson(finRes);
+      if (finData.success) {
+        currentUrl = finData.data.url || finData.data.imageUrl || currentUrl;
+        updateStep(jobId, "finish", { status: "done", resultUrl: currentUrl, cost: 0 });
+      } else {
+        updateStep(jobId, "finish", { status: "skipped", error: finData.error });
+      }
+      updateJob(jobId, { status: "done", resultUrl: currentUrl });
+      toast.success(`Sombra re-generada para ${job.file.name}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      updateJob(jobId, { status: "error", error: message });
+      toast.error(`Error: ${message}`);
+    } finally {
+      setReRunningJobId(null);
     }
   };
 
@@ -873,6 +1041,52 @@ export default function StaticProductPipelinePage() {
                                   <span className="font-mono text-[9px] text-violet-300">${step.cost.toFixed(3)}</span>
                                 )}
                               </div>
+
+                              {/* Gap 5 — per-step approval: botones Re-ejecutar / Cambiar fondo
+                                  visibles solo cuando el job está done o error y ningún re-run en curso */}
+                              {(job.status === "done" || job.status === "error") &&
+                                !isRunning &&
+                                reRunningJobId !== job.id && (
+                                  <div className="mt-1 flex items-center justify-end gap-1">
+                                    {key === "bg" && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setBgPromptModal({ job, customPrompt: getAdaptiveBgConfig(job.productType, job.brand).prompt });
+                                        }}
+                                        className="flex items-center gap-0.5 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium text-violet-300 transition hover:bg-violet-500/25"
+                                        title="Cambiar prompt del fondo y re-generar"
+                                      >
+                                        <Palette className="h-2.5 w-2.5" />
+                                        Cambiar
+                                      </button>
+                                    )}
+                                    {(key === "bg" || key === "shadow") && step.resultUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (key === "bg") reRunBgAndBelow(job.id);
+                                          else reRunShadowAndBelow(job.id);
+                                        }}
+                                        className="flex items-center gap-0.5 rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-medium text-gray-300 transition hover:bg-white/10"
+                                        title={`Re-ejecutar ${meta.label.toLowerCase()} con los mismos parámetros`}
+                                      >
+                                        <RotateCw className="h-2.5 w-2.5" />
+                                        Re-ejecutar
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                              {/* Indicador de re-run en curso */}
+                              {reRunningJobId === job.id && step.status === "running" && (
+                                <div className="mt-1 flex items-center justify-end text-[9px] text-amber-300">
+                                  <Loader2 className="mr-0.5 h-2.5 w-2.5 animate-spin" />
+                                  re-ejecutando
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -911,6 +1125,91 @@ export default function StaticProductPipelinePage() {
           </div>
         )}
       </div>
+
+      {/* Gap 5 — modal para cambiar el prompt del fondo y re-generar */}
+      {bgPromptModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setBgPromptModal(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-white/10 bg-zinc-900 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Palette className="h-4 w-4 text-violet-400" />
+                Cambiar fondo
+              </h3>
+              <button
+                onClick={() => setBgPromptModal(null)}
+                className="text-gray-500 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mb-2 text-xs text-gray-400">
+              {bgPromptModal.job.file.name} — {PRODUCT_TYPE_LABELS[bgPromptModal.job.productType]} / {BRAND_LABELS[bgPromptModal.job.brand]}
+            </p>
+
+            <div className="mb-2 flex flex-wrap gap-1">
+              {(["perfume", "cream", "sunscreen", "deodorant", "facial", "makeup"] as StaticProductType[]).map((pt) => {
+                const altConfig = getAdaptiveBgConfig(pt, bgPromptModal.job.brand);
+                const isCurrent = altConfig.prompt === bgPromptModal.customPrompt;
+                return (
+                  <button
+                    key={pt}
+                    type="button"
+                    onClick={() => setBgPromptModal({ ...bgPromptModal, customPrompt: altConfig.prompt })}
+                    className={cn(
+                      "rounded border px-2 py-1 text-[10px] transition",
+                      isCurrent
+                        ? "border-violet-400 bg-violet-500/20 text-violet-200"
+                        : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20 hover:text-white",
+                    )}
+                    title={altConfig.prompt.slice(0, 100) + "..."}
+                  >
+                    {altConfig.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <label className="mb-1 block text-xs text-gray-400">
+              Prompt del fondo (editable)
+            </label>
+            <textarea
+              value={bgPromptModal.customPrompt}
+              onChange={(e) => setBgPromptModal({ ...bgPromptModal, customPrompt: e.target.value })}
+              className="mb-3 h-32 w-full rounded border border-white/10 bg-black/40 p-2 text-xs text-gray-200"
+              placeholder="Describe el fondo deseado..."
+            />
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setBgPromptModal(null)}
+                className="rounded border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-gray-300 hover:border-white/20"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const modalJob = bgPromptModal.job;
+                  const prompt = bgPromptModal.customPrompt;
+                  setBgPromptModal(null);
+                  reRunBgAndBelow(modalJob.id, prompt);
+                }}
+                disabled={!bgPromptModal.customPrompt.trim()}
+                className="inline-flex items-center gap-1.5 rounded bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-400 disabled:opacity-50"
+              >
+                <RotateCw className="h-3 w-3" />
+                Re-generar fondo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

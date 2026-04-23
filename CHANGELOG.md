@@ -1,5 +1,38 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C5) — Gap 5 del audit: UI per-step con approval en Estáticos
+
+Quinto commit del plan. Da control de calidad al usuario después de que un job termina: puede re-ejecutar solo el step de fondo (con prompt custom o alternativa de la matriz) o solo el step de sombra, sin tener que re-subir la foto ni re-correr los 5 steps desde arriba.
+
+### Cambios
+
+**`unistudio/src/app/pipelines/static-product/page.tsx`**
+- Nuevo estado: `bgPromptModal` (para el modal de cambiar fondo), `reRunningJobId` (guard contra re-runs simultáneos).
+- Nueva función `reRunBgAndBelow(jobId, overridePrompt?, overrideSeed?)`: toma el output de "normalize" (o "isolate" como fallback) como input de `/api/bg-generate`, corre bg + shadow + finish en cadena con el mismo seed estable (Gap 2). Si `overridePrompt` se pasa, se usa en lugar del de la matriz.
+- Nueva función `reRunShadowAndBelow(jobId)`: toma el output de "bg" y corre shadow + finish. Útil cuando el fondo está bien pero la sombra quedó mal.
+- UI nueva: botones **"↻ Re-ejecutar"** y **"🎨 Cambiar"** en cada tarjeta del step timeline, visibles solo cuando el job terminó (done/error) y no hay otro re-run en curso. El botón Cambiar solo en el step bg, Re-ejecutar en bg + shadow.
+- Modal nuevo para Cambiar fondo: lista las 6 alternativas de la matriz por productType (perfume/cream/sunscreen/deodorant/facial/makeup × brand actual), permite elegir preset o editar el prompt manualmente en textarea. Al darle "Re-generar fondo", llama `reRunBgAndBelow` con el prompt custom.
+- Indicador de "re-ejecutando" mientras un step corre por segunda vez.
+
+### Efecto
+Flow de revisión de catálogo:
+```
+32 cremas procesadas en batch
+  → usuario revisa grid
+  → CRM-007 Hidratante Bronze quedó con fondo mal ajustado
+  → click "🎨 Cambiar" en el step bg de ese job
+  → modal abre con prompt de la matriz pre-cargado, 6 alternativas como chips
+  → elige "Beige cálido tipo spa" (la alt recomendada para Esika cremas)
+  → re-genera bg + shadow + finish en ~12s
+  → job actualizado sin tocar los demás 31
+```
+Sin esto, corregir una sola foto obligaba a re-procesar todo desde upload.
+
+### No toca
+- Pipeline Lencería (otra sesión trabajando ahí).
+- `processJob` principal (lógica inicial intacta).
+- Módulos bg-generate / shadows / enhance.
+
 ## 2026-04-23 (C4) — Gap 1 del audit: Batch desde folder en Pipeline Estáticos
 
 Cuarto commit del plan. Habilita procesar 32 cremas / 27 desodorantes / 10 bloqueadores / 2 limpieza-facial en un solo click — sin tener que arrastrar fotos una por una. Consume el `/api/inventory/scan` de C3 + el `/api/inventory/load` extendido.
