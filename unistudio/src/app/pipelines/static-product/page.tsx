@@ -25,6 +25,7 @@ import {
   type StaticProductType,
   type StaticBrand,
 } from "@/lib/pipelines/static-product";
+import { inferProductContextFromPath } from "@/lib/pipelines/folder-routing";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -203,21 +204,36 @@ export default function StaticProductPipelinePage() {
   const handleFiles = useCallback(
     (files: File[]) => {
       if (files.length === 0) return;
+      let ambiguousCount = 0;
       const newJobs: Job[] = files.map((file, i) => {
         const preview = URL.createObjectURL(file);
         previewUrlsRef.current.push(preview);
+
+        // Gap 4: antes de usar los defaults globales, inferir tipo/marca del filename
+        // o del webkitRelativePath (si viene de folder drag-drop). Previene que un
+        // DORSAY.jpg del folder /desodorantes/ se procese como perfume premium Esika.
+        const pathHint =
+          (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? file.name;
+        const inferred = inferProductContextFromPath(pathHint);
+        if (inferred.ambiguous) ambiguousCount += 1;
+
         return {
           id: `job-${Date.now()}-${i}`,
           file,
           previewUrl: preview,
-          productType: defaultType,
-          brand: defaultBrand,
+          productType: inferred.productType ?? defaultType,
+          brand: inferred.brand ?? defaultBrand,
           status: "idle",
           cost: 0,
           steps: { ...INITIAL_STEPS },
         };
       });
       setJobs((prev) => [...prev, ...newJobs]);
+      if (ambiguousCount > 0) {
+        toast.warning(
+          `${ambiguousCount} foto${ambiguousCount !== 1 ? "s" : ""} con nombre compartido entre perfumes y desodorantes — confirma el tipo antes de procesar.`,
+        );
+      }
     },
     [defaultType, defaultBrand],
   );

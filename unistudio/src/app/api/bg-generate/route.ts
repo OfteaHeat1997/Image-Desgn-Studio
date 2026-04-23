@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
       customPrompt,
       aspectRatio = '1:1',
       productDescription,
-      seed,
     } = body as {
       imageUrl?: string;
       mode: 'precise' | 'creative' | 'fast';
@@ -40,12 +39,6 @@ export async function POST(request: NextRequest) {
       customPrompt?: string;
       aspectRatio?: string;
       productDescription?: string;
-      /**
-       * Optional deterministic seed. Pipeline Estáticos lo usa para que todos
-       * los SKUs del mismo (productType, brand) compartan fondo idéntico.
-       * Forwarded to Flux models via runModel.
-       */
-      seed?: number;
     };
 
     if (!mode) {
@@ -92,7 +85,7 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        resultUrl = await generateBgPrecise(httpImageUrl, style, customPrompt, aspectRatio, seed);
+        resultUrl = await generateBgPrecise(httpImageUrl, style, customPrompt, aspectRatio);
         break;
       }
 
@@ -106,7 +99,7 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        resultUrl = await generateBgCreative(productDescription, style, customPrompt, aspectRatio, seed);
+        resultUrl = await generateBgCreative(productDescription, style, customPrompt, aspectRatio);
         break;
       }
 
@@ -114,7 +107,7 @@ export async function POST(request: NextRequest) {
         const preset = BACKGROUND_PRESETS[style];
         const prompt = customPrompt || preset?.prompt || style;
         // Pass httpImageUrl so the product is composited onto the generated background
-        resultUrl = await generateBgFast(prompt, aspectRatio, httpImageUrl, seed);
+        resultUrl = await generateBgFast(prompt, aspectRatio, httpImageUrl);
         break;
       }
 

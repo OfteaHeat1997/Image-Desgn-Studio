@@ -1,5 +1,27 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C2) — Gap 4 del audit: folder-routing helper + detección de ambigüedad
+
+Segundo commit del plan. Previene el bug histórico de imágenes compartidas entre categorías: `DORSAY.jpg`, `GAIA.jpg`, `OHM.jpg`, `OSADIA.jpg`, `ZENTRO.jpg` existen como perfumes Y como desodorantes. Sin este fix, la matriz defaulteaba a perfume premium (mármol Sephora) incluso cuando la foto venía del folder `/desodorantes/` donde el fondo correcto es gris neutro.
+
+### Cambios
+- **Nuevo:** `unistudio/src/lib/pipelines/folder-routing.ts` — función pura `inferProductContextFromPath(path)` con tres niveles de detección:
+  1. SKU pattern (`BLQ-004`, `COL-CY01`, `CRM-006`, `LF-LB01`, etc.) — highest confidence, determina tipo Y marca.
+  2. Folder pattern (`/desodorantes/`, `/cremas/`, `/bloqueador/`, `/limpieza-facial/`, `/perfumes/`, `/colonias/`, `/makeup/`) — segunda prioridad.
+  3. Brand keyword en filename (`yanbal`, `esika`, `l'bel`, `cyzone`, `avon`, `salome`).
+  Devuelve `{ productType?, brand?, ambiguous, reason }`. Flag `ambiguous:true` cuando el nombre coincide con los 5 nombres compartidos (DORSAY/GAIA/OHM/OSADIA/ZENTRO) y el folder no resuelve.
+- `unistudio/src/app/pipelines/static-product/page.tsx` — `handleFiles` ahora llama al helper por cada archivo, usa `webkitRelativePath` si viene de drag-drop de folder, cae al filename para uploads simples. Pre-completa los dropdowns per-job con lo inferido (ya no depende del default global para cada foto). Si hay N archivos ambiguos, muestra toast warning.
+- `docs/pipelines/static-product.md` — sección "Cómo decide el pipeline" actualizada con el nuevo paso folder-routing (antes de Claude Vision).
+- `docs/inventory-final/AUDIT_ESTATICOS.md` — Gap 4 marcado como HECHO.
+
+### Efecto concreto
+- Foto `DORSAY.jpg` en folder `/desodorantes/` → productType:deodorant automático → fondo gris neutro (NO mármol).
+- Foto `BLQ-004 Total Block Compact Beige Claro.png` → SKU pattern detecta sunscreen → fondo playa Coppertone.
+- Foto ambigua sin folder claro → warning al usuario, no se procesa silenciosamente mal.
+
+### Costo retrocompatible
+La función siempre devuelve un resultado (null-safe). Si no infiere nada, retorna `{ ambiguous:false, reason:'No match' }` y la UI cae al default del dropdown global — igual que antes.
+
 ## 2026-04-23 (C1) — Gap 2 del audit: seed estable por (productType, brand)
 
 Primer commit del plan de mejora del pipeline Estáticos. Implementa lo más barato de arreglar y lo de mayor impacto visual: **seeds deterministas** para que todos los SKUs del mismo `(productType, brand)` salgan con fondo idéntico (mármol, playa, gris, etc.). Sin esto, los 20 perfumes Yanbal generaban 20 mármoles distintos → catálogo incoherente.

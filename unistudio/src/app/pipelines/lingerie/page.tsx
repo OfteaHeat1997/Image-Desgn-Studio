@@ -33,7 +33,6 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
 import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
-import { useGalleryStore } from "@/stores/gallery-store";
 import type { ProductSpec } from "@/app/api/analyze-product/route";
 
 /* ------------------------------------------------------------------ */
@@ -139,18 +138,7 @@ function detectPhotoAngle(filename: string): PhotoAngle {
 
 interface ImageJob {
   id: string;
-  /**
-   * File object. Es null cuando el job fue restaurado desde localStorage
-   * (Files no serializan). Los jobs restaurados siguen siendo viewables
-   * porque tienen uploadedUrl, pero NO se pueden re-subir ni re-analizar
-   * Claude Vision sin re-agregar la foto.
-   */
-  file: File | null;
-  /**
-   * Nombre del archivo original. Se preserva aún cuando `file` es null
-   * (para mostrar en la UI). Cuando `file` existe, duplica `file.name`.
-   */
-  filename: string;
+  file: File;
   previewUrl: string;
   uploadedUrl?: string;
   falUrl?: string;
@@ -645,8 +633,6 @@ interface ImageLightboxProps {
   onClose: () => void;
   onSelect?: (url: string) => void;  // Si está, mostramos botón "Elegir esta"
   filenamePrefix?: string;    // ej "espalda-011473" → "espalda-011473-2.jpg"
-  /** URL de referencia (foto original / input del step) para modo comparación side-by-side */
-  compareWith?: string;
 }
 
 /**
@@ -655,25 +641,22 @@ interface ImageLightboxProps {
  * o tecla. Cada vista incluye botón Descargar y, si hay onSelect, botón
  * "Usar esta variante".
  */
-function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix, compareWith }: ImageLightboxProps) {
+function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix }: ImageLightboxProps) {
   const [idx, setIdx] = useState(Math.max(0, Math.min(startIndex, images.length - 1)));
-  const [compareMode, setCompareMode] = useState(false);
   const url = images[idx];
   const isVideo = url && (url.includes(".mp4") || url.includes(".webm"));
   const isSelected = url === selectedUrl;
-  const canCompare = !!compareWith && !isVideo;
 
-  // Cerrar con ESC, navegar con flechas, C para comparar
+  // Cerrar con ESC, navegar con flechas
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft" && images.length > 1) setIdx((i) => (i - 1 + images.length) % images.length);
       if (e.key === "ArrowRight" && images.length > 1) setIdx((i) => (i + 1) % images.length);
-      if ((e.key === "c" || e.key === "C") && compareWith && !isVideo) setCompareMode((c) => !c);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [images.length, onClose, compareWith, isVideo]);
+  }, [images.length, onClose]);
 
   // Lock body scroll mientras está abierto
   useEffect(() => {
@@ -717,22 +700,6 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
           )}
         </div>
         <div className="flex items-center gap-2">
-          {canCompare && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setCompareMode((c) => !c); }}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
-                compareMode
-                  ? "bg-violet-500 text-white hover:bg-violet-400"
-                  : "bg-white/10 text-white hover:bg-white/20",
-              )}
-              title="Comparar con la foto original (C)"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-              {compareMode ? "Solo resultado" : "Comparar con original"}
-            </button>
-          )}
           <a
             href={downloadHref}
             download={filename}
@@ -756,35 +723,9 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
         </div>
       </div>
 
-      {/* Imagen / video grande, centrada. En compareMode, mostramos split
-          50/50: original a la izquierda, resultado a la derecha. */}
+      {/* Imagen / video grande, centrada */}
       <div className="flex h-full w-full items-center justify-center px-4 py-16">
-        {compareMode && canCompare && compareWith ? (
-          <div className="flex h-full max-h-[80vh] w-full max-w-[95vw] items-center gap-2">
-            <div className="relative flex-1 h-full">
-              <img
-                src={compareWith}
-                alt="Original"
-                className="h-full w-full rounded-lg object-contain"
-                style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
-              />
-              <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                Original
-              </span>
-            </div>
-            <div className="relative flex-1 h-full">
-              <img
-                src={url}
-                alt="Resultado"
-                className="h-full w-full rounded-lg object-contain"
-                style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
-              />
-              <span className="absolute right-2 top-2 rounded-md bg-violet-500/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                Resultado
-              </span>
-            </div>
-          </div>
-        ) : isVideo ? (
+        {isVideo ? (
           <video
             src={url}
             controls
@@ -1164,7 +1105,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
           {/* Action buttons — only shown when done and in manual mode */}
           {canInteract && (
-            <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/6 pt-4">
+            <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/6 pt-4">
               <button
                 onClick={onSkip}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
@@ -1172,22 +1113,6 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 <SkipForward className="h-3.5 w-3.5" />
                 Saltar
               </button>
-              {/* Descargar directo sin abrir lightbox */}
-              {step.resultUrl && (
-                <a
-                  href={step.resultUrl.startsWith("/api/proxy-image")
-                    ? step.resultUrl
-                    : `/api/proxy-image?url=${encodeURIComponent(step.resultUrl)}`}
-                  download={`unistudio-${step.id}.${isVideo ? "mp4" : "jpg"}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
-                  title="Descargar esta imagen"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Descargar
-                </a>
-              )}
               <button
                 onClick={onRerun}
                 className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
@@ -1257,10 +1182,6 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           onClose={() => setLightboxIdx(null)}
           onSelect={onSelectCandidate}
           filenamePrefix={`unistudio-${step.id}`}
-          // Referencia para el modo comparación: el input del step (o el del
-          // chain), que es lo que se está transformando. Usuaria ve "antes vs
-          // después" side-by-side para evaluar fidelidad del producto.
-          compareWith={inputUrl}
         />
       )}
     </div>
@@ -1847,29 +1768,7 @@ export default function LingeriePipelinePage() {
     ageRange: "26-35",
   });
   const [steps, setSteps] = useState<PipelineStep[]>(makeSteps());
-  // Persistencia de jobs: se restauran al mount (sin `file`, usando
-  // uploadedUrl como previewUrl). Jobs restaurados son viewables y su
-  // pipeline puede re-correr si ya tienen uploadedUrl; lo único que no
-  // funciona sin file es analyze-product (Claude Vision).
-  const [jobs, setJobs] = useState<ImageJob[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = window.localStorage.getItem("lingerie:pipeline:jobs:v1");
-      if (!raw) return [];
-      const parsed = JSON.parse(raw) as Array<Omit<ImageJob, "file"> & { file?: never }>;
-      return parsed
-        .filter((j) => j.uploadedUrl)  // skip jobs sin upload (no servirían para nada)
-        .map((j) => ({
-          ...j,
-          file: null,
-          // Si previewUrl era blob (ya muerto) usar uploadedUrl como fallback
-          previewUrl: j.previewUrl?.startsWith("blob:") ? (j.uploadedUrl ?? "") : (j.previewUrl ?? j.uploadedUrl ?? ""),
-        }));
-    } catch (err) {
-      console.warn("[lingerie] failed to restore jobs:", err);
-      return [];
-    }
-  });
+  const [jobs, setJobs] = useState<ImageJob[]>([]);
   const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [autoMode, setAutoMode] = useState(persistedSettings?.autoMode ?? true);
   // Phase 2f: modo de generación elegible (default / face-swap / multi-sample).
@@ -1951,32 +1850,6 @@ export default function LingeriePipelinePage() {
     return () => clearTimeout(timer);
   }, [productType, modelConfig, autoMode, generationMode, fashnMode, referenceNumber]);
 
-  // Persistencia de jobs: guarda el array entero (sin `file`, que no
-  // serializa) cada vez que cambia. Debounce 800ms porque jobs cambia mucho
-  // durante el pipeline (cada status update). Máximo 20 jobs guardados para
-  // no saturar localStorage.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const timer = setTimeout(() => {
-      try {
-        const MAX_PERSISTED = 20;
-        const toPersist = jobs.slice(-MAX_PERSISTED).map((j) => {
-          // Omit `file` (File objects no serializan). Mantenemos todo lo demás.
-          // Previews blob: mantenemos el string tal cual; al restaurar se
-          // detecta y cae a uploadedUrl.
-          const { file: _file, ...rest } = j;
-          void _file;
-          return rest;
-        });
-        window.localStorage.setItem("lingerie:pipeline:jobs:v1", JSON.stringify(toPersist));
-      } catch {
-        // Quota excedido o disabled — silent. No molestar a la usuaria con
-        // un toast por cada write fallido.
-      }
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [jobs]);
-
   // Read URL params on mount — inventory auto-mode redirects with ?productType=bra|panty
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2020,57 +1893,13 @@ export default function LingeriePipelinePage() {
   }, [referenceNumber]);
 
   /* ---- Setup: add images ---- */
-  // Undo/Redo: stack de snapshots de jobs antes de cada acción destructiva.
-  // Solo se aplica en el setup phase — durante el pipeline run, setJobs cambia
-  // demasiado (cada status update) y un undo no tendría sentido semántico.
-  const historyRef = useRef<ImageJob[][]>([]);
-  const futureRef = useRef<ImageJob[][]>([]);
-  const MAX_HISTORY = 20;
-  const [historyVersion, setHistoryVersion] = useState(0);  // Para re-render de botones
-
-  /** Snapshot del estado actual de jobs antes de una acción destructiva.
-   *  Limpia el redo stack (futureRef) porque la nueva acción rompe el futuro. */
-  const pushHistory = useCallback(() => {
-    setJobs((prev) => {
-      historyRef.current.push(prev);
-      if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
-      futureRef.current = [];
-      setHistoryVersion((v) => v + 1);
-      return prev;
-    });
-  }, []);
-
-  const undoJobs = useCallback(() => {
-    if (historyRef.current.length === 0) return;
-    setJobs((prev) => {
-      futureRef.current.push(prev);
-      const last = historyRef.current.pop()!;
-      setHistoryVersion((v) => v + 1);
-      toast.info("Deshecho");
-      return last;
-    });
-  }, []);
-
-  const redoJobs = useCallback(() => {
-    if (futureRef.current.length === 0) return;
-    setJobs((prev) => {
-      historyRef.current.push(prev);
-      const next = futureRef.current.pop()!;
-      setHistoryVersion((v) => v + 1);
-      toast.info("Rehecho");
-      return next;
-    });
-  }, []);
-
   const handleFiles = useCallback((files: File[]) => {
-    pushHistory();
     const newJobs: ImageJob[] = files.map((file) => {
       const url = URL.createObjectURL(file);
       previewUrlsRef.current.push(url);
       return {
         id: `${Date.now()}-${Math.random()}`,
         file,
-        filename: file.name,
         previewUrl: url,
         steps: makeSteps(),
         status: "idle",
@@ -2083,63 +1912,16 @@ export default function LingeriePipelinePage() {
       };
     });
     setJobs((prev) => [...prev, ...newJobs]);
-  }, [pushHistory]);
+  }, []);
 
   /** Phase 2f P0-1: usuaria corrigió el ángulo desde el dropdown del card. */
   const updateJobAngle = useCallback((jobId: string, angle: PhotoAngle) => {
-    pushHistory();
     setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, photoAngle: angle } : j));
-  }, [pushHistory]);
+  }, []);
 
   const removeJob = useCallback((id: string) => {
-    pushHistory();
     setJobs((prev) => prev.filter((j) => j.id !== id));
-  }, [pushHistory]);
-
-  /** P2: "Comenzar de nuevo" — clear everything (jobs in memory + localStorage
-   *  persistence). La ficha técnica y los resultados procesados se limpian,
-   *  pero la galería (/gallery) y los settings quedan. */
-  const resetAll = useCallback(() => {
-    if (jobs.length > 0 && !window.confirm("¿Estás segura? Se borran las fotos subidas y los resultados. Los settings se mantienen.")) {
-      return;
-    }
-    pushHistory();
-    setJobs([]);
-    setActiveJobIndex(0);
-    setSharedModelUrl(undefined);
-    setSharedSeed(undefined);
-    setPhase("setup");
-    try {
-      window.localStorage.removeItem("lingerie:pipeline:jobs:v1");
-    } catch { /* ignore */ }
-    toast.success("Sesión reiniciada — podés subir fotos nuevas.");
-  }, [jobs.length, pushHistory]);
-
-  // Atajos Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y. Solo activan si el foco no está
-  // en un input/textarea (así no pisa el undo nativo del browser en campos).
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const isEditable = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-      if (isEditable) return;
-      const mod = e.ctrlKey || e.metaKey;
-      if (!mod) return;
-      if (e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undoJobs();
-      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
-        e.preventDefault();
-        redoJobs();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [undoJobs, redoJobs]);
-
-  const canUndo = historyRef.current.length > 0;
-  const canRedo = futureRef.current.length > 0;
-  // historyVersion fuerza re-render cuando canUndo/canRedo cambian
-  void historyVersion;
+  }, []);
 
   /* ---- Toggle step enabled ---- */
   const toggleStep = useCallback((stepId: StepId) => {
@@ -2225,7 +2007,7 @@ export default function LingeriePipelinePage() {
             || job;
         }
         if (targetPhoto?.uploadedUrl) {
-          console.log(`[lingerie] ${step.id}: face-swap sobre foto real "${targetPhoto.filename}"`);
+          console.log(`[lingerie] ${step.id}: face-swap sobre foto real "${targetPhoto.file.name}"`);
           const res = await fetch("/api/face-swap", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2252,7 +2034,7 @@ export default function LingeriePipelinePage() {
         const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
         if (matchingBack?.uploadedUrl && matchingBack.id !== job.id) {
           backGarmentUrl = matchingBack.uploadedUrl;
-          console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.filename})`);
+          console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.file.name})`);
         }
       }
 
@@ -2330,18 +2112,10 @@ export default function LingeriePipelinePage() {
     const job = jobsSnapshot.find((j) => j.id === jobId);
     if (!job) return {};
 
-    // Upload the image first. Si el job es RESTAURADO desde localStorage
-    // (file es null), saltamos el upload — ya debería tener uploadedUrl del
-    // run anterior. Si no tiene NI file NI uploadedUrl, el job está corrupto
-    // y marcamos error.
+    // Upload the image first
     let uploadedUrl = job.uploadedUrl;
     let falUrl = job.falUrl;
     if (!uploadedUrl) {
-      if (!job.file) {
-        setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
-        toast.error(`${job.filename}: tenés que subir la foto de nuevo (esta sesión fue restaurada sin el archivo).`);
-        return {};
-      }
       try {
         const uploaded = await uploadFile(job.file);
         uploadedUrl = uploaded.url;
@@ -2349,7 +2123,7 @@ export default function LingeriePipelinePage() {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, uploadedUrl, falUrl } : j));
       } catch (err) {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
-        toast.error(`Error de carga — ${job.filename}: ${err instanceof Error ? err.message : "Error desconocido"}`);
+        toast.error(`Error de carga — ${job.file.name}: ${err instanceof Error ? err.message : "Error desconocido"}`);
         return {};
       }
     }
@@ -2358,10 +2132,7 @@ export default function LingeriePipelinePage() {
     // del primer step. Produce una ProductSpec que se muestra al usuario
     // (editable) y que iteraciones siguientes inyectarán en los prompts. Si
     // falla, el pipeline sigue igual que antes (sin spec). No es bloqueante.
-    if (!job.productSpec && job.analysisStatus !== "done" && job.file) {
-      // Solo corremos el análisis de Claude Vision si tenemos el File (necesita
-      // subir el contenido en base64). Para jobs restaurados (file=null) la
-      // ficha técnica no se puede regenerar — queda undefined silenciosamente.
+    if (!job.productSpec && job.analysisStatus !== "done") {
       setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, analysisStatus: "analyzing" } : j));
       try {
         const spec = await analyzeProductPhotos(
@@ -2373,12 +2144,12 @@ export default function LingeriePipelinePage() {
         ));
       } catch (analyzeErr) {
         const msg = analyzeErr instanceof Error ? analyzeErr.message : "Análisis falló";
-        console.warn(`[lingerie] analyze-product failed for ${job.filename}:`, msg);
+        console.warn(`[lingerie] analyze-product failed for ${job.file.name}:`, msg);
         setJobs((prev) => prev.map((j) =>
           j.id === jobId ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg } : j,
         ));
         // No bloquea el pipeline — solo warnea y seguimos como antes.
-        toast.warning(`No se pudo leer la ficha técnica de ${job.filename}. Sigo con los pasos normales.`);
+        toast.warning(`No se pudo leer la ficha técnica de ${job.file.name}. Sigo con los pasos normales.`);
       }
     }
 
@@ -2524,16 +2295,13 @@ export default function LingeriePipelinePage() {
         // del paso. No es ideal pero evita que se pierda plata + el usuario
         // tenga que reintentar manualmente. Aviso por toast para transparencia.
         if (stepDef.id === "photoFullBody" || stepDef.id === "photoBack") {
-          // Usar el job original del snapshot (freshJob solo existe dentro del
-          // try block, acá estamos en el catch). Reconstruir para el matching.
-          const jobForMatching = { ...job, uploadedUrl, falUrl } as ImageJob;
           const fallback = stepDef.id === "photoBack"
-            ? findMatchingPhoto(jobForMatching, jobsSnapshot, ["espalda"])
-            : findMatchingPhoto(jobForMatching, jobsSnapshot, ["flat", "otra", "frontal"]);
+            ? findMatchingPhoto({ ...freshJob, uploadedUrl, falUrl }, jobsSnapshot, ["espalda"])
+            : findMatchingPhoto({ ...freshJob, uploadedUrl, falUrl }, jobsSnapshot, ["flat", "otra", "frontal"]);
           if (fallback?.uploadedUrl) {
-            console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.filename}" como resultado.`);
+            console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.file.name}" como resultado.`);
             toast.warning(
-              `${stepDef.label} falló — usamos tu foto real (${fallback.filename}) en su lugar para no perder el paso.`,
+              `${stepDef.label} falló — usamos tu foto real (${fallback.file.name}) en su lugar para no perder el paso.`,
             );
             updateStep(jobId, stepDef.id, {
               status: "done",
@@ -2592,46 +2360,8 @@ export default function LingeriePipelinePage() {
     }
 
     setJobs((prev) => prev.map((j) => j.id !== jobId ? j : { ...j, status: "done" }));
-
-    // Auto-guardar resultados en la galería persistente (gallery-store).
-    // Cada step con resultado queda como entry separada para que la usuaria
-    // pueda volver a /gallery y ver/descargar el historial entre sesiones
-    // (el store hace persistencia a localStorage con partialize).
-    try {
-      const addImages = useGalleryStore.getState().addImages;
-      const finalJob = (jobsSnapshot.find((j) => j.id === jobId)) ?? job;
-      const baseName = finalJob.filename.replace(/\.[^.]+$/, '');
-      const ts = Date.now();
-      const refTag = finalJob.referenceKey ?? '';
-      const colorTag = finalJob.color ?? '';
-      const labelSuffix = [refTag, colorTag].filter(Boolean).join(' · ');
-      const galleryItems: Parameters<typeof addImages>[0] = [];
-      for (const [stepId, resultUrl] of Object.entries(stepResults)) {
-        if (!resultUrl) continue;
-        const stepDef = STEP_DEFS.find((s) => s.id === stepId);
-        const isVideo = resultUrl.includes('.mp4') || resultUrl.includes('.webm') || resultUrl.includes('video');
-        const ext = isVideo ? 'mp4' : 'jpg';
-        galleryItems.push({
-          id: `lingerie-${stepId}-${ts}-${finalJob.id}`,
-          filename: `${baseName}-${stepId}${labelSuffix ? ` (${labelSuffix})` : ''}.${ext}`,
-          resultUrl,
-          originalUrl: finalJob.uploadedUrl ?? finalJob.previewUrl,
-          date: new Date().toISOString(),
-          operations: [stepDef?.label ?? stepId],
-          project: `lingerie-${productType}${refTag ? `-${refTag}` : ''}`,
-        });
-      }
-      if (galleryItems.length > 0) {
-        addImages(galleryItems);
-        console.log(`[lingerie] ${galleryItems.length} resultados guardados en /gallery`);
-      }
-    } catch (galleryErr) {
-      // Silent — fallo de la galería no bloquea el pipeline ni molesta con toast
-      console.warn('[lingerie] No se pudo guardar en galería:', galleryErr);
-    }
-
     return { newSharedModel, newSharedSeed };
-  }, [autoMode, executeStep, updateStep, productType]);
+  }, [autoMode, executeStep, updateStep]);
 
   /* ---- Start the full pipeline ---- */
   const startPipeline = useCallback(async () => {
@@ -2676,17 +2406,11 @@ export default function LingeriePipelinePage() {
     // Upload en paralelo para no secuenciar 6 uploads de ~5s cada uno.
     const uploadPromises = jobsSnapshot.map(async (job, idx) => {
       if (job.uploadedUrl) return { idx, ...job };
-      if (!job.file) {
-        // Job restaurado sin File — no podemos subir. Queda sin uploadedUrl
-        // y su processJob mostrará error amistoso.
-        console.warn(`[lingerie] ${job.filename}: job restaurado sin File, saltando upload`);
-        return { idx, ...job };
-      }
       try {
         const uploaded = await uploadFile(job.file);
         return { idx, ...job, uploadedUrl: uploaded.url, falUrl: uploaded.falUrl };
       } catch (err) {
-        console.warn(`[lingerie] pre-upload falló para ${job.filename}:`, err);
+        console.warn(`[lingerie] pre-upload falló para ${job.file.name}:`, err);
         return { idx, ...job };
       }
     });
@@ -2726,7 +2450,7 @@ export default function LingeriePipelinePage() {
   const downloadAll = useCallback(async () => {
     const results: { url: string; name: string }[] = [];
     for (const job of jobs) {
-      const base = job.filename.replace(/\.[^.]+$/, "");
+      const base = job.file.name.replace(/\.[^.]+$/, "");
       for (const step of job.steps) {
         if (step.resultUrl && (step.status === "done" || step.status === "accepted")) {
           results.push({ url: step.resultUrl, name: `${base}_${step.id}` });
@@ -2793,43 +2517,9 @@ export default function LingeriePipelinePage() {
             <div className="space-y-6">
               {/* Upload */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-                    1 · Fotos del Producto
-                  </h2>
-                  {/* Undo / Redo / Reset — controles "app profesional" */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={undoJobs}
-                      disabled={!canUndo}
-                      title="Deshacer (Ctrl+Z)"
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-gray-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-400"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={redoJobs}
-                      disabled={!canRedo}
-                      title="Rehacer (Ctrl+Shift+Z)"
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-gray-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-400"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5 -scale-x-100" />
-                    </button>
-                    <div className="mx-1 h-4 w-px bg-white/10" />
-                    <button
-                      type="button"
-                      onClick={resetAll}
-                      disabled={jobs.length === 0}
-                      title="Comenzar de nuevo — borra las fotos y resultados (settings se mantienen)"
-                      className="flex items-center gap-1 rounded-md border border-white/10 px-2 h-7 text-[11px] font-medium text-gray-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:bg-transparent disabled:hover:text-gray-400"
-                    >
-                      <X className="h-3 w-3" />
-                      Comenzar de nuevo
-                    </button>
-                  </div>
-                </div>
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                  1 · Fotos del Producto
+                </h2>
                 <UploadZone onFiles={handleFiles} />
 
                 {/* Uploaded image grid */}
@@ -2891,7 +2581,7 @@ export default function LingeriePipelinePage() {
                           <div className="relative">
                             <img
                               src={job.previewUrl}
-                              alt={job.filename}
+                              alt={job.file.name}
                               className="aspect-square w-full rounded-lg object-cover border border-white/10"
                             />
                             <button
@@ -2920,7 +2610,7 @@ export default function LingeriePipelinePage() {
                               </div>
                             )}
                           </div>
-                          <p className="mt-1 truncate text-[10px] text-gray-500">{job.filename}</p>
+                          <p className="mt-1 truncate text-[10px] text-gray-500">{job.file.name}</p>
                           {/* P0-1: dropdown para corregir el ángulo */}
                           <label className="mt-1 flex items-center gap-1">
                             <span className="text-[9px] uppercase tracking-wider text-gray-600">Ángulo</span>
@@ -3395,7 +3085,7 @@ export default function LingeriePipelinePage() {
                 <div className="relative shrink-0">
                   <img
                     src={job.previewUrl}
-                    alt={job.filename}
+                    alt={job.file.name}
                     className="h-10 w-10 rounded-md object-cover"
                   />
                   {job.status === "done" && (
@@ -3410,7 +3100,7 @@ export default function LingeriePipelinePage() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-medium text-white">{job.filename}</p>
+                  <p className="truncate text-[11px] font-medium text-white">{job.file.name}</p>
                   <p className="text-[10px] text-gray-500">
                     {job.status === "done"
                       ? `$${job.totalCost.toFixed(3)}`
@@ -3432,11 +3122,11 @@ export default function LingeriePipelinePage() {
               <div className="mb-6 flex items-center gap-4">
                 <img
                   src={activeJob.previewUrl}
-                  alt={activeJob.filename}
+                  alt={activeJob.file.name}
                   className="h-14 w-14 rounded-lg border border-white/10 object-cover"
                 />
                 <div>
-                  <h2 className="text-base font-bold text-white">{activeJob.filename}</h2>
+                  <h2 className="text-base font-bold text-white">{activeJob.file.name}</h2>
                   <p className="text-sm text-gray-400">
                     {activeJob.status === "done"
                       ? `Completado · costo: $${activeJob.totalCost.toFixed(3)}`
@@ -3444,37 +3134,6 @@ export default function LingeriePipelinePage() {
                       ? "Procesando…"
                       : "En cola"}
                   </p>
-                  {/* Live cost progress: gastado vs estimado, en tiempo real. */}
-                  {(() => {
-                    const done = activeJob.steps.filter((s) => s.status === "done" || s.status === "accepted" || s.status === "skipped").length;
-                    const total = activeJob.steps.filter((s) => s.enabled).length;
-                    if (total === 0) return null;
-                    const estimated = activeJob.steps
-                      .filter((s) => s.enabled)
-                      .reduce((sum, s) => {
-                        // Parsear "$0.02" o "$0.01-$0.04" → tomar el primer número
-                        const m = (s.cost ?? "").match(/\$(\d+\.?\d*)/);
-                        return sum + (m ? parseFloat(m[1]) : 0);
-                      }, 0);
-                    const spent = activeJob.totalCost;
-                    const pct = Math.min(100, Math.round((done / total) * 100));
-                    return (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <div className="h-1 flex-1 min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className={cn(
-                              "h-full transition-all",
-                              activeJob.status === "done" ? "bg-emerald-500" : "bg-violet-500",
-                            )}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-gray-500">
-                          {done}/{total} · ${spent.toFixed(3)} / ~${estimated.toFixed(2)}
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
                 {/* Mobile: image navigation */}
                 <div className="ml-auto flex items-center gap-2 lg:hidden">
@@ -3560,7 +3219,7 @@ export default function LingeriePipelinePage() {
               {/* Completion summary */}
               {activeJob.status === "done" && (
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3">
                     <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                     <div>
                       <p className="font-semibold text-white">Imagen procesada</p>
@@ -3568,44 +3227,7 @@ export default function LingeriePipelinePage() {
                         Costo total: <span className="font-medium text-emerald-400">${activeJob.totalCost.toFixed(3)}</span>
                       </p>
                     </div>
-                    <div className="ml-auto flex flex-wrap gap-2">
-                      {/* Descargar todos los resultados del job como ZIP (batch download) */}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const results = activeJob.steps
-                            .filter((s) => s.status === "done" || s.status === "accepted")
-                            .filter((s) => s.resultUrl && !s.resultUrl.startsWith("/api/proxy-image?url=data:"));
-                          if (results.length === 0) {
-                            toast.info("No hay resultados para descargar todavía.");
-                            return;
-                          }
-                          toast.info(`Descargando ${results.length} archivos…`);
-                          // Disparamos un <a download> por cada resultado con delay de
-                          // 200ms entre cada uno para que el browser no los ahogue.
-                          for (let i = 0; i < results.length; i++) {
-                            const s = results[i];
-                            if (!s.resultUrl) continue;
-                            const isVideo = s.resultUrl.includes(".mp4") || s.resultUrl.includes(".webm") || s.resultUrl.includes("video");
-                            const ext = isVideo ? "mp4" : "jpg";
-                            const href = s.resultUrl.startsWith("/api/proxy-image")
-                              ? s.resultUrl
-                              : `/api/proxy-image?url=${encodeURIComponent(s.resultUrl)}`;
-                            const a = document.createElement("a");
-                            a.href = href;
-                            a.download = `unistudio-${activeJob.referenceKey ?? activeJob.id.slice(0, 6)}-${s.id}.${ext}`;
-                            a.target = "_blank";
-                            document.body.appendChild(a);
-                            a.click();
-                            a.remove();
-                            if (i < results.length - 1) await new Promise((r) => setTimeout(r, 200));
-                          }
-                        }}
-                        className="flex items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-violet-500/30 hover:bg-violet-400"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Descargar todos
-                      </button>
+                    <div className="ml-auto flex gap-2">
                       {activeJobIndex < jobs.length - 1 && (
                         <button
                           onClick={() => setActiveJobIndex(activeJobIndex + 1)}

@@ -40,20 +40,31 @@ A diferencia de un pipeline genérico "bg-remove + white bg", este pipeline **de
 ### Cómo decide el pipeline
 
 ```
-FOTO → analyze-image (Claude Vision)
+FOTO + path/filename
+        |
+        v
+[folder-routing.ts] inferProductContextFromPath(path)
+        → { productType?, brand?, ambiguous, reason }
+   Prioridad: SKU pattern (BLQ-004 etc.) > folder path > brand keyword.
+   Si `productType` y `brand` vienen resueltos aquí, no se llama Claude Vision.
+   Si `ambiguous:true` (nombre compartido DORSAY/GAIA/OHM/OSADIA/ZENTRO
+   sin resolución de folder), la UI muestra warning y pide confirmación manual.
+        |
+        v
+analyze-image (Claude Vision) — SOLO si folder-routing no resolvió
         retorna: { productType, brand, packaging, colorDominant }
          |
          v
 Claude Haiku con la matriz + el análisis
-        retorna: { bgPrompt, shadowType, enhancePreset, aspectRatios }
+        retorna: { bgPrompt, shadowType, enhancePreset, aspectRatios, seed }
          |
          v
-bg-generate usa bgPrompt
+bg-generate usa bgPrompt + seed
 shadows usa shadowType
 enhance usa enhancePreset
 ```
 
-Si `ANTHROPIC_API_KEY` no está disponible, el pipeline cae a la matriz hardcoded (categoría+marca → preset directo), sin Claude.
+Si `ANTHROPIC_API_KEY` no está disponible, el pipeline cae a la matriz hardcoded (categoría+marca → preset directo), sin Claude. El helper `folder-routing` es pure-TS y siempre funciona.
 
 ---
 

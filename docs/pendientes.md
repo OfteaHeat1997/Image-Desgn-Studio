@@ -177,41 +177,9 @@ Nuevo selector en setup con 3 opciones:
 
 Fix: antes del loop del pipeline se suben TODAS las fotos en paralelo (`Promise.all`). Antes del fix, face-swap en job A no podía ver `uploadedUrl` de job B porque B no había corrido su processJob. Ahora las fotos están todas subidas antes del primer step, y `findMatchingPhoto` encuentra sus URLs.
 
-### UX Polish Bundle (shipped commits `eb147e8`, `ed83826`, `7335da4`, `bac9d38`)
-
-- **ImageLightbox modal**: click en cualquier resultado o variante → full-screen con descargar, ←/→ navegación, tabra de thumbs, botón "Usar variante N", ESC para cerrar
-- **Botón Descargar** directo en cada step card (al lado de Aceptar y continuar)
-- **Botón Descargar todos** en completion summary (dispara downloads con 200ms delay)
-- **Progress bar live** con cost counter: "3/7 · $0.15 / ~$0.35" en header del job
-- **Smart fallback** cuando photoFullBody/photoBack fallan: usa foto real tagged en vez de error rojo
-- **Persistencia de settings** en localStorage: modo, calidad, tipo, REF, modelConfig sobreviven refresh
-- **Badge "detectada" rediseñado**: pill emerald compacta "✓ Espalda real lista"
-- **Fix ReferenceError**: freshJob no existía en catch scope; ahora se reconstruye desde `job`
-
-### Persistencia completa (shipped commits `7335da4` + `43f2050`)
-
-- Settings (modo, calidad, tipo, REF, modelConfig) en `lingerie:pipeline:settings:v1`
-- Jobs (fotos, ángulos, colores, ficha técnica, resultados por step) en `lingerie:pipeline:jobs:v1`
-- Refresh de la página preserva TODO el trabajo
-- Jobs restaurados tienen `file=null` (los File objects no serializan) → no se pueden re-analizar con Claude Vision pero sí re-correr pipeline si ya tienen uploadedUrl
-
-### Gallery auto-save (shipped commit `3c663de`)
-
-Cada resultado final (tryon, photoBack, photoFullBody, videos) se guarda automáticamente al gallery-store persistente. Visible en `/gallery` entre sesiones. 3 pipelines canónicos ahora consistentes.
-
-### Undo/Redo + Reset (shipped commit `d0935ef`)
-
-- History stack de jobs (20 snapshots máx) + redo stack, tracked en refs (no state)
-- `pushHistory()` se llama antes de cada acción destructiva: add/remove/cambio ángulo/reset
-- Ctrl+Z (Cmd+Z en Mac) → undo; Ctrl+Shift+Z o Ctrl+Y → redo
-- Listeners ignoran si el foco está en input/textarea (no pisa undo nativo en campos)
-- Botones visibles Deshacer/Rehacer en el heading de la sección Fotos
-- "Comenzar de nuevo" rojo: confirm dialog + limpia jobs in memory + localStorage jobs key + sharedModel/Seed, mantiene settings
-- Toast "Deshecho"/"Rehecho" para feedback
-
 ### P1 pendiente (siguiente sesión)
 
+- Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura (requiere lift state por REF)
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
-- Saved models/backgrounds presets con nombre custom (estilo Photoroom Virtual Model)
-- Keyboard shortcuts help dialog (press `?` to view all)
-- Comparación side-by-side con foto original en cada step result
+- P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)
+- Download button por step (save individual step results)
