@@ -7,7 +7,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAiModels } from '@/lib/db/queries';
+import { getAiModels, updateAiModelName } from '@/lib/db/queries';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,6 +27,33 @@ export async function GET(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch AI models.',
       },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, name } = body as { id?: string; name?: string };
+    if (!id || !name) {
+      return NextResponse.json(
+        { success: false, error: '"id" y "name" son requeridos.' },
+        { status: 400 },
+      );
+    }
+    const ok = await updateAiModelName(id, name.trim());
+    if (!ok) {
+      return NextResponse.json(
+        { success: false, error: 'No se pudo actualizar el nombre.' },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[API /ai-models PATCH] Error:', error);
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Error.' },
       { status: 500 },
     );
   }

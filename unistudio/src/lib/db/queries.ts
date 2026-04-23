@@ -575,6 +575,18 @@ export async function saveAiModel(input: {
   }
 }
 
+export async function updateAiModelName(id: string, name: string): Promise<boolean> {
+  if (!prisma) return false;
+  try {
+    const db = await prisma;
+    await db.aiModel.update({ where: { id }, data: { name } });
+    return true;
+  } catch (e) {
+    console.error('[updateAiModelName] Error:', e);
+    return false;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Prompt Template Queries
 // -----------------------------------------------------------------------------

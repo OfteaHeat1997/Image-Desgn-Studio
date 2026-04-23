@@ -3184,8 +3184,35 @@ export default function LingeriePipelinePage() {
                           title={`${m.name} — ${m.gender ?? 'female'}, ${m.skinTone ?? 'medium'}, ${m.bodyType ?? 'average'}`}
                         >
                           <ModelThumb url={m.previewUrl} alt={m.name} name={m.name ?? 'Modelo'} />
-                          <div className="bg-black/60 px-1.5 py-1 text-[10px] text-gray-300 truncate">
-                            {m.name?.slice(0, 20) ?? 'Modelo'}
+                          <div className="bg-black/60 px-1.5 py-1 text-[10px] text-gray-300">
+                            <input
+                              type="text"
+                              defaultValue={m.name?.slice(0, 30) ?? 'Modelo'}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={async (e) => {
+                                const newName = e.target.value.trim();
+                                if (!newName || newName === m.name) return;
+                                try {
+                                  const res = await fetch('/api/ai-models', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: m.id, name: newName }),
+                                  });
+                                  const json = await res.json();
+                                  if (json.success) {
+                                    setSavedModels((prev) => prev.map((x) => x.id === m.id ? { ...x, name: newName } : x));
+                                    toast.success(`Modelo renombrada a "${newName}"`);
+                                  }
+                                } catch { /* silent */ }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                e.stopPropagation();
+                              }}
+                              className="w-full bg-transparent text-[10px] text-gray-300 outline-none truncate placeholder:text-gray-600 focus:text-white focus:bg-white/5 focus:rounded px-0.5"
+                              placeholder="Nombre…"
+                              title="Click para renombrar esta modelo (ej: 'Karen', 'Ana')"
+                            />
                           </div>
                           {isSelected && (
                             <div className="absolute right-1 top-1 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
