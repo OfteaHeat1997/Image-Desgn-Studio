@@ -1884,6 +1884,7 @@ export default function LingeriePipelinePage() {
   // pose. Sin seed serían modelos diferentes en cada foto.
   const [sharedSeed, setSharedSeed] = useState<number | undefined>();
   const [isRunning, setIsRunning] = useState(false);
+  const [loadingInventory, setLoadingInventory] = useState(false);
   const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string; seed?: number }>>([]);
 
   // Cargar modelos IA previamente generadas para ofrecer reuso sin costo
@@ -2095,6 +2096,62 @@ export default function LingeriePipelinePage() {
     pushHistory();
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, [pushHistory]);
+
+  /** Carga todo el inventario de bras desde public/inventory/bras/ vía
+   *  /api/inventory/scan-bras. Fetchea cada imagen como blob, la convierte a
+   *  File y usa handleFiles para crear ImageJobs (mismo flow de auto-detect
+   *  y pushHistory que drag-and-drop). En dev y prod funciona igual porque
+   *  las imágenes están en public/. */
+  const loadInventoryBras = useCallback(async () => {
+    setLoadingInventory(true);
+    try {
+      const res = await fetch("/api/inventory/scan-bras");
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(`No se pudo escanear el inventario: ${json.error ?? "error desconocido"}`);
+        return;
+      }
+      type ScannedPhoto = { filename: string; angle: PhotoAngle; color: string | undefined; relativePath: string };
+      type ScannedRef = { ref: string; photoCount: number; uniqueColors: string[]; hasBackPhoto: boolean; photos: ScannedPhoto[]; estimatedCost: number };
+      const refs: ScannedRef[] = json.data.refs;
+      const totalPhotos: number = json.data.totalPhotos;
+      toast.info(`Cargando ${totalPhotos} fotos de ${refs.length} REFs…`);
+
+      // Aplanar + fetchear en paralelo con concurrencia limitada a 6.
+      const flat: Array<ScannedPhoto & { ref: string }> = [];
+      for (const r of refs) for (const p of r.photos) flat.push({ ...p, ref: r.ref });
+
+      const CONCURRENCY = 6;
+      const newFiles: File[] = [];
+      let failed = 0;
+      const runOne = async (item: ScannedPhoto & { ref: string }) => {
+        try {
+          const r = await fetch(item.relativePath);
+          if (!r.ok) throw new Error(`${r.status}`);
+          const blob = await r.blob();
+          const type = blob.type || (item.filename.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg");
+          newFiles.push(new File([blob], item.filename, { type }));
+        } catch (err) {
+          failed++;
+          console.warn(`[load-inventory] ${item.filename}:`, err);
+        }
+      };
+      for (let i = 0; i < flat.length; i += CONCURRENCY) {
+        await Promise.all(flat.slice(i, i + CONCURRENCY).map(runOne));
+      }
+
+      if (newFiles.length === 0) {
+        toast.error("No se pudo cargar ninguna foto del inventario.");
+        return;
+      }
+      handleFiles(newFiles);
+      toast.success(`Inventario cargado: ${newFiles.length} fotos${failed > 0 ? ` (${failed} fallaron)` : ''}.`);
+    } catch (err) {
+      toast.error(`Error cargando inventario: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, [handleFiles]);
 
   /** P2: "Comenzar de nuevo" — clear everything (jobs in memory + localStorage
    *  persistence). La ficha técnica y los resultados procesados se limpian,
@@ -2831,6 +2888,33 @@ export default function LingeriePipelinePage() {
                   </div>
                 </div>
                 <UploadZone onFiles={handleFiles} />
+
+                {/* Cargar inventario — fetchea fotos del folder public/inventory/bras/
+                    como blobs y las añade como ImageJobs, saltando el drag-and-drop
+                    para los 20 REFs ya scaneados. */}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={loadInventoryBras}
+                    disabled={loadingInventory}
+                    className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 transition-colors hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-wait"
+                  >
+                    {loadingInventory ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Cargando…
+                      </>
+                    ) : (
+                      <>
+                        <Package className="h-3.5 w-3.5" />
+                        Cargar inventario BH (20 REFs, 128 fotos)
+                      </>
+                    )}
+                  </button>
+                  <span className="text-[10px] text-gray-500">
+                    Carga todas las fotos de <code className="rounded bg-white/5 px-1">docs/inventory-final/images/bras/</code> de una — podés borrar las que no te interesen.
+                  </span>
+                </div>
 
                 {/* Uploaded image grid */}
                 {jobs.length > 0 && (
