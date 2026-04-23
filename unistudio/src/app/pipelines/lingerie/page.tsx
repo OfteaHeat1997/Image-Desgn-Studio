@@ -217,8 +217,8 @@ const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: str
   },
   {
     value: "face-swap",
-    label: "Cambiar cara sobre tu foto real (experimental)",
-    desc: "Usa TU foto real (frontal/espalda) y solo cambia la cara. Producto idéntico al original. ⚠️ Requiere env var FACE_SWAP_MODEL configurada en Vercel con un hash válido de Replicate.",
+    label: "Cambiar cara sobre tu foto real",
+    desc: "Usa TU foto real (frontal/espalda) y solo cambia la cara por una modelo IA. Producto idéntico al original. Más rápido y barato.",
     cost: "~$0.01 / producto",
   },
   {
