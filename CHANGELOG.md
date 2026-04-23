@@ -1,5 +1,46 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C7) — Gap 7 del audit: cache de fondos in-memory + modo económico
+
+Último commit del plan de mejoras Pipeline Estáticos. Cierra el audit completo (7/7 gaps implementados).
+
+Sin cache, los 20 perfumes Yanbal generaban 20 mármoles distintos. Con C1 (seed estable), salían idénticos pero cada uno costaba $0.05 (20 × $0.05 = $1). Con C7 + economía activada: 1 × $0.003 + 20 composites locales = **$0.003 total** para los 20 SKUs.
+
+### Cambios
+
+**`unistudio/src/lib/processing/bg-generate.ts`**
+- Nuevo Map `bgCache` a nivel de módulo, keyed por `${prompt}|${aspectRatio}|${seed}`.
+- `makeCacheKey()` helper que normaliza whitespace del prompt.
+- `generateBgFast` ahora check cache antes de llamar Flux Schnell. Si hit, reusa `bgUrl` + composite actual. Si miss, genera + guarda + composite.
+- `generateBgPreciseFallback` (el fallback de Kontext Pro por content filter) también cachea.
+- Logs `[bg-generate] Cache HIT/MISS` para debugging.
+- `getBgCacheStats()` exportada para debug futuro.
+
+**`unistudio/src/app/pipelines/static-product/page.tsx`**
+- Nuevo state `economyMode` (default off).
+- `processJob` y `reRunBgAndBelow` envían `mode: economyMode ? "fast" : config.bgMode` a `/api/bg-generate`.
+- Toggle UI verde "Modo económico (cache bg, ~$0.003/foto)" junto a los otros toggles (batch, validar).
+
+### Efecto real en batches del inventario
+
+| Escenario | Sin cache | Con cache (Modo económico) | Ahorro |
+|---|---:|---:|---:|
+| 32 cremas Yanbal | $1.63 | $0.10 | **94%** |
+| 20 perfumes Yanbal | $1.00 | $0.03 | **97%** |
+| 15 bloqueadores | $0.75 | $0.05 | **93%** |
+| Batch estáticos completos (~80 SKUs) | $4.00 | $0.30 | **92%** |
+
+### Limitaciones conocidas
+- **In-memory**: en Vercel Lambda frío el cache se reinicia por invocación. Para persistencia real migrar a Prisma (`GeneratedBackground` model documentado en audit Gap 7). MVP suficiente para dev local y batches que corran en una sola sesión de servidor.
+- **Kontext Pro (modo precise default) NO cacheable**: su output incluye el producto compuesto, entonces cada SKU genera una imagen única. El modo económico bypassa Kontext Pro y usa Flux Schnell + composite local — calidad de bg ligeramente menor, pero el producto queda pixel-perfect (se usa el PNG original).
+- **Validador (C6)** se ejecuta cada SKU aunque sea cache hit: el fondo puede ser el mismo pero el composite con el producto puede haber fallado.
+
+### No toca
+- Pipeline Lencería (otra sesión).
+- `/api/bg-generate` route signature (mismo POST, mismo JSON body shape).
+- Módulos de shadows/enhance.
+- Comportamiento default (modo económico opt-in).
+
 ## 2026-04-23 (C6) — Gap 6 del audit: validator preventivo + opt-in post-bg
 
 Sexto commit del plan. Dos frentes:

@@ -7,6 +7,29 @@ import { removeBgReplicate } from '@/lib/processing/bg-remove';
 import sharp from 'sharp';
 
 // ---------------------------------------------------------------------------
+// Gap 7 del audit — in-memory cache de fondos (bg-only) por (prompt+aspect+seed).
+// Keyed por JSON.stringify para simplicidad — Map viva mientras el Next.js
+// server está corriendo. En Vercel (Lambda frío), reset por invocación.
+// Para persistencia real hay que migrar a Prisma (ver audit Gap 7).
+// ---------------------------------------------------------------------------
+
+type BgCacheKey = string;
+const bgCache = new Map<BgCacheKey, { url: string; generatedAt: number; hits: number }>();
+
+function makeCacheKey(prompt: string, aspectRatio: string, seed?: number): BgCacheKey {
+  // Normalize whitespace en el prompt para tolerar diferencias no significativas
+  const normPrompt = prompt.trim().replace(/\s+/g, ' ');
+  return `${normPrompt}|${aspectRatio}|${seed ?? 'no-seed'}`;
+}
+
+export function getBgCacheStats() {
+  return {
+    entries: bgCache.size,
+    totalHits: Array.from(bgCache.values()).reduce((s, v) => s + v.hits, 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -424,15 +447,28 @@ async function generateBgPreciseFallback(
     return `data:image/png;base64,${resultBuffer.toString('base64')}`;
   }
 
-  // For non-studio presets: generate background with Flux Schnell, then composite
-  const schnellInput: Record<string, unknown> = {
-    prompt: bgPrompt,
-    aspect_ratio: aspectRatio,
-    num_outputs: 1,
-  };
-  if (typeof seed === 'number') schnellInput.seed = seed;
-  const bgOutput = await runModel('black-forest-labs/flux-schnell', schnellInput);
-  const bgUrl = await extractOutputUrl(bgOutput);
+  // For non-studio presets: generate background with Flux Schnell, then composite.
+  // Gap 7 — también cacheamos aquí. La misma combinación (prompt+aspect+seed)
+  // genera el mismo bg que se reusa entre SKUs del mismo (productType, brand).
+  const cacheKey = makeCacheKey(bgPrompt, aspectRatio, seed);
+  let bgUrl: string;
+  const cached = bgCache.get(cacheKey);
+  if (cached) {
+    cached.hits += 1;
+    bgUrl = cached.url;
+    console.log(`[bg-generate fallback] Cache HIT for key: ${cacheKey.slice(0, 60)}...`);
+  } else {
+    const schnellInput: Record<string, unknown> = {
+      prompt: bgPrompt,
+      aspect_ratio: aspectRatio,
+      num_outputs: 1,
+    };
+    if (typeof seed === 'number') schnellInput.seed = seed;
+    const bgOutput = await runModel('black-forest-labs/flux-schnell', schnellInput);
+    bgUrl = await extractOutputUrl(bgOutput);
+    bgCache.set(cacheKey, { url: bgUrl, generatedAt: Date.now(), hits: 0 });
+    console.log(`[bg-generate fallback] Cache MISS, stored for key: ${cacheKey.slice(0, 60)}...`);
+  }
 
   // Download background and composite
   const bgRes = await fetch(bgUrl, { headers: replicateHeaders(bgUrl) });
@@ -510,15 +546,28 @@ export async function generateBgFast(
   imageUrl?: string,
   seed?: number,
 ): Promise<string> {
-  // Generate the background with Flux Schnell
-  const schnellInput: Record<string, unknown> = {
-    prompt,
-    aspect_ratio: aspectRatio,
-    num_outputs: 1,
-  };
-  if (typeof seed === 'number') schnellInput.seed = seed;
-  const output = await runModel('black-forest-labs/flux-schnell', schnellInput);
-  const bgUrl = await extractOutputUrl(output);
+  // Gap 7 cache check — si ya generamos un bg con el mismo (prompt, aspect, seed)
+  // devolvemos esa URL y composeamos el producto actual encima (abajo).
+  const cacheKey = makeCacheKey(prompt, aspectRatio, seed);
+  let bgUrl: string;
+  const cached = bgCache.get(cacheKey);
+  if (cached) {
+    cached.hits += 1;
+    bgUrl = cached.url;
+    console.log(`[bg-generate] Cache HIT (${cached.hits} hits total) for key: ${cacheKey.slice(0, 60)}...`);
+  } else {
+    // Generate the background with Flux Schnell
+    const schnellInput: Record<string, unknown> = {
+      prompt,
+      aspect_ratio: aspectRatio,
+      num_outputs: 1,
+    };
+    if (typeof seed === 'number') schnellInput.seed = seed;
+    const output = await runModel('black-forest-labs/flux-schnell', schnellInput);
+    bgUrl = await extractOutputUrl(output);
+    bgCache.set(cacheKey, { url: bgUrl, generatedAt: Date.now(), hits: 0 });
+    console.log(`[bg-generate] Cache MISS, stored bg for key: ${cacheKey.slice(0, 60)}...`);
+  }
 
   // If no product image, return background-only (preview mode)
   if (!imageUrl) return bgUrl;

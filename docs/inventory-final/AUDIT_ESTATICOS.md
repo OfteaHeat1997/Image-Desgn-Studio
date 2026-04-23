@@ -23,7 +23,7 @@
 | 4 | Image disambiguation perfume vs desodorante | 🟡 alto | S | ✅ **HECHO 2026-04-23** | `folder-routing.ts` + integración en `static-product/page.tsx` |
 | 5 | Sin UI per-step con approval (como Lencería) | 🟡 alto | L | ✅ **HECHO 2026-04-23** | botones Re-ejecutar + Cambiar fondo en step timeline + modal con alternativas de la matriz |
 | 6 | No hay troubleshooting programático (re-run si bg malo) | 🟢 medio | M | ✅ **HECHO 2026-04-23** | NO_DUP suffix preventivo en matriz + `/api/validate-bg` opt-in con Claude Haiku |
-| 7 | Sin integración con Prisma para guardar bg generado por marca (cache) | 🟢 medio | M | ⏳ pendiente | — |
+| 7 | Sin integración con Prisma para guardar bg generado por marca (cache) | 🟢 medio | M | ✅ **HECHO 2026-04-23** (MVP in-memory, sin Prisma) | Map cache en `bg-generate.ts` + toggle "Modo económico" que fuerza fast+cache |
 
 ---
 

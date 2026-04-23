@@ -269,6 +269,12 @@ export default function StaticProductPipelinePage() {
   // Gap 6 — validador post-bg con Claude Haiku (opt-in, +$0.0002/foto)
   const [validateBg, setValidateBg] = useState(false);
 
+  // Gap 7 — modo económico: fuerza bgMode:fast (Flux Schnell + composite + cache)
+  // en lugar de precise (Flux Pro sin cache). 95%+ ahorro en batches grandes del
+  // mismo (productType, brand). Calidad ligeramente menor pero acceptable para
+  // catálogo (el producto es pixel-perfect, solo el bg cambia).
+  const [economyMode, setEconomyMode] = useState(false);
+
   // Read URL params from auto-mode redirect (e.g., ?productType=perfume)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -486,7 +492,8 @@ export default function StaticProductPipelinePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: currentUrl,
-          mode: config.bgMode,
+          // Gap 7 — modo económico fuerza 'fast' (Flux Schnell cacheable).
+          mode: economyMode ? "fast" : config.bgMode,
           style: "custom",
           customPrompt: config.prompt,
           aspectRatio: "1:1",
@@ -629,7 +636,7 @@ export default function StaticProductPipelinePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: currentUrl,
-          mode: config.bgMode,
+          mode: economyMode ? "fast" : config.bgMode,
           style: "custom",
           customPrompt: finalPrompt,
           aspectRatio: "1:1",
@@ -1196,6 +1203,26 @@ export default function StaticProductPipelinePage() {
                 className="h-3 w-3 accent-amber-500"
               />
               <span>Validar fondos con IA <span className="text-[10px] opacity-70">(+$0.0002/foto)</span></span>
+            </label>
+
+            {/* Gap 7 — modo económico: cache + Flux Schnell en vez de Kontext Pro */}
+            <label
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
+                economyMode
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
+              )}
+              title="Usa Flux Schnell + cache de fondo por (tipo, marca). Los 20 SKUs Yanbal comparten 1 llamada a Flux. Calidad ligeramente menor que Kontext Pro pero el producto queda pixel-perfect. Ahorro típico 95%+ en batches."
+            >
+              <input
+                type="checkbox"
+                checked={economyMode}
+                onChange={(e) => setEconomyMode(e.target.checked)}
+                disabled={isRunning}
+                className="h-3 w-3 accent-emerald-500"
+              />
+              <span>Modo económico <span className="text-[10px] opacity-70">(cache bg, ~$0.003/foto)</span></span>
             </label>
             <button
               onClick={() => {
