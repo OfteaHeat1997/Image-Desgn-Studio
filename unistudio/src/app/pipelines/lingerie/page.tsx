@@ -59,7 +59,25 @@ interface PipelineStep {
   // para mostrar en el picker 2×2. Solo se popula cuando generationMode =
   // "multi-sample" y el step admite variantes (tryon/photoBack/photoFullBody).
   candidates?: string[];
+  // P1-1: la usuaria eligió un proveedor distinto al default en el retry (ej
+  // "reintentá con FASHN porque Kolors reinterpretó mal el broche"). El
+  // siguiente rerun usa este provider en vez del default de lencería (Kolors).
+  // Limpia al empezar un run exitoso para que el próximo ciclo vuelva al default.
+  providerOverride?: TryonProvider;
 }
+
+/**
+ * Proveedores de try-on disponibles. "auto" deja que /api/tryon elija
+ * (Kolors para lencería, FASHN/IDM-VTON para otros).
+ */
+type TryonProvider = "kolors" | "fashn" | "idm-vton" | "auto";
+
+const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: string }[] = [
+  { value: "auto",     label: "Automático",   hint: "El sistema elige (Kolors para lencería)" },
+  { value: "kolors",   label: "Kolors",        hint: "Default para lencería · rápido · $0.02" },
+  { value: "fashn",    label: "FASHN v1.6",    hint: "Alta calidad · mejor preservación de textura · $0.05" },
+  { value: "idm-vton", label: "IDM-VTON",      hint: "Backup · $0.02" },
+];
 
 /**
  * Ángulo / rol de una foto del producto (Phase 2f — P0-1). La usuaria lo
@@ -605,10 +623,11 @@ interface StepCardProps {
   onRerun: () => void;
   onStop?: () => void;
   onSelectCandidate?: (url: string) => void;
+  onChangeProvider?: (provider: TryonProvider) => void;
   autoMode: boolean;
 }
 
-function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate }: StepCardProps) {
+function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider }: StepCardProps) {
   const Icon = step.icon;
   // Fallback chain: step's own captured input > chain input > empty. Si los
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
@@ -891,20 +910,42 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
           {/* Error retry — Reintentar es primario (botón grande violeta), Saltar secundario (link gris) */}
           {step.status === "error" && (
-            <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/6 pt-4">
-              <button
-                onClick={onSkip}
-                className="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-300 hover:underline"
-              >
-                Saltar este paso
-              </button>
-              <button
-                onClick={onRerun}
-                className="flex items-center gap-2 rounded-lg bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/30 transition-colors hover:bg-violet-400"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reintentar
-              </button>
+            <div className="mt-4 space-y-3 border-t border-white/6 pt-4">
+              {/* P1-1: selector de proveedor para tryon steps. Permite reintentar
+                  con FASHN si Kolors reinterpretó mal el broche/textura. */}
+              {onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500">Proveedor:</span>
+                  <select
+                    value={step.providerOverride ?? "auto"}
+                    onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
+                    className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-violet-500/50"
+                  >
+                    {TRYON_PROVIDER_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value} title={p.hint}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={onSkip}
+                  className="text-xs font-medium text-gray-500 underline-offset-2 hover:text-gray-300 hover:underline"
+                >
+                  Saltar este paso
+                </button>
+                <button
+                  onClick={onRerun}
+                  className="flex items-center gap-2 rounded-lg bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/30 transition-colors hover:bg-violet-400"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  {step.providerOverride && step.providerOverride !== "auto"
+                    ? `Reintentar con ${TRYON_PROVIDER_OPTIONS.find((p) => p.value === step.providerOverride)?.label ?? step.providerOverride}`
+                    : "Reintentar"}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1205,6 +1246,12 @@ async function runStep(
    * reales del broche, banda, cruce de tirantes.
    */
   backGarmentUrl?: string,
+  /**
+   * P1-1: proveedor de tryon que la usuaria eligió en el retry. Si se pasa,
+   * sobreescribe el default (Kolors para lencería). Aplica en tryon,
+   * photoBack (phase 2) y photoFullBody (phase 2).
+   */
+  providerOverride?: TryonProvider,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -1346,7 +1393,8 @@ async function runStep(
         garmentImage: garmentForTryon,
         category,
         garmentType: garmentTypeForApi,
-        provider: "kolors",
+        // P1-1: respetar providerOverride si la usuaria lo pidió; sino default kolors
+        provider: providerOverride && providerOverride !== "auto" ? providerOverride : "kolors",
       }),
     });
     const tryonJson = await tryonRes.json();
@@ -1376,7 +1424,10 @@ async function runStep(
         garmentImage: inputUrl,
         category,
         garmentType: garmentTypeForApi,
-        provider: isLingerieFlow ? "kolors" : "idm-vton",
+        // P1-1: respetar providerOverride si existe; sino default del flow
+        provider: providerOverride && providerOverride !== "auto"
+          ? providerOverride
+          : (isLingerieFlow ? "kolors" : "idm-vton"),
       }),
     });
     const json = await res.json();
@@ -1722,6 +1773,7 @@ export default function LingeriePipelinePage() {
               currentIsolatedGarment,
               controller.signal,
               backGarmentUrl,
+              step.providerOverride,
             ),
           ),
         );
@@ -1746,6 +1798,7 @@ export default function LingeriePipelinePage() {
         currentIsolatedGarment,
         controller.signal,
         backGarmentUrl,
+        step.providerOverride,
       );
     } finally {
       abortControllersRef.current.delete(key);
@@ -2766,6 +2819,7 @@ export default function LingeriePipelinePage() {
                     onRerun={() => dispatchAction(activeJob.id, step.id, "rerun")}
                     onStop={() => stopStep(activeJob.id, step.id)}
                     onSelectCandidate={(url) => updateStep(activeJob.id, step.id, { resultUrl: url })}
+                    onChangeProvider={(provider) => updateStep(activeJob.id, step.id, { providerOverride: provider })}
                     autoMode={autoMode}
                   />
                 );
