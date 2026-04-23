@@ -188,10 +188,19 @@ Fix: antes del loop del pipeline se suben TODAS las fotos en paralelo (`Promise.
 - **Badge "detectada" rediseñado**: pill emerald compacta "✓ Espalda real lista"
 - **Fix ReferenceError**: freshJob no existía en catch scope; ahora se reconstruye desde `job`
 
+### Persistencia completa (shipped commits `7335da4` + `43f2050`)
+
+- Settings (modo, calidad, tipo, REF, modelConfig) en `lingerie:pipeline:settings:v1`
+- Jobs (fotos, ángulos, colores, ficha técnica, resultados por step) en `lingerie:pipeline:jobs:v1`
+- Refresh de la página preserva TODO el trabajo
+- Jobs restaurados tienen `file=null` (los File objects no serializan) → no se pueden re-analizar con Claude Vision pero sí re-correr pipeline si ya tienen uploadedUrl
+
+### Gallery auto-save (shipped commit `3c663de`)
+
+Cada resultado final (tryon, photoBack, photoFullBody, videos) se guarda automáticamente al gallery-store persistente. Visible en `/gallery` entre sesiones. 3 pipelines canónicos ahora consistentes.
+
 ### P1 pendiente (siguiente sesión)
 
-- **Persistencia de fotos**: los File objects no serializan a JSON, necesita refactor de `ImageJob.file` de required a optional + previewUrl fallback a uploadedUrl. Después de este fix, refrescar la página preservaría también las fotos y resultados
 - **Undo/Redo**: history stack de jobs/steps + atajos Ctrl+Z/Ctrl+Y
-- Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
 - Saved models/backgrounds presets (estilo Photoroom Virtual Model)
