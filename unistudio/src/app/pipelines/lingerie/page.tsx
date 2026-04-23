@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
 import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
+import { useGalleryStore } from "@/stores/gallery-store";
 import type { ProductSpec } from "@/app/api/analyze-product/route";
 
 /* ------------------------------------------------------------------ */
@@ -2379,8 +2380,46 @@ export default function LingeriePipelinePage() {
     }
 
     setJobs((prev) => prev.map((j) => j.id !== jobId ? j : { ...j, status: "done" }));
+
+    // Auto-guardar resultados en la galería persistente (gallery-store).
+    // Cada step con resultado queda como entry separada para que la usuaria
+    // pueda volver a /gallery y ver/descargar el historial entre sesiones
+    // (el store hace persistencia a localStorage con partialize).
+    try {
+      const addImages = useGalleryStore.getState().addImages;
+      const finalJob = (jobsSnapshot.find((j) => j.id === jobId)) ?? job;
+      const baseName = finalJob.file.name.replace(/\.[^.]+$/, '');
+      const ts = Date.now();
+      const refTag = finalJob.referenceKey ?? '';
+      const colorTag = finalJob.color ?? '';
+      const labelSuffix = [refTag, colorTag].filter(Boolean).join(' · ');
+      const galleryItems: Parameters<typeof addImages>[0] = [];
+      for (const [stepId, resultUrl] of Object.entries(stepResults)) {
+        if (!resultUrl) continue;
+        const stepDef = STEP_DEFS.find((s) => s.id === stepId);
+        const isVideo = resultUrl.includes('.mp4') || resultUrl.includes('.webm') || resultUrl.includes('video');
+        const ext = isVideo ? 'mp4' : 'jpg';
+        galleryItems.push({
+          id: `lingerie-${stepId}-${ts}-${finalJob.id}`,
+          filename: `${baseName}-${stepId}${labelSuffix ? ` (${labelSuffix})` : ''}.${ext}`,
+          resultUrl,
+          originalUrl: finalJob.uploadedUrl ?? finalJob.previewUrl,
+          date: new Date().toISOString(),
+          operations: [stepDef?.label ?? stepId],
+          project: `lingerie-${productType}${refTag ? `-${refTag}` : ''}`,
+        });
+      }
+      if (galleryItems.length > 0) {
+        addImages(galleryItems);
+        console.log(`[lingerie] ${galleryItems.length} resultados guardados en /gallery`);
+      }
+    } catch (galleryErr) {
+      // Silent — fallo de la galería no bloquea el pipeline ni molesta con toast
+      console.warn('[lingerie] No se pudo guardar en galería:', galleryErr);
+    }
+
     return { newSharedModel, newSharedSeed };
-  }, [autoMode, executeStep, updateStep]);
+  }, [autoMode, executeStep, updateStep, productType]);
 
   /* ---- Start the full pipeline ---- */
   const startPipeline = useCallback(async () => {
