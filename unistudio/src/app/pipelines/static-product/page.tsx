@@ -48,6 +48,12 @@ interface StepSnapshot {
   status: "idle" | "running" | "done" | "skipped" | "error";
   /** Mensaje de error si falló */
   error?: string;
+  /**
+   * Gap 6 — warning del validador opcional. Si set, la UI muestra un badge
+   * ⚠ junto al thumbnail con el motivo. No bloquea nada; el usuario decide
+   * si re-ejecuta vía los botones de Gap 5.
+   */
+  warning?: string;
 }
 
 interface Job {
@@ -259,6 +265,9 @@ export default function StaticProductPipelinePage() {
   // Gap 5 — Per-step approval: modal para cambiar el prompt del fondo
   const [bgPromptModal, setBgPromptModal] = useState<{ job: Job; customPrompt: string } | null>(null);
   const [reRunningJobId, setReRunningJobId] = useState<string | null>(null);
+
+  // Gap 6 — validador post-bg con Claude Haiku (opt-in, +$0.0002/foto)
+  const [validateBg, setValidateBg] = useState(false);
 
   // Read URL params from auto-mode redirect (e.g., ?productType=perfume)
   useEffect(() => {
@@ -496,6 +505,31 @@ export default function StaticProductPipelinePage() {
       totalCost += bgCost;
       updateStep(job.id, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost });
 
+      // Gap 6 — validador opcional post-bg. No bloquea; solo flaggea.
+      if (validateBg) {
+        try {
+          const vRes = await fetch("/api/validate-bg", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: currentUrl }),
+          });
+          const vData = await safeJson(vRes);
+          if (vData.success && vData.data) {
+            const v = vData.data as { productCount: number; looksLikeDuplicate: boolean; productMissing: boolean; reason: string };
+            const validateCost = (vData.cost as number) ?? 0.0002;
+            totalCost += validateCost;
+            if (v.productMissing) {
+              updateStep(job.id, "bg", { warning: `⚠ Producto no visible: ${v.reason}` });
+            } else if (v.looksLikeDuplicate || v.productCount > 1) {
+              updateStep(job.id, "bg", { warning: `⚠ Duplicado detectado (count=${v.productCount}): ${v.reason}` });
+            }
+          }
+        } catch (vErr) {
+          // Validator non-blocking: log y seguir
+          console.warn("[static-product] validate-bg failed:", vErr);
+        }
+      }
+
       // 5. Shadows → step "shadow"
       updateJob(job.id, { status: "shadowing" });
       updateStep(job.id, "shadow", { status: "running" });
@@ -610,7 +644,30 @@ export default function StaticProductPipelinePage() {
       currentUrl = genData.data.url || genData.data.imageUrl;
       const bgCost = genData.cost ?? (config.bgMode === "precise" ? 0.05 : 0.003);
       addedCost += bgCost;
-      updateStep(jobId, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost });
+      updateStep(jobId, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost, warning: undefined });
+
+      // Gap 6 — validador también se corre en re-runs
+      if (validateBg) {
+        try {
+          const vRes = await fetch("/api/validate-bg", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: currentUrl }),
+          });
+          const vData = await safeJson(vRes);
+          if (vData.success && vData.data) {
+            const v = vData.data as { productCount: number; looksLikeDuplicate: boolean; productMissing: boolean; reason: string };
+            addedCost += ((vData.cost as number) ?? 0.0002);
+            if (v.productMissing) {
+              updateStep(jobId, "bg", { warning: `⚠ Producto no visible: ${v.reason}` });
+            } else if (v.looksLikeDuplicate || v.productCount > 1) {
+              updateStep(jobId, "bg", { warning: `⚠ Duplicado detectado: ${v.reason}` });
+            }
+          }
+        } catch (vErr) {
+          console.warn("[static-product] validate-bg re-run failed:", vErr);
+        }
+      }
 
       // Shadow
       updateJob(jobId, { status: "shadowing" });
@@ -1018,12 +1075,22 @@ export default function StaticProductPipelinePage() {
                                 <span className="truncate font-medium text-gray-200">{meta.label}</span>
                               </div>
                               {step.resultUrl ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={step.resultUrl}
-                                  alt={meta.label}
-                                  className="mt-1 h-14 w-full rounded bg-black object-contain"
-                                />
+                                <div className="relative">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={step.resultUrl}
+                                    alt={meta.label}
+                                    className="mt-1 h-14 w-full rounded bg-black object-contain"
+                                  />
+                                  {step.warning && (
+                                    <span
+                                      className="absolute right-0.5 top-1.5 rounded bg-amber-500/90 px-1 py-0.5 text-[9px] font-semibold text-black shadow"
+                                      title={step.warning}
+                                    >
+                                      ⚠
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 text-gray-600">
                                   {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
@@ -1101,7 +1168,7 @@ export default function StaticProductPipelinePage() {
 
         {/* Actions */}
         {jobs.length > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleProcessAll}
               disabled={isRunning}
@@ -1110,6 +1177,26 @@ export default function StaticProductPipelinePage() {
               {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {isRunning ? "Procesando..." : "Procesar todas"}
             </button>
+
+            {/* Gap 6 — toggle validador de fondos */}
+            <label
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
+                validateBg
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+                  : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
+              )}
+              title="Corre un check de Claude Haiku después de generar el fondo para detectar duplicados, producto faltante, etc."
+            >
+              <input
+                type="checkbox"
+                checked={validateBg}
+                onChange={(e) => setValidateBg(e.target.checked)}
+                disabled={isRunning}
+                className="h-3 w-3 accent-amber-500"
+              />
+              <span>Validar fondos con IA <span className="text-[10px] opacity-70">(+$0.0002/foto)</span></span>
+            </label>
             <button
               onClick={() => {
                 jobs.forEach((j) => URL.revokeObjectURL(j.previewUrl));

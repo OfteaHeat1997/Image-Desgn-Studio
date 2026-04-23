@@ -90,6 +90,10 @@ export function getAdaptiveBgConfig(
   // Suffijo de calidad agregado a TODOS los prompts — fuerza Flux Pro a producir
   // imágenes nítidas sin artefactos, ampliación-ready para catálogo e-commerce.
   const HD = ', ultra high resolution, 8K, sharp focus, crystal clear details, professional commercial product photography, studio quality lighting, no blur, no artifacts, photo-realistic, magazine quality';
+  // Gap 6 — preemptive anti-duplication. Flux + Kontext Pro a veces generan un
+  // reflejo o segunda copia del producto en el fondo cuando el prompt menciona
+  // "reflejo" o "bokeh" cerca del producto. Este suffijo lo previene.
+  const NO_DUP = ', only ONE product visible in frame, no duplicate bottles or tubes or jars, no ghost copies, single product subject, no multiple instances of the product, background has no product in it';
   const seed = brandSeed(productType, brand);
 
   // --- Perfumes ---
@@ -97,7 +101,7 @@ export function getAdaptiveBgConfig(
     if (PREMIUM_BRANDS.includes(brand)) {
       return {
         prompt:
-          'luxury perfume bottle on polished cream marble surface with subtle veining, soft warm golden gradient lighting from side, visible glass refraction and crystal-clear reflections on the marble, shallow depth of field with bokeh, Sephora flagship store aesthetic, editorial catalog photography' + HD,
+          'luxury perfume bottle on polished cream marble surface with subtle veining, soft warm golden gradient lighting from side, visible glass refraction and crystal-clear reflections on the marble, shallow depth of field with bokeh, Sephora flagship store aesthetic, editorial catalog photography' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',
@@ -107,7 +111,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'cyzone') {
       return {
         prompt:
-          'vibrant coral-to-lilac gradient background with soft pastel bokeh highlights, youthful modern aesthetic with clean geometry, professional fragrance commercial photography, fresh and dynamic' + HD,
+          'vibrant coral-to-lilac gradient background with soft pastel bokeh highlights, youthful modern aesthetic with clean geometry, professional fragrance commercial photography, fresh and dynamic' + HD + NO_DUP,
         shadowType: 'drop',
         bgMode: 'precise',
         label: 'Fondo pastel juvenil',
@@ -116,7 +120,7 @@ export function getAdaptiveBgConfig(
     }
     return {
       prompt:
-        'clean warm beige studio background with soft natural daylight from the left, subtle linen texture visible, minimal elegant commercial product photography' + HD,
+        'clean warm beige studio background with soft natural daylight from the left, subtle linen texture visible, minimal elegant commercial product photography' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Beige cálido minimalista',
@@ -129,7 +133,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'yanbal' || brand === 'lbel') {
       return {
         prompt:
-          'pristine white Carrara marble surface with subtle gray veining, soft mirror-like reflection beneath the product, diffused daylight from left, clean spa aesthetic, La Mer flagship product photography, crisp edges' + HD,
+          'pristine white Carrara marble surface with subtle gray veining, soft mirror-like reflection beneath the product, diffused daylight from left, clean spa aesthetic, La Mer flagship product photography, crisp edges' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Mármol blanco premium (estilo La Mer)',
@@ -139,7 +143,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'esika' || brand === 'cyzone') {
       return {
         prompt:
-          'warm beige linen texture background with visible fabric weave, soft diffused lighting from above-left, cozy spa aesthetic, professional skincare commercial photography, natural and organic feel' + HD,
+          'warm beige linen texture background with visible fabric weave, soft diffused lighting from above-left, cozy spa aesthetic, professional skincare commercial photography, natural and organic feel' + HD + NO_DUP,
         shadowType: 'contact',
         bgMode: 'precise',
         label: 'Beige cálido tipo spa',
@@ -148,7 +152,7 @@ export function getAdaptiveBgConfig(
     }
     return {
       prompt:
-        'neutral warm cream background with subtle linen texture, soft studio lighting, clean commercial skincare product photography, elegant minimalism' + HD,
+        'neutral warm cream background with subtle linen texture, soft studio lighting, clean commercial skincare product photography, elegant minimalism' + HD + NO_DUP,
       shadowType: 'contact',
       bgMode: 'precise',
       label: 'Crema neutro',
@@ -160,7 +164,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'sunscreen') {
     return {
       prompt:
-        'defocused warm sandy beach background with golden-hour sun flare, soft turquoise ocean blur in the distance, shallow depth of field, summer sun-protection commercial photography, Coppertone campaign aesthetic, bright and vibrant' + HD,
+        'defocused warm sandy beach background with golden-hour sun flare, soft turquoise ocean blur in the distance, shallow depth of field, summer sun-protection commercial photography, Coppertone campaign aesthetic, bright and vibrant' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Playa desenfocada (estilo Coppertone)',
@@ -172,7 +176,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'deodorant') {
     return {
       prompt:
-        'smooth cool gray-to-silver gradient background with soft top lighting, subtle studio vignette, clean commercial product photography with no distractions, modern minimal aesthetic' + HD,
+        'smooth cool gray-to-silver gradient background with soft top lighting, subtle studio vignette, clean commercial product photography with no distractions, modern minimal aesthetic' + HD + NO_DUP,
       shadowType: 'contact',
       bgMode: 'precise',
       label: 'Degradado gris neutro',
@@ -184,7 +188,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'facial') {
     return {
       prompt:
-        'clean white-to-pale-blue spa background with suggestion of water droplets and subtle reflections, fresh clinical skincare aesthetic, La Roche-Posay pharmacy commercial photography, luminous and pure' + HD,
+        'clean white-to-pale-blue spa background with suggestion of water droplets and subtle reflections, fresh clinical skincare aesthetic, La Roche-Posay pharmacy commercial photography, luminous and pure' + HD + NO_DUP,
       shadowType: 'reflection',
       bgMode: 'precise',
       label: 'Spa azul/blanco',
@@ -196,7 +200,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'makeup') {
     return {
       prompt:
-        'dramatic matte black background with soft rim lighting from the side creating a rich shadow falloff, subtle spotlight on the product, luxury cosmetics editorial photography, high contrast, MAC flagship aesthetic, glossy and bold' + HD,
+        'dramatic matte black background with soft rim lighting from the side creating a rich shadow falloff, subtle spotlight on the product, luxury cosmetics editorial photography, high contrast, MAC flagship aesthetic, glossy and bold' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Negro mate dramático (estilo MAC)',
@@ -206,7 +210,7 @@ export function getAdaptiveBgConfig(
 
   // Fallback
   return {
-    prompt: 'clean pure white studio background with subtle gradient, professional commercial product photography, centered product, soft studio lighting' + HD,
+    prompt: 'clean pure white studio background with subtle gradient, professional commercial product photography, centered product, soft studio lighting' + HD + NO_DUP,
     shadowType: 'contact',
     bgMode: 'precise',
     label: 'Fondo blanco simple',

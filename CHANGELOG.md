@@ -1,5 +1,53 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C6) — Gap 6 del audit: validator preventivo + opt-in post-bg
+
+Sexto commit del plan. Dos frentes:
+
+1. **Preventivo (gratis)** — nuevo sufijo `NO_DUP` en la matriz de prompts:
+   `", only ONE product visible in frame, no duplicate bottles or tubes or jars, no ghost copies, single product subject, no multiple instances of the product, background has no product in it"`
+   Añadido a los 11 prompts de `getAdaptiveBgConfig` (6 tipos × variantes por marca). Flux y Kontext Pro respetan las negaciones en el prompt positivo.
+
+2. **Detección opt-in (+$0.0002/foto)** — nueva ruta `/api/validate-bg`:
+   - Toma `imageUrl` (URL HTTP o data URL)
+   - Fetchea + base64 + Claude Haiku con vision
+   - Prompt pide conteo de productos + flags `looksLikeDuplicate` y `productMissing`
+   - Respuesta JSON estricta parseada con regex + fallback
+   - Retorna `{ productCount, looksLikeDuplicate, productMissing, reason }` + cost 0.0002
+
+### Cambios
+- `unistudio/src/lib/pipelines/static-product.ts` — nuevo `NO_DUP`, aplicado vía replace_all `+ HD,` → `+ HD + NO_DUP,`.
+- `unistudio/src/app/api/validate-bg/route.ts` (nuevo) — 120 líneas, patrón basado en `/api/analyze-image`.
+- `unistudio/src/app/pipelines/static-product/page.tsx`:
+  - `StepSnapshot` añade `warning?: string`.
+  - Nuevo estado `validateBg` (boolean, default false).
+  - `processJob` llama al validador después de bg si el toggle está on. Setea `step.bg.warning` si falla. No bloquea.
+  - `reRunBgAndBelow` también valida al re-generar (resetea el warning primero).
+  - UI: toggle "Validar fondos con IA (+$0.0002/foto)" junto a "Procesar todas", color amber cuando on.
+  - Timeline del step bg: badge ⚠ amarillo en la esquina superior-derecha del thumbnail si hay warning, tooltip con el motivo.
+- `docs/inventory-final/AUDIT_ESTATICOS.md` — Gap 6 HECHO.
+
+### Flow real
+```
+Usuario activa "Validar fondos con IA"
+  → procesa batch de 32 cremas
+  → 29 pasan limpias, 3 salen con ⚠
+  → usuario clickea ⚠ en una, ve tooltip "Duplicado detectado: hay un reflejo con el tubo entero"
+  → click 🎨 Cambiar en ese job
+  → elige alternativa de matriz o edita prompt
+  → re-ejecuta → validador corre otra vez → si sale limpio, badge desaparece
+```
+
+### Costo real
+- Sin validador: $1.63 por 32 cremas (igual que antes)
+- Con validador: $1.63 + 32 × $0.0002 = **$1.64** (+0.6%)
+- Con cache de fondos (Gap 7 futuro): el validador NO se skippea para hits de cache — se re-valida cada SKU.
+
+### No toca
+- Pipeline Lencería.
+- `/api/bg-generate` (sigue sin negative_prompt dedicado — usamos sufijo en positive porque Kontext Pro no siempre respeta negative).
+- Validador es opt-in → costo default sigue igual que antes.
+
 ## 2026-04-23 (C5) — Gap 5 del audit: UI per-step con approval en Estáticos
 
 Quinto commit del plan. Da control de calidad al usuario después de que un job termina: puede re-ejecutar solo el step de fondo (con prompt custom o alternativa de la matriz) o solo el step de sombra, sin tener que re-subir la foto ni re-correr los 5 steps desde arriba.
