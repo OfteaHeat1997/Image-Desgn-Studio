@@ -1969,7 +1969,50 @@ export default function LingeriePipelinePage() {
   }, [referenceNumber]);
 
   /* ---- Setup: add images ---- */
+  // Undo/Redo: stack de snapshots de jobs antes de cada acción destructiva.
+  // Solo se aplica en el setup phase — durante el pipeline run, setJobs cambia
+  // demasiado (cada status update) y un undo no tendría sentido semántico.
+  const historyRef = useRef<ImageJob[][]>([]);
+  const futureRef = useRef<ImageJob[][]>([]);
+  const MAX_HISTORY = 20;
+  const [historyVersion, setHistoryVersion] = useState(0);  // Para re-render de botones
+
+  /** Snapshot del estado actual de jobs antes de una acción destructiva.
+   *  Limpia el redo stack (futureRef) porque la nueva acción rompe el futuro. */
+  const pushHistory = useCallback(() => {
+    setJobs((prev) => {
+      historyRef.current.push(prev);
+      if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
+      futureRef.current = [];
+      setHistoryVersion((v) => v + 1);
+      return prev;
+    });
+  }, []);
+
+  const undoJobs = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    setJobs((prev) => {
+      futureRef.current.push(prev);
+      const last = historyRef.current.pop()!;
+      setHistoryVersion((v) => v + 1);
+      toast.info("Deshecho");
+      return last;
+    });
+  }, []);
+
+  const redoJobs = useCallback(() => {
+    if (futureRef.current.length === 0) return;
+    setJobs((prev) => {
+      historyRef.current.push(prev);
+      const next = futureRef.current.pop()!;
+      setHistoryVersion((v) => v + 1);
+      toast.info("Rehecho");
+      return next;
+    });
+  }, []);
+
   const handleFiles = useCallback((files: File[]) => {
+    pushHistory();
     const newJobs: ImageJob[] = files.map((file) => {
       const url = URL.createObjectURL(file);
       previewUrlsRef.current.push(url);
@@ -1989,16 +2032,63 @@ export default function LingeriePipelinePage() {
       };
     });
     setJobs((prev) => [...prev, ...newJobs]);
-  }, []);
+  }, [pushHistory]);
 
   /** Phase 2f P0-1: usuaria corrigió el ángulo desde el dropdown del card. */
   const updateJobAngle = useCallback((jobId: string, angle: PhotoAngle) => {
+    pushHistory();
     setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, photoAngle: angle } : j));
-  }, []);
+  }, [pushHistory]);
 
   const removeJob = useCallback((id: string) => {
+    pushHistory();
     setJobs((prev) => prev.filter((j) => j.id !== id));
-  }, []);
+  }, [pushHistory]);
+
+  /** P2: "Comenzar de nuevo" — clear everything (jobs in memory + localStorage
+   *  persistence). La ficha técnica y los resultados procesados se limpian,
+   *  pero la galería (/gallery) y los settings quedan. */
+  const resetAll = useCallback(() => {
+    if (jobs.length > 0 && !window.confirm("¿Estás segura? Se borran las fotos subidas y los resultados. Los settings se mantienen.")) {
+      return;
+    }
+    pushHistory();
+    setJobs([]);
+    setActiveJobIndex(0);
+    setSharedModelUrl(undefined);
+    setSharedSeed(undefined);
+    setPhase("setup");
+    try {
+      window.localStorage.removeItem("lingerie:pipeline:jobs:v1");
+    } catch { /* ignore */ }
+    toast.success("Sesión reiniciada — podés subir fotos nuevas.");
+  }, [jobs.length, pushHistory]);
+
+  // Atajos Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y. Solo activan si el foco no está
+  // en un input/textarea (así no pisa el undo nativo del browser en campos).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isEditable = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+      if (isEditable) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undoJobs();
+      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        redoJobs();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undoJobs, redoJobs]);
+
+  const canUndo = historyRef.current.length > 0;
+  const canRedo = futureRef.current.length > 0;
+  // historyVersion fuerza re-render cuando canUndo/canRedo cambian
+  void historyVersion;
 
   /* ---- Toggle step enabled ---- */
   const toggleStep = useCallback((stepId: StepId) => {
@@ -2652,9 +2742,43 @@ export default function LingeriePipelinePage() {
             <div className="space-y-6">
               {/* Upload */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                  1 · Fotos del Producto
-                </h2>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+                    1 · Fotos del Producto
+                  </h2>
+                  {/* Undo / Redo / Reset — controles "app profesional" */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={undoJobs}
+                      disabled={!canUndo}
+                      title="Deshacer (Ctrl+Z)"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-gray-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-400"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={redoJobs}
+                      disabled={!canRedo}
+                      title="Rehacer (Ctrl+Shift+Z)"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-gray-400 transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-400"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 -scale-x-100" />
+                    </button>
+                    <div className="mx-1 h-4 w-px bg-white/10" />
+                    <button
+                      type="button"
+                      onClick={resetAll}
+                      disabled={jobs.length === 0}
+                      title="Comenzar de nuevo — borra las fotos y resultados (settings se mantienen)"
+                      className="flex items-center gap-1 rounded-md border border-white/10 px-2 h-7 text-[11px] font-medium text-gray-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                    >
+                      <X className="h-3 w-3" />
+                      Comenzar de nuevo
+                    </button>
+                  </div>
+                </div>
                 <UploadZone onFiles={handleFiles} />
 
                 {/* Uploaded image grid */}
