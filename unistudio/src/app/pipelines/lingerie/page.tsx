@@ -1954,13 +1954,14 @@ export default function LingeriePipelinePage() {
 
   // Persistencia de jobs: guarda el array entero (sin `file`, que no
   // serializa) cada vez que cambia. Debounce 800ms porque jobs cambia mucho
-  // durante el pipeline (cada status update). Máximo 20 jobs guardados para
-  // no saturar localStorage.
+  // durante el pipeline (cada status update). Máximo 150 jobs guardados para
+  // soportar el inventario completo (128 fotos = 128 jobs) sin saturar
+  // localStorage (~2KB/job × 150 = ~300KB, muy por debajo del quota 5-10MB).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const timer = setTimeout(() => {
       try {
-        const MAX_PERSISTED = 20;
+        const MAX_PERSISTED = 150;
         const toPersist = jobs.slice(-MAX_PERSISTED).map((j) => {
           // Omit `file` (File objects no serializan). Mantenemos todo lo demás.
           // Previews blob: mantenemos el string tal cual; al restaurar se
