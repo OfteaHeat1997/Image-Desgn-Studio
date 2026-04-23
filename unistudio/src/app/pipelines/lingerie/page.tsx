@@ -954,6 +954,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
   return (
     <div
+      data-step-id={step.id}
       className={cn(
         "rounded-xl border transition-all duration-200",
         isActive && step.status !== "idle" && step.status !== "pending"
@@ -2557,6 +2558,14 @@ export default function LingeriePipelinePage() {
 
       updateStep(jobId, stepDef.id, { status: "processing", inputUrl: inputForStep });
 
+      // Auto-scroll al step que está procesando. En mobile las tarjetas se
+      // extienden below-the-fold y la usuaria no vería que un step arrancó.
+      // requestAnimationFrame para esperar que React renderee el status update.
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-step-id="${stepDef.id}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+
       try {
         // Refresh job to get latest state
         const freshJob = (await new Promise<ImageJob>((resolve) => {
@@ -3596,6 +3605,42 @@ export default function LingeriePipelinePage() {
           )}
         </div>
       </header>
+
+      {/* Batch progress — visible arriba cuando hay 2+ jobs, muestra cuántos
+          van completados, cuántos en cola, y el gasto acumulado del batch. */}
+      {jobs.length > 1 && (
+        <div className="border-b border-white/8 bg-white/[0.02] px-4 py-2">
+          {(() => {
+            const done = jobs.filter((j) => j.status === "done").length;
+            const active = jobs.filter((j) => j.status === "active").length;
+            const errors = jobs.filter((j) => j.status === "error").length;
+            const pending = jobs.length - done - active - errors;
+            const totalSpent = jobs.reduce((sum, j) => sum + j.totalCost, 0);
+            const pct = Math.round((done / jobs.length) * 100);
+            return (
+              <div className="mx-auto flex max-w-4xl items-center gap-3">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-500",
+                      done === jobs.length ? "bg-emerald-500" : "bg-violet-500",
+                    )}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-gray-400 whitespace-nowrap">
+                  {done > 0 && <span className="text-emerald-400">{done} listo{done > 1 ? 's' : ''}</span>}
+                  {active > 0 && <span className="text-violet-400">{active} procesando</span>}
+                  {errors > 0 && <span className="text-red-400">{errors} error{errors > 1 ? 'es' : ''}</span>}
+                  {pending > 0 && <span>{pending} en cola</span>}
+                  <span className="text-gray-500">·</span>
+                  <span className="font-medium text-white">${totalSpent.toFixed(2)}</span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar — image list */}
