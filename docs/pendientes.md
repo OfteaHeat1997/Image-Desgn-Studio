@@ -159,10 +159,16 @@ Nuevo selector en setup con 3 opciones:
 - Grilla ordenada por (REF, color) para visibilidad
 - sharedModelUrl ya se reusa entre jobs del mismo batch (legacy) → modelo IA se paga UNA vez por batch aunque haya 10 colores
 
+### Provider switcher en retry (shipped commit `2d98353`)
+
+- Dropdown "Proveedor" aparece en el error panel de tryon/photoBack/photoFullBody
+- 4 opciones: Auto / Kolors (default lencería) / FASHN v1.6 (alta calidad) / IDM-VTON (backup)
+- Botón cambia a "Reintentar con FASHN v1.6" cuando la usuaria eligió algo distinto a Auto
+- El override queda persistido en `step.providerOverride` y se pasa a `/api/tryon` en el siguiente rerun
+
 ### P1 pendiente (siguiente sesión)
 
 - Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura (requiere lift state por REF)
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
-- P1-1: Provider switcher (Kolors→FASHN→Kling) en retry
-- P1-3: Quality/Speed toggle por step (FASHN mode)
+- P1-3: Quality/Speed toggle por step (FASHN `mode: performance/balanced/quality`)
 - P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)
