@@ -2074,6 +2074,34 @@ export default function LingeriePipelinePage() {
       })),
     }));
 
+    // Pre-upload TODAS las fotos antes de correr el pipeline. Así cuando el
+    // modo face-swap (u otro que use findMatchingPhoto) busque la uploadedUrl
+    // de otra foto del batch, ya está disponible. Sin esto, las fotos no-
+    // frontal quedan con uploadedUrl=undefined hasta que su propio processJob
+    // las suba — y face-swap en frontal runs ANTES, así que no las veía.
+    //
+    // Upload en paralelo para no secuenciar 6 uploads de ~5s cada uno.
+    const uploadPromises = jobsSnapshot.map(async (job, idx) => {
+      if (job.uploadedUrl) return { idx, ...job };
+      try {
+        const uploaded = await uploadFile(job.file);
+        return { idx, ...job, uploadedUrl: uploaded.url, falUrl: uploaded.falUrl };
+      } catch (err) {
+        console.warn(`[lingerie] pre-upload falló para ${job.file.name}:`, err);
+        return { idx, ...job };
+      }
+    });
+    const uploadedJobs = await Promise.all(uploadPromises);
+    // Mutar jobsSnapshot in-place con las URLs conseguidas + reflejar en la
+    // UI para que la usuaria vea que hubo progreso (ya no quedan en "En cola").
+    for (const u of uploadedJobs) {
+      jobsSnapshot[u.idx] = { ...jobsSnapshot[u.idx], uploadedUrl: u.uploadedUrl, falUrl: u.falUrl };
+    }
+    setJobs((prev) => prev.map((j) => {
+      const match = uploadedJobs.find((u) => u.id === j.id);
+      return match ? { ...j, uploadedUrl: match.uploadedUrl, falUrl: match.falUrl } : j;
+    }));
+
     for (let i = 0; i < jobsSnapshot.length; i++) {
       const job = jobsSnapshot[i];
       setActiveJobIndex(i);
