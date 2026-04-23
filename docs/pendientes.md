@@ -166,9 +166,20 @@ Nuevo selector en setup con 3 opciones:
 - Botón cambia a "Reintentar con FASHN v1.6" cuando la usuaria eligió algo distinto a Auto
 - El override queda persistido en `step.providerOverride` y se pasa a `/api/tryon` en el siguiente rerun
 
+### P1-3 Quality toggle FASHN (shipped commit `4044938`)
+
+- Toggle `Rápido / Balanceado / Alta calidad` en el setup (con duración estimada por cada uno)
+- Se pasa como `fashnMode` al `/api/tryon` → inyectado dentro de `inputs.mode` del FASHN API v1.6
+- Solo afecta cuando el tryon usa FASHN. Kolors/IDM-VTON lo ignoran
+- Combinable con provider switcher: "Reintentar con FASHN v1.6" + modo Alta calidad = preservación máxima de textura
+
+### Pre-upload paralelo (shipped commit `b8ff9ff`)
+
+Fix: antes del loop del pipeline se suben TODAS las fotos en paralelo (`Promise.all`). Antes del fix, face-swap en job A no podía ver `uploadedUrl` de job B porque B no había corrido su processJob. Ahora las fotos están todas subidas antes del primer step, y `findMatchingPhoto` encuentra sus URLs.
+
 ### P1 pendiente (siguiente sesión)
 
 - Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura (requiere lift state por REF)
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
-- P1-3: Quality/Speed toggle por step (FASHN `mode: performance/balanced/quality`)
 - P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)
+- Download button por step (save individual step results)
