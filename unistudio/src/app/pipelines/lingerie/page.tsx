@@ -2396,13 +2396,16 @@ export default function LingeriePipelinePage() {
         // y tryon varían. La usuaria elige cuál interpretación le gusta más.
         const seeds = Array.from({ length: N_SAMPLES }, () => Math.floor(Math.random() * 999999));
         console.log(`[lingerie] ${step.id}: multi-sample con ${N_SAMPLES} variantes (seeds: ${seeds.join(', ')})`);
+        const effectiveConfig: ModelConfig = job.suggestedBodyType && job.suggestedBodyType !== modelConfig.bodyType
+          ? { ...modelConfig, bodyType: job.suggestedBodyType }
+          : modelConfig;
         const results = await Promise.all(
           seeds.map((seed) =>
             runStep(
               step.id,
               inputUrl,
               job.falUrl,
-              modelConfig,
+              effectiveConfig,
               productType,
               currentSharedModel,
               referenceNumber || undefined,
@@ -2424,11 +2427,19 @@ export default function LingeriePipelinePage() {
         };
       }
 
+      // Per-job bodyType override: si la foto tiene talla detectada que sugiere
+      // un bodyType distinto al global, usamos el sugerido para ESTE job. Así un
+      // batch con tallas mixtas (32B slim + 38B curvy + 42D plus-size) genera
+      // modelos IA con cuerpos apropiados para cada talla automáticamente.
+      const effectiveModelConfig: ModelConfig = job.suggestedBodyType && job.suggestedBodyType !== modelConfig.bodyType
+        ? { ...modelConfig, bodyType: job.suggestedBodyType }
+        : modelConfig;
+
       return await runStep(
         step.id,
         inputUrl,
         job.falUrl,
-        modelConfig,
+        effectiveModelConfig,
         productType,
         currentSharedModel,
         referenceNumber || undefined,
