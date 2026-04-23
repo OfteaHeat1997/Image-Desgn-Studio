@@ -578,7 +578,7 @@ export async function saveAiModel(input: {
 export async function updateAiModelName(id: string, name: string): Promise<boolean> {
   if (!prisma) return false;
   try {
-    const db = await prisma;
+    const db = prisma as NonNullable<typeof prisma>;
     await db.aiModel.update({ where: { id }, data: { name } });
     return true;
   } catch (e) {

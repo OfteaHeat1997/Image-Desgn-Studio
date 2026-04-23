@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
 
     console.log('[face-swap] target:', targetImage.slice(0, 80), '| source:', sourceImage.slice(0, 80));
 
+    // Param names dependen del modelo exacto en Replicate. cdingram/face-swap
+    // usa input_image + swap_image. Otros modelos pueden usar target_image +
+    // source_image, o face + target. Si el modelo tira "invalid input", hay
+    // que verificar los param names en https://replicate.com/<model>/api.
     const output = await runModel(FACE_SWAP_MODEL, {
       input_image: targetImage,
       swap_image: sourceImage,
