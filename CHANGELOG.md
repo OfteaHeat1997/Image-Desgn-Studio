@@ -1,5 +1,32 @@
 # UniStudio — Changelog
 
+## 2026-04-23 — Inventario final post-limpieza familia + auditoría pipeline Estáticos
+
+Mamá y Angely terminaron la limpieza manual del inventario (mamá borró rows, Angely marcó en rojo los que había que eliminar). Llegaron 7 Word docs (`*_UPDATED.docx` + `*_FINAL.docx`) y 5 zips con las imágenes finales en `C:\Users\maria\Pictures\Inventory Unistyles images\`. Procesado todo en `docs/inventory-final/`:
+
+### Deliverables (solo docs — sin cambios de código)
+- `docs/inventory-final/README.md` — conteos post-limpieza vs inventario viejo (+4 bloqueadores, +3 cremas, −7 colonias, resto igual). Total inventario = 486 productos (sin cambio neto).
+- `docs/inventory-final/RESUMEN_CORTO.md` — versión para móvil / texto.
+- `docs/inventory-final/AUDIT_ESTATICOS.md` — auditoría del pipeline Estáticos vs Lencería (el gold standard). 7 gaps priorizados con commits sugeridos: seed por marca (gap 2), batch desde folder (gap 1), scan paths nuevos (gap 3), disambiguación perfume/desodorante (gap 4), UI per-step con approval (gap 5), validación programática (gap 6), cache de backgrounds generados (gap 7).
+- `docs/inventory-final/FLUJO_POR_PRODUCTO.md` — step-by-step para cada uno de los 6 tipos estáticos (perfume/crema/bloqueador/desodorante/facial/maquillaje) con prompts de la matriz + seeds sugeridos + errores comunes + costos.
+- `docs/inventory-final/catalogos/*.md` — los 6 Word convertidos a markdown vía pandoc.
+- `docs/inventory-final/_raw_products.json` — lista estructurada (108KB) para scripts futuros.
+- `docs/inventory-final/images/` — 199 imágenes extraídas y organizadas (bras/128, desodorantes/27, cremas/32, bloqueador/10, limpieza-facial/2), total 24MB. El folder `docs/` ya está en `.vercelignore` → no impacta deploy.
+
+### Gaps de INPUT detectados (bloqueadores para producción)
+- No hay zip de COLONIAS (139 perfumes sin imagen nueva)
+- No hay zip de PANTYS (72 pantys sin imagen)
+- No hay docx actualizado de DESODORANTES (27 imgs sin SKU claro)
+- 29 SKUs huérfanos: 4 limpieza-facial + 5 bloqueador + 20 cremas sin foto en zip
+
+### Pointer actualizado
+- `docs/inventory.md` ahora marca que para las 7 cats actualizadas la fuente de verdad es `docs/inventory-final/README.md`.
+
+### Sin cambios en
+- Pipeline Estáticos (código) — el audit queda como plan, código pendiente
+- `docs/pipelines/static-product.md` — doc de pipeline sigue igual hasta que se implementen los gaps
+- Módulos API — sin tocar
+
 ## 2026-04-21 (deploy: `1e63a40`) — Fix definitivo 422 image_load_error en tryon Kolors (lencería)
 
 Bug persistente desde hace varias sesiones: Kolors devolvía `Failed to load the image` en el `garment_image_url` con URL `https://v3b.fal.media/.../upload.jpeg`. La raíz real: `ensureFalAccessibleUrl` descargaba `api.replicate.com/v1/files/{id}` (que con Bearer auth devuelve **JSON metadata**, no bytes de imagen) y subía ese JSON a fal.media con extensión `.jpeg` → Kolors intentaba decodificar JSON como JPEG. Commits `74abcee` → `b789018` → `cb61537` → `2a59f66` → `d80265a` intentaron arreglarlo y fueron revertidos.

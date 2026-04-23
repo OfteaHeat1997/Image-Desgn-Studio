@@ -1,10 +1,16 @@
 # UNISTYLES CURACAO - Complete Product & Image Inventory
 
+> ⚠️ **ACTUALIZACIÓN 2026-04-23:** Este documento contiene el inventario histórico.
+> Para las categorías que recibieron update de mamá/Angely en Abril 2026
+> (BH, Pantys, Colonias, Cremas, Bloqueador, Limpieza Facial, Desodorantes)
+> la **fuente de verdad actual** es `docs/inventory-final/README.md`.
+> Este archivo sigue siendo válido para: Shapewear, Joyería, referencias históricas.
+
 > **Purpose:** This document is a complete reference for any AI agent working on this project.
 > It maps every product, image, data source, and known issue so you can fix images,
 > update products, and sync data accurately.
 >
-> **Last updated:** 2026-03-23
+> **Last updated:** 2026-03-23 (contenido histórico) · 2026-04-23 (pointer a inventory-final)
 
 ---
 
