@@ -13,6 +13,8 @@ import {
   Sparkles,
   Download,
   Wand2,
+  FolderOpen,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -124,6 +126,68 @@ function StatusPill({ status }: { status: JobStatus }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Batch from folder helpers — Gap 1 del audit                         */
+/* ------------------------------------------------------------------ */
+
+interface InventoryCategoryLite {
+  id: string;
+  name: string;
+  pipeline?: string;
+  pipelineParams?: Record<string, string>;
+  imageCount: number;
+  folders: string[];
+}
+
+interface InventoryImage {
+  filename: string;
+  dataUrl: string;
+  size: number;
+}
+
+/** base64 data URL → File para reusar el flow existente del pipeline */
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [header, base64] = dataUrl.split(",");
+  const mimeMatch = header.match(/data:([^;]+)/);
+  const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
+
+/** Carga TODOS los imágenes de un folder vía /api/inventory/load con paginación 10×10 */
+async function loadAllFromFolder(
+  folder: string,
+  onProgress: (loaded: number, total: number) => void,
+): Promise<InventoryImage[]> {
+  const all: InventoryImage[] = [];
+  let offset = 0;
+  const limit = 10;
+  while (true) {
+    const res = await fetch("/api/inventory/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder, offset, limit }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Error cargando (status ${res.status}): ${errText.slice(0, 120)}`);
+    }
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Error desconocido al cargar");
+    const page = json.data.images as InventoryImage[];
+    const total = json.data.total as number;
+    all.push(...page);
+    onProgress(all.length, total);
+    if (!json.data.hasMore || page.length === 0) break;
+    offset += page.length;
+    // seguridad: evitar loops infinitos si total < offset
+    if (offset >= total) break;
+  }
+  return all;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Upload zone                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -184,6 +248,12 @@ export default function StaticProductPipelinePage() {
   const [defaultBrand, setDefaultBrand] = useState<StaticBrand>("other");
   const previewUrlsRef = useRef<string[]>([]);
 
+  // Gap 1 — Batch desde folder del inventario
+  const [batchCategories, setBatchCategories] = useState<InventoryCategoryLite[] | null>(null);
+  const [batchLoadingId, setBatchLoadingId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+
   // Read URL params from auto-mode redirect (e.g., ?productType=perfume)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -201,8 +271,41 @@ export default function StaticProductPipelinePage() {
     };
   }, []);
 
+  // Gap 1 — cargar categorías del inventario al montar la página
+  const loadScan = useCallback(async () => {
+    setScanError(null);
+    try {
+      const res = await fetch("/api/inventory/scan");
+      if (!res.ok) throw new Error(`Scan falló con status ${res.status}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Scan falló");
+      const allCats = json.data.categories as InventoryCategoryLite[];
+      // Solo nos interesan categorías que ruteen a static-product Y tengan imágenes
+      const staticCats = allCats.filter(
+        (c) => c.pipeline === "/pipelines/static-product" && c.imageCount > 0,
+      );
+      setBatchCategories(staticCats);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : String(err));
+      setBatchCategories([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadScan();
+  }, [loadScan]);
+
+  /**
+   * Añade files al grid de jobs. Infiere tipo/marca del filename o de un
+   * `pathHint` explícito (C2 Gap 4). Si `presetType` / `presetBrand` vienen,
+   * ganan por encima de la inferencia (usado por el batch de C4 que ya conoce
+   * la categoría desde el scan).
+   */
   const handleFiles = useCallback(
-    (files: File[]) => {
+    (
+      files: File[],
+      opts?: { pathHint?: (f: File) => string; presetType?: StaticProductType; presetBrand?: StaticBrand },
+    ) => {
       if (files.length === 0) return;
       let ambiguousCount = 0;
       const newJobs: Job[] = files.map((file, i) => {
@@ -213,16 +316,18 @@ export default function StaticProductPipelinePage() {
         // o del webkitRelativePath (si viene de folder drag-drop). Previene que un
         // DORSAY.jpg del folder /desodorantes/ se procese como perfume premium Esika.
         const pathHint =
-          (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? file.name;
+          opts?.pathHint?.(file) ??
+          (file as File & { webkitRelativePath?: string }).webkitRelativePath ??
+          file.name;
         const inferred = inferProductContextFromPath(pathHint);
-        if (inferred.ambiguous) ambiguousCount += 1;
+        if (inferred.ambiguous && !opts?.presetType) ambiguousCount += 1;
 
         return {
           id: `job-${Date.now()}-${i}`,
           file,
           previewUrl: preview,
-          productType: inferred.productType ?? defaultType,
-          brand: inferred.brand ?? defaultBrand,
+          productType: opts?.presetType ?? inferred.productType ?? defaultType,
+          brand: opts?.presetBrand ?? inferred.brand ?? defaultBrand,
           status: "idle",
           cost: 0,
           steps: { ...INITIAL_STEPS },
@@ -255,6 +360,54 @@ export default function StaticProductPipelinePage() {
   const removeJob = (id: string) => {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   };
+
+  /**
+   * Gap 1 del audit — carga todas las imágenes de una categoría del inventario
+   * (paginado 10×10 vía /api/inventory/load), las convierte en File y las
+   * añade al grid. Después el usuario hace click en "Procesar todas" como
+   * con upload normal. Seed compartido por marca (Gap 2) garantiza catálogo
+   * cohesivo sin requerir cambios aquí.
+   */
+  const loadBatchFromCategory = useCallback(
+    async (cat: InventoryCategoryLite) => {
+      if (isRunning || batchLoadingId) return;
+      if (cat.folders.length === 0) {
+        toast.error(`${cat.name} no tiene carpetas con imágenes.`);
+        return;
+      }
+
+      setBatchLoadingId(cat.id);
+      setBatchProgress({ loaded: 0, total: cat.imageCount });
+      const loadedFiles: File[] = [];
+
+      try {
+        for (const folder of cat.folders) {
+          const images = await loadAllFromFolder(folder, (loaded) => {
+            setBatchProgress({ loaded: loadedFiles.length + loaded, total: cat.imageCount });
+          });
+          for (const img of images) {
+            loadedFiles.push(dataUrlToFile(img.dataUrl, img.filename));
+          }
+        }
+        if (loadedFiles.length === 0) {
+          toast.info(`No se encontraron imágenes en ${cat.name}.`);
+          return;
+        }
+        // Preset el productType desde el scan para esquivar la inferencia por filename
+        // (que solo ve el nombre, no el folder — resultaría menos precisa).
+        const presetType = cat.pipelineParams?.productType as StaticProductType | undefined;
+        handleFiles(loadedFiles, { presetType });
+        toast.success(`${loadedFiles.length} foto(s) cargadas desde ${cat.name}.`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.error(`Error cargando ${cat.name}: ${msg}`);
+      } finally {
+        setBatchLoadingId(null);
+        setBatchProgress(null);
+      }
+    },
+    [isRunning, batchLoadingId, handleFiles],
+  );
 
   const processJob = async (job: Job): Promise<void> => {
     const config = getAdaptiveBgConfig(job.productType, job.brand);
@@ -451,10 +604,98 @@ export default function StaticProductPipelinePage() {
           </p>
         </div>
 
+        {/* Gap 1 — Batch desde inventario local */}
+        <section className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">
+                <FolderOpen className="mr-2 inline h-4 w-4" />
+                Batch desde inventario
+              </h2>
+              <p className="mt-1 text-xs text-gray-400">
+                Carga todas las fotos de una categoría sin subir manualmente. Solo funciona en dev local (las imágenes viven en <code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code>, no se deployan).
+              </p>
+            </div>
+            <button
+              onClick={loadScan}
+              disabled={batchLoadingId !== null}
+              className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-gray-400 hover:border-white/20 hover:text-white disabled:opacity-50"
+              title="Refrescar inventario"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Refrescar
+            </button>
+          </div>
+
+          {scanError && (
+            <div className="mb-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              Error cargando inventario: {scanError}
+            </div>
+          )}
+
+          {batchCategories === null ? (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Loader2 className="h-3 w-3 animate-spin" /> Escaneando inventario...
+            </div>
+          ) : batchCategories.length === 0 ? (
+            <p className="text-xs text-gray-500">
+              No se encontraron categorías de estáticos en el inventario local. Verifica que <code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code> existe.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {batchCategories.map((cat) => {
+                const isLoading = batchLoadingId === cat.id;
+                const pt = cat.pipelineParams?.productType ?? "other";
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => loadBatchFromCategory(cat)}
+                    disabled={batchLoadingId !== null || isRunning}
+                    className={cn(
+                      "group relative flex flex-col items-start gap-1 rounded-lg border bg-black/30 px-3 py-2.5 text-left transition",
+                      isLoading
+                        ? "border-amber-500/40 bg-amber-500/10"
+                        : "border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:bg-black/30",
+                    )}
+                  >
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold text-gray-200">{cat.name}</span>
+                      {isLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-amber-300" />
+                      ) : (
+                        <Package className="h-3.5 w-3.5 flex-shrink-0 text-gray-500 group-hover:text-emerald-400" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                      <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono">{pt}</span>
+                      <span>{cat.imageCount} fotos</span>
+                    </div>
+                    {isLoading && batchProgress && (
+                      <div className="mt-1 w-full">
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-black/40">
+                          <div
+                            className="h-full bg-amber-400 transition-all"
+                            style={{
+                              width: `${batchProgress.total > 0 ? Math.round((batchProgress.loaded / batchProgress.total) * 100) : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-[9px] text-amber-300">
+                          Cargando {batchProgress.loaded}/{batchProgress.total}...
+                        </p>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Defaults + upload */}
         <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-            1 · Sube tus fotos
+            1 · Sube tus fotos <span className="font-normal normal-case text-gray-500">o usa el batch de arriba</span>
           </h2>
 
           <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

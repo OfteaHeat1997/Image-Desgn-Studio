@@ -16,6 +16,14 @@ const ALLOWED_WIN_ROOTS = [
   "C:\\Users\\maria\\Desktop\\Unistyles Projects\\",
 ];
 
+/**
+ * Linux path allowlist — para las imágenes finales en docs/inventory-final/
+ * (Gap 3 del audit). Resuelve una vez al boot desde el cwd del Next.js server,
+ * que es la carpeta `unistudio/`. El repo root es un nivel arriba.
+ */
+const REPO_ROOT = path.resolve(process.cwd(), "..");
+const ALLOWED_LINUX_ROOTS = [path.join(REPO_ROOT, "docs", "inventory-final", "images") + path.sep];
+
 function toWslPath(winPath: string): string {
   return winPath.replace(/^([A-Z]):\\/, (_, drive: string) => `/mnt/${drive.toLowerCase()}/`).replace(/\\/g, "/");
 }
@@ -24,7 +32,10 @@ function toWslPath(winPath: string): string {
 function isAllowedFolder(folder: string): boolean {
   // Reject any path containing traversal sequences
   if (folder.includes("..") || folder.includes("%2e") || folder.includes("%2E")) return false;
-  return ALLOWED_WIN_ROOTS.some((root) => folder.startsWith(root));
+  if (ALLOWED_WIN_ROOTS.some((root) => folder.startsWith(root))) return true;
+  // Allow paths under the repo's inventory-final folder
+  if (ALLOWED_LINUX_ROOTS.some((root) => folder.startsWith(root))) return true;
+  return false;
 }
 
 export async function POST(request: NextRequest) {
@@ -44,14 +55,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Folder not permitted." }, { status: 403 });
     }
 
-    const wslPath = toWslPath(folder);
+    // Si viene formato Windows, traducir a WSL. Paths Linux absolutos pasan igual.
+    const resolvedPath = folder.match(/^[A-Z]:\\/) ? toWslPath(folder) : folder;
 
-    if (!fs.existsSync(wslPath)) {
+    if (!fs.existsSync(resolvedPath)) {
       return NextResponse.json({ success: false, error: `Folder not found: ${folder}` }, { status: 404 });
     }
 
     // Read all image files
-    const entries = fs.readdirSync(wslPath, { withFileTypes: true });
+    const entries = fs.readdirSync(resolvedPath, { withFileTypes: true });
     const allImages = entries
       .filter((e) => e.isFile() && IMAGE_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -62,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // Read each image file and convert to base64 data URL
     const images = slice.map((entry) => {
-      const filePath = path.join(wslPath, entry.name);
+      const filePath = path.join(resolvedPath, entry.name);
       const buffer = fs.readFileSync(filePath);
       const ext = path.extname(entry.name).toLowerCase();
       const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";

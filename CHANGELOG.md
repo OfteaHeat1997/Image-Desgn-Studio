@@ -1,5 +1,56 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C4) — Gap 1 del audit: Batch desde folder en Pipeline Estáticos
+
+Cuarto commit del plan. Habilita procesar 32 cremas / 27 desodorantes / 10 bloqueadores / 2 limpieza-facial en un solo click — sin tener que arrastrar fotos una por una. Consume el `/api/inventory/scan` de C3 + el `/api/inventory/load` extendido.
+
+### Cambios
+
+**`unistudio/src/app/api/inventory/load/route.ts`** — allowlist Linux
+- Nueva constante `ALLOWED_LINUX_ROOTS` apuntando a `docs/inventory-final/images/` resuelto desde el cwd del server (`path.resolve(process.cwd(), '..')`).
+- `isAllowedFolder` ahora acepta Windows Y Linux roots.
+- `toWslPath` solo se aplica si el path empieza con `[A-Z]:\` — los paths Linux absolutos pasan sin tocar. Mismo patrón que se añadió al scan en C3.
+
+**`unistudio/src/app/pipelines/static-product/page.tsx`** — UI de batch
+- Sección nueva "Batch desde inventario" (verde, encima del upload zone) que:
+  1. Fetchea `/api/inventory/scan` al montar.
+  2. Filtra a categorías con `pipeline:"/pipelines/static-product"` + `imageCount>0`.
+  3. Renderiza un grid de tarjetas — cada tarjeta = una categoría con nombre, productType (chip mono), count de fotos.
+  4. Click → `loadBatchFromCategory(cat)` paginea `/api/inventory/load` 10×10 hasta agotar el folder.
+  5. Cada imagen → `dataUrlToFile(dataUrl, filename)` → File real.
+  6. Progress bar en vivo en la tarjeta mientras carga ("Cargando 15/32").
+  7. Al terminar, `handleFiles(files, { presetType })` añade los jobs con el productType correcto del scan (no se confía solo en filename inference).
+- Botón "Refrescar" para re-escanear si el usuario añade imágenes al folder.
+- Manejo de error con banner rojo si el scan falla.
+- `handleFiles` firma extendida con `opts?: { pathHint, presetType, presetBrand }` para casos donde el batch ya sabe la categoría y no hace falta inferirla por nombre.
+
+### Flow completo ahora funciona end-to-end (dev local)
+
+```
+Usuario abre /pipelines/static-product
+  → UI fetch /api/inventory/scan → muestra 4 tarjetas (Cremas, Bloqueador, Desodorantes, Limpieza Facial)
+  → Click "Cremas (32 fotos)"
+  → fetch /api/inventory/load pagina × 4 (32/10) → 32 base64 → 32 Files
+  → handleFiles({ presetType: 'cream' }) → 32 jobs, productType preset
+  → Click "Procesar todas"
+  → Pipeline corre por cada job con seed compartido (Gap 2) → los 32 SKUs Yanbal/Esika comparten mármol/lino
+  → Outputs auto-guardados en galería con naming static-{type}-{brand}
+```
+
+### Costo real por batch completo (estimado)
+- Cremas: 32 × $0.051 = **$1.63**
+- Desodorantes: 27 × $0.051 = **$1.38**
+- Bloqueador: 10 × $0.051 = **$0.51**
+- Limpieza Facial: 2 × $0.051 = **$0.10**
+- **Total batch estáticos completos: ~$3.62**
+- Con cache de fondos (Gap 7 cuando se implemente): ~$0.80
+
+### No toca
+- Pipeline Lencería.
+- Módulos bg-generate / shadows / enhance / bg-remove (invariantes).
+- Entries legacy del scan.
+- Formato de output (mismo naming, misma galería).
+
 ## 2026-04-23 (C3) — Gap 3 del audit: scan route mapea docs/inventory-final/images/
 
 Tercer commit del plan. Habilita el batch futuro (C4) al enseñarle al scan dónde viven las imágenes finales post-limpieza.
