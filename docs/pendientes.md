@@ -199,8 +199,19 @@ Fix: antes del loop del pipeline se suben TODAS las fotos en paralelo (`Promise.
 
 Cada resultado final (tryon, photoBack, photoFullBody, videos) se guarda automáticamente al gallery-store persistente. Visible en `/gallery` entre sesiones. 3 pipelines canónicos ahora consistentes.
 
+### Undo/Redo + Reset (shipped commit `d0935ef`)
+
+- History stack de jobs (20 snapshots máx) + redo stack, tracked en refs (no state)
+- `pushHistory()` se llama antes de cada acción destructiva: add/remove/cambio ángulo/reset
+- Ctrl+Z (Cmd+Z en Mac) → undo; Ctrl+Shift+Z o Ctrl+Y → redo
+- Listeners ignoran si el foco está en input/textarea (no pisa undo nativo en campos)
+- Botones visibles Deshacer/Rehacer en el heading de la sección Fotos
+- "Comenzar de nuevo" rojo: confirm dialog + limpia jobs in memory + localStorage jobs key + sharedModel/Seed, mantiene settings
+- Toast "Deshecho"/"Rehecho" para feedback
+
 ### P1 pendiente (siguiente sesión)
 
-- **Undo/Redo**: history stack de jobs/steps + atajos Ctrl+Z/Ctrl+Y
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
-- Saved models/backgrounds presets (estilo Photoroom Virtual Model)
+- Saved models/backgrounds presets con nombre custom (estilo Photoroom Virtual Model)
+- Keyboard shortcuts help dialog (press `?` to view all)
+- Comparación side-by-side con foto original en cada step result
