@@ -1105,7 +1105,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
           {/* Action buttons — only shown when done and in manual mode */}
           {canInteract && (
-            <div className="mt-4 flex items-center justify-end gap-2 border-t border-white/6 pt-4">
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/6 pt-4">
               <button
                 onClick={onSkip}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
@@ -1113,6 +1113,22 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 <SkipForward className="h-3.5 w-3.5" />
                 Saltar
               </button>
+              {/* Descargar directo sin abrir lightbox */}
+              {step.resultUrl && (
+                <a
+                  href={step.resultUrl.startsWith("/api/proxy-image")
+                    ? step.resultUrl
+                    : `/api/proxy-image?url=${encodeURIComponent(step.resultUrl)}`}
+                  download={`unistudio-${step.id}.${isVideo ? "mp4" : "jpg"}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
+                  title="Descargar esta imagen"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Descargar
+                </a>
+              )}
               <button
                 onClick={onRerun}
                 className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
@@ -3137,6 +3153,37 @@ export default function LingeriePipelinePage() {
                       ? "Procesando…"
                       : "En cola"}
                   </p>
+                  {/* Live cost progress: gastado vs estimado, en tiempo real. */}
+                  {(() => {
+                    const done = activeJob.steps.filter((s) => s.status === "done" || s.status === "accepted" || s.status === "skipped").length;
+                    const total = activeJob.steps.filter((s) => s.enabled).length;
+                    if (total === 0) return null;
+                    const estimated = activeJob.steps
+                      .filter((s) => s.enabled)
+                      .reduce((sum, s) => {
+                        // Parsear "$0.02" o "$0.01-$0.04" → tomar el primer número
+                        const m = (s.cost ?? "").match(/\$(\d+\.?\d*)/);
+                        return sum + (m ? parseFloat(m[1]) : 0);
+                      }, 0);
+                    const spent = activeJob.totalCost;
+                    const pct = Math.min(100, Math.round((done / total) * 100));
+                    return (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="h-1 flex-1 min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className={cn(
+                              "h-full transition-all",
+                              activeJob.status === "done" ? "bg-emerald-500" : "bg-violet-500",
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-500">
+                          {done}/{total} · ${spent.toFixed(3)} / ~${estimated.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 {/* Mobile: image navigation */}
                 <div className="ml-auto flex items-center gap-2 lg:hidden">
@@ -3222,7 +3269,7 @@ export default function LingeriePipelinePage() {
               {/* Completion summary */}
               {activeJob.status === "done" && (
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <CheckCircle2 className="h-6 w-6 text-emerald-400" />
                     <div>
                       <p className="font-semibold text-white">Imagen procesada</p>
@@ -3230,7 +3277,44 @@ export default function LingeriePipelinePage() {
                         Costo total: <span className="font-medium text-emerald-400">${activeJob.totalCost.toFixed(3)}</span>
                       </p>
                     </div>
-                    <div className="ml-auto flex gap-2">
+                    <div className="ml-auto flex flex-wrap gap-2">
+                      {/* Descargar todos los resultados del job como ZIP (batch download) */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const results = activeJob.steps
+                            .filter((s) => s.status === "done" || s.status === "accepted")
+                            .filter((s) => s.resultUrl && !s.resultUrl.startsWith("/api/proxy-image?url=data:"));
+                          if (results.length === 0) {
+                            toast.info("No hay resultados para descargar todavía.");
+                            return;
+                          }
+                          toast.info(`Descargando ${results.length} archivos…`);
+                          // Disparamos un <a download> por cada resultado con delay de
+                          // 200ms entre cada uno para que el browser no los ahogue.
+                          for (let i = 0; i < results.length; i++) {
+                            const s = results[i];
+                            if (!s.resultUrl) continue;
+                            const isVideo = s.resultUrl.includes(".mp4") || s.resultUrl.includes(".webm") || s.resultUrl.includes("video");
+                            const ext = isVideo ? "mp4" : "jpg";
+                            const href = s.resultUrl.startsWith("/api/proxy-image")
+                              ? s.resultUrl
+                              : `/api/proxy-image?url=${encodeURIComponent(s.resultUrl)}`;
+                            const a = document.createElement("a");
+                            a.href = href;
+                            a.download = `unistudio-${activeJob.referenceKey ?? activeJob.id.slice(0, 6)}-${s.id}.${ext}`;
+                            a.target = "_blank";
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            if (i < results.length - 1) await new Promise((r) => setTimeout(r, 200));
+                          }
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-violet-500/30 hover:bg-violet-400"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Descargar todos
+                      </button>
                       {activeJobIndex < jobs.length - 1 && (
                         <button
                           onClick={() => setActiveJobIndex(activeJobIndex + 1)}
