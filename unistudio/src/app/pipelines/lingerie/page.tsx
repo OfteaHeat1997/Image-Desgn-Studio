@@ -28,6 +28,7 @@ import {
   ZapOff,
   Info,
   StopCircle,
+  Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -622,6 +623,191 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
 }
 
 /* ------------------------------------------------------------------ */
+/*  ImageLightbox — modal full-screen para ver/comparar/descargar      */
+/* ------------------------------------------------------------------ */
+
+interface ImageLightboxProps {
+  images: string[];           // 1 o N URLs (multi-sample = N candidatos)
+  startIndex: number;
+  selectedUrl?: string;       // URL marcada como "elegida" (multi-sample)
+  onClose: () => void;
+  onSelect?: (url: string) => void;  // Si está, mostramos botón "Elegir esta"
+  filenamePrefix?: string;    // ej "espalda-011473" → "espalda-011473-2.jpg"
+}
+
+/**
+ * Modal full-screen para inspeccionar una imagen al detalle. Si recibe
+ * múltiples imágenes (multi-sample), permite navegar entre ellas con flechas
+ * o tecla. Cada vista incluye botón Descargar y, si hay onSelect, botón
+ * "Usar esta variante".
+ */
+function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix }: ImageLightboxProps) {
+  const [idx, setIdx] = useState(Math.max(0, Math.min(startIndex, images.length - 1)));
+  const url = images[idx];
+  const isVideo = url && (url.includes(".mp4") || url.includes(".webm"));
+  const isSelected = url === selectedUrl;
+
+  // Cerrar con ESC, navegar con flechas
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && images.length > 1) setIdx((i) => (i - 1 + images.length) % images.length);
+      if (e.key === "ArrowRight" && images.length > 1) setIdx((i) => (i + 1) % images.length);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [images.length, onClose]);
+
+  // Lock body scroll mientras está abierto
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  if (!url) return null;
+
+  // Click outside (en el backdrop) cierra. Click en la imagen NO cierra.
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  // Para descargar: usamos el route /api/proxy-image?url=… para forzar el
+  // header content-disposition: attachment cuando sea posible. Si la URL es
+  // ya proxy interno, ponemos download attribute en el anchor.
+  const downloadHref = url.startsWith("/api/proxy-image")
+    ? url
+    : `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  const filename = `${filenamePrefix ?? "uniestudio"}-${idx + 1}.${isVideo ? "mp4" : "jpg"}`;
+
+  return (
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
+    >
+      {/* Top bar con controles */}
+      <div className="absolute top-0 right-0 left-0 flex items-center justify-between gap-2 p-3 sm:p-4">
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          {images.length > 1 && (
+            <span className="rounded-md bg-black/60 px-2.5 py-1 font-medium text-white">
+              {idx + 1} / {images.length}
+            </span>
+          )}
+          {isSelected && (
+            <span className="rounded-md bg-violet-500/30 px-2.5 py-1 font-medium text-violet-200">
+              ✓ Variante elegida
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={downloadHref}
+            download={filename}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+            title="Descargar esta imagen"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Descargar
+          </a>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+            title="Cerrar (Esc)"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Imagen / video grande, centrada */}
+      <div className="flex h-full w-full items-center justify-center px-4 py-16">
+        {isVideo ? (
+          <video
+            src={url}
+            controls
+            autoPlay
+            loop
+            className="max-h-[80vh] max-w-[95vw] rounded-lg"
+          />
+        ) : (
+          <img
+            src={url}
+            alt={`Imagen ${idx + 1}`}
+            className="max-h-[80vh] max-w-[95vw] rounded-lg object-contain"
+            style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
+          />
+        )}
+      </div>
+
+      {/* Navegación entre candidatos */}
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + images.length) % images.length); }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            title="Anterior (←)"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % images.length); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            title="Siguiente (→)"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        </>
+      )}
+
+      {/* Bottom: botón Elegir (solo en multi-sample) */}
+      {onSelect && images.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 flex justify-center p-4">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(url); onClose(); }}
+            disabled={isSelected}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors",
+              isSelected
+                ? "bg-emerald-500/30 text-emerald-200 cursor-default"
+                : "bg-violet-500 text-white shadow-lg shadow-violet-500/30 hover:bg-violet-400",
+            )}
+          >
+            <Check className="h-4 w-4" />
+            {isSelected ? "Variante ya elegida" : `Usar variante ${idx + 1}`}
+          </button>
+        </div>
+      )}
+
+      {/* Thumbnails strip al pie cuando hay multi-sample */}
+      {images.length > 1 && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-1.5 rounded-lg bg-black/60 p-1.5">
+          {images.map((u, i) => (
+            <button
+              key={`${u}-${i}`}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setIdx(i); }}
+              className={cn(
+                "relative h-10 w-10 overflow-hidden rounded transition-all",
+                i === idx ? "ring-2 ring-violet-400" : "opacity-60 hover:opacity-100",
+              )}
+            >
+              <img src={u} alt={`v${i + 1}`} className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Step Card — the core interactive component                          */
 /* ------------------------------------------------------------------ */
 
@@ -648,6 +834,13 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
   const canInteract = step.status === "done" && !autoMode;
   const isVideo = step.resultUrl && (step.resultUrl.includes(".mp4") || step.resultUrl.includes(".webm") || step.resultUrl.includes("video"));
   const [showDocs, setShowDocs] = useState(false);
+  // Lightbox: cuando es null no está abierto. Cuando tiene número, esa es
+  // la imagen inicial. Para resultado único usamos el array [resultUrl].
+  // Para multi-sample usamos step.candidates.
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const lightboxImages = step.candidates && step.candidates.length > 1
+    ? step.candidates
+    : (step.resultUrl ? [step.resultUrl] : []);
   const docs = STEP_DOCS[step.id];
 
   return (
@@ -823,11 +1016,12 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 </div>
               ) : step.candidates && step.candidates.length > 1 ? (
                 // Multi-sample: grid 2×2 de candidatos. resultUrl es el
-                // seleccionado actualmente (borde violeta); click en otro lo
-                // cambia. Fit en mobile: grid-cols-2 h-20 each = 2×80px.
+                // seleccionado actualmente (borde violeta); click en uno
+                // ABRE el lightbox (no selecciona directo) — la usuaria ve
+                // el detalle al tamaño grande y desde ahí puede elegir.
                 <div>
                   <p className="mb-1.5 text-[10px] text-violet-300">
-                    {step.candidates.length} variantes — tocá la que más se parezca a tu producto
+                    {step.candidates.length} variantes — tocá una para verla grande y elegirla
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {step.candidates.map((url, i) => {
@@ -836,14 +1030,14 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                         <button
                           key={`${url}-${i}`}
                           type="button"
-                          onClick={() => onSelectCandidate?.(url)}
+                          onClick={() => setLightboxIdx(i)}
                           className={cn(
                             "group relative aspect-[3/4] overflow-hidden rounded-md border transition-all",
                             isSelected
                               ? "border-violet-400 ring-2 ring-violet-400/50"
                               : "border-white/15 hover:border-white/40",
                           )}
-                          title={`Variante ${i + 1}${isSelected ? ' (seleccionada)' : ''}`}
+                          title={`Tocá para ver variante ${i + 1} en grande${isSelected ? ' (seleccionada)' : ''}`}
                         >
                           <img
                             src={url}
@@ -859,13 +1053,23 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                               <Check className="h-2.5 w-2.5 text-white" />
                             </div>
                           )}
+                          {/* Hint visual de "click para zoom" */}
+                          <div className="absolute right-1 bottom-1 flex h-5 w-5 items-center justify-center rounded bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Maximize2 className="h-3 w-3 text-white" />
+                          </div>
                         </button>
                       );
                     })}
                   </div>
                 </div>
               ) : (
-                <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => step.resultUrl && setLightboxIdx(0)}
+                  disabled={!step.resultUrl}
+                  className="group relative block w-full text-left disabled:cursor-not-allowed"
+                  title={step.resultUrl ? "Tocá para ver en grande + descargar" : undefined}
+                >
                   {isVideo ? (
                     <video
                       src={step.resultUrl}
@@ -884,11 +1088,17 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     />
                   )}
                   {(step.status === "accepted") && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-emerald-500/20">
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-emerald-500/20 pointer-events-none">
                       <CheckCircle2 className="h-8 w-8 text-emerald-400" />
                     </div>
                   )}
-                </div>
+                  {step.resultUrl && (
+                    <div className="absolute right-1.5 top-1.5 flex h-7 items-center gap-1 rounded-md bg-black/60 px-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Maximize2 className="h-3.5 w-3.5 text-white" />
+                      <span className="text-[10px] font-medium text-white">Ver grande</span>
+                    </div>
+                  )}
+                </button>
               )}
             </div>
           </div>
@@ -961,6 +1171,18 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             </div>
           )}
         </div>
+      )}
+
+      {/* Lightbox: solo se monta cuando lightboxIdx tiene valor */}
+      {lightboxIdx !== null && lightboxImages.length > 0 && (
+        <ImageLightbox
+          images={lightboxImages}
+          startIndex={lightboxIdx}
+          selectedUrl={step.resultUrl}
+          onClose={() => setLightboxIdx(null)}
+          onSelect={onSelectCandidate}
+          filenamePrefix={`unistudio-${step.id}`}
+        />
       )}
     </div>
   );
@@ -2015,6 +2237,32 @@ export default function LingeriePipelinePage() {
           // Salir del loop de steps: si paró un paso es porque no quiere seguir.
           break;
         }
+
+        // Smart fallback: si photoFullBody / photoBack fallan y la usuaria
+        // tiene una foto REAL del ángulo correspondiente (o una frontal como
+        // último recurso para photoFullBody), usamos esa foto como resultado
+        // del paso. No es ideal pero evita que se pierda plata + el usuario
+        // tenga que reintentar manualmente. Aviso por toast para transparencia.
+        if (stepDef.id === "photoFullBody" || stepDef.id === "photoBack") {
+          const fallback = stepDef.id === "photoBack"
+            ? findMatchingPhoto({ ...freshJob, uploadedUrl, falUrl }, jobsSnapshot, ["espalda"])
+            : findMatchingPhoto({ ...freshJob, uploadedUrl, falUrl }, jobsSnapshot, ["flat", "otra", "frontal"]);
+          if (fallback?.uploadedUrl) {
+            console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.file.name}" como resultado.`);
+            toast.warning(
+              `${stepDef.label} falló — usamos tu foto real (${fallback.file.name}) en su lugar para no perder el paso.`,
+            );
+            updateStep(jobId, stepDef.id, {
+              status: "done",
+              resultUrl: fallback.uploadedUrl,
+              cost_actual: 0,
+              error: undefined,
+            });
+            stepResults[stepDef.id] = fallback.uploadedUrl;
+            continue;  // Pasa al siguiente step sin marcar error
+          }
+        }
+
         // "Failed to fetch" / "NetworkError" / "Load failed" son TypeErrors del
         // browser cuando fetch() falla antes de recibir respuesta (conexión móvil
         // intermitente, red caída, request cortado). Traducimos a español para
@@ -2231,8 +2479,9 @@ export default function LingeriePipelinePage() {
                         {jobs.length} foto{jobs.length === 1 ? '' : 's'} · el ángulo se detecta del nombre, pero podés corregirlo abajo de cada foto
                       </span>
                       {jobs.some((j) => j.photoAngle === 'espalda') && (
-                        <span className="rounded-md bg-violet-500/15 px-2 py-0.5 font-medium text-violet-300">
-                          ✓ Foto de espalda detectada — se va a usar como referencia real
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                          <Check className="h-2.5 w-2.5" />
+                          Espalda real lista
                         </span>
                       )}
                     </div>
