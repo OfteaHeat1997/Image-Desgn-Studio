@@ -1949,6 +1949,20 @@ export default function LingeriePipelinePage() {
   // pose. Sin seed serían modelos diferentes en cada foto.
   const [sharedSeed, setSharedSeed] = useState<number | undefined>();
   const [isRunning, setIsRunning] = useState(false);
+  // "Detener todo el batch": cuando la usuaria aprieta el botón rojo
+  // grande, seteamos esto en true. El loop de startPipeline chequea antes
+  // de procesar cada job y si es true, salta todos los restantes.
+  const batchAbortRef = useRef(false);
+  const stopBatch = useCallback(() => {
+    batchAbortRef.current = true;
+    // Abort todos los controllers activos de todos los steps en vuelo
+    for (const [, ctrl] of abortControllersRef.current) {
+      ctrl.abort();
+    }
+    abortControllersRef.current.clear();
+    setIsRunning(false);
+    toast.warning("Batch detenido. Los jobs ya completados se guardaron.");
+  }, []);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string; seed?: number }>>([]);
 
@@ -2845,7 +2859,10 @@ export default function LingeriePipelinePage() {
       return match ? { ...j, uploadedUrl: match.uploadedUrl, falUrl: match.falUrl } : j;
     }));
 
+    batchAbortRef.current = false;
     for (let i = 0; i < jobsSnapshot.length; i++) {
+      // Check si la usuaria apretó "Detener todo el batch"
+      if (batchAbortRef.current) break;
       const job = jobsSnapshot[i];
       setActiveJobIndex(i);
       setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "active" } : j));
@@ -2855,7 +2872,11 @@ export default function LingeriePipelinePage() {
     }
 
     setIsRunning(false);
-    toast.success(`Pipeline completado — ${jobsSnapshot.length} imagen(es) procesada(s)`);
+    if (!batchAbortRef.current) {
+      toast.success(`Pipeline completado — ${jobsSnapshot.length} imagen(es) procesada(s)`);
+    } else {
+      batchAbortRef.current = false;
+    }
   }, [jobs, steps, sharedModelUrl, sharedSeed, processJob]);
 
   /* ---- Manual mode action dispatcher ---- */
@@ -3635,6 +3656,16 @@ export default function LingeriePipelinePage() {
                   {pending > 0 && <span>{pending} en cola</span>}
                   <span className="text-gray-500">·</span>
                   <span className="font-medium text-white">${totalSpent.toFixed(2)}</span>
+                  {isRunning && (
+                    <button
+                      type="button"
+                      onClick={stopBatch}
+                      className="ml-1 flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-300 hover:bg-red-500/20"
+                    >
+                      <StopCircle className="h-3 w-3" />
+                      Parar todo
+                    </button>
+                  )}
                 </div>
               </div>
             );
