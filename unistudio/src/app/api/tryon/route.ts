@@ -60,11 +60,13 @@ async function tryOnFashn(
   modelImage: string,
   garmentImage: string,
   category: string,
+  mode?: 'performance' | 'balanced' | 'quality',
 ): Promise<string> {
   const id = await runFashn({
     model_image: modelImage,
     garment_image: garmentImage,
     category: toFashnCategory(category),
+    mode,
   });
   const result = await pollFashn(id);
   if (result.output && result.output.length > 0) return result.output[0];
@@ -112,6 +114,7 @@ async function smartTryOn(
   category: string,
   garmentType?: string,
   garmentDescription?: string,
+  fashnMode?: 'performance' | 'balanced' | 'quality',
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
@@ -124,7 +127,7 @@ async function smartTryOn(
   // Prefer FASHN when API key is configured (highest quality for non-intimate)
   if (process.env.FASHN_API_KEY) {
     try {
-      const url = await tryOnFashn(modelImage, garmentImage, category);
+      const url = await tryOnFashn(modelImage, garmentImage, category, fashnMode);
       return { url, provider: 'fashn' };
     } catch (err) {
       console.warn('[tryon] FASHN failed, falling back to IDM-VTON:', err instanceof Error ? err.message : err);
@@ -150,6 +153,7 @@ export async function POST(request: NextRequest) {
       garmentType,
       garmentDescription,
       provider = 'auto',
+      fashnMode,
     } = body as {
       modelImage: string;
       garmentImage: string;
@@ -157,6 +161,9 @@ export async function POST(request: NextRequest) {
       garmentType?: string;
       garmentDescription?: string;
       provider?: 'idm-vton' | 'fashn' | 'kolors' | 'auto';
+      // P1-3: FASHN v1.6 mode (performance/balanced/quality). Solo aplica a
+      // FASHN; Kolors e IDM-VTON lo ignoran silenciosamente.
+      fashnMode?: 'performance' | 'balanced' | 'quality';
     };
 
     if (!modelImage) {
@@ -195,7 +202,7 @@ export async function POST(request: NextRequest) {
     let usedProvider: string;
 
     if (effectiveProvider === 'auto' || !effectiveProvider) {
-      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription);
+      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription, fashnMode);
       resultUrl = result.url;
       usedProvider = result.provider;
     } else {
@@ -205,7 +212,7 @@ export async function POST(request: NextRequest) {
           resultUrl = await tryOnIdmVton(httpModelImage, httpGarmentImage, category, garmentDescription);
           break;
         case 'fashn':
-          resultUrl = await tryOnFashn(httpModelImage, httpGarmentImage, category);
+          resultUrl = await tryOnFashn(httpModelImage, httpGarmentImage, category, fashnMode);
           break;
         case 'kolors':
           resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);

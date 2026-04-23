@@ -80,6 +80,18 @@ const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: strin
 ];
 
 /**
+ * P1-3: modo de calidad de FASHN v1.6. Solo afecta cuando tryon usa FASHN
+ * (via provider override o flow non-lencería). Kolors e IDM-VTON lo ignoran.
+ */
+type FashnMode = "performance" | "balanced" | "quality";
+
+const FASHN_MODE_OPTIONS: { value: FashnMode; label: string; duration: string; hint: string }[] = [
+  { value: "performance", label: "Rápido",        duration: "~5s",  hint: "Menor fidelidad, útil para previews" },
+  { value: "balanced",    label: "Balanceado",    duration: "~8s",  hint: "Default — equilibrio calidad/velocidad" },
+  { value: "quality",     label: "Alta calidad",  duration: "~17s", hint: "Preserva mejor texturas, costuras, broches" },
+];
+
+/**
  * Ángulo / rol de una foto del producto (Phase 2f — P0-1). La usuaria lo
  * asigna manualmente por dropdown, o se auto-detecta del nombre del archivo.
  *
@@ -1252,6 +1264,11 @@ async function runStep(
    * photoBack (phase 2) y photoFullBody (phase 2).
    */
   providerOverride?: TryonProvider,
+  /**
+   * P1-3: modo de calidad FASHN. Solo tiene efecto si el proveedor resuelto
+   * termina siendo FASHN. Kolors e IDM-VTON lo ignoran.
+   */
+  fashnMode?: FashnMode,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -1395,6 +1412,7 @@ async function runStep(
         garmentType: garmentTypeForApi,
         // P1-1: respetar providerOverride si la usuaria lo pidió; sino default kolors
         provider: providerOverride && providerOverride !== "auto" ? providerOverride : "kolors",
+        fashnMode,
       }),
     });
     const tryonJson = await tryonRes.json();
@@ -1428,6 +1446,7 @@ async function runStep(
         provider: providerOverride && providerOverride !== "auto"
           ? providerOverride
           : (isLingerieFlow ? "kolors" : "idm-vton"),
+        fashnMode,
       }),
     });
     const json = await res.json();
@@ -1501,6 +1520,9 @@ export default function LingeriePipelinePage() {
   // Phase 2f: modo de generación elegible (default / face-swap / multi-sample).
   // default = el flow legacy (model-create + tryon Kolors).
   const [generationMode, setGenerationMode] = useState<GenerationMode>("default");
+  // P1-3: calidad FASHN — solo aplica cuando tryon usa FASHN (override manual
+  // o flow non-lencería). Kolors e IDM-VTON lo ignoran.
+  const [fashnMode, setFashnMode] = useState<FashnMode>("balanced");
   const [sharedModelUrl, setSharedModelUrl] = useState<string | undefined>();
   // Seed compartido entre poses: photoBack + photoFullBody lo reusan para que
   // SeedDream genere la MISMA modelo (mismo rostro + cuerpo + piel) en distinta
@@ -1774,6 +1796,7 @@ export default function LingeriePipelinePage() {
               controller.signal,
               backGarmentUrl,
               step.providerOverride,
+              fashnMode,
             ),
           ),
         );
@@ -1799,11 +1822,12 @@ export default function LingeriePipelinePage() {
         controller.signal,
         backGarmentUrl,
         step.providerOverride,
+        fashnMode,
       );
     } finally {
       abortControllersRef.current.delete(key);
     }
-  }, [modelConfig, productType, referenceNumber, generationMode, findMatchingPhoto]);
+  }, [modelConfig, productType, referenceNumber, generationMode, findMatchingPhoto, fashnMode]);
 
   /* ---- Process one job sequentially ---- */
   const processJob = useCallback(async (
@@ -2595,6 +2619,45 @@ export default function LingeriePipelinePage() {
                     ⚠️ Requiere que etiquetes tus fotos con su ángulo (Frontal/Espalda/Cuerpo). El face-swap solo se aplica a las fotos reales que subiste; las vistas sin foto real caen al modo clásico automáticamente.
                   </p>
                 )}
+              </section>
+
+              {/* P1-3: calidad de FASHN — solo aplica cuando tryon usa FASHN
+                  (via provider override en retry o flow non-lencería). Para
+                  el default lencería sigue siendo Kolors que no tiene modes. */}
+              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                  Calidad de Try-on (FASHN)
+                </h2>
+                <p className="mb-3 text-[11px] text-gray-500">
+                  Solo aplica cuando usas FASHN (eligiéndolo en el retry). Kolors default no tiene modos.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {FASHN_MODE_OPTIONS.map((opt) => {
+                    const selected = fashnMode === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFashnMode(opt.value)}
+                        className={cn(
+                          "flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 transition-all",
+                          selected
+                            ? "border-violet-500/50 bg-violet-500/10"
+                            : "border-white/8 bg-white/[0.02] hover:border-white/20",
+                        )}
+                        title={opt.hint}
+                      >
+                        <span className={cn(
+                          "text-xs font-semibold",
+                          selected ? "text-violet-200" : "text-gray-300",
+                        )}>
+                          {opt.label}
+                        </span>
+                        <span className="text-[10px] text-gray-500">{opt.duration}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </section>
 
               {/* Cost summary + launch */}

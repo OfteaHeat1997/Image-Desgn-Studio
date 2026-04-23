@@ -72,6 +72,13 @@ export interface FashnRunInput {
   model_image: string;
   garment_image: string;
   category: FashnCategory;
+  /**
+   * P1-3: modo de generación de FASHN v1.6.
+   * - "performance": ~5s, menor fidelidad
+   * - "balanced": ~8s, equilibrio (default)
+   * - "quality":    ~17s, preserva mejor texturas, costuras, broches
+   */
+  mode?: 'performance' | 'balanced' | 'quality';
 }
 
 export interface FashnErrorDetail {
@@ -100,6 +107,8 @@ const FASHN_BASE_URL = 'https://api.fashn.ai/v1';
  */
 export async function runFashn(input: FashnRunInput): Promise<string> {
   try {
+    // P1-3: `mode` va adentro de `inputs` según FASHN v1.6 API docs. Si no se
+    // pasa, la API usa "balanced" por default.
     const response = await fetch(`${FASHN_BASE_URL}/run`, {
       method: 'POST',
       headers: authHeaders(),
