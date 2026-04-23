@@ -209,9 +209,25 @@ Cada resultado final (tryon, photoBack, photoFullBody, videos) se guarda automá
 - "Comenzar de nuevo" rojo: confirm dialog + limpia jobs in memory + localStorage jobs key + sharedModel/Seed, mantiene settings
 - Toast "Deshecho"/"Rehecho" para feedback
 
-### P1 pendiente (siguiente sesión)
+### Per-job bodyType automático (shipped commit `9d2b6ca`)
 
-- Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
-- Saved models/backgrounds presets con nombre custom (estilo Photoroom Virtual Model)
-- Keyboard shortcuts help dialog (press `?` to view all)
-- Comparación side-by-side con foto original en cada step result
+Cuando una foto tiene talla detectada (ej "38B" → curvy, "32A" → slim), el pipeline usa ESE bodyType para ESE job en vez del global. Batches mixtos (32B + 38B + 42D) generan modelos IA con cuerpos apropiados automáticamente.
+
+### Saved model presets — renombrar inline (shipped commit `e6c5eae`)
+
+Click en el nombre de una modelo IA en el picker → editar → Enter/blur → se guarda en la DB. Antes: "female model – 26-35, medium (bra)". Ahora: "Karen" o "Ana".
+
+### Keyboard shortcuts help (shipped commit `c5edc67`)
+
+Tecla `?` o `/` → modal con tabla de atajos (Ctrl+Z, ←→, C, Esc).
+
+### Comparar con original side-by-side (shipped commit `03e5ff8`)
+
+En el lightbox: botón "Comparar con original" o tecla C → split 50/50 Original vs Resultado.
+
+### P2 pendiente (siguiente sesión)
+
+- Face-swap en producción (env var FACE_SWAP_MODEL con hash real de Replicate)
+- Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody)
+- Undo en pipeline run (hoy solo funciona en setup)
+- Per-talla model identity lock: fotos de la misma REF+talla deberían COMPARTIR exactamente la misma modelo IA (misma cara) aunque el bodyType varíe entre tallas
