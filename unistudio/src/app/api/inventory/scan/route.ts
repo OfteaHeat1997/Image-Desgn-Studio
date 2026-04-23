@@ -22,7 +22,20 @@ interface FolderConfig {
   /** Query params to attach to the pipeline redirect (productType, brand, etc.). */
   pipelineParams?: Record<string, string>;
   paths: string[];
+  /**
+   * When true, `scanFolder` recurses into subdirectories (needed for bras/
+   * organized por REF). Default false for flat folders (cremas/, desodorantes/).
+   */
+  recursive?: boolean;
 }
+
+/**
+ * Repo root path — the scan route runs from `unistudio/` (Next.js cwd), but
+ * inventory-final images viven en `../docs/inventory-final/images/` relativo
+ * al repo. Resolver una sola vez.
+ */
+const REPO_ROOT = path.resolve(process.cwd(), '..');
+const INVENTORY_FINAL = path.join(REPO_ROOT, 'docs', 'inventory-final', 'images');
 
 /** Inventory source directories — mapped to pipelines or batch presets */
 const INVENTORY_FOLDERS: FolderConfig[] = [
@@ -126,6 +139,49 @@ const INVENTORY_FOLDERS: FolderConfig[] = [
       "C:\\Users\\maria\\Desktop\\Unistyles Projects\\Unistyles inveotory images\\limpieza facial",
     ],
   },
+
+  // =======================================================================
+  // Gap 3 del audit: inventario FINAL post-limpieza familia (abril 2026).
+  // Viene de docs/inventory-final/images/ — excluido de Vercel (docs/ en
+  // .vercelignore) pero commiteado al repo. Solo funciona en dev local.
+  // En producción estas entries retornan count:0 y la UI no las muestra.
+  // =======================================================================
+  {
+    id: "inv-final-bras",
+    name: "BH (inventory-final)",
+    pipeline: "/pipelines/lingerie",
+    pipelineParams: { productType: "bra" },
+    paths: [path.join(INVENTORY_FINAL, "bras")],
+    recursive: true, // organized by REF/<files>
+  },
+  {
+    id: "inv-final-cremas",
+    name: "Cremas (inventory-final)",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "cream" },
+    paths: [path.join(INVENTORY_FINAL, "cremas")],
+  },
+  {
+    id: "inv-final-bloqueador",
+    name: "Bloqueador (inventory-final)",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "sunscreen" },
+    paths: [path.join(INVENTORY_FINAL, "bloqueador")],
+  },
+  {
+    id: "inv-final-desodorantes",
+    name: "Desodorantes (inventory-final)",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "deodorant" },
+    paths: [path.join(INVENTORY_FINAL, "desodorantes")],
+  },
+  {
+    id: "inv-final-facial",
+    name: "Limpieza Facial (inventory-final)",
+    pipeline: "/pipelines/static-product",
+    pipelineParams: { productType: "facial" },
+    paths: [path.join(INVENTORY_FINAL, "limpieza-facial")],
+  },
 ];
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
@@ -134,18 +190,36 @@ function toWslPath(winPath: string): string {
   return winPath.replace(/^([A-Z]):\\/, (_, drive: string) => `/mnt/${drive.toLowerCase()}/`).replace(/\\/g, "/");
 }
 
-function scanFolder(dirPath: string): { files: string[]; count: number } {
-  const wslPath = toWslPath(dirPath);
+function scanFolder(dirPath: string, recursive = false): { files: string[]; count: number } {
+  // WSL path translation only for Windows-style paths. Native Linux / already-resolved paths pasan igual.
+  const resolvedPath = dirPath.match(/^[A-Z]:\\/) ? toWslPath(dirPath) : dirPath;
 
   try {
-    if (!fs.existsSync(wslPath)) return { files: [], count: 0 };
+    if (!fs.existsSync(resolvedPath)) return { files: [], count: 0 };
 
-    const entries = fs.readdirSync(wslPath, { withFileTypes: true });
-    const imageFiles = entries
-      .filter((e) => e.isFile() && IMAGE_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
-      .map((e) => path.join(wslPath, e.name));
+    if (!recursive) {
+      const entries = fs.readdirSync(resolvedPath, { withFileTypes: true });
+      const imageFiles = entries
+        .filter((e) => e.isFile() && IMAGE_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
+        .map((e) => path.join(resolvedPath, e.name));
+      return { files: imageFiles, count: imageFiles.length };
+    }
 
-    return { files: imageFiles, count: imageFiles.length };
+    // Recursive mode — para inventarios organizados por sub-REF (ej: bras/<REF>/*.png)
+    const collected: string[] = [];
+    const stack: string[] = [resolvedPath];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const entries = fs.readdirSync(current, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(current, e.name);
+        if (e.isDirectory()) stack.push(full);
+        else if (e.isFile() && IMAGE_EXTENSIONS.has(path.extname(e.name).toLowerCase())) {
+          collected.push(full);
+        }
+      }
+    }
+    return { files: collected, count: collected.length };
   } catch {
     return { files: [], count: 0 };
   }
@@ -170,7 +244,7 @@ export async function GET() {
     const allFolders: string[] = [];
 
     for (const p of folder.paths) {
-      const result = scanFolder(p);
+      const result = scanFolder(p, folder.recursive ?? false);
       totalCount += result.count;
       if (result.count > 0) {
         allFolders.push(p);

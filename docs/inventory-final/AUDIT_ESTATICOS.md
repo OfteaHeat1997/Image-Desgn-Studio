@@ -19,7 +19,7 @@
 |---|---|---|---|---|---|
 | 1 | Batch real desde folder no implementado | 🔴 bloqueante | M | ⏳ pendiente | — |
 | 2 | Seed compartido por marca no se persiste | 🔴 bloqueante | S | ✅ **HECHO 2026-04-23** | seed en `static-product.ts` + propagado por `/api/bg-generate` a Flux |
-| 3 | `/api/inventory/scan` no mapea los paths nuevos | 🔴 bloqueante | S | ⏳ pendiente | — |
+| 3 | `/api/inventory/scan` no mapea los paths nuevos | 🔴 bloqueante | S | ✅ **HECHO 2026-04-23** | scan route añade 5 entries `inv-final-*` + modo recursive para bras |
 | 4 | Image disambiguation perfume vs desodorante | 🟡 alto | S | ✅ **HECHO 2026-04-23** | `folder-routing.ts` + integración en `static-product/page.tsx` |
 | 5 | Sin UI per-step con approval (como Lencería) | 🟡 alto | L | ⏳ pendiente | — |
 | 6 | No hay troubleshooting programático (re-run si bg malo) | 🟢 medio | M | ⏳ pendiente | — |

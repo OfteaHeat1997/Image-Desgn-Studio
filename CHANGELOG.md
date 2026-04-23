@@ -1,5 +1,26 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C3) — Gap 3 del audit: scan route mapea docs/inventory-final/images/
+
+Tercer commit del plan. Habilita el batch futuro (C4) al enseñarle al scan dónde viven las imágenes finales post-limpieza.
+
+### Cambios
+- `unistudio/src/app/api/inventory/scan/route.ts`:
+  - Nueva constante `INVENTORY_FINAL = path.join(process.cwd(), '..', 'docs', 'inventory-final', 'images')` — computada una vez al boot.
+  - Añadidas 5 entries nuevas (`inv-final-bras`, `inv-final-cremas`, `inv-final-bloqueador`, `inv-final-desodorantes`, `inv-final-facial`) que apuntan a las subcarpetas correctas y ya traen `pipelineParams` (productType) para que el redirect a `/pipelines/static-product` o `/pipelines/lingerie` llegue pre-configurado.
+  - `bras` lleva `recursive:true` porque está organizada por REF (`bras/011473/*.png`, etc.); las otras son flat.
+  - `scanFolder` ahora acepta `recursive:boolean` y hace walk con stack si se pide. Mantiene el comportamiento flat por defecto para no romper los 11 folders legacy.
+  - Detección de path: si viene en formato Windows (`C:\...`) aplica `toWslPath`, sino usa tal cual. Paths absolutos Linux (los nuevos) pasan sin tocar.
+- `docs/inventory-final/AUDIT_ESTATICOS.md` — Gap 3 marcado como HECHO.
+
+### Efecto
+En dev local, GET `/api/inventory/scan` ahora lista 16 categorías (11 legacy + 5 inventory-final). En Vercel producción las 5 nuevas devuelven count:0 porque `docs/` está en `.vercelignore` — la UI las filtra automáticamente. Sin esto, el batch de C4 no tenía dónde leer imágenes.
+
+### No toca
+- Pipeline Lencería (otra sesión trabajando ahí).
+- Módulos existentes (`/api/bg-generate`, etc.).
+- Entries legacy del scan siguen funcionando tal cual.
+
 ## 2026-04-23 (C2) — Gap 4 del audit: folder-routing helper + detección de ambigüedad
 
 Segundo commit del plan. Previene el bug histórico de imágenes compartidas entre categorías: `DORSAY.jpg`, `GAIA.jpg`, `OHM.jpg`, `OSADIA.jpg`, `ZENTRO.jpg` existen como perfumes Y como desodorantes. Sin este fix, la matriz defaulteaba a perfume premium (mármol Sephora) incluso cuando la foto venía del folder `/desodorantes/` donde el fondo correcto es gris neutro.
@@ -49,7 +70,9 @@ Mamá y Angely terminaron la limpieza manual del inventario (mamá borró rows, 
 ### Deliverables (solo docs — sin cambios de código)
 - `docs/inventory-final/README.md` — conteos post-limpieza vs inventario viejo (+4 bloqueadores, +3 cremas, −7 colonias, resto igual). Total inventario = 486 productos (sin cambio neto).
 - `docs/inventory-final/RESUMEN_CORTO.md` — versión para móvil / texto.
-- `docs/inventory-final/AUDIT_ESTATICOS.md` — auditoría del pipeline Estáticos vs Lencería (el gold standard). 7 gaps priorizados con commits sugeridos: seed por marca (gap 2), batch desde folder (gap 1), scan paths nuevos (gap 3), disambiguación perfume/desodorante (gap 4), UI per-step con approval (gap 5), validación programática (gap 6), cache de backgrounds generados (gap 7).
+- `docs/inventory-final/AUDIT_ESTATICOS.md` — auditoría del pipeline Estáticos vs Lencería (el gold standard). 7 gaps priorizados con commits sugeridos: seed por marca (gap 2), batch desde folder (gap 1), scan paths nuevos (gap 3), disambiguación perfume/desodorante (gap 4), UI per-step con approval (gap 5), validación programática (gap 6), cache de backgrounds gen
+
+erados (gap 7).
 - `docs/inventory-final/FLUJO_POR_PRODUCTO.md` — step-by-step para cada uno de los 6 tipos estáticos (perfume/crema/bloqueador/desodorante/facial/maquillaje) con prompts de la matriz + seeds sugeridos + errores comunes + costos.
 - `docs/inventory-final/catalogos/*.md` — los 6 Word convertidos a markdown vía pandoc.
 - `docs/inventory-final/_raw_products.json` — lista estructurada (108KB) para scripts futuros.
