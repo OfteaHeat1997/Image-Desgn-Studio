@@ -177,9 +177,21 @@ Nuevo selector en setup con 3 opciones:
 
 Fix: antes del loop del pipeline se suben TODAS las fotos en paralelo (`Promise.all`). Antes del fix, face-swap en job A no podía ver `uploadedUrl` de job B porque B no había corrido su processJob. Ahora las fotos están todas subidas antes del primer step, y `findMatchingPhoto` encuentra sus URLs.
 
+### UX Polish Bundle (shipped commits `eb147e8`, `ed83826`, `7335da4`, `bac9d38`)
+
+- **ImageLightbox modal**: click en cualquier resultado o variante → full-screen con descargar, ←/→ navegación, tabra de thumbs, botón "Usar variante N", ESC para cerrar
+- **Botón Descargar** directo en cada step card (al lado de Aceptar y continuar)
+- **Botón Descargar todos** en completion summary (dispara downloads con 200ms delay)
+- **Progress bar live** con cost counter: "3/7 · $0.15 / ~$0.35" en header del job
+- **Smart fallback** cuando photoFullBody/photoBack fallan: usa foto real tagged en vez de error rojo
+- **Persistencia de settings** en localStorage: modo, calidad, tipo, REF, modelConfig sobreviven refresh
+- **Badge "detectada" rediseñado**: pill emerald compacta "✓ Espalda real lista"
+- **Fix ReferenceError**: freshJob no existía en catch scope; ahora se reconstruye desde `job`
+
 ### P1 pendiente (siguiente sesión)
 
-- Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura (requiere lift state por REF)
+- **Persistencia de fotos**: los File objects no serializan a JSON, necesita refactor de `ImageJob.file` de required a optional + previewUrl fallback a uploadedUrl. Después de este fix, refrescar la página preservaría también las fotos y resultados
+- **Undo/Redo**: history stack de jobs/steps + atajos Ctrl+Z/Ctrl+Y
+- Isolate-sharing por REF: si 3 jobs tienen mismo REF pero distinto color, correr `isolate` una sola vez y reusar la estructura
 - Multi-sample para step `tryon` (hoy solo photoBack/photoFullBody — tryon usa sharedModel fijo + Kolors determinístico, necesita approach distinto)
-- P1-4: Saved models/backgrounds presets (estilo Photoroom Virtual Model)
-- Download button por step (save individual step results)
+- Saved models/backgrounds presets (estilo Photoroom Virtual Model)
