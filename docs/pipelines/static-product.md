@@ -116,8 +116,23 @@ OUTPUTS: main.jpg (1:1 2000x2000), wide.jpg (16:9), vertical.jpg (9:16 Instagram
 Problema conocido del inventory: DORSAY.jpg, GAIA.jpg, OHM.jpg, ZENTRO.jpg se comparten entre perfumes y desodorantes. El pipeline resuelve esto:
 
 1. **Naming por SKU único:** `output/static/{productType}/{brand}/{sku}.jpg` — nunca por nombre de producto, siempre por SKU.
-2. **Seed compartido por marca:** todas las fotos de perfumes Yanbal usan el mismo `seed` en `bg-generate` para que el fondo dorado sea IDÉNTICO entre productos. Esto produce un catálogo visual cohesivo.
+2. **Seed compartido por marca** *(Gap 2 — IMPLEMENTADO 2026-04-23)*: `getAdaptiveBgConfig(productType, brand)` devuelve un `seed` determinista calculado con `brandSeed()` (fórmula `10000 + ti*1000 + bi*100` donde `ti`/`bi` son índices estables en arrays ordenados). La página lo envía a `/api/bg-generate` como `body.seed`, que lo propaga a los modelos Flux (`flux-kontext-pro`, `flux-schnell`, `flux-dev`). Resultado: todos los SKUs de `perfume+yanbal` comparten **exactamente el mismo mármol dorado**. Sin esto, los 20 perfumes Yanbal salían con 20 mármoles distintos → catálogo incoherente.
 3. **Template de canvas compartido:** mismo 2000x2000, mismo padding, mismo punto de sombra. El producto cambia, el resto es idéntico.
+
+### Seeds asignados por (productType, brand)
+
+Fórmula: `10000 + ti*1000 + bi*100` — los rangos quedan bien separados para que un cambio de marca dé un fondo claramente distinto, no una variación sutil.
+
+| productType \ brand | esika | yanbal | lbel | cyzone | avon | salome | other |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| perfume | 10000 | 10100 | 10200 | 10300 | 10400 | 10500 | 10600 |
+| cream | 11000 | 11100 | 11200 | 11300 | 11400 | 11500 | 11600 |
+| sunscreen | 12000 | 12100 | 12200 | 12300 | 12400 | 12500 | 12600 |
+| deodorant | 13000 | 13100 | 13200 | 13300 | 13400 | 13500 | 13600 |
+| facial | 14000 | 14100 | 14200 | 14300 | 14400 | 14500 | 14600 |
+| makeup | 15000 | 15100 | 15200 | 15300 | 15400 | 15500 | 15600 |
+
+Cambiar un seed requiere cambiar `brandSeed()` en `src/lib/pipelines/static-product.ts` — al hacerlo, todos los catálogos vuelven a generarse distintos, **así que no cambiar salvo que sea deliberado**.
 
 ---
 

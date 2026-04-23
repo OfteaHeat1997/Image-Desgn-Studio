@@ -15,15 +15,15 @@
 
 ## TL;DR — 7 gaps priorizados
 
-| # | Gap | Prioridad | Esfuerzo | Commit sugerido |
-|---|---|---|---|---|
-| 1 | Batch real desde folder no implementado | 🔴 bloqueante | M | "feat(estáticos): batch desde docs/inventory-final/images/" |
-| 2 | Seed compartido por marca no se persiste | 🔴 bloqueante | S | "feat(estáticos): seed estable por marca para cohesión visual" |
-| 3 | `/api/inventory/scan` no mapea los paths nuevos | 🔴 bloqueante | S | "feat(inventory): auto-rutear desde docs/inventory-final/images/" |
-| 4 | Image disambiguation perfume vs desodorante | 🟡 alto | S | "fix(estáticos): productType se fuerza desde folder ANTES de matriz" |
-| 5 | Sin UI per-step con approval (como Lencería) | 🟡 alto | L | "feat(estáticos): step-by-step UI con aprobación manual" |
-| 6 | No hay troubleshooting programático (re-run si bg malo) | 🟢 medio | M | "feat(estáticos): re-run automático si validator de fondo falla" |
-| 7 | Sin integración con Prisma para guardar bg generado por marca (cache) | 🟢 medio | M | "feat(estáticos): tabla GeneratedBackground con hit por brand+type" |
+| # | Gap | Prioridad | Esfuerzo | Estado | Commit |
+|---|---|---|---|---|---|
+| 1 | Batch real desde folder no implementado | 🔴 bloqueante | M | ⏳ pendiente | — |
+| 2 | Seed compartido por marca no se persiste | 🔴 bloqueante | S | ✅ **HECHO 2026-04-23** | seed en `static-product.ts` + propagado por `/api/bg-generate` a Flux |
+| 3 | `/api/inventory/scan` no mapea los paths nuevos | 🔴 bloqueante | S | ⏳ pendiente | — |
+| 4 | Image disambiguation perfume vs desodorante | 🟡 alto | S | ⏳ pendiente | — |
+| 5 | Sin UI per-step con approval (como Lencería) | 🟡 alto | L | ⏳ pendiente | — |
+| 6 | No hay troubleshooting programático (re-run si bg malo) | 🟢 medio | M | ⏳ pendiente | — |
+| 7 | Sin integración con Prisma para guardar bg generado por marca (cache) | 🟢 medio | M | ⏳ pendiente | — |
 
 ---
 

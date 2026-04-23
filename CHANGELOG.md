@@ -1,5 +1,25 @@
 # UniStudio — Changelog
 
+## 2026-04-23 (C1) — Gap 2 del audit: seed estable por (productType, brand)
+
+Primer commit del plan de mejora del pipeline Estáticos. Implementa lo más barato de arreglar y lo de mayor impacto visual: **seeds deterministas** para que todos los SKUs del mismo `(productType, brand)` salgan con fondo idéntico (mármol, playa, gris, etc.). Sin esto, los 20 perfumes Yanbal generaban 20 mármoles distintos → catálogo incoherente.
+
+### Cambios
+- `unistudio/src/lib/pipelines/static-product.ts` — `AdaptiveBgConfig` añade campo `seed`. Nueva función `brandSeed()` con fórmula `10000 + ti*1000 + bi*100` (ti/bi = índices estables en arrays `typeOrder`/`brandOrder`). Todas las ramas de `getAdaptiveBgConfig` devuelven el seed correspondiente.
+- `unistudio/src/app/pipelines/static-product/page.tsx` — el call a `/api/bg-generate` envía `body.seed: config.seed`.
+- `unistudio/src/app/api/bg-generate/route.ts` — acepta `seed?: number` en el body y lo forwarea.
+- `unistudio/src/lib/processing/bg-generate.ts` — `generateBgPrecise`/`generateBgCreative`/`generateBgFast` + fallback aceptan `seed?` y lo pasan a `runModel` (flux-kontext-pro, flux-schnell, flux-dev).
+- `docs/pipelines/static-product.md` — sección "Consistencia entre fotos" actualizada con tabla de seeds asignados por tipo×marca.
+- `docs/inventory-final/AUDIT_ESTATICOS.md` — Gap 2 marcado como HECHO.
+
+### Seeds asignados (quedan grabados)
+Rangos: 10xxx=perfume, 11xxx=cream, 12xxx=sunscreen, 13xxx=deodorant, 14xxx=facial, 15xxx=makeup.
+Dentro de cada rango: ×00=esika, ×100=yanbal, ×200=lbel, ×300=cyzone, ×400=avon, ×500=salome, ×600=other.
+Ejemplo: `perfume+yanbal → 10100`, `cream+lbel → 11200`, `sunscreen+esika → 12000`.
+
+### No toca
+Módulos fuera de bg-generate. Jewelry/Lencería no afectados. El módulo `/api/bg-generate` sigue funcionando sin seed para quien no lo mande (retrocompatible).
+
 ## 2026-04-23 — Inventario final post-limpieza familia + auditoría pipeline Estáticos
 
 Mamá y Angely terminaron la limpieza manual del inventario (mamá borró rows, Angely marcó en rojo los que había que eliminar). Llegaron 7 Word docs (`*_UPDATED.docx` + `*_FINAL.docx`) y 5 zips con las imágenes finales en `C:\Users\maria\Pictures\Inventory Unistyles images\`. Procesado todo en `docs/inventory-final/`:

@@ -306,6 +306,9 @@ export default function StaticProductPipelinePage() {
           style: "custom",
           customPrompt: config.prompt,
           aspectRatio: "1:1",
+          // Seed estable por (productType, brand) → todos los SKUs del mismo grupo
+          // comparten fondo idéntico (mármol, playa, gris, etc.) para catálogo cohesivo.
+          seed: config.seed,
         }),
       });
       const genData = await safeJson(genRes);

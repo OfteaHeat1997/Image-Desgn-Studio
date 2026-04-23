@@ -313,6 +313,7 @@ export async function generateBgPrecise(
   stylePreset: string,
   customPrompt?: string,
   aspectRatio: string = '1:1',
+  seed?: number,
 ): Promise<string> {
   const preset = BACKGROUND_PRESETS[stylePreset];
   const bgPrompt = customPrompt || preset?.prompt || stylePreset;
@@ -321,11 +322,13 @@ export async function generateBgPrecise(
   try {
     const fullPrompt = `CRITICAL PRODUCT PRESERVATION: Keep this EXACT product completely unchanged. Do NOT modify, redesign, replace, alter, or reimagine the product in any way. Every detail — shape, colors, labels, text, packaging, logo, texture — must remain pixel-perfect identical to the input image. The product is the ONLY element that must be preserved exactly as-is. ONLY change the background/environment around the product to: ${bgPrompt}. Do NOT alter the product shape, color, label, packaging, or any detail whatsoever.`;
 
-    const output = await runModel('black-forest-labs/flux-kontext-pro', {
+    const kontextInput: Record<string, unknown> = {
       input_image: imageUrl,
       prompt: fullPrompt,
       aspect_ratio: aspectRatio,
-    });
+    };
+    if (typeof seed === 'number') kontextInput.seed = seed;
+    const output = await runModel('black-forest-labs/flux-kontext-pro', kontextInput);
 
     return await extractOutputUrl(output);
   } catch (error) {
@@ -336,7 +339,7 @@ export async function generateBgPrecise(
 
     // Fallback: remove background with rembg, then composite onto new background
     console.log('[bg-generate] Kontext Pro flagged content, using bg-remove + composite fallback');
-    return generateBgPreciseFallback(imageUrl, stylePreset, bgPrompt, aspectRatio);
+    return generateBgPreciseFallback(imageUrl, stylePreset, bgPrompt, aspectRatio, seed);
   }
 }
 
@@ -372,6 +375,7 @@ async function generateBgPreciseFallback(
   stylePreset: string,
   bgPrompt: string,
   aspectRatio: string,
+  seed?: number,
 ): Promise<string> {
   // Step 1: Remove background using rembg (no content filter)
   const transparentUrl = await removeBgReplicate(imageUrl);
@@ -421,11 +425,13 @@ async function generateBgPreciseFallback(
   }
 
   // For non-studio presets: generate background with Flux Schnell, then composite
-  const bgOutput = await runModel('black-forest-labs/flux-schnell', {
+  const schnellInput: Record<string, unknown> = {
     prompt: bgPrompt,
     aspect_ratio: aspectRatio,
     num_outputs: 1,
-  });
+  };
+  if (typeof seed === 'number') schnellInput.seed = seed;
+  const bgOutput = await runModel('black-forest-labs/flux-schnell', schnellInput);
   const bgUrl = await extractOutputUrl(bgOutput);
 
   // Download background and composite
@@ -463,6 +469,7 @@ export async function generateBgCreative(
   stylePreset: string,
   customPrompt?: string,
   aspectRatio: string = '1:1',
+  seed?: number,
 ): Promise<string> {
   const preset = BACKGROUND_PRESETS[stylePreset];
   const bgPrompt = customPrompt || preset?.prompt || stylePreset;
@@ -470,12 +477,14 @@ export async function generateBgCreative(
 
   const fullPrompt = `Professional product photography of ${productDescription}. Background: ${bgPrompt}. Studio quality, sharp focus, beautiful lighting, commercial photography, 8k, high resolution.`;
 
-  const output = await runModel('black-forest-labs/flux-dev', {
+  const creativeInput: Record<string, unknown> = {
     prompt: fullPrompt,
     negative_prompt: negativePrompt,
     aspect_ratio: aspectRatio,
     num_outputs: 1,
-  });
+  };
+  if (typeof seed === 'number') creativeInput.seed = seed;
+  const output = await runModel('black-forest-labs/flux-dev', creativeInput);
 
   return await extractOutputUrl(output);
 }
@@ -499,13 +508,16 @@ export async function generateBgFast(
   prompt: string,
   aspectRatio: string = '1:1',
   imageUrl?: string,
+  seed?: number,
 ): Promise<string> {
   // Generate the background with Flux Schnell
-  const output = await runModel('black-forest-labs/flux-schnell', {
+  const schnellInput: Record<string, unknown> = {
     prompt,
     aspect_ratio: aspectRatio,
     num_outputs: 1,
-  });
+  };
+  if (typeof seed === 'number') schnellInput.seed = seed;
+  const output = await runModel('black-forest-labs/flux-schnell', schnellInput);
   const bgUrl = await extractOutputUrl(output);
 
   // If no product image, return background-only (preview mode)
