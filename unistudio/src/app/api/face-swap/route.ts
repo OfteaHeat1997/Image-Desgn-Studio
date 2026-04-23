@@ -14,10 +14,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 
-// cdingram/face-swap — v1 model, estable y rápido. Input: input_image (target,
-// donde cambiamos la cara) + swap_image (source, de donde tomamos la cara).
-const FACE_SWAP_MODEL =
-  'cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71d3a32';
+// Modelo de face-swap en Replicate. Configurable por env var FACE_SWAP_MODEL
+// para permitir probar distintos (cdingram/face-swap, lucataco/faceswap,
+// yan-ops/face_swap, etc.) sin tocar código. El hash exacto de cada versión
+// hay que copiarlo desde https://replicate.com/<owner>/<model>/api — los
+// ejemplos abajo son plantillas, NO usar tal cual en producción sin verificar.
+//
+// Default: `cdingram/face-swap` sin hash. Replicate lo resuelve a latest pero
+// SI el modelo requiere hash explícito (la mayoría de community models) va a
+// tirar error. En ese caso, setear FACE_SWAP_MODEL con el hash real.
+const FACE_SWAP_MODEL = process.env.FACE_SWAP_MODEL?.trim() || 'cdingram/face-swap';
 
 // Costo aproximado del modelo en Replicate (verificar periódicamente).
 const FACE_SWAP_COST = 0.003;
@@ -65,9 +71,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API /face-swap] Error:', error);
-    const msg = error instanceof Error ? error.message : 'face-swap failed';
+    const rawMsg = error instanceof Error ? error.message : 'face-swap failed';
+    // Si el modelo no existe en Replicate (404) o el hash está mal, traducir a
+    // mensaje amigable para que la usuaria sepa que no es fallo de su foto.
+    const isModelIssue = /not found|invalid version|no such model|404/i.test(rawMsg);
+    const friendly = isModelIssue
+      ? `El modelo de face-swap "${FACE_SWAP_MODEL}" no está disponible en Replicate. Seteá la env var FACE_SWAP_MODEL con un hash válido (formato: owner/name:sha256hash) o usá otro modo de generación.`
+      : rawMsg;
     return NextResponse.json(
-      { success: false, error: msg },
+      { success: false, error: friendly },
       { status: 500 },
     );
   }
