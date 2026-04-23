@@ -180,6 +180,10 @@ interface ImageJob {
   // futuro, optimizar el isolate cuando varios colores comparten el mismo
   // corte. Opcional — si no se detecta, queda undefined.
   color?: string;
+  // Talla detectada (ej "38B", "XL"). Informativa — badge en UI + sugerencia
+  // de bodyType. La modelo IA debería parecerse a esta talla para credibilidad.
+  sizeHint?: string;
+  suggestedBodyType?: string;
 }
 
 /**
@@ -279,6 +283,52 @@ const COLOR_SWATCH: Record<string, string> = {
   plateado: "#b8b8b8",
   turquesa: "#3db8a8",
 };
+
+/**
+ * Detecta la talla de un bra desde el filename. Busca patrones comunes:
+ *   "38B", "40C", "34 B", "XXL", "L", "S", "M"
+ * Returns undefined si no matchea nada reconocible.
+ *
+ * Ejemplos:
+ *   "Leonisa Bra BEIGE 38 B REF 011473.png" → "38B"
+ *   "BH NEGRO XXL 091022.png"                → "XXL"
+ *   "bh beige 011473.png"                     → undefined
+ */
+function detectSize(filename: string): string | undefined {
+  const f = filename.toUpperCase();
+  // Patrón numérico: "32B", "34 B", "38C", "40 C", "42D"
+  const numMatch = f.match(/\b(\d{2})\s*([A-G])\b/);
+  if (numMatch) return `${numMatch[1]}${numMatch[2]}`;
+  // Patrón letter-only: "XXL", "XL", "L", "M", "S"
+  const letterMatch = f.match(/\b(XXL|XL|L|M|S)\b/);
+  if (letterMatch) return letterMatch[1];
+  return undefined;
+}
+
+/**
+ * Mapea una talla a un bodyType sugerido para el modelConfig.
+ * La modelo IA debe parecerse a la talla del producto para que el resultado
+ * sea creíble (no poner un bra 42D en una modelo slim).
+ */
+function sizeToBodyType(size: string | undefined): string | undefined {
+  if (!size) return undefined;
+  const s = size.toUpperCase();
+  // Tallas numéricas: 32-34 → slim, 36 → average, 38 → curvy, 40+ → plus-size
+  const numMatch = s.match(/^(\d{2})/);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    if (num <= 34) return "slim";
+    if (num === 36) return "average";
+    if (num <= 38) return "curvy";
+    return "plus-size";
+  }
+  // Tallas letras
+  if (s === "S") return "slim";
+  if (s === "M") return "average";
+  if (s === "L") return "curvy";
+  if (s === "XL" || s === "XXL") return "plus-size";
+  return undefined;
+}
 
 /**
  * Extrae una clave de referencia del nombre del archivo. Soporta patrones:
@@ -1806,6 +1856,20 @@ async function runStep(
 
 export default function LingeriePipelinePage() {
   const [phase, setPhase] = useState<Phase>("setup");
+  // Help dialog: keyboard shortcuts reference
+  const [showHelp, setShowHelp] = useState(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      if (e.key === "?" || e.key === "/") {
+        e.preventDefault();
+        setShowHelp((s) => !s);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
   const [referenceNumber, setReferenceNumber] = useState("");
   // Inicializar referenceNumber desde localStorage (no se puede usar
   // persistedSettings acá porque está declarado abajo). Lo seteo al mount.
@@ -2082,6 +2146,8 @@ export default function LingeriePipelinePage() {
         photoAngle: detectPhotoAngle(file.name),
         referenceKey: detectReferenceKey(file.name),
         color: detectColor(file.name),
+        sizeHint: detectSize(file.name),
+        suggestedBodyType: sizeToBodyType(detectSize(file.name)),
       };
     });
     setJobs((prev) => [...prev, ...newJobs]);
@@ -2931,6 +2997,34 @@ export default function LingeriePipelinePage() {
                         </span>
                       )}
                     </div>
+                    {/* Warning de talla vs bodyType: si las fotos tienen tallas que
+                        sugieren un bodyType distinto al configurado, avisamos. */}
+                    {(() => {
+                      const suggestions = new Map<string, number>();
+                      for (const j of jobs) {
+                        if (j.suggestedBodyType) {
+                          suggestions.set(j.suggestedBodyType, (suggestions.get(j.suggestedBodyType) ?? 0) + 1);
+                        }
+                      }
+                      if (suggestions.size === 0) return null;
+                      // Encontrar el bodyType más frecuente entre las fotos
+                      const mostCommon = Array.from(suggestions.entries()).sort((a, b) => b[1] - a[1])[0];
+                      if (!mostCommon || mostCommon[0] === modelConfig.bodyType) return null;
+                      return (
+                        <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-[11px] text-amber-200">
+                          <span className="font-semibold">Sugerencia de talla:</span> la mayoría de tus fotos son talla que sugiere modelo <b>{mostCommon[0]}</b>, pero tenés configurado <b>{modelConfig.bodyType}</b>.
+                          {' '}
+                          <button
+                            type="button"
+                            onClick={() => setModelConfig((prev) => ({ ...prev, bodyType: mostCommon[0] }))}
+                            className="ml-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100 hover:bg-amber-500/20"
+                          >
+                            Cambiar a {mostCommon[0]}
+                          </button>
+                        </div>
+                      );
+                    })()}
+
                     {/* P1-2: resumen de agrupación por REF + colores detectados.
                         Muestra a la usuaria qué tantos productos únicos detectó. */}
                     {(() => {
@@ -2997,6 +3091,12 @@ export default function LingeriePipelinePage() {
                                   style={{ background: COLOR_SWATCH[job.color] ?? "#666" }}
                                 />
                                 <span className="capitalize">{job.color}</span>
+                              </div>
+                            )}
+                            {/* Talla detectada */}
+                            {job.sizeHint && (
+                              <div className="absolute right-1 top-14 rounded-md bg-blue-500/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                                {job.sizeHint}
                               </div>
                             )}
                             {job.referenceKey && (
@@ -3708,6 +3808,45 @@ export default function LingeriePipelinePage() {
           )}
         </main>
       </div>
+
+      {/* Keyboard shortcuts help dialog */}
+      {showHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowHelp(false)}
+        >
+          <div
+            className="mx-4 w-full max-w-md rounded-xl border border-white/15 bg-[#1a1a1a] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">Atajos de teclado</h3>
+              <button onClick={() => setShowHelp(false)} className="text-gray-400 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              {[
+                ["Ctrl + Z", "Deshacer (undo)"],
+                ["Ctrl + Shift + Z", "Rehacer (redo)"],
+                ["Ctrl + Y", "Rehacer (alternativo)"],
+                ["?  o  /", "Abrir/cerrar esta ayuda"],
+                ["Esc", "Cerrar modal / lightbox"],
+                ["← →", "Navegar entre variantes (lightbox)"],
+                ["C", "Comparar con original (lightbox)"],
+              ].map(([keys, desc]) => (
+                <div key={keys} className="flex items-center justify-between gap-3 border-b border-white/5 py-1.5">
+                  <span className="text-gray-300">{desc}</span>
+                  <kbd className="whitespace-nowrap rounded border border-white/15 bg-white/5 px-2 py-0.5 font-mono text-xs text-gray-400">{keys}</kbd>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-center text-[11px] text-gray-600">
+              Los atajos no funcionan cuando estás escribiendo en un campo de texto.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
