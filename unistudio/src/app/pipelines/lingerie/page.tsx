@@ -139,7 +139,18 @@ function detectPhotoAngle(filename: string): PhotoAngle {
 
 interface ImageJob {
   id: string;
-  file: File;
+  /**
+   * File object. Es null cuando el job fue restaurado desde localStorage
+   * (Files no serializan). Los jobs restaurados siguen siendo viewables
+   * porque tienen uploadedUrl, pero NO se pueden re-subir ni re-analizar
+   * Claude Vision sin re-agregar la foto.
+   */
+  file: File | null;
+  /**
+   * Nombre del archivo original. Se preserva aún cuando `file` es null
+   * (para mostrar en la UI). Cuando `file` existe, duplica `file.name`.
+   */
+  filename: string;
   previewUrl: string;
   uploadedUrl?: string;
   falUrl?: string;
@@ -1785,7 +1796,29 @@ export default function LingeriePipelinePage() {
     ageRange: "26-35",
   });
   const [steps, setSteps] = useState<PipelineStep[]>(makeSteps());
-  const [jobs, setJobs] = useState<ImageJob[]>([]);
+  // Persistencia de jobs: se restauran al mount (sin `file`, usando
+  // uploadedUrl como previewUrl). Jobs restaurados son viewables y su
+  // pipeline puede re-correr si ya tienen uploadedUrl; lo único que no
+  // funciona sin file es analyze-product (Claude Vision).
+  const [jobs, setJobs] = useState<ImageJob[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("lingerie:pipeline:jobs:v1");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as Array<Omit<ImageJob, "file"> & { file?: never }>;
+      return parsed
+        .filter((j) => j.uploadedUrl)  // skip jobs sin upload (no servirían para nada)
+        .map((j) => ({
+          ...j,
+          file: null,
+          // Si previewUrl era blob (ya muerto) usar uploadedUrl como fallback
+          previewUrl: j.previewUrl?.startsWith("blob:") ? (j.uploadedUrl ?? "") : (j.previewUrl ?? j.uploadedUrl ?? ""),
+        }));
+    } catch (err) {
+      console.warn("[lingerie] failed to restore jobs:", err);
+      return [];
+    }
+  });
   const [activeJobIndex, setActiveJobIndex] = useState(0);
   const [autoMode, setAutoMode] = useState(persistedSettings?.autoMode ?? true);
   // Phase 2f: modo de generación elegible (default / face-swap / multi-sample).
@@ -1867,6 +1900,32 @@ export default function LingeriePipelinePage() {
     return () => clearTimeout(timer);
   }, [productType, modelConfig, autoMode, generationMode, fashnMode, referenceNumber]);
 
+  // Persistencia de jobs: guarda el array entero (sin `file`, que no
+  // serializa) cada vez que cambia. Debounce 800ms porque jobs cambia mucho
+  // durante el pipeline (cada status update). Máximo 20 jobs guardados para
+  // no saturar localStorage.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const timer = setTimeout(() => {
+      try {
+        const MAX_PERSISTED = 20;
+        const toPersist = jobs.slice(-MAX_PERSISTED).map((j) => {
+          // Omit `file` (File objects no serializan). Mantenemos todo lo demás.
+          // Previews blob: mantenemos el string tal cual; al restaurar se
+          // detecta y cae a uploadedUrl.
+          const { file: _file, ...rest } = j;
+          void _file;
+          return rest;
+        });
+        window.localStorage.setItem("lingerie:pipeline:jobs:v1", JSON.stringify(toPersist));
+      } catch {
+        // Quota excedido o disabled — silent. No molestar a la usuaria con
+        // un toast por cada write fallido.
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [jobs]);
+
   // Read URL params on mount — inventory auto-mode redirects with ?productType=bra|panty
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1917,6 +1976,7 @@ export default function LingeriePipelinePage() {
       return {
         id: `${Date.now()}-${Math.random()}`,
         file,
+        filename: file.name,
         previewUrl: url,
         steps: makeSteps(),
         status: "idle",
@@ -2024,7 +2084,7 @@ export default function LingeriePipelinePage() {
             || job;
         }
         if (targetPhoto?.uploadedUrl) {
-          console.log(`[lingerie] ${step.id}: face-swap sobre foto real "${targetPhoto.file.name}"`);
+          console.log(`[lingerie] ${step.id}: face-swap sobre foto real "${targetPhoto.filename}"`);
           const res = await fetch("/api/face-swap", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -2051,7 +2111,7 @@ export default function LingeriePipelinePage() {
         const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
         if (matchingBack?.uploadedUrl && matchingBack.id !== job.id) {
           backGarmentUrl = matchingBack.uploadedUrl;
-          console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.file.name})`);
+          console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.filename})`);
         }
       }
 
@@ -2129,10 +2189,18 @@ export default function LingeriePipelinePage() {
     const job = jobsSnapshot.find((j) => j.id === jobId);
     if (!job) return {};
 
-    // Upload the image first
+    // Upload the image first. Si el job es RESTAURADO desde localStorage
+    // (file es null), saltamos el upload — ya debería tener uploadedUrl del
+    // run anterior. Si no tiene NI file NI uploadedUrl, el job está corrupto
+    // y marcamos error.
     let uploadedUrl = job.uploadedUrl;
     let falUrl = job.falUrl;
     if (!uploadedUrl) {
+      if (!job.file) {
+        setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
+        toast.error(`${job.filename}: tenés que subir la foto de nuevo (esta sesión fue restaurada sin el archivo).`);
+        return {};
+      }
       try {
         const uploaded = await uploadFile(job.file);
         uploadedUrl = uploaded.url;
@@ -2140,7 +2208,7 @@ export default function LingeriePipelinePage() {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, uploadedUrl, falUrl } : j));
       } catch (err) {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
-        toast.error(`Error de carga — ${job.file.name}: ${err instanceof Error ? err.message : "Error desconocido"}`);
+        toast.error(`Error de carga — ${job.filename}: ${err instanceof Error ? err.message : "Error desconocido"}`);
         return {};
       }
     }
@@ -2149,7 +2217,10 @@ export default function LingeriePipelinePage() {
     // del primer step. Produce una ProductSpec que se muestra al usuario
     // (editable) y que iteraciones siguientes inyectarán en los prompts. Si
     // falla, el pipeline sigue igual que antes (sin spec). No es bloqueante.
-    if (!job.productSpec && job.analysisStatus !== "done") {
+    if (!job.productSpec && job.analysisStatus !== "done" && job.file) {
+      // Solo corremos el análisis de Claude Vision si tenemos el File (necesita
+      // subir el contenido en base64). Para jobs restaurados (file=null) la
+      // ficha técnica no se puede regenerar — queda undefined silenciosamente.
       setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, analysisStatus: "analyzing" } : j));
       try {
         const spec = await analyzeProductPhotos(
@@ -2161,12 +2232,12 @@ export default function LingeriePipelinePage() {
         ));
       } catch (analyzeErr) {
         const msg = analyzeErr instanceof Error ? analyzeErr.message : "Análisis falló";
-        console.warn(`[lingerie] analyze-product failed for ${job.file.name}:`, msg);
+        console.warn(`[lingerie] analyze-product failed for ${job.filename}:`, msg);
         setJobs((prev) => prev.map((j) =>
           j.id === jobId ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg } : j,
         ));
         // No bloquea el pipeline — solo warnea y seguimos como antes.
-        toast.warning(`No se pudo leer la ficha técnica de ${job.file.name}. Sigo con los pasos normales.`);
+        toast.warning(`No se pudo leer la ficha técnica de ${job.filename}. Sigo con los pasos normales.`);
       }
     }
 
@@ -2319,9 +2390,9 @@ export default function LingeriePipelinePage() {
             ? findMatchingPhoto(jobForMatching, jobsSnapshot, ["espalda"])
             : findMatchingPhoto(jobForMatching, jobsSnapshot, ["flat", "otra", "frontal"]);
           if (fallback?.uploadedUrl) {
-            console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.file.name}" como resultado.`);
+            console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.filename}" como resultado.`);
             toast.warning(
-              `${stepDef.label} falló — usamos tu foto real (${fallback.file.name}) en su lugar para no perder el paso.`,
+              `${stepDef.label} falló — usamos tu foto real (${fallback.filename}) en su lugar para no perder el paso.`,
             );
             updateStep(jobId, stepDef.id, {
               status: "done",
@@ -2388,7 +2459,7 @@ export default function LingeriePipelinePage() {
     try {
       const addImages = useGalleryStore.getState().addImages;
       const finalJob = (jobsSnapshot.find((j) => j.id === jobId)) ?? job;
-      const baseName = finalJob.file.name.replace(/\.[^.]+$/, '');
+      const baseName = finalJob.filename.replace(/\.[^.]+$/, '');
       const ts = Date.now();
       const refTag = finalJob.referenceKey ?? '';
       const colorTag = finalJob.color ?? '';
@@ -2464,11 +2535,17 @@ export default function LingeriePipelinePage() {
     // Upload en paralelo para no secuenciar 6 uploads de ~5s cada uno.
     const uploadPromises = jobsSnapshot.map(async (job, idx) => {
       if (job.uploadedUrl) return { idx, ...job };
+      if (!job.file) {
+        // Job restaurado sin File — no podemos subir. Queda sin uploadedUrl
+        // y su processJob mostrará error amistoso.
+        console.warn(`[lingerie] ${job.filename}: job restaurado sin File, saltando upload`);
+        return { idx, ...job };
+      }
       try {
         const uploaded = await uploadFile(job.file);
         return { idx, ...job, uploadedUrl: uploaded.url, falUrl: uploaded.falUrl };
       } catch (err) {
-        console.warn(`[lingerie] pre-upload falló para ${job.file.name}:`, err);
+        console.warn(`[lingerie] pre-upload falló para ${job.filename}:`, err);
         return { idx, ...job };
       }
     });
@@ -2508,7 +2585,7 @@ export default function LingeriePipelinePage() {
   const downloadAll = useCallback(async () => {
     const results: { url: string; name: string }[] = [];
     for (const job of jobs) {
-      const base = job.file.name.replace(/\.[^.]+$/, "");
+      const base = job.filename.replace(/\.[^.]+$/, "");
       for (const step of job.steps) {
         if (step.resultUrl && (step.status === "done" || step.status === "accepted")) {
           results.push({ url: step.resultUrl, name: `${base}_${step.id}` });
@@ -2639,7 +2716,7 @@ export default function LingeriePipelinePage() {
                           <div className="relative">
                             <img
                               src={job.previewUrl}
-                              alt={job.file.name}
+                              alt={job.filename}
                               className="aspect-square w-full rounded-lg object-cover border border-white/10"
                             />
                             <button
@@ -2668,7 +2745,7 @@ export default function LingeriePipelinePage() {
                               </div>
                             )}
                           </div>
-                          <p className="mt-1 truncate text-[10px] text-gray-500">{job.file.name}</p>
+                          <p className="mt-1 truncate text-[10px] text-gray-500">{job.filename}</p>
                           {/* P0-1: dropdown para corregir el ángulo */}
                           <label className="mt-1 flex items-center gap-1">
                             <span className="text-[9px] uppercase tracking-wider text-gray-600">Ángulo</span>
@@ -3143,7 +3220,7 @@ export default function LingeriePipelinePage() {
                 <div className="relative shrink-0">
                   <img
                     src={job.previewUrl}
-                    alt={job.file.name}
+                    alt={job.filename}
                     className="h-10 w-10 rounded-md object-cover"
                   />
                   {job.status === "done" && (
@@ -3158,7 +3235,7 @@ export default function LingeriePipelinePage() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-medium text-white">{job.file.name}</p>
+                  <p className="truncate text-[11px] font-medium text-white">{job.filename}</p>
                   <p className="text-[10px] text-gray-500">
                     {job.status === "done"
                       ? `$${job.totalCost.toFixed(3)}`
@@ -3180,11 +3257,11 @@ export default function LingeriePipelinePage() {
               <div className="mb-6 flex items-center gap-4">
                 <img
                   src={activeJob.previewUrl}
-                  alt={activeJob.file.name}
+                  alt={activeJob.filename}
                   className="h-14 w-14 rounded-lg border border-white/10 object-cover"
                 />
                 <div>
-                  <h2 className="text-base font-bold text-white">{activeJob.file.name}</h2>
+                  <h2 className="text-base font-bold text-white">{activeJob.filename}</h2>
                   <p className="text-sm text-gray-400">
                     {activeJob.status === "done"
                       ? `Completado · costo: $${activeJob.totalCost.toFixed(3)}`
