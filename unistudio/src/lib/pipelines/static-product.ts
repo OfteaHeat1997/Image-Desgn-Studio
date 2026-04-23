@@ -38,6 +38,28 @@ export interface AdaptiveBgConfig {
   bgMode: 'fast' | 'precise';
   /** Etiqueta humana del look elegido, solo para mostrar en UI */
   label: string;
+  /**
+   * Seed determinista por (productType, brand). Mismo valor → Flux genera el
+   * mismo fondo para todos los SKUs del mismo tipo+marca → catálogo cohesivo
+   * (los 20 perfumes Yanbal comparten mármol idéntico, no 20 mármoles distintos).
+   * Range: 1..999_999. Estable entre runs.
+   */
+  seed: number;
+}
+
+/**
+ * Seed determinista por (productType, brand). Calculada con hash simple
+ * basado en el orden de PRODUCT_TYPE_LABELS × BRAND_LABELS, para que un SKU
+ * procesado hoy use el mismo seed que otro SKU del mismo tipo+marca procesado
+ * el mes pasado. No usamos Math.random ni Date.now: la estabilidad es el punto.
+ */
+function brandSeed(productType: StaticProductType, brand: StaticBrand): number {
+  const typeOrder: StaticProductType[] = ['perfume', 'cream', 'sunscreen', 'deodorant', 'facial', 'makeup'];
+  const brandOrder: StaticBrand[] = ['esika', 'yanbal', 'lbel', 'cyzone', 'avon', 'salome', 'other'];
+  const ti = typeOrder.indexOf(productType);
+  const bi = brandOrder.indexOf(brand);
+  // 10000 + type×1000 + brand×100 → rangos 10000..16699 bien separados entre grupos
+  return 10000 + ti * 1000 + bi * 100;
 }
 
 export const PRODUCT_TYPE_LABELS: Record<StaticProductType, string> = {
@@ -68,6 +90,7 @@ export function getAdaptiveBgConfig(
   // Suffijo de calidad agregado a TODOS los prompts — fuerza Flux Pro a producir
   // imágenes nítidas sin artefactos, ampliación-ready para catálogo e-commerce.
   const HD = ', ultra high resolution, 8K, sharp focus, crystal clear details, professional commercial product photography, studio quality lighting, no blur, no artifacts, photo-realistic, magazine quality';
+  const seed = brandSeed(productType, brand);
 
   // --- Perfumes ---
   if (productType === 'perfume') {
@@ -78,6 +101,7 @@ export function getAdaptiveBgConfig(
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',
+        seed,
       };
     }
     if (brand === 'cyzone') {
@@ -87,6 +111,7 @@ export function getAdaptiveBgConfig(
         shadowType: 'drop',
         bgMode: 'precise',
         label: 'Fondo pastel juvenil',
+        seed,
       };
     }
     return {
@@ -95,6 +120,7 @@ export function getAdaptiveBgConfig(
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Beige cálido minimalista',
+      seed,
     };
   }
 
@@ -107,6 +133,7 @@ export function getAdaptiveBgConfig(
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Mármol blanco premium (estilo La Mer)',
+        seed,
       };
     }
     if (brand === 'esika' || brand === 'cyzone') {
@@ -116,6 +143,7 @@ export function getAdaptiveBgConfig(
         shadowType: 'contact',
         bgMode: 'precise',
         label: 'Beige cálido tipo spa',
+        seed,
       };
     }
     return {
@@ -124,6 +152,7 @@ export function getAdaptiveBgConfig(
       shadowType: 'contact',
       bgMode: 'precise',
       label: 'Crema neutro',
+      seed,
     };
   }
 
@@ -135,6 +164,7 @@ export function getAdaptiveBgConfig(
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Playa desenfocada (estilo Coppertone)',
+      seed,
     };
   }
 
@@ -146,6 +176,7 @@ export function getAdaptiveBgConfig(
       shadowType: 'contact',
       bgMode: 'precise',
       label: 'Degradado gris neutro',
+      seed,
     };
   }
 
@@ -157,6 +188,7 @@ export function getAdaptiveBgConfig(
       shadowType: 'reflection',
       bgMode: 'precise',
       label: 'Spa azul/blanco',
+      seed,
     };
   }
 
@@ -168,6 +200,7 @@ export function getAdaptiveBgConfig(
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Negro mate dramático (estilo MAC)',
+      seed,
     };
   }
 
@@ -177,6 +210,7 @@ export function getAdaptiveBgConfig(
     shadowType: 'contact',
     bgMode: 'precise',
     label: 'Fondo blanco simple',
+    seed,
   };
 }
 
