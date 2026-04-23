@@ -645,6 +645,8 @@ interface ImageLightboxProps {
   onClose: () => void;
   onSelect?: (url: string) => void;  // Si está, mostramos botón "Elegir esta"
   filenamePrefix?: string;    // ej "espalda-011473" → "espalda-011473-2.jpg"
+  /** URL de referencia (foto original / input del step) para modo comparación side-by-side */
+  compareWith?: string;
 }
 
 /**
@@ -653,22 +655,25 @@ interface ImageLightboxProps {
  * o tecla. Cada vista incluye botón Descargar y, si hay onSelect, botón
  * "Usar esta variante".
  */
-function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix }: ImageLightboxProps) {
+function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix, compareWith }: ImageLightboxProps) {
   const [idx, setIdx] = useState(Math.max(0, Math.min(startIndex, images.length - 1)));
+  const [compareMode, setCompareMode] = useState(false);
   const url = images[idx];
   const isVideo = url && (url.includes(".mp4") || url.includes(".webm"));
   const isSelected = url === selectedUrl;
+  const canCompare = !!compareWith && !isVideo;
 
-  // Cerrar con ESC, navegar con flechas
+  // Cerrar con ESC, navegar con flechas, C para comparar
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft" && images.length > 1) setIdx((i) => (i - 1 + images.length) % images.length);
       if (e.key === "ArrowRight" && images.length > 1) setIdx((i) => (i + 1) % images.length);
+      if ((e.key === "c" || e.key === "C") && compareWith && !isVideo) setCompareMode((c) => !c);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [images.length, onClose]);
+  }, [images.length, onClose, compareWith, isVideo]);
 
   // Lock body scroll mientras está abierto
   useEffect(() => {
@@ -712,6 +717,22 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
           )}
         </div>
         <div className="flex items-center gap-2">
+          {canCompare && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setCompareMode((c) => !c); }}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
+                compareMode
+                  ? "bg-violet-500 text-white hover:bg-violet-400"
+                  : "bg-white/10 text-white hover:bg-white/20",
+              )}
+              title="Comparar con la foto original (C)"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              {compareMode ? "Solo resultado" : "Comparar con original"}
+            </button>
+          )}
           <a
             href={downloadHref}
             download={filename}
@@ -735,9 +756,35 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
         </div>
       </div>
 
-      {/* Imagen / video grande, centrada */}
+      {/* Imagen / video grande, centrada. En compareMode, mostramos split
+          50/50: original a la izquierda, resultado a la derecha. */}
       <div className="flex h-full w-full items-center justify-center px-4 py-16">
-        {isVideo ? (
+        {compareMode && canCompare && compareWith ? (
+          <div className="flex h-full max-h-[80vh] w-full max-w-[95vw] items-center gap-2">
+            <div className="relative flex-1 h-full">
+              <img
+                src={compareWith}
+                alt="Original"
+                className="h-full w-full rounded-lg object-contain"
+                style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
+              />
+              <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+                Original
+              </span>
+            </div>
+            <div className="relative flex-1 h-full">
+              <img
+                src={url}
+                alt="Resultado"
+                className="h-full w-full rounded-lg object-contain"
+                style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
+              />
+              <span className="absolute right-2 top-2 rounded-md bg-violet-500/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+                Resultado
+              </span>
+            </div>
+          </div>
+        ) : isVideo ? (
           <video
             src={url}
             controls
@@ -1210,6 +1257,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           onClose={() => setLightboxIdx(null)}
           onSelect={onSelectCandidate}
           filenamePrefix={`unistudio-${step.id}`}
+          // Referencia para el modo comparación: el input del step (o el del
+          // chain), que es lo que se está transformando. Usuaria ve "antes vs
+          // después" side-by-side para evaluar fidelidad del producto.
+          compareWith={inputUrl}
         />
       )}
     </div>
