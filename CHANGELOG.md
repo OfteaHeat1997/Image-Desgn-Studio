@@ -1,5 +1,28 @@
 # UniStudio — Changelog
 
+## 2026-04-29 — Batch: data-loss prevention (auto-descarga + persistencia + warning)
+
+Reportado durante test real: el usuario refrescó la página tras procesar 10 bloqueadores y perdió todo. Los `useState` de la BatchPage no persistían y los blob URLs murieron al unmount.
+
+### Tres capas de protección contra pérdida de datos
+
+1. **Auto-descarga ON por default** (toggleable). Cada imagen se descarga al disco apenas termina su pipeline — no hay que esperar al final ni hacer click. Sobrevive a cualquier refresh/crash/cierre.
+2. **Persistencia a localStorage** (`unistudio.batch.recent-results`, cap 200) de los resultados con URL HTTP — los blob URLs se filtran porque no sobreviven refresh. Al volver, aparece sección verde "Resultados recuperados" con los thumbnails clicables para re-descargar.
+3. **`beforeunload` warning** mientras `isRunning === true` — el browser pide confirmación si tratás de cerrar/refrescar con un batch en progreso.
+
+### Cambios en `unistudio/src/app/batch/page.tsx`
+
+- Nuevo state `autoDownload` (default true) + checkbox en el header de "Subir Imágenes".
+- Nuevo state `persistedResults` con `useEffect` de hidratación al mount.
+- Helper `triggerDownload(url, filename)` que clickea un `<a download>` programático.
+- Nueva sección "Resultados recuperados" con grid de hasta 24 thumbnails + Descargar Todo + Limpiar.
+- `useEffect` de `beforeunload` que solo se enchufa cuando hay batch corriendo.
+- En el `success` del loop: dispara `triggerDownload` si `autoDownload`, y persiste si la URL es `http(s)://` (skip blobs).
+
+### Validación
+
+- `tsc --noEmit` clean (solo el error pre-existente de `pipelines/lingerie/page.tsx:3818`).
+
 ## 2026-04-29 — Batch: progreso por imagen + Detener + reintentar
 
 Pedido durante test real con 10 bloqueadores: el batch corría pero la UI solo mostraba un % global, sin saber qué imagen iba ni cómo cancelar.

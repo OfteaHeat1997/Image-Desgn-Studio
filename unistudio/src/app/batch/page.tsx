@@ -221,6 +221,53 @@ function formatEta(seconds: number): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Persisted results (recover from refresh / accidental close)         */
+/* ------------------------------------------------------------------ */
+
+const RECENT_RESULTS_KEY = "unistudio.batch.recent-results";
+
+interface PersistedResult {
+  id: string;
+  filename: string;
+  resultUrl: string;        // ONLY persisted if it's an http(s) URL
+  steps: string[];
+  completedAt: number;
+}
+
+function loadPersistedResults(): PersistedResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_RESULTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePersistedResults(results: PersistedResult[]) {
+  if (typeof window === "undefined") return;
+  try {
+    // Cap at 200 results so localStorage doesn't blow up
+    const slice = results.slice(-200);
+    localStorage.setItem(RECENT_RESULTS_KEY, JSON.stringify(slice));
+  } catch {
+    /* quota exceeded — silently drop (user already has files via auto-download) */
+  }
+}
+
+function triggerDownload(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 100);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -233,8 +280,27 @@ export default function BatchPage() {
   const [stopRequested, setStopRequested] = useState(false);
   const [batchStartTime, setBatchStartTime] = useState<number | null>(null);
   const [currentImageIdx, setCurrentImageIdx] = useState<number | null>(null);
+  const [autoDownload, setAutoDownload] = useState(true);
+  const [persistedResults, setPersistedResults] = useState<PersistedResult[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const addToGallery = useGalleryStore((s) => s.addImage);
+
+  /* ---- Restore persisted results on mount ---- */
+  useEffect(() => {
+    setPersistedResults(loadPersistedResults());
+  }, []);
+
+  /* ---- Beforeunload warning while running ---- */
+  useEffect(() => {
+    if (!isRunning) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Hay un batch en progreso. Si salís perdés las imágenes en cola.";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isRunning]);
 
   // Track all preview blob URLs so we can revoke them on clear and unmount
   const previewUrlsRef = useRef<string[]>([]);
@@ -848,6 +914,31 @@ export default function BatchPage() {
           operations: steps.map((s) => s.operation),
           project: "batch",
         });
+
+        // Auto-download as soon as the image is done — guarantees zero data loss
+        // even if the user closes the tab or refreshes mid-batch.
+        if (autoDownload && result.resultUrl) {
+          triggerDownload(result.resultUrl, `processed-${target.file.name}`);
+        }
+
+        // Persist to localStorage — only http(s) URLs survive refresh.
+        // Blob URLs (e.g. watermark step output) cannot be recovered, so we skip them.
+        if (result.resultUrl && /^https?:\/\//.test(result.resultUrl)) {
+          setPersistedResults((prev) => {
+            const updated: PersistedResult[] = [
+              ...prev,
+              {
+                id: `batch-${Date.now()}-${i}`,
+                filename: target.file.name,
+                resultUrl: result.resultUrl,
+                steps: steps.map((s) => s.operation),
+                completedAt: Date.now(),
+              },
+            ];
+            savePersistedResults(updated);
+            return updated;
+          });
+        }
       } catch (error) {
         const isAbort =
           (error instanceof DOMException && error.name === "AbortError") ||
@@ -895,7 +986,7 @@ export default function BatchPage() {
     setIsRunning(false);
     setCurrentImageIdx(null);
     abortControllerRef.current = null;
-  }, [images, steps, processOneImage, addToGallery]);
+  }, [images, steps, processOneImage, addToGallery, autoDownload]);
 
   const retryFailed = useCallback(() => {
     const failed = images.filter((img) => img.status === "error" || img.status === "cancelled");
@@ -1063,7 +1154,20 @@ export default function BatchPage() {
         <div className="space-y-6">
           {/* Upload area */}
           <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
-            <h2 className="mb-3 text-sm font-semibold text-gray-200">Subir Imagenes</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-200">Subir Imagenes</h2>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={autoDownload}
+                  onChange={(e) => setAutoDownload(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-gray-600 bg-surface text-accent focus:ring-accent"
+                />
+                <Download className="h-3.5 w-3.5" />
+                Auto-descarga
+                <span className="text-[10px] text-gray-500">(recomendado)</span>
+              </label>
+            </div>
             <Dropzone
               onDrop={handleDrop}
               multiple
@@ -1207,6 +1311,73 @@ export default function BatchPage() {
                     </div>
                   ))}
               </div>
+            </div>
+          )}
+
+          {/* Recovered results — shown when the user comes back after a refresh */}
+          {persistedResults.length > 0 && images.filter((i) => i.status === "done").length === 0 && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-emerald-300">
+                    Resultados recuperados ({persistedResults.length})
+                  </h2>
+                  <p className="mt-0.5 text-[11px] text-gray-400">
+                    Procesadas en una sesión anterior — los URLs siguen vivos.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Download className="h-3.5 w-3.5" />}
+                    onClick={async () => {
+                      for (const r of persistedResults) {
+                        triggerDownload(r.resultUrl, `processed-${r.filename}`);
+                        await new Promise((res) => setTimeout(res, 300));
+                      }
+                    }}
+                  >
+                    Descargar todo
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPersistedResults([]);
+                      savePersistedResults([]);
+                    }}
+                    className="rounded border border-gray-600 px-2 py-1 text-[10px] text-gray-400 hover:bg-surface"
+                    title="Limpiar la lista (no borra los archivos descargados)"
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {persistedResults.slice().reverse().slice(0, 24).map((r) => (
+                  <a
+                    key={r.id}
+                    href={r.resultUrl}
+                    download={`processed-${r.filename}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group relative aspect-square overflow-hidden rounded-lg border border-emerald-500/30 hover:border-emerald-500/60"
+                  >
+                    <img src={r.resultUrl} alt={r.filename} className="h-full w-full object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1">
+                      <p className="truncate text-[9px] text-white">{r.filename}</p>
+                    </div>
+                    <div className="absolute right-1 top-1 rounded bg-emerald-500/80 p-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Download className="h-3 w-3 text-white" />
+                    </div>
+                  </a>
+                ))}
+              </div>
+              {persistedResults.length > 24 && (
+                <p className="mt-2 text-center text-[10px] text-gray-500">
+                  Mostrando las 24 más recientes de {persistedResults.length}.
+                </p>
+              )}
             </div>
           )}
 
