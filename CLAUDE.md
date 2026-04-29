@@ -11,6 +11,8 @@ The Next.js app lives in the `unistudio/` subdirectory — **not** the repo root
 ### Git push after every change
 After any code modification (bug fix, feature, refactor): `git add` → `git commit` → `git push origin main`. Do not wait for the user to ask, and do not leave uncommitted changes at the end of a task.
 
+**NEVER `git add .` or `git add -A` from the repo root.** Stage explicit paths only. On 2026-04-29 an accidental sweep added 1.1M files from `.claude/worktrees/` (nested orphan agent worktrees) into the index, crashing VS Code and Claude Desktop. `.claude/worktrees/` is gitignored AND a `pre-commit` hook blocks it, but explicit-path staging is the real prevention. If you used `Agent` with `isolation: "worktree"`, you must `git worktree remove <path>` after the agent finishes — the harness does not auto-clean.
+
 ### Build / deploy only when the machine is clear
 Build and deploy are allowed, but NEVER start one while another is already running — that collides with Vercel or with another terminal and breaks. Before `next build` or `vercel --prod`, run these checks and abort if any is non-empty:
 

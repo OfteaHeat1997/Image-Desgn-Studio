@@ -1,5 +1,22 @@
 # UniStudio — Changelog
 
+## 2026-04-29 — Fix raíz: pollution de `.claude/worktrees/` en git
+
+Incidente: el repo tenía 1,100,470 archivos rastreados de worktrees Claude Code anidadas que orphanearon en runs anteriores. Crasheaba VS Code y Claude Desktop por file-watcher saturation. Causa raíz: `.claude/worktrees/` no estaba en `.gitignore` y un `git add .` (probablemente automático) las metió todas al índice.
+
+### Defensa en 4 capas (ahora aplicada)
+
+1. **`.gitignore`** — agregado `.claude/worktrees/` (commit `9b58896`).
+2. **`.git/info/exclude`** — fallback local por si alguien revierte el gitignore.
+3. **`~/.config/git-hooks/pre-commit`** — bloquea cualquier commit que stagee `.claude/worktrees/`. Probado: rechaza con mensaje claro.
+4. **`CLAUDE.md`** — regla mandatoria: nunca `git add .` desde la raíz, siempre paths explícitos. Si se usó `Agent` con `isolation: "worktree"`, hay que `git worktree remove` al terminar.
+
+### Resultado verificado
+
+- Index: 1,100,470 → 0 archivos `.claude/worktrees/` rastreados.
+- `.git/`: 69 MB → 40 MB (tras `git gc --prune=now`).
+- Hook probado con commit fake → bloqueado correctamente.
+
 ## 2026-04-23 (C7) — Gap 7 del audit: cache de fondos in-memory + modo económico
 
 Último commit del plan de mejoras Pipeline Estáticos. Cierra el audit completo (7/7 gaps implementados).
