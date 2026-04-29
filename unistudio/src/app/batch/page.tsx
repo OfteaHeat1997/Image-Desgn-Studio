@@ -690,14 +690,29 @@ export default function BatchPage() {
           break;
         }
         case "bg-generate": {
+          // /api/bg-generate requires `mode` (precise/creative/fast).
+          // - precise: Kontext Pro, needs imageUrl (which we always have here) — DEFAULT
+          // - creative: Flux Dev, needs productDescription
+          // - fast: Flux Schnell, needs productDescription
+          // For batch we use precise by default since we always have the original product image,
+          // unless the step explicitly requests a different mode.
+          const mode = (step.params?.mode as string) ?? "precise";
+          const customPrompt =
+            (step.params?.customPrompt as string) ??
+            (step.params?.prompt as string) ??
+            "professional lifestyle product photography, beautiful soft natural lighting";
           const res = await fetch("/api/bg-generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
-              prompt: (step.params?.prompt as string) ?? "professional lifestyle product photography, beautiful background",
+              mode,
               style: (step.params?.style as string) ?? "lifestyle",
+              customPrompt,
+              productDescription:
+                (step.params?.productDescription as string) ?? "product",
+              aspectRatio: step.params?.aspectRatio,
             }),
           });
           const data = await safeJson(res);
