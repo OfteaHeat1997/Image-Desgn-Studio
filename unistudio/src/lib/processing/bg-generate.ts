@@ -621,6 +621,73 @@ export async function generateBgFast(
 }
 
 // ---------------------------------------------------------------------------
+// Solid color composite (no Flux call — for marketplace/ecommerce white bg)
+// ---------------------------------------------------------------------------
+
+/**
+ * Removes the product background and composites it onto a solid hex color.
+ * Pure-Sharp pipeline, no generative model — guarantees the product is
+ * pixel-perfect AND the background is exact #RRGGBB (Amazon/MercadoLibre/
+ * Shopify all require true #FFFFFF for listing photos).
+ *
+ * @param imageUrl    - URL of the product image (any background; will be removed).
+ * @param hexColor    - Background fill, '#RRGGBB' format.
+ * @param aspectRatio - Target aspect ratio. Defaults to '1:1'.
+ * @param baseSize    - Base canvas size in px. Defaults to 2000 (matches the
+ *                      static-product pipeline normalize step at 2000×2000).
+ * @returns Data URL of the composited PNG.
+ */
+export async function compositeOnSolidColor(
+  imageUrl: string,
+  hexColor: string,
+  aspectRatio: string = '1:1',
+  baseSize: number = 2000,
+): Promise<string> {
+  // Step 1: bg-remove the product (Replicate rembg, no content filter).
+  const transparentUrl = await removeBgReplicate(imageUrl);
+  const { replicateHeaders } = await import('@/lib/utils/image');
+  const transparentRes = await fetch(transparentUrl, { headers: replicateHeaders(transparentUrl) });
+  if (!transparentRes.ok) throw new Error(`Failed to download transparent image: ${transparentRes.status}`);
+  const transparentBuffer = Buffer.from(await transparentRes.arrayBuffer());
+
+  // Step 2: canvas + product sizing (80% width, 85% height — same ratios as
+  // existing fallback so all 3 outputs of the static-product pipeline keep the
+  // product at a consistent size relative to the frame).
+  const canvas = aspectRatioToCanvas(aspectRatio, baseSize);
+  const productMaxW = Math.round(canvas.width * 0.80);
+  const productMaxH = Math.round(canvas.height * 0.85);
+
+  const resizedProduct = await sharp(transparentBuffer)
+    .resize(productMaxW, productMaxH, { fit: 'inside', withoutEnlargement: false })
+    .png()
+    .toBuffer();
+  const prodMeta = await sharp(resizedProduct).metadata();
+  const prodW = prodMeta.width || productMaxW;
+  const prodH = prodMeta.height || productMaxH;
+  const left = Math.round((canvas.width - prodW) / 2);
+  const top = Math.round((canvas.height - prodH) / 2);
+
+  // Step 3: parse hex → rgb. Throws on malformed input rather than silently
+  // defaulting to black.
+  const hex = hexColor.replace('#', '').trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+    throw new Error(`compositeOnSolidColor: invalid hex color "${hexColor}" — expected #RRGGBB.`);
+  }
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+
+  const resultBuffer = await sharp({
+    create: { width: canvas.width, height: canvas.height, channels: 4, background: { r, g, b, alpha: 1 } },
+  })
+    .composite([{ input: resizedProduct, left, top }])
+    .png()
+    .toBuffer();
+
+  return `data:image/png;base64,${resultBuffer.toString('base64')}`;
+}
+
+// ---------------------------------------------------------------------------
 // Composite product onto generated background
 // ---------------------------------------------------------------------------
 

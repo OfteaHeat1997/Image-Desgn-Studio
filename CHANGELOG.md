@@ -1,5 +1,40 @@
 # UniStudio — Changelog
 
+## 2026-04-29 — Static-product: composite-first + 3 outputs + lightbox
+
+Tras feedback real testeando con un perfume Yanbal en producción: el pipeline cambiaba la forma del producto (Kontext Pro lo "redibujaba"), no había preview en grande, y solo generaba 1 output. Las quejas se resuelven en este commit.
+
+### Cambios
+
+- **Producto pixel-perfect** — el pipeline ahora siempre usa `mode: 'fast'` (Flux Schnell + Sharp composite). El producto NUNCA pasa por un modelo de edición; sus pixeles originales se compositean sobre el fondo generado. Adiós a las deformaciones de letras, vidrio o etiqueta.
+- **3 outputs por foto** en paralelo desde el mismo input normalizado:
+  1. ⬜ **Blanco e-commerce** (1:1, #FFFFFF puro vía Sharp, $0) — listo para Amazon/MercadoLibre/Shopify listings que exigen blanco verdadero.
+  2. 🎨 **Adaptativo catálogo** (1:1, fondo decidido por marca+tipo, $0.003) — Sephora/MAC-style.
+  3. 📱 **Vertical 9:16** (mismo fondo adaptativo, mismo seed, $0.003) — listo para Reels/Stories/TikTok.
+- **Lightbox** — click en cualquier thumbnail de cualquier paso abre la imagen full-size en modal, con botón descargar. Resuelve "no hay preview en grande".
+- **Descarga por output** — cada uno de los 3 resultados tiene su botón de descarga independiente; auto-save a galería con sufijos `-white`, `-adaptive`, `-vertical`.
+- **Validador IA default ON** ($0.0002/foto) — atrapa duplicados y producto faltante en el output adaptativo.
+- **Removido el toggle "modo económico"** — ya no aplica porque `fast` es ahora el default forzado.
+
+### Costo por foto antes / después
+
+| | Antes | Ahora |
+|---|---|---|
+| Outputs | 1 (1:1 adaptativo, deformable) | 3 (blanco + 1:1 + 9:16, pixel-perfect) |
+| bg-generate | Kontext Pro $0.05 | Schnell ×2 con cache $0.003–0.006 |
+| Total típico | ~$0.06 | ~$0.013–0.016 |
+
+### Cambios técnicos
+
+- `src/lib/processing/bg-generate.ts`: nueva función exportada `compositeOnSolidColor(imageUrl, hexColor, aspectRatio, baseSize=2000)` — bg-remove + Sharp composite, sin Flux.
+- `src/app/api/bg-generate/route.ts`: nuevo registry `SOLID_COLOR_STYLES` con `pure-white/black/gray`. Al detectar uno de esos styles, corta antes del switch de `mode` y usa el path Sharp directo.
+- `src/app/pipelines/static-product/page.tsx`: rewrite del modelo de steps (`isolate | normalize | white | adaptive | vertical`), `processJob` lanza los 3 outputs con `Promise.all`, nuevo helper `reRunOutputs(jobId, keys[], overridePrompt?)` reemplaza `reRunBgAndBelow/reRunShadowAndBelow`. Modal "Cambiar fondo" re-ejecuta adaptive+vertical para mantener catálogo y reels coherentes.
+
+### Validación
+
+- `tsc --noEmit` clean para los 3 archivos modificados (sólo persiste el error pre-existente en lingerie/page.tsx 3818, no relacionado).
+- Triple-check: archivos verificados, grep para referencias muertas (0 hits), tsc passes.
+
 ## 2026-04-29 — Batch: ZIP download + descarga garantizada + before/after persistido
 
 Iteración tras testing real con bloqueadores: la auto-descarga sequential puede ser bloqueada por el popup blocker del browser. Y los persisted results no tenían before/after porque el original era un blob URL.

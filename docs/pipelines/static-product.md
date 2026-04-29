@@ -2,10 +2,26 @@
 
 > Para: Unistyles (Curaçao) — **240 productos** (146 perfumes + 49 cremas + 28 desodorantes + 11 bloqueador + 6 facial + maquillaje futuro)
 
-**Última actualización:** 2026-04-20
-**Estado:** Implementado (MVP) — commit 3 del ciclo. Matriz de fondo adaptativo en `src/lib/pipelines/static-product.ts`, página orquesta los módulos desde el cliente.
-**Ruta API:** No tiene ruta propia — la página llama a `/api/bg-remove`, `/api/enhance`, `/api/bg-generate`, `/api/shadows` directamente (mismo patrón que Lencería, permite per-step UI).
+**Última actualización:** 2026-04-29
+**Estado:** Implementado + composite-first + 3 outputs en paralelo. Producto pixel-perfect garantizado (no pasa por modelo generativo).
+**Ruta API:** No tiene ruta propia — la página llama a `/api/bg-remove`, `/api/enhance`, `/api/bg-generate` (con `style: 'pure-white'` o `style: 'custom'` + `mode: 'fast'`).
 **Página UI:** `/pipelines/static-product`
+
+## Garantía clave: producto pixel-perfect
+
+A partir del 2026-04-29, el pipeline **nunca** pasa el producto por un modelo de edición tipo Kontext Pro. Siempre usa el flujo composite-first: `bg-remove` aísla el producto sobre transparente → `bg-generate` (modo fast / pure-white) genera SOLO el fondo → Sharp compositea los pixeles originales del producto encima. Resultado: forma, etiqueta, vidrio, color del envase quedan idénticos al input. Lo único que cambia es el fondo.
+
+## 3 outputs por foto
+
+Cada job genera 3 imágenes en paralelo desde el mismo input normalizado:
+
+| Output | Fondo | Aspect | Costo | Para qué |
+|---|---|---|---|---|
+| ⬜ `white` | #FFFFFF puro vía Sharp (no Flux) | 1:1 | $0 | Amazon, MercadoLibre, Shopify listings que requieren blanco verdadero |
+| 🎨 `adaptive` | Decidido por (productType, brand) — mármol, gradient, playa | 1:1 | $0.003 | Catálogo web, Instagram feed, look Sephora/MAC |
+| 📱 `vertical` | Mismo fondo adaptativo, mismo seed | 9:16 | $0.003 | Reels, Stories, TikTok |
+
+Los 3 comparten el SKU/seed, así que la coherencia visual entre formatos está garantizada.
 
 ---
 

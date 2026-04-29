@@ -17,6 +17,7 @@ import {
   RefreshCw,
   RotateCw,
   Palette,
+  Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -35,9 +36,17 @@ import { inferProductContextFromPath } from "@/lib/pipelines/folder-routing";
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type JobStatus = "idle" | "uploading" | "isolating" | "normalizing" | "generating-bg" | "shadowing" | "finishing" | "done" | "error";
+type JobStatus = "idle" | "uploading" | "isolating" | "normalizing" | "generating" | "done" | "error";
 
-type StepKey = "isolate" | "normalize" | "bg" | "shadow" | "finish";
+/**
+ * Steps:
+ *  - isolate / normalize: shared prep (bg-remove + center 2000×2000).
+ *  - white / adaptive / vertical: the 3 final outputs, generated in parallel
+ *    after normalize. Each composites the SAME pixel-perfect product onto a
+ *    different background — guaranteeing the bottle/jar shape is identical
+ *    across all 3 outputs.
+ */
+type StepKey = "isolate" | "normalize" | "white" | "adaptive" | "vertical";
 
 interface StepSnapshot {
   /** URL después de completar este paso */
@@ -48,11 +57,7 @@ interface StepSnapshot {
   status: "idle" | "running" | "done" | "skipped" | "error";
   /** Mensaje de error si falló */
   error?: string;
-  /**
-   * Gap 6 — warning del validador opcional. Si set, la UI muestra un badge
-   * ⚠ junto al thumbnail con el motivo. No bloquea nada; el usuario decide
-   * si re-ejecuta vía los botones de Gap 5.
-   */
+  /** Warning opcional del validador IA */
   warning?: string;
 }
 
@@ -63,28 +68,60 @@ interface Job {
   productType: StaticProductType;
   brand: StaticBrand;
   status: JobStatus;
+  /**
+   * resultUrl es el "main" output mostrado en el thumbnail principal — apunta
+   * a `steps.adaptive.resultUrl` cuando está listo (es el de "catálogo Sephora",
+   * el más vistoso). Los 3 outputs reales viven en `steps.white/adaptive/vertical`.
+   */
   resultUrl?: string;
   error?: string;
   cost: number;
-  /** Snapshot por paso para mostrar progreso visual en vivo */
   steps: Record<StepKey, StepSnapshot>;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
   isolate: { cost: 0, status: "idle" },
   normalize: { cost: 0, status: "idle" },
-  bg: { cost: 0, status: "idle" },
-  shadow: { cost: 0, status: "idle" },
-  finish: { cost: 0, status: "idle" },
+  white: { cost: 0, status: "idle" },
+  adaptive: { cost: 0, status: "idle" },
+  vertical: { cost: 0, status: "idle" },
 };
 
-const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string }> = {
-  isolate: { label: "Quitar fondo", icon: "✂️", costHint: "$0.01" },
-  normalize: { label: "Centrar en cuadrado", icon: "📐", costHint: "Gratis" },
-  bg: { label: "Fondo adaptativo", icon: "🎨", costHint: "$0.003–$0.05" },
-  shadow: { label: "Sombra", icon: "🌒", costHint: "Gratis" },
-  finish: { label: "Ajustes finales", icon: "✨", costHint: "Gratis" },
+const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string; description: string }> = {
+  isolate: {
+    label: "Quitar fondo",
+    icon: "✂️",
+    costHint: "$0.01",
+    description: "Aísla el producto sobre transparente.",
+  },
+  normalize: {
+    label: "Centrar 2000×2000",
+    icon: "📐",
+    costHint: "Gratis",
+    description: "Resize y centrado consistente entre fotos del mismo SKU.",
+  },
+  white: {
+    label: "Blanco e-commerce",
+    icon: "⬜",
+    costHint: "Gratis",
+    description: "Fondo #FFFFFF puro, listo para Amazon/MercadoLibre/listing. Sharp puro, no pasa por modelo IA.",
+  },
+  adaptive: {
+    label: "Adaptativo catálogo",
+    icon: "🎨",
+    costHint: "$0.003",
+    description: "Fondo decidido por marca+tipo (mármol, gradient, playa). 1:1, listo para web/Instagram feed.",
+  },
+  vertical: {
+    label: "Vertical 9:16",
+    icon: "📱",
+    costHint: "$0.003",
+    description: "Mismo fondo adaptativo en formato vertical. Listo para Reels/Stories/TikTok.",
+  },
 };
+
+/** Las 3 etapas que producen un output descargable (orden de display). */
+const OUTPUT_STEPS: StepKey[] = ["white", "adaptive", "vertical"];
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -103,10 +140,8 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   idle: "Listo",
   uploading: "Subiendo...",
   isolating: "Quitando fondo...",
-  normalizing: "Centrando en 2000×2000...",
-  "generating-bg": "Generando fondo adaptativo...",
-  shadowing: "Agregando sombra...",
-  finishing: "Ajustes finales...",
+  normalizing: "Centrando 2000×2000...",
+  generating: "Generando 3 fondos...",
   done: "Listo",
   error: "Error",
 };
@@ -266,14 +301,15 @@ export default function StaticProductPipelinePage() {
   const [bgPromptModal, setBgPromptModal] = useState<{ job: Job; customPrompt: string } | null>(null);
   const [reRunningJobId, setReRunningJobId] = useState<string | null>(null);
 
-  // Gap 6 — validador post-bg con Claude Haiku (opt-in, +$0.0002/foto)
-  const [validateBg, setValidateBg] = useState(false);
+  // Gap 6 — validador post-bg con Claude Haiku (default ON, costo despreciable
+  // $0.0002/foto y atrapa duplicados/producto faltante que de otra manera
+  // pasarían silenciosos).
+  const [validateBg, setValidateBg] = useState(true);
 
-  // Gap 7 — modo económico: fuerza bgMode:fast (Flux Schnell + composite + cache)
-  // en lugar de precise (Flux Pro sin cache). 95%+ ahorro en batches grandes del
-  // mismo (productType, brand). Calidad ligeramente menor pero acceptable para
-  // catálogo (el producto es pixel-perfect, solo el bg cambia).
-  const [economyMode, setEconomyMode] = useState(false);
+  // Lightbox state — click on any thumbnail to view full-size in a modal.
+  // Fixes the "no preview en grande" complaint: every step thumb is clickable
+  // and opens the original-resolution image.
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
 
   // Read URL params from auto-mode redirect (e.g., ?productType=perfume)
   useEffect(() => {
@@ -430,6 +466,76 @@ export default function StaticProductPipelinePage() {
     [isRunning, batchLoadingId, handleFiles],
   );
 
+  /**
+   * Generate ONE of the 3 outputs (white | adaptive | vertical) using the
+   * given input URL (the normalized transparent product). Composite-first:
+   * for the adaptive/vertical outputs we use `mode: 'fast'` which calls
+   * `generateBgFast` server-side, which does bg-remove + Flux Schnell bg +
+   * Sharp composite — the original product pixels are NEVER modified by Flux.
+   * For white we use `style: 'pure-white'` which goes straight to Sharp.
+   */
+  const generateOneOutput = async (
+    inputUrl: string,
+    key: StepKey,
+    config: ReturnType<typeof getAdaptiveBgConfig>,
+    overridePrompt?: string,
+  ): Promise<{ url: string; cost: number }> => {
+    if (key === "white") {
+      const r = await fetch("/api/bg-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: inputUrl,
+          mode: "fast", // ignored by route when style is solid-color; included for safety
+          style: "pure-white",
+          aspectRatio: "1:1",
+        }),
+      });
+      const d = await safeJson(r);
+      if (!d.success) throw new Error(d.error || "Falló blanco e-commerce");
+      return { url: d.data.url || d.data.imageUrl, cost: d.cost ?? 0 };
+    }
+
+    // adaptive (1:1) and vertical (9:16) share the same prompt + seed → cohesive
+    // catalog look across both formats. Always use mode:'fast' so the product
+    // is composited (pixel-perfect), never re-imagined by Kontext Pro.
+    const aspectRatio = key === "vertical" ? "9:16" : "1:1";
+    const r = await fetch("/api/bg-generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageUrl: inputUrl,
+        mode: "fast",
+        style: "custom",
+        customPrompt: overridePrompt?.trim() || config.prompt,
+        aspectRatio,
+        seed: config.seed,
+      }),
+    });
+    const d = await safeJson(r);
+    if (!d.success) throw new Error(d.error || `Falló generar ${key}`);
+    return { url: d.data.url || d.data.imageUrl, cost: d.cost ?? 0.003 };
+  };
+
+  const runOutputStep = async (
+    jobId: string,
+    key: StepKey,
+    inputUrl: string,
+    config: ReturnType<typeof getAdaptiveBgConfig>,
+    overridePrompt?: string,
+  ): Promise<{ url?: string; cost: number }> => {
+    updateStep(jobId, key, { status: "running", error: undefined });
+    try {
+      const { url, cost } = await generateOneOutput(inputUrl, key, config, overridePrompt);
+      updateStep(jobId, key, { status: "done", resultUrl: url, cost });
+      return { url, cost };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      updateStep(jobId, key, { status: "error", error: message });
+      return { cost: 0 };
+    }
+  };
+
   const processJob = async (job: Job): Promise<void> => {
     const config = getAdaptiveBgConfig(job.productType, job.brand);
     let currentUrl: string;
@@ -484,41 +590,25 @@ export default function StaticProductPipelinePage() {
         updateStep(job.id, "normalize", { status: "done", resultUrl: currentUrl, cost: 0 });
       }
 
-      // 4. Generate adaptive background → step "bg"
-      updateJob(job.id, { status: "generating-bg" });
-      updateStep(job.id, "bg", { status: "running" });
-      const genRes = await fetch("/api/bg-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: currentUrl,
-          // Gap 7 — modo económico fuerza 'fast' (Flux Schnell cacheable).
-          mode: economyMode ? "fast" : config.bgMode,
-          style: "custom",
-          customPrompt: config.prompt,
-          aspectRatio: "1:1",
-          // Seed estable por (productType, brand) → todos los SKUs del mismo grupo
-          // comparten fondo idéntico (mármol, playa, gris, etc.) para catálogo cohesivo.
-          seed: config.seed,
-        }),
-      });
-      const genData = await safeJson(genRes);
-      if (!genData.success) {
-        updateStep(job.id, "bg", { status: "error", error: genData.error || "Falló generar fondo" });
-        throw new Error(genData.error || "Background generation failed");
-      }
-      currentUrl = genData.data.url || genData.data.imageUrl;
-      const bgCost = genData.cost ?? (config.bgMode === "precise" ? 0.05 : 0.003);
-      totalCost += bgCost;
-      updateStep(job.id, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost });
+      // 4. Generate the 3 outputs in parallel from the same normalized input.
+      //    All 3 share the EXACT same product pixels (composite-first).
+      updateJob(job.id, { status: "generating" });
+      const sharedInput = currentUrl;
+      const [whiteRes, adaptiveRes, verticalRes] = await Promise.all([
+        runOutputStep(job.id, "white", sharedInput, config),
+        runOutputStep(job.id, "adaptive", sharedInput, config),
+        runOutputStep(job.id, "vertical", sharedInput, config),
+      ]);
+      totalCost += whiteRes.cost + adaptiveRes.cost + verticalRes.cost;
 
-      // Gap 6 — validador opcional post-bg. No bloquea; solo flaggea.
-      if (validateBg) {
+      // Optional Gap-6 validator on the adaptive output only (the most likely to
+      // surface a "missing product" or "duplicate" issue from Flux).
+      if (validateBg && adaptiveRes.url) {
         try {
           const vRes = await fetch("/api/validate-bg", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageUrl: currentUrl }),
+            body: JSON.stringify({ imageUrl: adaptiveRes.url }),
           });
           const vData = await safeJson(vRes);
           if (vData.success && vData.data) {
@@ -526,71 +616,51 @@ export default function StaticProductPipelinePage() {
             const validateCost = (vData.cost as number) ?? 0.0002;
             totalCost += validateCost;
             if (v.productMissing) {
-              updateStep(job.id, "bg", { warning: `⚠ Producto no visible: ${v.reason}` });
+              updateStep(job.id, "adaptive", { warning: `⚠ Producto no visible: ${v.reason}` });
             } else if (v.looksLikeDuplicate || v.productCount > 1) {
-              updateStep(job.id, "bg", { warning: `⚠ Duplicado detectado (count=${v.productCount}): ${v.reason}` });
+              updateStep(job.id, "adaptive", { warning: `⚠ Duplicado detectado (count=${v.productCount}): ${v.reason}` });
             }
           }
         } catch (vErr) {
-          // Validator non-blocking: log y seguir
           console.warn("[static-product] validate-bg failed:", vErr);
         }
       }
 
-      // 5. Shadows → step "shadow"
-      updateJob(job.id, { status: "shadowing" });
-      updateStep(job.id, "shadow", { status: "running" });
-      const shRes = await fetch("/api/shadows", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: currentUrl,
-          type: config.shadowType,
-        }),
+      // The "main" thumbnail uses the adaptive 1:1 output (most visually rich).
+      // If adaptive failed, fall back to white, then vertical, then the
+      // normalize result, so the user always sees something useful.
+      const main = adaptiveRes.url || whiteRes.url || verticalRes.url || currentUrl;
+      const anyOutputSucceeded = !!(whiteRes.url || adaptiveRes.url || verticalRes.url);
+      updateJob(job.id, {
+        status: anyOutputSucceeded ? "done" : "error",
+        resultUrl: main,
+        cost: totalCost,
+        error: anyOutputSucceeded ? undefined : "Los 3 outputs fallaron — revisa los errores por paso.",
       });
-      const shData = await safeJson(shRes);
-      if (shData.success) {
-        currentUrl = shData.data.url || shData.data.imageUrl || currentUrl;
-        const shCost = shData.cost ?? 0;
-        totalCost += shCost;
-        updateStep(job.id, "shadow", { status: "done", resultUrl: currentUrl, cost: shCost });
-      } else {
-        console.warn("[static-product] shadow step soft-failed:", shData.error);
-        updateStep(job.id, "shadow", { status: "skipped", error: shData.error });
+
+      // Save each successful output to the gallery so it's not lost. The
+      // gallery shows them as separate entries with distinct suffixes.
+      if (anyOutputSucceeded) {
+        const addToGallery = useGalleryStore.getState().addImage;
+        const stem = job.file.name.replace(/\.[^.]+$/, "");
+        const outs: Array<[StepKey, string | undefined]> = [
+          ["white", whiteRes.url],
+          ["adaptive", adaptiveRes.url],
+          ["vertical", verticalRes.url],
+        ];
+        for (const [key, url] of outs) {
+          if (!url) continue;
+          addToGallery({
+            id: `static-${Date.now()}-${job.id}-${key}`,
+            filename: `${stem}-${key}.jpg`,
+            resultUrl: url,
+            originalUrl: job.previewUrl,
+            date: new Date().toISOString(),
+            operations: ["bg-remove", "enhance", "bg-generate"],
+            project: `static-${job.productType}-${job.brand}`,
+          });
+        }
       }
-
-      // 6. Final color pop enhance → step "finish"
-      updateJob(job.id, { status: "finishing" });
-      updateStep(job.id, "finish", { status: "running" });
-      const finRes = await fetch("/api/enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: currentUrl,
-          preset: "product-clean",
-        }),
-      });
-      const finData = await safeJson(finRes);
-      if (finData.success) {
-        currentUrl = finData.data.url || finData.data.imageUrl || currentUrl;
-        updateStep(job.id, "finish", { status: "done", resultUrl: currentUrl, cost: 0 });
-      } else {
-        updateStep(job.id, "finish", { status: "skipped", error: finData.error });
-      }
-
-      updateJob(job.id, { status: "done", resultUrl: currentUrl, cost: totalCost });
-
-      // Auto-save a galería para que la usuaria no pierda el resultado aunque no haga click en download
-      const addToGallery = useGalleryStore.getState().addImage;
-      addToGallery({
-        id: `static-${Date.now()}-${job.id}`,
-        filename: job.file.name.replace(/\.[^.]+$/, '') + '-static.jpg',
-        resultUrl: currentUrl,
-        originalUrl: job.previewUrl,
-        date: new Date().toISOString(),
-        operations: ['bg-remove', 'enhance', 'bg-generate', 'shadows', 'enhance-final'],
-        project: `static-${job.productType}-${job.brand}`,
-      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(job.id, { status: "error", error: message });
@@ -599,185 +669,43 @@ export default function StaticProductPipelinePage() {
   };
 
   /**
-   * Gap 5 — re-ejecutar el step de fondo con un prompt custom (o el de la
-   * matriz si no se pasa override) + cadena completa hacia abajo (shadow + finish).
-   * Usa el resultado de "normalize" como input de bg. Seed sigue siendo el
-   * estable por (tipo, marca) salvo que `overrideSeed` se pase.
+   * Re-generate ONE of the 3 outputs (or all of adaptive+vertical when called
+   * from the "Cambiar fondo" modal). Uses the existing normalize result as
+   * input, so we don't pay isolate+normalize again.
    */
-  const reRunBgAndBelow = async (
+  const reRunOutputs = async (
     jobId: string,
+    keys: StepKey[],
     overridePrompt?: string,
-    overrideSeed?: number,
   ) => {
     if (isRunning || reRunningJobId) return;
     const job = jobs.find((j) => j.id === jobId);
     if (!job) return;
     const inputUrl = job.steps.normalize.resultUrl || job.steps.isolate.resultUrl;
     if (!inputUrl) {
-      toast.error("No hay imagen disponible desde el paso previo. Procesa el job completo primero.");
+      toast.error("No hay imagen disponible. Procesa el job completo primero.");
       return;
     }
     const config = getAdaptiveBgConfig(job.productType, job.brand);
-    const finalPrompt = overridePrompt?.trim() || config.prompt;
-    const finalSeed = overrideSeed ?? config.seed;
     setReRunningJobId(jobId);
-    // Resetear los 3 steps de abajo
-    updateStep(jobId, "bg", { status: "running", resultUrl: undefined, cost: 0, error: undefined });
-    updateStep(jobId, "shadow", { status: "idle", resultUrl: undefined, cost: 0, error: undefined });
-    updateStep(jobId, "finish", { status: "idle", resultUrl: undefined, cost: 0, error: undefined });
-    updateJob(jobId, { status: "generating-bg", error: undefined });
-
-    let currentUrl = inputUrl;
-    let addedCost = 0;
+    updateJob(jobId, { status: "generating", error: undefined });
     try {
-      // BG
-      const genRes = await fetch("/api/bg-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: currentUrl,
-          mode: economyMode ? "fast" : config.bgMode,
-          style: "custom",
-          customPrompt: finalPrompt,
-          aspectRatio: "1:1",
-          seed: finalSeed,
-        }),
-      });
-      const genData = await safeJson(genRes);
-      if (!genData.success) {
-        updateStep(jobId, "bg", { status: "error", error: genData.error || "Falló generar fondo" });
-        throw new Error(genData.error || "Background generation failed");
-      }
-      currentUrl = genData.data.url || genData.data.imageUrl;
-      const bgCost = genData.cost ?? (config.bgMode === "precise" ? 0.05 : 0.003);
-      addedCost += bgCost;
-      updateStep(jobId, "bg", { status: "done", resultUrl: currentUrl, cost: bgCost, warning: undefined });
-
-      // Gap 6 — validador también se corre en re-runs
-      if (validateBg) {
-        try {
-          const vRes = await fetch("/api/validate-bg", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageUrl: currentUrl }),
-          });
-          const vData = await safeJson(vRes);
-          if (vData.success && vData.data) {
-            const v = vData.data as { productCount: number; looksLikeDuplicate: boolean; productMissing: boolean; reason: string };
-            addedCost += ((vData.cost as number) ?? 0.0002);
-            if (v.productMissing) {
-              updateStep(jobId, "bg", { warning: `⚠ Producto no visible: ${v.reason}` });
-            } else if (v.looksLikeDuplicate || v.productCount > 1) {
-              updateStep(jobId, "bg", { warning: `⚠ Duplicado detectado: ${v.reason}` });
-            }
-          }
-        } catch (vErr) {
-          console.warn("[static-product] validate-bg re-run failed:", vErr);
-        }
-      }
-
-      // Shadow
-      updateJob(jobId, { status: "shadowing" });
-      updateStep(jobId, "shadow", { status: "running" });
-      const shRes = await fetch("/api/shadows", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: currentUrl, type: config.shadowType }),
-      });
-      const shData = await safeJson(shRes);
-      if (shData.success) {
-        currentUrl = shData.data.url || shData.data.imageUrl || currentUrl;
-        const shCost = shData.cost ?? 0;
-        addedCost += shCost;
-        updateStep(jobId, "shadow", { status: "done", resultUrl: currentUrl, cost: shCost });
-      } else {
-        updateStep(jobId, "shadow", { status: "skipped", error: shData.error });
-      }
-
-      // Finish
-      updateJob(jobId, { status: "finishing" });
-      updateStep(jobId, "finish", { status: "running" });
-      const finRes = await fetch("/api/enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: currentUrl, preset: "product-clean" }),
-      });
-      const finData = await safeJson(finRes);
-      if (finData.success) {
-        currentUrl = finData.data.url || finData.data.imageUrl || currentUrl;
-        updateStep(jobId, "finish", { status: "done", resultUrl: currentUrl, cost: 0 });
-      } else {
-        updateStep(jobId, "finish", { status: "skipped", error: finData.error });
-      }
-
+      const results = await Promise.all(
+        keys.map((key) => runOutputStep(jobId, key, inputUrl, config, overridePrompt)),
+      );
+      const addedCost = results.reduce((s, r) => s + r.cost, 0);
+      const adaptive = job.steps.adaptive.resultUrl;
+      const next = results.find((r) => r.url)?.url || adaptive || job.resultUrl;
       updateJob(jobId, {
         status: "done",
-        resultUrl: currentUrl,
+        resultUrl: next,
         cost: job.cost + addedCost,
       });
-      toast.success(`Fondo re-generado para ${job.file.name}.`);
+      toast.success(`Re-generado: ${keys.join(", ")}.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(jobId, { status: "error", error: message });
-      toast.error(`Error re-ejecutando ${job.file.name}: ${message}`);
-    } finally {
-      setReRunningJobId(null);
-    }
-  };
-
-  /**
-   * Gap 5 — re-ejecutar solo el step de sombra + finish. Útil cuando el fondo
-   * está bien pero la sombra quedó muy dura o muy suave.
-   */
-  const reRunShadowAndBelow = async (jobId: string) => {
-    if (isRunning || reRunningJobId) return;
-    const job = jobs.find((j) => j.id === jobId);
-    if (!job) return;
-    const inputUrl = job.steps.bg.resultUrl;
-    if (!inputUrl) {
-      toast.error("No hay resultado del fondo todavía.");
-      return;
-    }
-    const config = getAdaptiveBgConfig(job.productType, job.brand);
-    setReRunningJobId(jobId);
-    updateStep(jobId, "shadow", { status: "running", resultUrl: undefined, cost: 0, error: undefined });
-    updateStep(jobId, "finish", { status: "idle", resultUrl: undefined, cost: 0, error: undefined });
-    updateJob(jobId, { status: "shadowing", error: undefined });
-
-    let currentUrl = inputUrl;
-    try {
-      const shRes = await fetch("/api/shadows", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: currentUrl, type: config.shadowType }),
-      });
-      const shData = await safeJson(shRes);
-      if (shData.success) {
-        currentUrl = shData.data.url || shData.data.imageUrl || currentUrl;
-        updateStep(jobId, "shadow", { status: "done", resultUrl: currentUrl, cost: 0 });
-      } else {
-        updateStep(jobId, "shadow", { status: "skipped", error: shData.error });
-      }
-      updateJob(jobId, { status: "finishing" });
-      updateStep(jobId, "finish", { status: "running" });
-      const finRes = await fetch("/api/enhance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: currentUrl, preset: "product-clean" }),
-      });
-      const finData = await safeJson(finRes);
-      if (finData.success) {
-        currentUrl = finData.data.url || finData.data.imageUrl || currentUrl;
-        updateStep(jobId, "finish", { status: "done", resultUrl: currentUrl, cost: 0 });
-      } else {
-        updateStep(jobId, "finish", { status: "skipped", error: finData.error });
-      }
-      updateJob(jobId, { status: "done", resultUrl: currentUrl });
-      toast.success(`Sombra re-generada para ${job.file.name}.`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      updateJob(jobId, { status: "error", error: message });
-      toast.error(`Error: ${message}`);
+      toast.error(`Error re-ejecutando: ${message}`);
     } finally {
       setReRunningJobId(null);
     }
@@ -1059,111 +987,173 @@ export default function StaticProductPipelinePage() {
                     </div>
                     </div>
 
-                    {/* Step timeline — live preview de cada paso con thumbnails + costo */}
+                    {/* Step timeline — split into 2 prep steps (compact) + 3 outputs (big) */}
                     {job.status !== "idle" && (
-                      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
-                        {(Object.keys(STEP_META) as StepKey[]).map((key) => {
-                          const step = job.steps[key];
-                          const meta = STEP_META[key];
-                          const activeClass =
-                            step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
-                            step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
-                            step.status === "error" ? "bg-red-500/10 border-red-500/40" :
-                            step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
-                            "bg-white/[0.02] border-white/10";
-                          return (
-                            <div
-                              key={key}
-                              className={cn("flex flex-col rounded border p-2 text-[10px]", activeClass)}
-                              title={step.error ?? meta.label}
-                            >
-                              <div className="flex items-center gap-1">
-                                <span className="text-sm">{meta.icon}</span>
-                                <span className="truncate font-medium text-gray-200">{meta.label}</span>
-                              </div>
-                              {step.resultUrl ? (
-                                <div className="relative">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={step.resultUrl}
-                                    alt={meta.label}
-                                    className="mt-1 h-14 w-full rounded bg-black object-contain"
-                                  />
-                                  {step.warning && (
-                                    <span
-                                      className="absolute right-0.5 top-1.5 rounded bg-amber-500/90 px-1 py-0.5 text-[9px] font-semibold text-black shadow"
-                                      title={step.warning}
-                                    >
-                                      ⚠
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 text-gray-600">
-                                  {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
-                                </div>
-                              )}
-                              <div className="mt-1 flex items-center justify-between gap-1 text-gray-400">
-                                <span>
-                                  {step.status === "done" && <CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" />}
-                                  {step.status === "error" && <AlertCircle className="inline h-2.5 w-2.5 text-red-400" />}
-                                  {step.status === "skipped" && "saltado"}
-                                  {step.status === "running" && "..."}
-                                  {step.status === "idle" && meta.costHint}
-                                </span>
-                                {step.status === "done" && step.cost > 0 && (
-                                  <span className="font-mono text-[9px] text-violet-300">${step.cost.toFixed(3)}</span>
+                      <div className="mt-3 space-y-3">
+                        {/* Prep — compact thumbnails */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {(["isolate", "normalize"] as StepKey[]).map((key) => {
+                            const step = job.steps[key];
+                            const meta = STEP_META[key];
+                            const activeClass =
+                              step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
+                              step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
+                              step.status === "error" ? "bg-red-500/10 border-red-500/40" :
+                              step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
+                              "bg-white/[0.02] border-white/10";
+                            return (
+                              <div
+                                key={key}
+                                className={cn("flex items-center gap-2 rounded border p-2 text-[11px]", activeClass)}
+                                title={step.error ?? meta.description}
+                              >
+                                <span className="text-base">{meta.icon}</span>
+                                {step.resultUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setLightbox({ url: step.resultUrl!, label: meta.label })}
+                                    className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/60"
+                                    title="Ver en grande"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={step.resultUrl} alt={meta.label} className="h-full w-full object-contain" />
+                                  </button>
+                                ) : (
+                                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-black/40 text-gray-600">
+                                    {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
+                                  </div>
                                 )}
+                                <div className="flex flex-1 flex-col text-[10px]">
+                                  <span className="truncate font-medium text-gray-200">{meta.label}</span>
+                                  <span className="text-gray-400">
+                                    {step.status === "done" && <><CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" /> {step.cost > 0 && <span className="font-mono text-violet-300">${step.cost.toFixed(3)}</span>}</>}
+                                    {step.status === "error" && <span className="text-red-400"><AlertCircle className="inline h-2.5 w-2.5" /> falló</span>}
+                                    {step.status === "skipped" && "saltado"}
+                                    {step.status === "running" && "procesando…"}
+                                    {step.status === "idle" && meta.costHint}
+                                  </span>
+                                </div>
                               </div>
+                            );
+                          })}
+                        </div>
 
-                              {/* Gap 5 — per-step approval: botones Re-ejecutar / Cambiar fondo
-                                  visibles solo cuando el job está done o error y ningún re-run en curso */}
-                              {(job.status === "done" || job.status === "error") &&
-                                !isRunning &&
-                                reRunningJobId !== job.id && (
-                                  <div className="mt-1 flex items-center justify-end gap-1">
-                                    {key === "bg" && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setBgPromptModal({ job, customPrompt: getAdaptiveBgConfig(job.productType, job.brand).prompt });
-                                        }}
-                                        className="flex items-center gap-0.5 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-medium text-violet-300 transition hover:bg-violet-500/25"
-                                        title="Cambiar prompt del fondo y re-generar"
+                        {/* Outputs — big thumbnails with download + zoom + re-run */}
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          {OUTPUT_STEPS.map((key) => {
+                            const step = job.steps[key];
+                            const meta = STEP_META[key];
+                            const activeClass =
+                              step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
+                              step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
+                              step.status === "error" ? "bg-red-500/10 border-red-500/40" :
+                              step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
+                              "bg-white/[0.02] border-white/10";
+                            const downloadName = `${job.file.name.replace(/\.[^.]+$/, "")}-${key}.jpg`;
+                            const canRerun =
+                              (job.status === "done" || job.status === "error") &&
+                              !isRunning &&
+                              reRunningJobId !== job.id;
+                            return (
+                              <div
+                                key={key}
+                                className={cn("flex flex-col rounded-lg border p-2", activeClass)}
+                                title={step.error ?? meta.description}
+                              >
+                                <div className="mb-1.5 flex items-center justify-between gap-1 text-[11px]">
+                                  <span className="flex items-center gap-1 truncate font-semibold text-gray-100">
+                                    <span className="text-base">{meta.icon}</span>
+                                    {meta.label}
+                                  </span>
+                                  <span className="font-mono text-[10px] text-violet-300">
+                                    {step.status === "done" && step.cost > 0 ? `$${step.cost.toFixed(3)}` : meta.costHint}
+                                  </span>
+                                </div>
+
+                                {step.resultUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${meta.label}` })}
+                                    className="group relative h-40 w-full overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/70"
+                                    title="Click para ver en grande"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={step.resultUrl}
+                                      alt={meta.label}
+                                      className="h-full w-full object-contain"
+                                    />
+                                    <span className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white opacity-0 transition group-hover:opacity-100">
+                                      <Maximize2 className="h-3 w-3" />
+                                    </span>
+                                    {step.warning && (
+                                      <span
+                                        className="absolute left-1 top-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
+                                        title={step.warning}
                                       >
-                                        <Palette className="h-2.5 w-2.5" />
-                                        Cambiar
-                                      </button>
+                                        ⚠ Revisar
+                                      </span>
                                     )}
-                                    {(key === "bg" || key === "shadow") && step.resultUrl && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (key === "bg") reRunBgAndBelow(job.id);
-                                          else reRunShadowAndBelow(job.id);
-                                        }}
-                                        className="flex items-center gap-0.5 rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-medium text-gray-300 transition hover:bg-white/10"
-                                        title={`Re-ejecutar ${meta.label.toLowerCase()} con los mismos parámetros`}
-                                      >
-                                        <RotateCw className="h-2.5 w-2.5" />
-                                        Re-ejecutar
-                                      </button>
+                                  </button>
+                                ) : (
+                                  <div className="flex h-40 w-full items-center justify-center rounded bg-black/40 text-gray-600">
+                                    {step.status === "running" ? (
+                                      <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
+                                    ) : step.status === "error" ? (
+                                      <AlertCircle className="h-6 w-6 text-red-400" />
+                                    ) : (
+                                      <span className="text-xs">esperando…</span>
                                     )}
                                   </div>
                                 )}
 
-                              {/* Indicador de re-run en curso */}
-                              {reRunningJobId === job.id && step.status === "running" && (
-                                <div className="mt-1 flex items-center justify-end text-[9px] text-amber-300">
-                                  <Loader2 className="mr-0.5 h-2.5 w-2.5 animate-spin" />
-                                  re-ejecutando
+                                <p className="mt-1.5 line-clamp-2 text-[10px] text-gray-500">{meta.description}</p>
+
+                                {/* Per-output controls */}
+                                <div className="mt-2 flex items-center justify-end gap-1">
+                                  {step.resultUrl && (
+                                    <a
+                                      href={step.resultUrl}
+                                      download={downloadName}
+                                      className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25"
+                                      title={`Descargar ${meta.label}`}
+                                    >
+                                      <Download className="h-2.5 w-2.5" />
+                                      Descargar
+                                    </a>
+                                  )}
+                                  {canRerun && key === "adaptive" && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setBgPromptModal({
+                                          job,
+                                          customPrompt: getAdaptiveBgConfig(job.productType, job.brand).prompt,
+                                        })
+                                      }
+                                      className="inline-flex items-center gap-1 rounded bg-violet-500/15 px-2 py-1 text-[10px] font-medium text-violet-300 transition hover:bg-violet-500/25"
+                                      title="Cambiar prompt y re-generar adaptativo + vertical"
+                                    >
+                                      <Palette className="h-2.5 w-2.5" />
+                                      Cambiar
+                                    </button>
+                                  )}
+                                  {canRerun && (
+                                    <button
+                                      type="button"
+                                      onClick={() => reRunOutputs(job.id, [key])}
+                                      className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-[10px] font-medium text-gray-300 transition hover:bg-white/10"
+                                      title="Re-ejecutar este output"
+                                    >
+                                      <RotateCw className="h-2.5 w-2.5" />
+                                      Repetir
+                                    </button>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1185,7 +1175,7 @@ export default function StaticProductPipelinePage() {
               {isRunning ? "Procesando..." : "Procesar todas"}
             </button>
 
-            {/* Gap 6 — toggle validador de fondos */}
+            {/* Gap 6 — toggle validador de fondos (default ON, costo despreciable) */}
             <label
               className={cn(
                 "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
@@ -1193,7 +1183,7 @@ export default function StaticProductPipelinePage() {
                   ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
                   : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
               )}
-              title="Corre un check de Claude Haiku después de generar el fondo para detectar duplicados, producto faltante, etc."
+              title="Corre un check de Claude Haiku después de generar el fondo adaptativo para detectar duplicados o producto faltante."
             >
               <input
                 type="checkbox"
@@ -1203,26 +1193,6 @@ export default function StaticProductPipelinePage() {
                 className="h-3 w-3 accent-amber-500"
               />
               <span>Validar fondos con IA <span className="text-[10px] opacity-70">(+$0.0002/foto)</span></span>
-            </label>
-
-            {/* Gap 7 — modo económico: cache + Flux Schnell en vez de Kontext Pro */}
-            <label
-              className={cn(
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
-                economyMode
-                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                  : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
-              )}
-              title="Usa Flux Schnell + cache de fondo por (tipo, marca). Los 20 SKUs Yanbal comparten 1 llamada a Flux. Calidad ligeramente menor que Kontext Pro pero el producto queda pixel-perfect. Ahorro típico 95%+ en batches."
-            >
-              <input
-                type="checkbox"
-                checked={economyMode}
-                onChange={(e) => setEconomyMode(e.target.checked)}
-                disabled={isRunning}
-                className="h-3 w-3 accent-emerald-500"
-              />
-              <span>Modo económico <span className="text-[10px] opacity-70">(cache bg, ~$0.003/foto)</span></span>
             </label>
             <button
               onClick={() => {
@@ -1312,15 +1282,56 @@ export default function StaticProductPipelinePage() {
                   const modalJob = bgPromptModal.job;
                   const prompt = bgPromptModal.customPrompt;
                   setBgPromptModal(null);
-                  reRunBgAndBelow(modalJob.id, prompt);
+                  // Re-generate both adaptive 1:1 AND vertical 9:16 with the new
+                  // prompt so the catalog square and reels formats stay coherent.
+                  reRunOutputs(modalJob.id, ["adaptive", "vertical"], prompt);
                 }}
                 disabled={!bgPromptModal.customPrompt.trim()}
                 className="inline-flex items-center gap-1.5 rounded bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-400 disabled:opacity-50"
               >
                 <RotateCw className="h-3 w-3" />
-                Re-generar fondo
+                Re-generar adaptativo + vertical
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox — full-size preview of any thumbnail. ESC or click outside closes. */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setLightbox(null);
+            }}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            title="Cerrar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="flex max-h-full max-w-full flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <p className="max-w-[80vw] truncate text-xs text-gray-300">{lightbox.label}</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lightbox.url}
+              alt={lightbox.label}
+              className="max-h-[85vh] max-w-[90vw] rounded object-contain"
+            />
+            <a
+              href={lightbox.url}
+              download
+              className="inline-flex items-center gap-1.5 rounded bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-400"
+            >
+              <Download className="h-3 w-3" />
+              Descargar imagen
+            </a>
           </div>
         </div>
       )}

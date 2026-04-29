@@ -9,6 +9,7 @@ import {
   generateBgPrecise,
   generateBgCreative,
   generateBgFast,
+  compositeOnSolidColor,
   BACKGROUND_PRESETS,
 } from '@/lib/processing/bg-generate';
 import { ensureHttpUrl } from '@/lib/api/replicate';
@@ -20,6 +21,16 @@ const MODE_COSTS: Record<string, number> = {
   precise: 0.05, // Kontext Pro
   creative: 0.03, // Flux Dev
   fast: 0.003, // Flux Schnell
+  solid: 0,     // Sharp-only composite onto a solid color, no model call
+};
+
+// Styles that bypass Flux entirely and composite onto a solid color via Sharp.
+// Used by the static-product pipeline for marketplace/ecommerce white bg
+// (Amazon/MercadoLibre require true #FFFFFF, which Flux cannot guarantee).
+const SOLID_COLOR_STYLES: Record<string, string> = {
+  'pure-white': '#FFFFFF',
+  'pure-black': '#000000',
+  'pure-gray': '#808080',
 };
 
 export async function POST(request: NextRequest) {
@@ -73,12 +84,38 @@ export async function POST(request: NextRequest) {
     }
 
     let resultUrl: string;
-    const cost = MODE_COSTS[mode] ?? 0;
+    let cost = MODE_COSTS[mode] ?? 0;
 
     // Convert data URLs to Replicate HTTP URLs to avoid payload size limits
     let httpImageUrl = imageUrl;
     if (imageUrl && imageUrl.startsWith('data:')) {
       httpImageUrl = await ensureHttpUrl(imageUrl);
+    }
+
+    // Solid-color shortcut: bypass Flux entirely. The bg-remove + Sharp
+    // composite path guarantees product pixel-perfect AND background hex-exact.
+    if (SOLID_COLOR_STYLES[style]) {
+      if (!httpImageUrl) {
+        return NextResponse.json(
+          { success: false, error: `Style "${style}" requires "imageUrl".` },
+          { status: 400 },
+        );
+      }
+      const hexColor = SOLID_COLOR_STYLES[style];
+      resultUrl = await compositeOnSolidColor(httpImageUrl, hexColor, aspectRatio);
+      cost = MODE_COSTS.solid;
+      await saveJob({
+        operation: 'bg-generate',
+        provider: 'solid',
+        inputParams: { imageUrl, mode, style, hexColor, aspectRatio },
+        outputUrl: resultUrl,
+        cost,
+      });
+      return NextResponse.json({
+        success: true,
+        data: { url: proxyReplicateUrl(resultUrl), mode: 'solid', style },
+        cost,
+      });
     }
 
     switch (mode) {
