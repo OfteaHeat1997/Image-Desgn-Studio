@@ -21,6 +21,8 @@ import {
   ArrowRight,
   Image as ImageIcon,
 } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
@@ -77,6 +79,7 @@ interface UploadedImage {
   id: string;
   file: File;
   preview: string;
+  /** Persistent http URL after /api/upload — survives refresh, unlike `preview` (blob). */
   originalUrl?: string;
   resultUrl?: string;
   status: "pending" | "processing" | "done" | "error" | "cancelled";
@@ -84,6 +87,8 @@ interface UploadedImage {
   /** When status === "processing", current step index + human label. */
   currentStepIdx?: number;
   currentStepLabel?: string;
+  /** True once the result was triggered for download (auto or manual). */
+  downloaded?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -230,6 +235,8 @@ interface PersistedResult {
   id: string;
   filename: string;
   resultUrl: string;        // ONLY persisted if it's an http(s) URL
+  /** http URL of the uploaded original (for before/after). Only http, never blob. */
+  originalUrl?: string;
   steps: string[];
   completedAt: number;
 }
@@ -265,6 +272,46 @@ function triggerDownload(url: string, filename: string) {
   document.body.appendChild(a);
   a.click();
   setTimeout(() => document.body.removeChild(a), 100);
+}
+
+/**
+ * Bundle multiple URLs into a single ZIP and save it. Single user gesture =
+ * single download = no popup blocker issues, unlike sequential triggerDownload.
+ *
+ * Uses Promise.allSettled so one broken URL doesn't kill the whole batch.
+ */
+async function downloadAsZip(
+  items: Array<{ url: string; filename: string }>,
+  zipName: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ added: number; failed: number }> {
+  const zip = new JSZip();
+  const total = items.length;
+  let added = 0;
+  let failed = 0;
+
+  // Fetch sequentially to avoid hammering Replicate/fal CDN
+  for (let i = 0; i < items.length; i++) {
+    const { url, filename } = items[i];
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      // Strip path components from filename and ensure unique
+      const safe = filename.replace(/[/\\]/g, "_");
+      zip.file(safe, blob);
+      added++;
+    } catch {
+      failed++;
+    }
+    onProgress?.(i + 1, total);
+  }
+
+  if (added === 0) return { added: 0, failed };
+
+  const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+  saveAs(zipBlob, zipName);
+  return { added, failed };
 }
 
 /* ------------------------------------------------------------------ */
@@ -428,34 +475,52 @@ export default function BatchPage() {
     }
   }, []);
 
-  /* ---- Download all results as ZIP ---- */
+  /* ---- Download all results as a single ZIP (no popup blocker issues) ---- */
+
+  const [isZipping, setIsZipping] = useState(false);
+  const [zipProgress, setZipProgress] = useState({ done: 0, total: 0 });
 
   const handleDownloadAll = useCallback(async () => {
     const doneImages = images.filter((img) => img.status === "done" && img.resultUrl);
     if (doneImages.length === 0) return;
 
-    // If only one image, just download it directly
+    // Single image — direct download, no need to ZIP
     if (doneImages.length === 1) {
-      const a = document.createElement("a");
-      a.href = doneImages[0].resultUrl!;
-      a.download = `processed-${doneImages[0].file.name}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      triggerDownload(doneImages[0].resultUrl!, `processed-${doneImages[0].file.name}`);
+      setImages((prev) =>
+        prev.map((img) => (img.id === doneImages[0].id ? { ...img, downloaded: true } : img)),
+      );
       return;
     }
 
-    // For multiple images, download each and offer individually
-    // (ZIP would require a library like JSZip - keep it simple for now)
-    for (const img of doneImages) {
-      const a = document.createElement("a");
-      a.href = img.resultUrl!;
-      a.download = `processed-${img.file.name}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      // Small delay between downloads
-      await new Promise((r) => setTimeout(r, 300));
+    setIsZipping(true);
+    setZipProgress({ done: 0, total: doneImages.length });
+    try {
+      const items = doneImages.map((img) => ({
+        url: img.resultUrl!,
+        filename: `processed-${img.file.name}`,
+      }));
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const { added, failed } = await downloadAsZip(
+        items,
+        `batch-${stamp}.zip`,
+        (done, total) => setZipProgress({ done, total }),
+      );
+      // Mark all that made it into the ZIP as downloaded
+      const downloadedIds = new Set(doneImages.slice(0, added).map((i) => i.id));
+      setImages((prev) =>
+        prev.map((img) => (downloadedIds.has(img.id) ? { ...img, downloaded: true } : img)),
+      );
+      if (failed > 0) {
+        toast.error(`ZIP creado con ${added} imágenes — ${failed} fallaron al descargar.`);
+      } else {
+        toast.success(`ZIP listo (${added} imágenes).`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error generando ZIP";
+      toast.error(`No pude crear el ZIP: ${msg}`);
+    } finally {
+      setIsZipping(false);
     }
   }, [images]);
 
@@ -466,7 +531,7 @@ export default function BatchPage() {
     pipelineSteps: PipelineStep[],
     signal?: AbortSignal,
     onStep?: (stepIdx: number, label: string) => void,
-  ): Promise<{ resultUrl: string }> => {
+  ): Promise<{ resultUrl: string; uploadedOriginalUrl: string }> => {
     // Step 0: Upload image
     onStep?.(-1, "Subiendo imagen...");
     const formData = new FormData();
@@ -475,7 +540,8 @@ export default function BatchPage() {
     const uploadData = await safeJson(uploadRes);
     if (!uploadData.success) throw new Error(uploadData.error || "Upload failed");
 
-    let currentImageUrl = uploadData.data.url;
+    const uploadedOriginalUrl: string = uploadData.data.url;
+    let currentImageUrl = uploadedOriginalUrl;
 
     // Step N: Run each pipeline step sequentially
     for (let stepIdx = 0; stepIdx < pipelineSteps.length; stepIdx++) {
@@ -705,7 +771,7 @@ export default function BatchPage() {
       }
     }
 
-    return { resultUrl: currentImageUrl };
+    return { resultUrl: currentImageUrl, uploadedOriginalUrl };
   }, []);
 
   /* ---- Auto Mode: Load category + pipeline + process ---- */
@@ -889,6 +955,14 @@ export default function BatchPage() {
         );
         // Track blob result URLs (e.g. from watermark step) for cleanup
         if (result.resultUrl?.startsWith("blob:")) resultUrlsRef.current.push(result.resultUrl);
+
+        // Auto-download triggers BEFORE we mark `downloaded:true` to avoid race.
+        // Returns true on success so we know whether to show the badge.
+        const willAutoDownload = autoDownload && result.resultUrl && /^https?:\/\//.test(result.resultUrl);
+        if (willAutoDownload) {
+          triggerDownload(result.resultUrl, `processed-${target.file.name}`);
+        }
+
         setImages((prev) =>
           prev.map((img) =>
             img.id === target.id
@@ -896,7 +970,9 @@ export default function BatchPage() {
                   ...img,
                   status: "done" as const,
                   resultUrl: result.resultUrl,
-                  originalUrl: img.preview,
+                  // Prefer the http URL from /api/upload (survives refresh).
+                  originalUrl: result.uploadedOriginalUrl || img.preview,
+                  downloaded: !!willAutoDownload,
                   currentStepIdx: undefined,
                   currentStepLabel: undefined,
                 }
@@ -904,22 +980,16 @@ export default function BatchPage() {
           ),
         );
 
-        // Save to gallery
+        // Save to gallery (originalUrl is the http one, not blob)
         addToGallery({
           id: `batch-${Date.now()}-${i}`,
           filename: target.file.name,
           resultUrl: result.resultUrl,
-          originalUrl: target.preview,
+          originalUrl: result.uploadedOriginalUrl,
           date: new Date().toISOString().split("T")[0],
           operations: steps.map((s) => s.operation),
           project: "batch",
         });
-
-        // Auto-download as soon as the image is done — guarantees zero data loss
-        // even if the user closes the tab or refreshes mid-batch.
-        if (autoDownload && result.resultUrl) {
-          triggerDownload(result.resultUrl, `processed-${target.file.name}`);
-        }
 
         // Persist to localStorage — only http(s) URLs survive refresh.
         // Blob URLs (e.g. watermark step output) cannot be recovered, so we skip them.
@@ -931,6 +1001,7 @@ export default function BatchPage() {
                 id: `batch-${Date.now()}-${i}`,
                 filename: target.file.name,
                 resultUrl: result.resultUrl,
+                originalUrl: result.uploadedOriginalUrl,
                 steps: steps.map((s) => s.operation),
                 completedAt: Date.now(),
               },
@@ -1331,14 +1402,37 @@ export default function BatchPage() {
                     variant="outline"
                     size="sm"
                     leftIcon={<Download className="h-3.5 w-3.5" />}
+                    disabled={isZipping}
+                    loading={isZipping}
                     onClick={async () => {
-                      for (const r of persistedResults) {
-                        triggerDownload(r.resultUrl, `processed-${r.filename}`);
-                        await new Promise((res) => setTimeout(res, 300));
+                      setIsZipping(true);
+                      setZipProgress({ done: 0, total: persistedResults.length });
+                      try {
+                        const items = persistedResults.map((r) => ({
+                          url: r.resultUrl,
+                          filename: `processed-${r.filename}`,
+                        }));
+                        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+                        const { added, failed } = await downloadAsZip(
+                          items,
+                          `batch-recovered-${stamp}.zip`,
+                          (done, total) => setZipProgress({ done, total }),
+                        );
+                        if (failed > 0) {
+                          toast.error(`ZIP creado con ${added} imágenes — ${failed} URLs ya no responden (pueden haber expirado).`);
+                        } else {
+                          toast.success(`ZIP listo (${added} imágenes recuperadas).`);
+                        }
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Error generando ZIP");
+                      } finally {
+                        setIsZipping(false);
                       }
                     }}
                   >
-                    Descargar todo
+                    {isZipping
+                      ? `Empaquetando ${zipProgress.done}/${zipProgress.total}...`
+                      : `Descargar ZIP (${persistedResults.length})`}
                   </Button>
                   <button
                     type="button"
@@ -1382,59 +1476,91 @@ export default function BatchPage() {
           )}
 
           {/* Results — live (visible while running too, so user sees progress) */}
-          {images.some((img) => img.status === "done") && (
-            <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-200">
-                  Resultados <span className="text-xs text-gray-500">({images.filter((i) => i.status === "done").length})</span>
-                </h2>
-                <Button variant="outline" size="sm" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={handleDownloadAll} disabled={isRunning && images.filter((i) => i.status === "done").length === 0}>
-                  Descargar Todo
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {images
-                  .filter((img) => img.status === "done")
-                  .map((img) => (
-                    <div
-                      key={img.id}
-                      className="group overflow-hidden rounded-lg border border-surface-lighter bg-surface"
-                    >
-                      {/* Before / After side by side */}
-                      <div className="grid grid-cols-2 gap-0.5 bg-surface-lighter">
-                        <div className="relative aspect-square">
-                          <img
-                            src={img.preview}
-                            alt="Original"
-                            className="h-full w-full object-cover"
-                          />
-                          <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-gray-300 uppercase">Antes</span>
+          {images.some((img) => img.status === "done") && (() => {
+            const doneCount = images.filter((i) => i.status === "done").length;
+            const downloadedCount = images.filter((i) => i.status === "done" && i.downloaded).length;
+            return (
+              <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-200">
+                      Resultados <span className="text-xs text-gray-500">({doneCount})</span>
+                    </h2>
+                    <p className="mt-0.5 text-[11px] text-gray-500">
+                      {downloadedCount}/{doneCount} descargadas · localStorage SAFE — refresh OK
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Download className="h-3.5 w-3.5" />}
+                    onClick={handleDownloadAll}
+                    disabled={doneCount === 0 || isZipping}
+                    loading={isZipping}
+                  >
+                    {isZipping
+                      ? `Empaquetando ${zipProgress.done}/${zipProgress.total}...`
+                      : doneCount === 1 ? "Descargar" : `Descargar ZIP (${doneCount})`}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {images
+                    .filter((img) => img.status === "done")
+                    .map((img) => (
+                      <div
+                        key={img.id}
+                        className={cn(
+                          "group overflow-hidden rounded-lg border bg-surface transition-colors",
+                          img.downloaded ? "border-emerald-500/40" : "border-surface-lighter",
+                        )}
+                      >
+                        {/* Before / After side by side */}
+                        <div className="relative grid grid-cols-2 gap-0.5 bg-surface-lighter">
+                          <div className="relative aspect-square">
+                            <img
+                              src={img.originalUrl || img.preview}
+                              alt="Original"
+                              className="h-full w-full object-cover"
+                            />
+                            <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-gray-300 uppercase">Antes</span>
+                          </div>
+                          <div className="relative aspect-square">
+                            <img
+                              src={img.resultUrl || img.preview}
+                              alt="Resultado"
+                              className="h-full w-full object-cover"
+                            />
+                            <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">Despues</span>
+                          </div>
+                          {img.downloaded && (
+                            <div className="absolute right-1 top-1 z-10 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[9px] font-bold text-white shadow-lg">
+                              <CheckCircle className="h-2.5 w-2.5" />
+                              DESCARGADA
+                            </div>
+                          )}
                         </div>
-                        <div className="relative aspect-square">
-                          <img
-                            src={img.resultUrl || img.preview}
-                            alt="Resultado"
-                            className="h-full w-full object-cover"
-                          />
-                          <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">Despues</span>
+                        {/* File info + per-image download */}
+                        <div className="flex items-center justify-between px-2 py-1.5">
+                          <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{img.file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerDownload(img.resultUrl!, `processed-${img.file.name}`);
+                              setImages((prev) =>
+                                prev.map((it) => (it.id === img.id ? { ...it, downloaded: true } : it)),
+                              );
+                            }}
+                            className="flex items-center gap-1 rounded bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-light hover:bg-accent/30 transition-colors"
+                          >
+                            <Download className="h-3 w-3" /> Descargar
+                          </button>
                         </div>
                       </div>
-                      {/* File info + download */}
-                      <div className="flex items-center justify-between px-2 py-1.5">
-                        <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{img.file.name}</span>
-                        <a
-                          href={img.resultUrl || img.preview}
-                          download={`processed-${img.file.name}`}
-                          className="flex items-center gap-1 rounded bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-light hover:bg-accent/30 transition-colors"
-                        >
-                          <Download className="h-3 w-3" /> Descargar
-                        </a>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* ---------- Right: Pipeline Builder ---------- */}

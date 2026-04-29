@@ -1,5 +1,23 @@
 # UniStudio — Changelog
 
+## 2026-04-29 — Batch: ZIP download + descarga garantizada + before/after persistido
+
+Iteración tras testing real con bloqueadores: la auto-descarga sequential puede ser bloqueada por el popup blocker del browser. Y los persisted results no tenían before/after porque el original era un blob URL.
+
+### Cambios
+
+- **ZIP de un click** con JSZip + file-saver. "Descargar ZIP (10)" baja un solo archivo `batch-2026-04-29...zip` que ningún popup blocker puede frenar. Progress en vivo "Empaquetando 3/10...". Falla parcial OK — usa `Promise.allSettled` style (cada URL puede fallar sin tirar el ZIP entero).
+- **`uploadedOriginalUrl`** propagado desde `processOneImage` → guardado en `images[].originalUrl` y en `persistedResults[].originalUrl`. Antes era el blob `URL.createObjectURL(file)` que muere al refresh; ahora es la URL HTTP de `/api/upload` que sobrevive.
+- **Badge "DESCARGADA"** verde sobre cada result card una vez disparado el download (auto, manual, o en el ZIP). `images[].downloaded` rastrea.
+- **Botón "Descargar"** por imagen en cada card (siempre visible, independiente del ZIP).
+- **Header de Resultados** muestra `X/Y descargadas · localStorage SAFE — refresh OK` para tranquilidad mental durante el testing.
+- **"Resultados recuperados"** ahora también con ZIP — `batch-recovered-<timestamp>.zip` para descargar todo lo de sesiones anteriores de un saque.
+
+### Validación
+
+- `tsc --noEmit` clean (sólo el error pre-existente de lingerie).
+- Dev server compiló `/batch` con JSZip en 822ms sin warnings.
+
 ## 2026-04-29 — Batch: data-loss prevention (auto-descarga + persistencia + warning)
 
 Reportado durante test real: el usuario refrescó la página tras procesar 10 bloqueadores y perdió todo. Los `useState` de la BatchPage no persistían y los blob URLs murieron al unmount.
