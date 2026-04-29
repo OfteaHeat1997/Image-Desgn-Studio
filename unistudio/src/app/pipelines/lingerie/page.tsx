@@ -3808,6 +3808,11 @@ export default function LingeriePipelinePage() {
                   ));
                 }}
                 onReanalyze={async () => {
+                  if (!activeJob.file) {
+                    toast.error("No hay archivo cargado para analizar.");
+                    return;
+                  }
+                  const fileToAnalyze: File = activeJob.file;
                   setJobs((prev) => prev.map((j) =>
                     j.id === activeJob.id
                       ? { ...j, analysisStatus: "analyzing", analysisError: undefined }
@@ -3815,7 +3820,7 @@ export default function LingeriePipelinePage() {
                   ));
                   try {
                     const spec = await analyzeProductPhotos(
-                      [{ file: activeJob.file, role: "frontal" }],
+                      [{ file: fileToAnalyze, role: "frontal" }],
                       productType,
                     );
                     setJobs((prev) => prev.map((j) =>
