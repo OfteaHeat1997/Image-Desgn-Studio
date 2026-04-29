@@ -35,6 +35,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude Code worktrees (temporary agent workspaces — must NEVER be tracked)
+.claude/worktrees/
+
 # Docker volumes
 postgres_data/
 

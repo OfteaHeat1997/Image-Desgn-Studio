@@ -65,7 +65,13 @@
       "Bash(vercel:*)",
       "Bash(git:*)",
       "Bash(xargs basename:*)",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(ps -eo pid,comm,args)",
+      "Bash(awk '!/awk|grep|claude/')",
+      "Bash(ps -eo pid,args)",
+      "Bash(npx --no-install tsc --noEmit)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(timeout 20 du -sh unistudio/node_modules unistudio/.next .git)"
     ]
   }
 }
