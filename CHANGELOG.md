@@ -1,5 +1,25 @@
 # UniStudio — Changelog
 
+## 2026-04-29 — Batch: progreso por imagen + Detener + reintentar
+
+Pedido durante test real con 10 bloqueadores: el batch corría pero la UI solo mostraba un % global, sin saber qué imagen iba ni cómo cancelar.
+
+### Cambios en `unistudio/src/app/batch/page.tsx`
+
+- **Botón Detener** (rojo, solo visible cuando corre) usa `AbortController` real — corta la imagen en curso y marca el resto como "cancelled".
+- **Card "Procesando..."** con preview de la imagen actual + label del paso ("Quitando fondo... 1/4").
+- **Highlight visual** en la grilla de thumbnails: ring accent + spinner overlay sobre la imagen activa, borde verde para done, rojo para error, gris opaco para cancelled.
+- **ETA** calculado por avg-time-per-imagen ("~2 min restantes").
+- **Resultados en vivo**: ya no se esperan a que termine todo, aparecen apenas se completan.
+- **Retry fallidos**: botón "Reintentar fallidos" en sección Errores que reprocesa solo las erradas/canceladas.
+- **Status nuevo**: `"cancelled"` agregado al union type de UploadedImage (era pending|processing|done|error).
+- **Signal threading**: cada `fetch` dentro de `processOneImage` ahora recibe el AbortSignal — la cancelación es real, no cosmética.
+
+### Validación
+
+- `tsc --noEmit` clean (el único error es pre-existente en `pipelines/lingerie/page.tsx:3818`).
+- Dev server hot-reload OK.
+
 ## 2026-04-29 — Fix raíz: pollution de `.claude/worktrees/` en git
 
 Incidente: el repo tenía 1,100,470 archivos rastreados de worktrees Claude Code anidadas que orphanearon en runs anteriores. Crasheaba VS Code y Claude Desktop por file-watcher saturation. Causa raíz: `.claude/worktrees/` no estaba en `.gitignore` y un `git add .` (probablemente automático) las metió todas al índice.

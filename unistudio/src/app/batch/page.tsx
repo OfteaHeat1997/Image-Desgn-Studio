@@ -7,6 +7,8 @@ import {
   ChevronUp,
   ChevronDown,
   Play,
+  StopCircle,
+  RotateCcw,
   Download,
   CheckCircle,
   XCircle,
@@ -77,8 +79,11 @@ interface UploadedImage {
   preview: string;
   originalUrl?: string;
   resultUrl?: string;
-  status: "pending" | "processing" | "done" | "error";
+  status: "pending" | "processing" | "done" | "error" | "cancelled";
   error?: string;
+  /** When status === "processing", current step index + human label. */
+  currentStepIdx?: number;
+  currentStepLabel?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -198,11 +203,21 @@ function StatusIcon({ status }: { status: UploadedImage["status"] }) {
       return <CheckCircle className="h-4 w-4 text-emerald-400" />;
     case "error":
       return <XCircle className="h-4 w-4 text-red-400" />;
+    case "cancelled":
+      return <StopCircle className="h-4 w-4 text-gray-500" />;
     case "processing":
       return <Loader2 className="h-4 w-4 animate-spin text-accent-light" />;
     default:
       return <Clock className="h-4 w-4 text-gray-500" />;
   }
+}
+
+function formatEta(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "calculando...";
+  if (seconds < 60) return `~${Math.round(seconds)}s restantes`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return s === 0 ? `~${m} min restantes` : `~${m} min ${s}s restantes`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -215,6 +230,10 @@ export default function BatchPage() {
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [stopRequested, setStopRequested] = useState(false);
+  const [batchStartTime, setBatchStartTime] = useState<number | null>(null);
+  const [currentImageIdx, setCurrentImageIdx] = useState<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const addToGallery = useGalleryStore((s) => s.addImage);
 
   // Track all preview blob URLs so we can revoke them on clear and unmount
@@ -376,18 +395,28 @@ export default function BatchPage() {
 
   /* ---- Run batch (real API calls) ---- */
 
-  const processOneImage = useCallback(async (img: UploadedImage, pipelineSteps: PipelineStep[]): Promise<{ resultUrl: string }> => {
-    // Step 1: Upload image
+  const processOneImage = useCallback(async (
+    img: UploadedImage,
+    pipelineSteps: PipelineStep[],
+    signal?: AbortSignal,
+    onStep?: (stepIdx: number, label: string) => void,
+  ): Promise<{ resultUrl: string }> => {
+    // Step 0: Upload image
+    onStep?.(-1, "Subiendo imagen...");
     const formData = new FormData();
     formData.append("file", img.file);
-    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData, signal });
     const uploadData = await safeJson(uploadRes);
     if (!uploadData.success) throw new Error(uploadData.error || "Upload failed");
 
     let currentImageUrl = uploadData.data.url;
 
-    // Step 2: Run each pipeline step sequentially
-    for (const step of pipelineSteps) {
+    // Step N: Run each pipeline step sequentially
+    for (let stepIdx = 0; stepIdx < pipelineSteps.length; stepIdx++) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const step = pipelineSteps[stepIdx];
+      const opMeta = OPERATIONS.find((o) => o.value === step.operation);
+      onStep?.(stepIdx, opMeta?.label ?? step.operation);
       switch (step.operation) {
         case "bg-remove": {
           // Batch always uses server-side replicate (browser provider needs client-side canvas)
@@ -395,6 +424,7 @@ export default function BatchPage() {
           const res = await fetch("/api/bg-remove", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({ imageUrl: currentImageUrl, provider: bgProvider }),
           });
           const data = await safeJson(res);
@@ -407,6 +437,7 @@ export default function BatchPage() {
           const res = await fetch("/api/enhance", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({ imageUrl: currentImageUrl, preset: presetName, ...step.params }),
           });
           const data = await safeJson(res);
@@ -431,6 +462,7 @@ export default function BatchPage() {
           const res = await fetch("/api/shadows", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify(shadowBody),
           });
           const data = await safeJson(res);
@@ -442,6 +474,7 @@ export default function BatchPage() {
           const res = await fetch("/api/upscale", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
               scale: (step.params?.scale as number) ?? 2,
@@ -458,6 +491,7 @@ export default function BatchPage() {
           const res = await fetch("/api/outpaint", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
               targetAspectRatio: (step.params?.targetAspectRatio as string) ?? "1:1",
@@ -474,6 +508,7 @@ export default function BatchPage() {
           const res = await fetch("/api/outpaint", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
               targetAspectRatio: (step.params?.targetAspectRatio as string) ?? "1:1",
@@ -526,6 +561,7 @@ export default function BatchPage() {
           const res = await fetch("/api/bg-generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
               prompt: (step.params?.prompt as string) ?? "professional lifestyle product photography, beautiful background",
@@ -541,6 +577,7 @@ export default function BatchPage() {
           const res = await fetch("/api/model-create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
               ...step.params,
@@ -555,6 +592,7 @@ export default function BatchPage() {
           const res = await fetch("/api/tryon", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               garmentUrl: currentImageUrl,
               ...step.params,
@@ -569,6 +607,7 @@ export default function BatchPage() {
           const res = await fetch("/api/video", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               imageUrl: currentImageUrl,
               ...step.params,
@@ -583,6 +622,7 @@ export default function BatchPage() {
           const res = await fetch("/api/jewelry-tryon", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal,
             body: JSON.stringify({
               jewelryUrl: currentImageUrl,
               ...step.params,
@@ -718,52 +758,150 @@ export default function BatchPage() {
     setLoadingCategory(null);
   }, [isRunning, autoProcessing, processOneImage, addToGallery]);
 
-  const startBatch = useCallback(async () => {
-    if (images.length === 0 || steps.length === 0) return;
-    setIsRunning(true);
-    setOverallProgress(0);
+  const stopBatch = useCallback(() => {
+    setStopRequested(true);
+    abortControllerRef.current?.abort();
+    toast("Deteniendo batch... la imagen actual se cancelará.");
+  }, []);
 
-    // Mark all as pending
-    setImages((prev) => prev.map((img) => ({ ...img, status: "pending" as const, resultUrl: undefined, error: undefined })));
+  const startBatch = useCallback(async (imagesToProcess?: UploadedImage[]) => {
+    const queue = imagesToProcess ?? images.filter((img) => img.status !== "done");
+    if (queue.length === 0 || steps.length === 0) return;
+    setIsRunning(true);
+    setStopRequested(false);
+    setOverallProgress(0);
+    setBatchStartTime(Date.now());
+    setCurrentImageIdx(null);
+
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    // Mark all queued as pending and clear stale errors
+    const queuedIds = new Set(queue.map((q) => q.id));
+    setImages((prev) =>
+      prev.map((img) =>
+        queuedIds.has(img.id)
+          ? { ...img, status: "pending" as const, resultUrl: undefined, error: undefined, currentStepIdx: undefined, currentStepLabel: undefined }
+          : img,
+      ),
+    );
 
     let processed = 0;
-    const total = images.length;
+    const total = queue.length;
+    let aborted = false;
 
     for (let i = 0; i < total; i++) {
+      const target = queue[i];
+      const realIdx = images.findIndex((img) => img.id === target.id);
+      setCurrentImageIdx(realIdx);
+
+      // Stop request between images: mark remaining as cancelled and break
+      if (signal.aborted) {
+        aborted = true;
+        break;
+      }
+
       // Mark current as processing
-      setImages((prev) => prev.map((img, idx) => idx === i ? { ...img, status: "processing" as const } : img));
+      setImages((prev) =>
+        prev.map((img) => (img.id === target.id ? { ...img, status: "processing" as const } : img)),
+      );
 
       try {
-        const result = await processOneImage(images[i], steps);
+        const result = await processOneImage(
+          target,
+          steps,
+          signal,
+          (stepIdx, label) => {
+            setImages((prev) =>
+              prev.map((img) =>
+                img.id === target.id
+                  ? { ...img, currentStepIdx: stepIdx, currentStepLabel: label }
+                  : img,
+              ),
+            );
+          },
+        );
         // Track blob result URLs (e.g. from watermark step) for cleanup
         if (result.resultUrl?.startsWith("blob:")) resultUrlsRef.current.push(result.resultUrl);
-        setImages((prev) => prev.map((img, idx) =>
-          idx === i ? { ...img, status: "done" as const, resultUrl: result.resultUrl, originalUrl: images[i].preview } : img,
-        ));
+        setImages((prev) =>
+          prev.map((img) =>
+            img.id === target.id
+              ? {
+                  ...img,
+                  status: "done" as const,
+                  resultUrl: result.resultUrl,
+                  originalUrl: img.preview,
+                  currentStepIdx: undefined,
+                  currentStepLabel: undefined,
+                }
+              : img,
+          ),
+        );
 
         // Save to gallery
         addToGallery({
           id: `batch-${Date.now()}-${i}`,
-          filename: images[i].file.name,
+          filename: target.file.name,
           resultUrl: result.resultUrl,
-          originalUrl: images[i].preview,
+          originalUrl: target.preview,
           date: new Date().toISOString().split("T")[0],
           operations: steps.map((s) => s.operation),
           project: "batch",
         });
       } catch (error) {
+        const isAbort =
+          (error instanceof DOMException && error.name === "AbortError") ||
+          (error instanceof Error && /aborted/i.test(error.message));
+        if (isAbort) {
+          aborted = true;
+          setImages((prev) =>
+            prev.map((img) =>
+              img.id === target.id
+                ? { ...img, status: "cancelled" as const, currentStepIdx: undefined, currentStepLabel: undefined }
+                : img,
+            ),
+          );
+          break;
+        }
         const errMsg = error instanceof Error ? error.message : "Processing failed";
-        setImages((prev) => prev.map((img, idx) =>
-          idx === i ? { ...img, status: "error" as const, error: errMsg } : img,
-        ));
+        setImages((prev) =>
+          prev.map((img) =>
+            img.id === target.id
+              ? { ...img, status: "error" as const, error: errMsg, currentStepIdx: undefined, currentStepLabel: undefined }
+              : img,
+          ),
+        );
       }
 
       processed++;
       setOverallProgress(Math.round((processed / total) * 100));
     }
 
+    // Mark any still-pending queued images as cancelled if we aborted
+    if (aborted) {
+      setImages((prev) =>
+        prev.map((img) =>
+          queuedIds.has(img.id) && img.status === "pending"
+            ? { ...img, status: "cancelled" as const }
+            : img,
+        ),
+      );
+      toast.success(`Batch detenido — ${processed}/${total} procesadas.`);
+    } else {
+      const errs = queue.filter((q) => images.find((i) => i.id === q.id)?.status === "error").length;
+      toast.success(`Batch terminado — ${processed}/${total} procesadas${errs ? `, ${errs} con error` : ""}.`);
+    }
+
     setIsRunning(false);
+    setCurrentImageIdx(null);
+    abortControllerRef.current = null;
   }, [images, steps, processOneImage, addToGallery]);
+
+  const retryFailed = useCallback(() => {
+    const failed = images.filter((img) => img.status === "error" || img.status === "cancelled");
+    if (failed.length === 0) return;
+    void startBatch(failed);
+  }, [images, startBatch]);
 
   /* ---- Render ---- */
 
@@ -777,15 +915,28 @@ export default function BatchPage() {
             Sube imagenes, construye un pipeline y procesalas todas de una vez.
           </p>
         </div>
-        <Button
-          variant="primary"
-          leftIcon={<Play className="h-4 w-4" />}
-          disabled={isRunning || images.length === 0 || steps.length === 0}
-          loading={isRunning}
-          onClick={startBatch}
-        >
-          Iniciar Lote
-        </Button>
+        <div className="flex items-center gap-2">
+          {isRunning && (
+            <Button
+              variant="outline"
+              leftIcon={<StopCircle className="h-4 w-4" />}
+              onClick={stopBatch}
+              disabled={stopRequested}
+              className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+            >
+              {stopRequested ? "Deteniendo..." : "Detener"}
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            leftIcon={<Play className="h-4 w-4" />}
+            disabled={isRunning || images.length === 0 || steps.length === 0}
+            loading={isRunning}
+            onClick={() => startBatch()}
+          >
+            Iniciar Lote
+          </Button>
+        </div>
       </div>
 
       {/* ============================================================== */}
@@ -924,21 +1075,45 @@ export default function BatchPage() {
             {/* Thumbnails grid */}
             {images.length > 0 && (
               <div className="mt-4 grid grid-cols-6 gap-2">
-                {images.map((img) => (
-                  <div
-                    key={img.id}
-                    className="group relative aspect-square overflow-hidden rounded-lg border border-surface-lighter"
-                  >
-                    <img
-                      src={img.preview}
-                      alt={img.file.name}
-                      className="h-full w-full object-cover"
-                    />
-                    <div className="absolute bottom-1 right-1">
-                      <StatusIcon status={img.status} />
+                {images.map((img) => {
+                  const isCurrent = img.status === "processing";
+                  return (
+                    <div
+                      key={img.id}
+                      className={cn(
+                        "group relative aspect-square overflow-hidden rounded-lg border transition-all",
+                        isCurrent
+                          ? "border-accent ring-2 ring-accent/40 shadow-lg shadow-accent/20"
+                          : img.status === "done"
+                            ? "border-emerald-500/40"
+                            : img.status === "error"
+                              ? "border-red-500/40"
+                              : img.status === "cancelled"
+                                ? "border-gray-600/40 opacity-60"
+                                : "border-surface-lighter",
+                      )}
+                    >
+                      <img
+                        src={img.preview}
+                        alt={img.file.name}
+                        className="h-full w-full object-cover"
+                      />
+                      {isCurrent && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-black/80 via-black/30 to-transparent p-1">
+                          <Loader2 className="h-5 w-5 animate-spin text-accent-light" />
+                          {img.currentStepLabel && (
+                            <span className="mt-1 line-clamp-2 text-center text-[8px] font-medium leading-tight text-white">
+                              {img.currentStepLabel}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="absolute bottom-1 right-1">
+                        <StatusIcon status={img.status} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -949,38 +1124,100 @@ export default function BatchPage() {
             )}
           </div>
 
-          {/* Progress */}
-          {isRunning && (
-            <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
-              <h2 className="mb-3 text-sm font-semibold text-gray-200">Progreso</h2>
-              <Progress value={overallProgress} label="Overall Progress" />
-            </div>
-          )}
+          {/* Progress (live) */}
+          {isRunning && (() => {
+            const doneCount = images.filter((i) => i.status === "done").length;
+            const errCount = images.filter((i) => i.status === "error").length;
+            const cancelCount = images.filter((i) => i.status === "cancelled").length;
+            const processedCount = doneCount + errCount + cancelCount;
+            const totalQueued = images.filter((i) => i.status !== "pending" || isRunning).length || images.length;
+            const elapsed = batchStartTime ? (Date.now() - batchStartTime) / 1000 : 0;
+            const avg = doneCount > 0 ? elapsed / doneCount : 0;
+            const remaining = avg > 0 ? avg * (totalQueued - processedCount) : NaN;
+            const currentImg = currentImageIdx !== null ? images[currentImageIdx] : null;
+            return (
+              <div className="rounded-xl border border-accent/30 bg-gradient-to-br from-accent/10 via-surface-light to-surface-light p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-accent-light" />
+                    <h2 className="text-sm font-semibold text-gray-200">Procesando...</h2>
+                  </div>
+                  <span className="text-sm tabular-nums text-accent-light">{overallProgress}%</span>
+                </div>
+                <Progress value={overallProgress} size="sm" />
+                <div className="mt-2 flex items-center justify-between text-[11px] text-gray-400">
+                  <span>
+                    {processedCount} / {totalQueued} procesadas
+                    {errCount > 0 && <span className="text-red-300"> · {errCount} error{errCount !== 1 ? "es" : ""}</span>}
+                  </span>
+                  <span className="text-gray-500">{formatEta(remaining)}</span>
+                </div>
+
+                {/* Current image preview + step */}
+                {currentImg && (
+                  <div className="mt-4 flex items-center gap-3 rounded-lg border border-accent/20 bg-surface p-3">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-accent/30">
+                      <img src={currentImg.preview} alt="" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium text-gray-200">{currentImg.file.name}</p>
+                      <p className="mt-0.5 flex items-center gap-1 text-[11px] text-accent-light">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {currentImg.currentStepLabel || "Iniciando..."}
+                        {currentImg.currentStepIdx !== undefined && currentImg.currentStepIdx >= 0 && (
+                          <span className="text-gray-500">
+                            ({currentImg.currentStepIdx + 1}/{steps.length})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Errors */}
-          {!isRunning && images.some((img) => img.status === "error") && (
+          {images.some((img) => img.status === "error" || img.status === "cancelled") && (
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
-              <h2 className="mb-3 text-sm font-semibold text-red-400">Errores</h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-red-400">
+                  {images.filter((i) => i.status === "error").length > 0 ? "Errores" : "Cancelados"}
+                </h2>
+                {!isRunning && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+                    onClick={retryFailed}
+                    className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+                  >
+                    Reintentar fallidos
+                  </Button>
+                )}
+              </div>
               <div className="space-y-1.5">
                 {images
-                  .filter((img) => img.status === "error")
+                  .filter((img) => img.status === "error" || img.status === "cancelled")
                   .map((img) => (
                     <div key={img.id} className="flex items-center gap-2 text-xs text-gray-400">
-                      <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+                      <StatusIcon status={img.status} />
                       <span className="font-medium text-gray-300">{img.file.name}:</span>
-                      <span>{img.error}</span>
+                      <span>{img.status === "cancelled" ? "Cancelada" : img.error}</span>
                     </div>
                   ))}
               </div>
             </div>
           )}
 
-          {/* Results */}
-          {!isRunning && images.some((img) => img.status === "done") && (
+          {/* Results — live (visible while running too, so user sees progress) */}
+          {images.some((img) => img.status === "done") && (
             <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-200">Resultados</h2>
-                <Button variant="outline" size="sm" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={handleDownloadAll}>
+                <h2 className="text-sm font-semibold text-gray-200">
+                  Resultados <span className="text-xs text-gray-500">({images.filter((i) => i.status === "done").length})</span>
+                </h2>
+                <Button variant="outline" size="sm" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={handleDownloadAll} disabled={isRunning && images.filter((i) => i.status === "done").length === 0}>
                   Descargar Todo
                 </Button>
               </div>
