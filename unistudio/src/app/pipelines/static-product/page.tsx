@@ -701,6 +701,31 @@ export default function StaticProductPipelinePage() {
         }
       }
 
+      // Identity check: ensure the bottle in the adaptive output is the SAME
+      // product as the input. Detects when the AI hallucinated a different
+      // bottle. Soft-fail: only adds a warning chip, doesn't block the output.
+      if (adaptiveRes.url) {
+        fetch("/api/identity-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inputUrl: sharedInput,
+            outputUrl: adaptiveRes.url,
+            category: "static-product",
+          }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
+              const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
+              updateStep(job.id, "adaptive", {
+                warning: `⚠ El producto cambió: ${changes || d.data.reason}`,
+              });
+            }
+          })
+          .catch((err) => console.warn("[static-product] identity-check failed:", err));
+      }
+
       // The "main" thumbnail uses the adaptive 1:1 output (most visually rich).
       // If adaptive failed, fall back to white, then vertical, then the
       // normalize result, so the user always sees something useful.

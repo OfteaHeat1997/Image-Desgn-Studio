@@ -697,6 +697,10 @@ export default function BatchPage() {
           // For batch we use precise by default since we always have the original product image,
           // unless the step explicitly requests a different mode.
           const mode = (step.params?.mode as string) ?? "precise";
+          // Regression guard for the f5e57c1 fix: if mode is ever undefined/null
+          // after the default, surface it loudly in DevTools so we catch it
+          // before the user sees "Missing required field 'mode'" again.
+          console.assert(mode, "[batch] bg-generate mode field is missing — regression of f5e57c1");
           const customPrompt =
             (step.params?.customPrompt as string) ??
             (step.params?.prompt as string) ??

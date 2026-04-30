@@ -52,6 +52,8 @@ interface StepSnapshot {
   cost: number;
   status: "idle" | "running" | "done" | "skipped" | "error";
   error?: string;
+  /** Warning post-procesamiento (ej identity-check detectó que la joya cambió) */
+  warning?: string;
 }
 
 interface Job {
@@ -362,6 +364,29 @@ export default function JewelryPipelinePage() {
       totalCost += estanteCost;
       updateJob(job.id, { estanteUrl });
       updateStep(job.id, "estante", { status: "done", resultUrl: estanteUrl, cost: estanteCost });
+
+      // Identity-check on estante: ensure the jewelry piece in the estante is
+      // the SAME piece as the input (no hallucinated material/stone changes).
+      // Soft-fail with a warning chip; doesn't block the result.
+      fetch("/api/identity-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputUrl: isolatedUrl,
+          outputUrl: estanteUrl,
+          category: "jewelry",
+        }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
+            const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
+            updateStep(job.id, "estante", {
+              warning: `⚠ La joya cambió: ${changes || d.data.reason}`,
+            });
+          }
+        })
+        .catch((err) => console.warn("[jewelry] identity-check failed:", err));
 
       // 5. Optional: Generate MODELO → step "modelo"
       let modelUrl: string | undefined;
@@ -763,6 +788,14 @@ export default function JewelryPipelinePage() {
                                   <span className="font-mono text-[9px] text-amber-300">${step.cost.toFixed(3)}</span>
                                 )}
                               </div>
+                              {step.warning && (
+                                <p
+                                  className="mt-1 line-clamp-2 text-[9px] leading-tight text-amber-300"
+                                  title={step.warning}
+                                >
+                                  {step.warning}
+                                </p>
+                              )}
                             </div>
                           );
                         })}
