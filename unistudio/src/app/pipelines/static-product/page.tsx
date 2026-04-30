@@ -1189,11 +1189,19 @@ export default function StaticProductPipelinePage() {
                                     )}
                                   </button>
                                 ) : (
-                                  <div className="flex h-40 w-full items-center justify-center rounded bg-black/40 text-gray-600">
+                                  <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded bg-black/40 px-2 text-gray-600">
                                     {step.status === "running" ? (
-                                      <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
+                                      <>
+                                        <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
+                                        <span className="text-[10px] text-amber-300">Generando…</span>
+                                      </>
                                     ) : step.status === "error" ? (
-                                      <AlertCircle className="h-6 w-6 text-red-400" />
+                                      <>
+                                        <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-400" />
+                                        <span className="line-clamp-3 text-center text-[10px] leading-tight text-red-300" title={step.error}>
+                                          {step.error || "Error desconocido"}
+                                        </span>
+                                      </>
                                     ) : (
                                       <span className="text-xs">esperando…</span>
                                     )}

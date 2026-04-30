@@ -22,6 +22,7 @@ import {
   getJewelryConfig,
   SUB_TYPE_LABELS,
   JEWELRY_UPSCALE_CONFIG,
+  withJewelryPreserve,
   type JewelrySubType,
 } from "@/lib/pipelines/jewelry";
 
@@ -310,7 +311,7 @@ export default function JewelryPipelinePage() {
           imageUrl: isolatedUrl,
           mode: "precise",
           style: "custom",
-          customPrompt: config.estantePrompt,
+          customPrompt: withJewelryPreserve(config.estantePrompt),
           aspectRatio: "1:1",
         }),
       });
@@ -671,8 +672,16 @@ export default function JewelryPipelinePage() {
                                   className="mt-1 h-14 w-full rounded bg-black object-contain"
                                 />
                               ) : (
-                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 text-gray-600">
-                                  {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
+                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 px-1 text-gray-600">
+                                  {step.status === "running" ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : step.status === "error" ? (
+                                    <span className="line-clamp-3 text-center text-[8px] leading-tight text-red-300" title={step.error}>
+                                      {step.error || "Error"}
+                                    </span>
+                                  ) : (
+                                    "—"
+                                  )}
                                 </div>
                               )}
                               <div className="mt-1 flex items-center justify-between gap-1 text-gray-400">

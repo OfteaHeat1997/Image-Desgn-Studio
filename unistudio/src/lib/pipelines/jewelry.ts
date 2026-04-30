@@ -53,6 +53,19 @@ export const SUB_TYPE_LABELS: Record<JewelrySubType, string> = {
 // HD suffix para forzar Flux Pro a producir calidad editorial, sin artefactos.
 const HD = ', ultra high resolution, 8K, sharp focus, crystal clear metal and gem details, professional commercial jewelry photography, studio quality lighting, photo-realistic, magazine quality, no blur';
 
+// PRESERVE suffix para anclar Kontext al producto del input image y NUNCA
+// re-imaginarlo. Sin esto, prompts que describen el ambiente pueden disparar
+// que Kontext reinterprete la joya — un anillo dorado puede salir plateado.
+const PRESERVE = '. CRITICAL: preserve the EXACT jewelry piece from the input image — same shape, same metal color, same gems, same engravings, same proportions. Only modify the background/scene around it.';
+
+/**
+ * Public helper: append the preservation guard to any estantePrompt at the
+ * bg-generate call site, so Kontext Pro never re-imagines the jewelry piece.
+ */
+export function withJewelryPreserve(prompt: string): string {
+  return prompt + PRESERVE;
+}
+
 export function getJewelryConfig(subType: JewelrySubType): JewelryConfig {
   switch (subType) {
     case 'earrings':

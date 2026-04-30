@@ -1183,7 +1183,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   {isVideo ? (
                     <video
                       src={step.resultUrl}
-                      className="h-40 w-full rounded-lg object-cover"
+                      className="h-40 w-full rounded-lg object-contain bg-black"
                       muted
                       loop
                       autoPlay
