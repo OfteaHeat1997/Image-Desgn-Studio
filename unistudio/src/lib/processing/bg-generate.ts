@@ -556,15 +556,37 @@ export async function generateBgFast(
     bgUrl = cached.url;
     console.log(`[bg-generate] Cache HIT (${cached.hits} hits total) for key: ${cacheKey.slice(0, 60)}...`);
   } else {
-    // Generate the background with Flux Schnell
+    // Generate the background with Flux Schnell. Retry once with a stripped
+    // prompt if the first call hits Schnell's soft NSFW filter or 422 token
+    // overflow — these surface as the "Adaptativo catálogo" red error in
+    // production for premium perfume brands.
     const schnellInput: Record<string, unknown> = {
       prompt,
       aspect_ratio: aspectRatio,
       num_outputs: 1,
     };
     if (typeof seed === 'number') schnellInput.seed = seed;
-    const output = await runModel('black-forest-labs/flux-schnell', schnellInput);
-    bgUrl = await extractOutputUrl(output);
+
+    try {
+      const output = await runModel('black-forest-labs/flux-schnell', schnellInput);
+      bgUrl = await extractOutputUrl(output);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRetryable =
+        /flagged|content_policy|sensitive|422|nsfw|content_filter/i.test(msg);
+      if (!isRetryable) throw err;
+
+      // Strip the heaviest words (HD/NO_DUP suffixes are ~50 words). Keep only
+      // the first sentence which describes the actual scene.
+      const stripped = prompt.split(/[.!?]/)[0].slice(0, 200);
+      console.warn(
+        `[bg-generate] Schnell rejected prompt (${msg.slice(0, 80)}…), retrying with stripped prompt`,
+      );
+      const retryInput = { ...schnellInput, prompt: stripped };
+      const output = await runModel('black-forest-labs/flux-schnell', retryInput);
+      bgUrl = await extractOutputUrl(output);
+    }
+
     bgCache.set(cacheKey, { url: bgUrl, generatedAt: Date.now(), hits: 0 });
     console.log(`[bg-generate] Cache MISS, stored bg for key: ${cacheKey.slice(0, 60)}...`);
   }

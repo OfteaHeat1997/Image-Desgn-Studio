@@ -11,6 +11,7 @@ import { runFal, ensureFalAccessibleUrl } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
+import { flattenToWhite } from '@/lib/processing/image-prep';
 
 // Cost estimates in dollars
 const PROVIDER_COSTS: Record<string, number> = {
@@ -77,6 +78,20 @@ async function tryOnKolors(
   modelImage: string,
   garmentImage: string,
 ): Promise<string> {
+  // Pre-flatten the garment image to a white-background JPEG. Kolors
+  // hallucinates a generic mint tank-top when it receives a transparent PNG —
+  // the flat JPEG anchors it to the actual garment shape & color. Gated
+  // behind LINGERIE_FLATTEN so it can be disabled if it ever causes regression.
+  const flattenEnabled = process.env.LINGERIE_FLATTEN !== '0';
+  let prepGarment = garmentImage;
+  if (flattenEnabled) {
+    try {
+      prepGarment = await flattenToWhite(garmentImage);
+    } catch (err) {
+      console.warn('[tryon:kolors] flattenToWhite failed, using original garment URL:', err);
+    }
+  }
+
   // Log diagnóstico: capturar URLs antes y después de ensureFalAccessibleUrl.
   // Mantener hasta que confirmemos que no hay más 422 image_load_error en producción.
   console.log('[tryon:kolors] input URLs', {
@@ -84,9 +99,10 @@ async function tryOnKolors(
     garmentImage: garmentImage.slice(0, 120),
     modelIsData: modelImage.startsWith('data:'),
     garmentIsData: garmentImage.startsWith('data:'),
+    flattened: prepGarment !== garmentImage,
   });
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
-  const garmentImageUrl = await ensureFalAccessibleUrl(garmentImage);
+  const garmentImageUrl = await ensureFalAccessibleUrl(prepGarment);
   console.log('[tryon:kolors] resolved fal URLs', {
     human_image_url: humanImageUrl.slice(0, 120),
     garment_image_url: garmentImageUrl.slice(0, 120),

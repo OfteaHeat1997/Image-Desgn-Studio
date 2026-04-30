@@ -1,5 +1,91 @@
 # UniStudio — Changelog
 
+## 2026-04-30 — Pipelines: producto 100% basado en la foto subida (7 commits)
+
+Branch `claude/fix-pipeline-tests-aOzQG`. Bug crítico reportado en testing real: _"ninguna reconoce, cambia el producto o cambia lencería o colonia o otras cosas, nunca lo está haciendo correcto"_ + _"esos procesos no me gustan, no funcionan, y son muy básicos, muy malos"_.
+
+### Cambios — los 3 pipelines elevados al mismo nivel profesional
+
+**Lencería** — fix del bra → tank-top mint (commit `04ec248`):
+- `lib/processing/image-prep.ts` nuevo: `flattenToWhite()` aplana PNG transparente a JPEG sobre blanco antes de mandar a Kolors. Sin esto Kolors recibía alpha channel y alucinaba un tank-top genérico mint en lugar de respetar el bra real. Gated tras `LINGERIE_FLATTEN` env (default ON, `=0` desactiva).
+- `app/api/tryon/route.ts:88-98`: pre-flatten + log diagnóstico extendido (gated por `DEBUG_KOLORS=1`).
+- `app/pipelines/lingerie/page.tsx`: `<video>` del resultado usa `object-contain` en lugar de `object-cover` — la modelo se ve **completa**, no recortada al busto.
+
+**Estáticos** — fix "Adaptativo catálogo" rojo (commit `5a3de94`):
+- `lib/processing/bg-generate.ts:558-590`: retry automático en Schnell cuando el filtro NSFW blando o 422 token-overflow rechaza el prompt. Retry con prompt strippeado a la primera oración, max 200 chars.
+- `app/pipelines/static-product/page.tsx`: tarjetas de error muestran el mensaje real con icono + tooltip + line-clamp 3, en vez de solo `(!)`.
+
+**Joyería** — preserve guard + error UX (commit `1fd21ac`):
+- `lib/pipelines/jewelry.ts`: nueva const `PRESERVE` + helper `withJewelryPreserve(prompt)` que ancla Kontext al input image. Sin esto el prompt del estante puede disparar reinterpretación de la pieza (anillo dorado saliendo plateado).
+- `app/pipelines/jewelry/page.tsx`: bg-generate "estante" usa `withJewelryPreserve()`. Tarjetas de error idem static-product.
+
+**Análisis profundo del producto (foundation, commit `d18f6f0`)**:
+- `lib/processing/product-features.ts` nuevo: `analyzeProductFeatures(input, category)` con prompts JSON-strict por categoría. Tipos `LingerieFeatures`/`StaticProductFeatures`/`JewelryFeatures`. Cache SHA256.
+- `app/api/product-features/route.ts` nuevo: endpoint POST que envuelve el lib.
+- Helpers: `lingerieDescriptor`, `staticProductDescriptor`, `jewelryDescriptor`, `preserveProductGuard`.
+
+**Wiring del análisis a los pipelines (commit `bbac8d4`)**:
+- Estáticos y joyería ahora llaman `/api/product-features` después del upload (en paralelo con bg-remove, cap 5s).
+- Los features detectados se inyectan al `customPrompt` de bg-generate: el fondo se compone alrededor del frasco/joya **real**, no de un template genérico por marca+tipo.
+- UI muestra chips ✨ "Lo que la IA ve en tu foto" antes de procesar para que la usuaria valide.
+
+**Identity-check post-procesamiento (commit `602aac2`)**:
+- `lib/processing/identity-check.ts` nuevo: `checkProductIdentity(input, output, category)` compara con Claude Haiku Vision (~$0.0005). Devuelve `{same, confidence, reason, changes}`.
+- `/api/identity-check` route nuevo.
+- Cableado en estáticos (post adaptive) y joyería (post estante): si confidence > 0.6 y `same:false`, muestra warning chip ⚠ con los cambios específicos ("frasco cuadrado → redondo", "oro → plata").
+- Console.assert regression guard en `/batch` para el fix `f5e57c1` (mode field).
+
+**STEP_DOCS (commit `f8b49e4`)**:
+- Tooltip ⓘ por paso en estáticos y joyería con qué hace, proveedor, tiempo típico, tips. Paridad con lencería.
+- HTML `<details>`/`<summary>` nativo, sin estado React, sin componente compartido (zero risk de romper lencería).
+
+### Pre-existing lint fix (este branch)
+- `prefer-const` errors en lencería/page.tsx líneas 2640 y 2722 (preexistentes del commit `b8ff9ff`): `let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined` — declarar con valor inicial satisface la regla sin cambiar comportamiento.
+
+### Verificación realizada
+- ✅ `npx tsc --noEmit` — 0 errors
+- ✅ `npx eslint <archivos tocados>` — 0 errors (54 warnings preexistentes)
+- ⚠ `npx next build` — falla solo por Google Fonts fetch (sandbox sin internet); Vercel sí baja la fuente, build pasará en deploy
+
+### Cómo testear (paso a paso)
+
+1. **Lencería ref 011841**:
+   - Subir foto del bra beige
+   - El RESULTADO debe ser bra beige (NO mint, NO tank-top)
+   - El video de la modelo debe verse **completo**, no recortado al busto
+   - Si sale mint igual: setear `LINGERIE_FLATTEN=0` en Vercel desactiva el fix; útil para confirmar que el flatten es el que arregla.
+
+2. **Estáticos** (`/pipelines/static-product`):
+   - Subir 2 perfumes (uno premium tipo Yanbal 43°N + uno Cyzone)
+   - Antes de procesar: chips verdes ✨ "Lo que la IA ve en tu foto" deben aparecer con `frasco piramidal · vidrio-transparente · color · tapa rosca · marca`
+   - Las 3 tarjetas (Blanco $0, Adaptativo $0.003-0.05, Vertical $0.003) deben quedar verdes
+   - Si "Adaptativo catálogo" falla: tarjeta debe mostrar **mensaje del error legible**, no solo `(!)`
+   - Si la IA cambió el frasco: chip ⚠ amarillo "El producto cambió: ..." debajo del thumbnail
+   - Click en ⓘ junto al label de cualquier paso → panel con qué hace + proveedor + tips
+
+3. **Joyería** (`/pipelines/jewelry`):
+   - Subir un anillo dorado con piedras
+   - Chips verdes ✨ deben mostrar `anillo · oro · brillante · 3 piedras transparentes`
+   - El "estante" debe respetar oro (NO salir plateado)
+   - Si la joya cambió: chip ⚠ amarillo debajo del thumbnail
+   - Tooltip ⓘ funciona en cada paso
+
+4. **/batch** (Ainnara/AllBlack/alma/alteus.jpg):
+   - Pipeline `bg-remove → bg-generate`
+   - Network tab: `POST /api/bg-generate` request body debe contener `"mode":"precise"`
+   - Sin toast "Missing required field 'mode'"
+   - Si vuelve a faltar mode: console.assert lo grita en DevTools
+
+### Variables de entorno opcionales
+- `LINGERIE_FLATTEN=0` — desactiva el flatten antes de Kolors (debug)
+- `DEBUG_KOLORS=1` — log extendido de Kolors con primeros 16 bytes hex de los buffers
+
+### Out of scope (pendientes con bajo ROI, no incluidos)
+- Helpers compartidos (`detectColor`/`detectReferenceKey`) — refactor que arriesgaría romper lencería que ya funciona
+- Unificación de step names entre /batch y /pipelines/static-product — son contextos distintos por diseño
+
+---
+
 ## 2026-04-30 — Static-product: dedupe, timeout, cost-hint, "Descargar las 3"
 
 Bug report tras testing real con perfumes/colonias. 4 fixes (commit `aa903ba`):

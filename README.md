@@ -196,6 +196,94 @@ unistudio/
 
 ---
 
+## 🧪 Testing — Pipeline Fixes (Apr 30, 2026)
+
+Branch `claude/fix-pipeline-tests-aOzQG` contiene **7 commits** que arreglan los bugs reportados en testing real ("ninguna reconoce, cambia el producto", tarjetas de error mudas, video recortado a la mitad). Antes de mergear a `main`, testear cada pipeline en orden:
+
+### Setup previo
+1. Esperar que Vercel termine el deploy del último commit (`f8b49e4` o más reciente).
+2. Confirmar `ANTHROPIC_API_KEY` está set en Vercel — el análisis de producto y el identity-check lo usan.
+3. Variables opcionales:
+   - `LINGERIE_FLATTEN=0` para **desactivar** el flatten antes de Kolors (úsalo si el fix causa regresión)
+   - `DEBUG_KOLORS=1` para ver logs detallados de Kolors en Vercel function logs
+
+### Test 1 — Lencería (`/pipelines/lingerie`, ref 011841)
+
+Upload: la foto del bra beige que reportaba el bug del tank-top mint.
+
+**Lo que tiene que funcionar:**
+- ✅ El RESULTADO muestra el bra beige (color real), NO un tank-top mint genérico.
+- ✅ El video del modelo se ve **completo de cabeza a cintura**, no recortado al busto.
+- ✅ El bra preserva tirantes y textura del input.
+
+**Si falla:** abrir Vercel function logs, buscar `[tryon:kolors] resolved fal URLs`. Pegar la `garment_image_url` en el browser — debería mostrar el bra beige sobre fondo blanco (no transparente). Si está transparente, el flatten no corrió: revisar que `LINGERIE_FLATTEN !== "0"`.
+
+### Test 2 — Estáticos (`/pipelines/static-product`)
+
+Upload: 2 perfumes con marcas distintas (Yanbal 43°N premium + Cyzone básico).
+
+**Lo que tiene que funcionar:**
+- ✅ Antes de procesar aparecen chips verdes **✨ "Lo que la IA ve en tu foto"** con: `frasco piramidal · vidrio-transparente · color · tapa rosca · marca legible`. Esto confirma que el análisis Vision corrió.
+- ✅ Las 3 tarjetas finales (Blanco $0, Adaptativo $0.003–0.05, Vertical $0.003) quedan verdes.
+- ✅ El frasco final tiene la **misma forma, color y etiqueta** que el input.
+- ✅ Click en el botón **ⓘ** junto al label de cada paso → tooltip con qué hace + proveedor + tiempo + tips.
+
+**Si "Adaptativo catálogo" falla:** la tarjeta debe mostrar el **mensaje del error real**, no solo `(!)`. El retry automático (Schnell con prompt strippeado) debería absorber la mayoría de fallos por filtro NSFW.
+
+**Si el frasco cambió:** debajo del thumbnail aparece chip ⚠ amarillo `"El producto cambió: <cambios específicos>"`. Eso confirma que el identity-check funciona.
+
+### Test 3 — Joyería (`/pipelines/jewelry`)
+
+Upload: un anillo dorado con piedras + (opcional) una cadena en plata.
+
+**Lo que tiene que funcionar:**
+- ✅ Chips verdes **✨** muestran `anillo · oro · brillante · 3 piedras transparentes` (los detalles dependen de tu foto).
+- ✅ El "estante" preserva el material — anillo dorado sale dorado (NO plateado), cadena de plata sale plateada (NO dorada).
+- ✅ Si el material cambió: chip ⚠ amarillo `"La joya cambió: oro → plata"`.
+- ✅ Tooltip **ⓘ** en cada paso (`isolate`, `upscale`, `estante`, `modelo`, `video`) abre panel con info.
+
+### Test 4 — Batch (`/batch`)
+
+Upload: las 4 fotos que daban "Missing field mode" antes (Ainnara cyzone.jpg, All Black cyzone.jpg, alma.jpg, alteus.jpg).
+
+Pipeline: `bg-remove → bg-generate`.
+
+**Lo que tiene que funcionar:**
+- ✅ DevTools Network → `POST /api/bg-generate` request body contiene `"mode":"precise"`.
+- ✅ Sin toast `"Missing required field 'mode'"`.
+- ✅ Si por alguna razón el mode field se pierde: `console.assert` lo grita inmediato en DevTools console (`[batch] bg-generate mode field is missing — regression of f5e57c1`).
+
+### Verificación de código previa al merge
+
+Las verificaciones automáticas ya pasaron en el dev container del agente:
+- ✅ `npx tsc --noEmit` — **0 errores TypeScript**
+- ✅ `npx eslint` en archivos tocados — **0 errores ESLint** (warnings preexistentes intactos)
+- ⚠ `npx next build` — fallaba solo por Google Fonts (sandbox sin internet); Vercel sí lo baja, el build pasará en deploy
+
+### Endpoints nuevos (referencia rápida)
+- `POST /api/product-features` — `{ imageUrl, category: "lingerie"|"static-product"|"jewelry" }` → `{ success, data: <FeaturesObject>, cost, cached }`
+- `POST /api/identity-check` — `{ inputUrl, outputUrl, category }` → `{ success, data: { same, confidence, reason, changes }, cost }`
+
+### Archivos clave creados
+- `unistudio/src/lib/processing/product-features.ts` (foundation per-photo Vision analysis)
+- `unistudio/src/lib/processing/identity-check.ts` (post-procesamiento validator)
+- `unistudio/src/lib/processing/image-prep.ts` (`flattenToWhite`, `dominantRgb`)
+- `unistudio/src/app/api/product-features/route.ts`
+- `unistudio/src/app/api/identity-check/route.ts`
+
+### Cómo deshacer si algo se rompe en producción
+
+```bash
+git revert f8b49e4 602aac2 bbac8d4 1fd21ac 5a3de94 04ec248 d18f6f0
+git push
+```
+
+O para deshacer SOLO el flatten de lencería (más quirúrgico):
+- En Vercel project settings → Environment Variables → agregar `LINGERIE_FLATTEN=0`
+- Redeploy
+
+---
+
 ## Current Status (April 2026)
 
 ### What's Complete

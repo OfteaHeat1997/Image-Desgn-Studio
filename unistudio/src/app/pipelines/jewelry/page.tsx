@@ -22,8 +22,13 @@ import {
   getJewelryConfig,
   SUB_TYPE_LABELS,
   JEWELRY_UPSCALE_CONFIG,
+  withJewelryPreserve,
   type JewelrySubType,
 } from "@/lib/pipelines/jewelry";
+import {
+  jewelryDescriptor,
+  type JewelryFeatures,
+} from "@/lib/processing/product-features";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -47,6 +52,8 @@ interface StepSnapshot {
   cost: number;
   status: "idle" | "running" | "done" | "skipped" | "error";
   error?: string;
+  /** Warning post-procesamiento (ej identity-check detectó que la joya cambió) */
+  warning?: string;
 }
 
 interface Job {
@@ -61,6 +68,12 @@ interface Job {
   error?: string;
   cost: number;
   steps: Record<StepKey, StepSnapshot>;
+  /**
+   * Features extraídos por Claude Vision de ESTA foto (material, acabado,
+   * piedras, color). Se inyectan en el prompt del estante para anclar
+   * Kontext al producto real, no a un template genérico por subType.
+   */
+  productFeatures?: JewelryFeatures | null;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -71,12 +84,65 @@ const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
   video: { cost: 0, status: "idle" },
 };
 
-const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string }> = {
-  isolate: { label: "Quitar fondo", icon: "✂️", costHint: "$0.01" },
-  upscale: { label: "Upscale 2x", icon: "🔍", costHint: "$0.02" },
-  estante: { label: "Estante lujoso", icon: "🎭", costHint: "$0.05" },
-  modelo: { label: "En modelo", icon: "👤", costHint: "$0.10" },
-  video: { label: "Video 360°", icon: "🎥", costHint: "Gratis" },
+interface StepMeta {
+  label: string;
+  icon: string;
+  costHint: string;
+  what?: string;
+  provider?: string;
+  duration?: string;
+  tips?: string[];
+}
+
+const STEP_META: Record<StepKey, StepMeta> = {
+  isolate: {
+    label: "Quitar fondo",
+    icon: "✂️",
+    costHint: "$0.01",
+    what: "Aísla la joya sobre fondo transparente — base nítida para el upscale y todos los pasos siguientes.",
+    provider: "Replicate rembg + WithoutBG fallback.",
+    duration: "5–15 s",
+    tips: ["Para joyas chicas (aretes, topos), una foto bien iluminada da mejor isolate."],
+  },
+  upscale: {
+    label: "Upscale 2x",
+    icon: "🔍",
+    costHint: "$0.02",
+    what: "Duplica la resolución para preservar detalle de gemas, grabados y acabado del metal — crítico en joyería.",
+    provider: "Real-ESRGAN 2x (Replicate).",
+    duration: "10–25 s",
+    tips: ["Si falla, el pipeline se detiene — sin upscale el estante sale borroso."],
+  },
+  estante: {
+    label: "Estante lujoso",
+    icon: "🎭",
+    costHint: "$0.05",
+    what: "Genera el fondo estilo catálogo Tiffany/Cartier alrededor de TU joya, manteniendo la pieza intacta gracias al guard 'preserve'.",
+    provider: "Flux Kontext Pro con input_image (composite-first).",
+    duration: "20–40 s",
+    tips: [
+      "Usa los features detectados (material, acabado, piedras) para anclar el resultado.",
+      "Si la joya cambia (ej oro → plata), el identity-check muestra warning chip.",
+    ],
+  },
+  modelo: {
+    label: "En modelo",
+    icon: "👤",
+    costHint: "$0.10",
+    what: "Aplica TU joya sobre una modelo IA (orejas, cuello, mano según subtipo) — 100% catálogo profesional.",
+    provider: "model-create (SeedDream) + tryon (Kolors/Kontext según subtipo).",
+    duration: "40–90 s",
+    tips: ["Opcional: desactivá si solo necesitás el estante.", "Las gemas y proporciones se preservan gracias al tryonPrompt específico por subtipo."],
+  },
+  video: {
+    label: "Video 360°",
+    icon: "🎥",
+    costHint: "Gratis",
+    what: "Video 360° rotando la joya sobre estante, ideal para Reels/Stories.",
+    provider: "wan-2.2-fast (Replicate).",
+    duration: "60–120 s",
+    tips: ["Opcional. Si no lo necesitás, desactivá para ahorrar tiempo."],
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -255,6 +321,18 @@ export default function JewelryPipelinePage() {
       if (!upData.success) throw new Error(upData.error || "Upload failed");
       let workingUrl: string = upData.data.url;
 
+      // 1b. Analyze jewelry features in parallel — extracts material, acabado,
+      // piedras, etc. from THIS photo and injects them into the estante prompt
+      // so Kontext respects the actual piece (not a generic ring/earring).
+      const featuresPromise = fetch("/api/product-features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: workingUrl, category: "jewelry" }),
+      })
+        .then((r) => r.json())
+        .then((d) => (d?.success ? (d.data as JewelryFeatures) : null))
+        .catch(() => null);
+
       // 2. Remove background → step "isolate"
       updateJob(job.id, { status: "isolating" });
       updateStep(job.id, "isolate", { status: "running" });
@@ -301,8 +379,23 @@ export default function JewelryPipelinePage() {
       const isolatedUrl = workingUrl;
 
       // 4. Generate ESTANTE → step "estante"
+      // Wait for vision features (started in step 1b), capped at 5s so the
+      // pipeline never stalls. If null, fall back to the legacy template prompt.
       updateJob(job.id, { status: "generating-estante" });
       updateStep(job.id, "estante", { status: "running" });
+      const features = await Promise.race([
+        featuresPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      if (features) {
+        updateJob(job.id, { productFeatures: features });
+      }
+      const featureSuffix = features
+        ? `. Featuring this exact piece: ${jewelryDescriptor(features)}.`
+        : "";
+      const estantePromptWithFeatures = withJewelryPreserve(
+        config.estantePrompt + featureSuffix,
+      );
       const estanteRes = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -310,7 +403,7 @@ export default function JewelryPipelinePage() {
           imageUrl: isolatedUrl,
           mode: "precise",
           style: "custom",
-          customPrompt: config.estantePrompt,
+          customPrompt: estantePromptWithFeatures,
           aspectRatio: "1:1",
         }),
       });
@@ -324,6 +417,29 @@ export default function JewelryPipelinePage() {
       totalCost += estanteCost;
       updateJob(job.id, { estanteUrl });
       updateStep(job.id, "estante", { status: "done", resultUrl: estanteUrl, cost: estanteCost });
+
+      // Identity-check on estante: ensure the jewelry piece in the estante is
+      // the SAME piece as the input (no hallucinated material/stone changes).
+      // Soft-fail with a warning chip; doesn't block the result.
+      fetch("/api/identity-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputUrl: isolatedUrl,
+          outputUrl: estanteUrl,
+          category: "jewelry",
+        }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
+            const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
+            updateStep(job.id, "estante", {
+              warning: `⚠ La joya cambió: ${changes || d.data.reason}`,
+            });
+          }
+        })
+        .catch((err) => console.warn("[jewelry] identity-check failed:", err));
 
       // 5. Optional: Generate MODELO → step "modelo"
       let modelUrl: string | undefined;
@@ -636,6 +752,36 @@ export default function JewelryPipelinePage() {
                             </p>
                           )}
                         </div>
+
+                        {job.productFeatures && (
+                          <div className="rounded border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1.5">
+                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
+                              ✨ Lo que la IA ve en tu foto
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                {job.productFeatures.tipo} · {job.productFeatures.material}
+                              </span>
+                              {job.productFeatures.acabado && (
+                                <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                  {job.productFeatures.acabado}
+                                </span>
+                              )}
+                              {job.productFeatures.piedras && job.productFeatures.num_piedras > 0 && (
+                                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+                                  {job.productFeatures.num_piedras} piedra{job.productFeatures.num_piedras > 1 ? "s" : ""}
+                                  {job.productFeatures.color_piedras.length > 0 &&
+                                    ` (${job.productFeatures.color_piedras.join(", ")})`}
+                                </span>
+                              )}
+                              {job.productFeatures.grabados && (
+                                <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                  con grabados
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -662,6 +808,39 @@ export default function JewelryPipelinePage() {
                               <div className="flex items-center gap-1">
                                 <span className="text-sm">{meta.icon}</span>
                                 <span className="truncate font-medium text-gray-200">{meta.label}</span>
+                                {meta.what && (
+                                  <details className="relative">
+                                    <summary
+                                      className="cursor-pointer list-none rounded bg-white/5 px-1 text-[9px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                                      title="¿Qué hace este paso?"
+                                    >
+                                      ⓘ
+                                    </summary>
+                                    <div className="absolute left-0 top-5 z-10 w-60 rounded-lg border border-white/10 bg-zinc-900 p-2.5 shadow-xl">
+                                      <p className="mb-1 text-[10px] leading-tight text-gray-200">{meta.what}</p>
+                                      {meta.provider && (
+                                        <p className="mt-1.5 text-[9px] text-gray-400">
+                                          <span className="font-semibold text-amber-300">Proveedor:</span> {meta.provider}
+                                        </p>
+                                      )}
+                                      {meta.duration && (
+                                        <p className="text-[9px] text-gray-400">
+                                          <span className="font-semibold text-amber-300">Tiempo:</span> {meta.duration}
+                                        </p>
+                                      )}
+                                      {meta.tips && meta.tips.length > 0 && (
+                                        <div className="mt-1.5 border-t border-white/10 pt-1.5">
+                                          <p className="text-[9px] font-semibold text-amber-300">Tips:</p>
+                                          <ul className="mt-0.5 list-disc pl-3 text-[9px] text-gray-300">
+                                            {meta.tips.map((t, i) => (
+                                              <li key={i} className="leading-tight">{t}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </details>
+                                )}
                               </div>
                               {step.resultUrl ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -671,8 +850,16 @@ export default function JewelryPipelinePage() {
                                   className="mt-1 h-14 w-full rounded bg-black object-contain"
                                 />
                               ) : (
-                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 text-gray-600">
-                                  {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
+                                <div className="mt-1 flex h-14 items-center justify-center rounded bg-black/40 px-1 text-gray-600">
+                                  {step.status === "running" ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : step.status === "error" ? (
+                                    <span className="line-clamp-3 text-center text-[8px] leading-tight text-red-300" title={step.error}>
+                                      {step.error || "Error"}
+                                    </span>
+                                  ) : (
+                                    "—"
+                                  )}
                                 </div>
                               )}
                               <div className="mt-1 flex items-center justify-between gap-1 text-gray-400">
@@ -687,6 +874,14 @@ export default function JewelryPipelinePage() {
                                   <span className="font-mono text-[9px] text-amber-300">${step.cost.toFixed(3)}</span>
                                 )}
                               </div>
+                              {step.warning && (
+                                <p
+                                  className="mt-1 line-clamp-2 text-[9px] leading-tight text-amber-300"
+                                  title={step.warning}
+                                >
+                                  {step.warning}
+                                </p>
+                              )}
                             </div>
                           );
                         })}
