@@ -99,36 +99,81 @@ const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
   vertical: { cost: 0, status: "idle" },
 };
 
-const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string; description: string }> = {
+interface StepMeta {
+  label: string;
+  icon: string;
+  costHint: string;
+  description: string;
+  /** Lo que hace este paso en lenguaje humano */
+  what?: string;
+  /** Proveedor / modelo usado */
+  provider?: string;
+  /** Tiempo típico */
+  duration?: string;
+  /** Modos típicos de falla */
+  canFail?: string[];
+  /** Qué hacer si falla */
+  tips?: string[];
+}
+
+const STEP_META: Record<StepKey, StepMeta> = {
   isolate: {
     label: "Quitar fondo",
     icon: "✂️",
     costHint: "$0.01",
     description: "Aísla el producto sobre transparente.",
+    what: "Quita el fondo de tu foto y deja solo el producto sobre fondo transparente — base para todos los outputs siguientes.",
+    provider: "Replicate rembg (cjwbw/rembg). Fallback: WithoutBG Docker.",
+    duration: "5–15 s",
+    canFail: ["Si el producto tiene partes brillantes o transparentes (frasco vidrio), el borde puede salir con halo."],
+    tips: ["Reintentá si el primer intento dejó halo.", "Para frascos de vidrio considerá una foto con fondo más contrastante."],
   },
   normalize: {
     label: "Centrar 2000×2000",
     icon: "📐",
     costHint: "Gratis",
     description: "Resize y centrado consistente entre fotos del mismo SKU.",
+    what: "Centra y normaliza el lienzo a 2000×2000 px para que todas las fotos del mismo SKU se vean alineadas en el catálogo.",
+    provider: "Sharp (server-side) — gratis, sin IA.",
+    duration: "<1 s",
+    canFail: ["Si la imagen original es muy chica (<1000px), puede salir pixelada."],
+    tips: ["Subí fotos de al menos 1500×1500 para mejor calidad."],
   },
   white: {
     label: "Blanco e-commerce",
     icon: "⬜",
     costHint: "Gratis",
     description: "Fondo #FFFFFF puro, listo para Amazon/MercadoLibre/listing. Sharp puro, no pasa por modelo IA.",
+    what: "Compone el producto sobre fondo blanco puro (#FFFFFF), formato exigido por Amazon, MercadoLibre y la mayoría de marketplaces.",
+    provider: "Sharp composite — sin IA, garantiza pixel-perfect.",
+    duration: "<1 s",
+    canFail: ["Casi nunca falla. Si el isolate dejó halo, ese halo se preserva en blanco."],
+    tips: ["Para listings de Amazon usá este output."],
   },
   adaptive: {
     label: "Adaptativo catálogo",
     icon: "🎨",
     costHint: "$0.003",
     description: "Fondo decidido por marca+tipo (mármol, gradient, playa). 1:1, listo para web/Instagram feed.",
+    what: "Genera un fondo único basado en la marca y tipo del producto (mármol para premium, gradient para teen, playa para verano). Compone TU producto encima en pixel-perfect.",
+    provider: "Flux Schnell (Replicate) + Sharp composite. Mode 'fast'.",
+    duration: "8–15 s",
+    canFail: [
+      "Schnell puede rechazar el prompt por filtro NSFW blando para algunas marcas premium (palabra 'luxury' dispara) — con retry automático en este branch.",
+      "Si el prompt supera ~150 palabras (combo HD+NO_DUP+brand), retry con prompt strippeado.",
+    ],
+    tips: ["Si sale raro, click 'Cambiar' para editar el prompt y regenerar.", "Adaptive y vertical comparten seed → look cohesivo entre 1:1 y 9:16."],
   },
   vertical: {
     label: "Vertical 9:16",
     icon: "📱",
     costHint: "$0.003",
     description: "Mismo fondo adaptativo en formato vertical. Listo para Reels/Stories/TikTok.",
+    what: "Mismo fondo adaptativo del paso anterior pero en 9:16 — para Reels, Stories, TikTok. Mismo seed → estética cohesiva con el 1:1.",
+    provider: "Flux Schnell + Sharp composite. Mismo seed que adaptive.",
+    duration: "8–15 s",
+    canFail: ["Mismo riesgo que adaptive (filtro NSFW)."],
+    tips: ["Usá este output para Reels y Stories."],
   },
 };
 
@@ -1249,6 +1294,39 @@ export default function StaticProductPipelinePage() {
                                   <span className="flex items-center gap-1 truncate font-semibold text-gray-100">
                                     <span className="text-base">{meta.icon}</span>
                                     {meta.label}
+                                    {meta.what && (
+                                      <details className="relative ml-1">
+                                        <summary
+                                          className="cursor-pointer list-none rounded bg-white/5 px-1 text-[9px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                                          title="¿Qué hace este paso?"
+                                        >
+                                          ⓘ
+                                        </summary>
+                                        <div className="absolute left-0 top-5 z-10 w-64 rounded-lg border border-white/10 bg-zinc-900 p-2.5 shadow-xl">
+                                          <p className="mb-1 text-[10px] leading-tight text-gray-200">{meta.what}</p>
+                                          {meta.provider && (
+                                            <p className="mt-1.5 text-[9px] text-gray-400">
+                                              <span className="font-semibold text-violet-300">Proveedor:</span> {meta.provider}
+                                            </p>
+                                          )}
+                                          {meta.duration && (
+                                            <p className="text-[9px] text-gray-400">
+                                              <span className="font-semibold text-violet-300">Tiempo:</span> {meta.duration}
+                                            </p>
+                                          )}
+                                          {meta.tips && meta.tips.length > 0 && (
+                                            <div className="mt-1.5 border-t border-white/10 pt-1.5">
+                                              <p className="text-[9px] font-semibold text-amber-300">Tips:</p>
+                                              <ul className="mt-0.5 list-disc pl-3 text-[9px] text-gray-300">
+                                                {meta.tips.map((t, i) => (
+                                                  <li key={i} className="leading-tight">{t}</li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </details>
+                                    )}
                                   </span>
                                   <span
                                     className={cn(

@@ -84,12 +84,65 @@ const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
   video: { cost: 0, status: "idle" },
 };
 
-const STEP_META: Record<StepKey, { label: string; icon: string; costHint: string }> = {
-  isolate: { label: "Quitar fondo", icon: "✂️", costHint: "$0.01" },
-  upscale: { label: "Upscale 2x", icon: "🔍", costHint: "$0.02" },
-  estante: { label: "Estante lujoso", icon: "🎭", costHint: "$0.05" },
-  modelo: { label: "En modelo", icon: "👤", costHint: "$0.10" },
-  video: { label: "Video 360°", icon: "🎥", costHint: "Gratis" },
+interface StepMeta {
+  label: string;
+  icon: string;
+  costHint: string;
+  what?: string;
+  provider?: string;
+  duration?: string;
+  tips?: string[];
+}
+
+const STEP_META: Record<StepKey, StepMeta> = {
+  isolate: {
+    label: "Quitar fondo",
+    icon: "✂️",
+    costHint: "$0.01",
+    what: "Aísla la joya sobre fondo transparente — base nítida para el upscale y todos los pasos siguientes.",
+    provider: "Replicate rembg + WithoutBG fallback.",
+    duration: "5–15 s",
+    tips: ["Para joyas chicas (aretes, topos), una foto bien iluminada da mejor isolate."],
+  },
+  upscale: {
+    label: "Upscale 2x",
+    icon: "🔍",
+    costHint: "$0.02",
+    what: "Duplica la resolución para preservar detalle de gemas, grabados y acabado del metal — crítico en joyería.",
+    provider: "Real-ESRGAN 2x (Replicate).",
+    duration: "10–25 s",
+    tips: ["Si falla, el pipeline se detiene — sin upscale el estante sale borroso."],
+  },
+  estante: {
+    label: "Estante lujoso",
+    icon: "🎭",
+    costHint: "$0.05",
+    what: "Genera el fondo estilo catálogo Tiffany/Cartier alrededor de TU joya, manteniendo la pieza intacta gracias al guard 'preserve'.",
+    provider: "Flux Kontext Pro con input_image (composite-first).",
+    duration: "20–40 s",
+    tips: [
+      "Usa los features detectados (material, acabado, piedras) para anclar el resultado.",
+      "Si la joya cambia (ej oro → plata), el identity-check muestra warning chip.",
+    ],
+  },
+  modelo: {
+    label: "En modelo",
+    icon: "👤",
+    costHint: "$0.10",
+    what: "Aplica TU joya sobre una modelo IA (orejas, cuello, mano según subtipo) — 100% catálogo profesional.",
+    provider: "model-create (SeedDream) + tryon (Kolors/Kontext según subtipo).",
+    duration: "40–90 s",
+    tips: ["Opcional: desactivá si solo necesitás el estante.", "Las gemas y proporciones se preservan gracias al tryonPrompt específico por subtipo."],
+  },
+  video: {
+    label: "Video 360°",
+    icon: "🎥",
+    costHint: "Gratis",
+    what: "Video 360° rotando la joya sobre estante, ideal para Reels/Stories.",
+    provider: "wan-2.2-fast (Replicate).",
+    duration: "60–120 s",
+    tips: ["Opcional. Si no lo necesitás, desactivá para ahorrar tiempo."],
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -755,6 +808,39 @@ export default function JewelryPipelinePage() {
                               <div className="flex items-center gap-1">
                                 <span className="text-sm">{meta.icon}</span>
                                 <span className="truncate font-medium text-gray-200">{meta.label}</span>
+                                {meta.what && (
+                                  <details className="relative">
+                                    <summary
+                                      className="cursor-pointer list-none rounded bg-white/5 px-1 text-[9px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                                      title="¿Qué hace este paso?"
+                                    >
+                                      ⓘ
+                                    </summary>
+                                    <div className="absolute left-0 top-5 z-10 w-60 rounded-lg border border-white/10 bg-zinc-900 p-2.5 shadow-xl">
+                                      <p className="mb-1 text-[10px] leading-tight text-gray-200">{meta.what}</p>
+                                      {meta.provider && (
+                                        <p className="mt-1.5 text-[9px] text-gray-400">
+                                          <span className="font-semibold text-amber-300">Proveedor:</span> {meta.provider}
+                                        </p>
+                                      )}
+                                      {meta.duration && (
+                                        <p className="text-[9px] text-gray-400">
+                                          <span className="font-semibold text-amber-300">Tiempo:</span> {meta.duration}
+                                        </p>
+                                      )}
+                                      {meta.tips && meta.tips.length > 0 && (
+                                        <div className="mt-1.5 border-t border-white/10 pt-1.5">
+                                          <p className="text-[9px] font-semibold text-amber-300">Tips:</p>
+                                          <ul className="mt-0.5 list-disc pl-3 text-[9px] text-gray-300">
+                                            {meta.tips.map((t, i) => (
+                                              <li key={i} className="leading-tight">{t}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </details>
+                                )}
                               </div>
                               {step.resultUrl ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
