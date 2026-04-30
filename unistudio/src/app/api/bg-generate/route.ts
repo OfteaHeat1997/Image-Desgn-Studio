@@ -73,11 +73,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!BACKGROUND_PRESETS[style] && !customPrompt) {
+    // Accept the style if it's:
+    //   1. A known BACKGROUND_PRESETS key (Flux preset prompts), OR
+    //   2. A SOLID_COLOR_STYLES key (sharp composite, no IA), OR
+    //   3. The caller provided a customPrompt (free-form Flux generation).
+    // Otherwise reject with the full list of accepted values.
+    if (!BACKGROUND_PRESETS[style] && !SOLID_COLOR_STYLES[style] && !customPrompt) {
+      const validStyles = [
+        ...Object.keys(SOLID_COLOR_STYLES),
+        ...Object.keys(BACKGROUND_PRESETS),
+      ];
       return NextResponse.json(
         {
           success: false,
-          error: `Unknown style "${style}" and no "customPrompt" provided. Use one of: ${Object.keys(BACKGROUND_PRESETS).join(', ')}.`,
+          error: `Unknown style "${style}" and no "customPrompt" provided. Use one of: ${validStyles.join(', ')}.`,
         },
         { status: 400 },
       );
