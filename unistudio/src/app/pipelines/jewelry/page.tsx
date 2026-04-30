@@ -464,6 +464,13 @@ export default function JewelryPipelinePage() {
           const modelCreateCost = modelData.cost ?? 0.055;
           totalCost += modelCreateCost;
 
+          // Build the feature descriptor from the cached productFeatures (set
+          // by step 1b — /api/product-features). This anchors the Kontext
+          // prompt to THIS piece (anillo redondo dorado con 3 piedras) so the
+          // model on the result wears the actual product, not an invented one.
+          const tryonFeatureDescriptor = features
+            ? jewelryDescriptor(features)
+            : undefined;
           const tryonRes = await fetch("/api/jewelry-tryon", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -472,6 +479,7 @@ export default function JewelryPipelinePage() {
               jewelryImage: isolatedUrl,
               type: job.subType,
               mode: "modelo",
+              featureDescriptor: tryonFeatureDescriptor,
             }),
           });
           const tryonData = await safeJson(tryonRes);
@@ -480,6 +488,31 @@ export default function JewelryPipelinePage() {
             const tryonCost = tryonData.cost ?? 0.05;
             totalCost += tryonCost;
             updateJob(job.id, { modelUrl });
+
+            // Identity-check on modelo output: ensure the jewelry on the
+            // person is the SAME piece as the input. Same pattern as estante.
+            if (modelUrl) {
+              fetch("/api/identity-check", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  inputUrl: isolatedUrl,
+                  outputUrl: modelUrl,
+                  category: "jewelry",
+                }),
+              })
+                .then((r) => r.json())
+                .then((d) => {
+                  if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
+                    const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
+                    updateStep(job.id, "modelo", {
+                      warning: `⚠ La joya cambió en la modelo: ${changes || d.data.reason}`,
+                    });
+                  }
+                })
+                .catch((err) => console.warn("[jewelry] modelo identity-check failed:", err));
+            }
+
             updateStep(job.id, "modelo", {
               status: "done",
               resultUrl: modelUrl,

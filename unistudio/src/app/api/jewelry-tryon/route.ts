@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     let metalType: string | undefined;
     let finish: string | undefined;
     let bgStyle: string | undefined;
+    let featureDescriptor: string | undefined;
 
     const contentType = request.headers.get('content-type') || '';
 
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
       metalType = (formData.get('metalType') as string) || undefined;
       finish = (formData.get('finish') as string) || undefined;
       bgStyle = (formData.get('bgStyle') as string) || undefined;
+      featureDescriptor = (formData.get('featureDescriptor') as string) || undefined;
 
       if (!jewelryFile) {
         return NextResponse.json(
@@ -72,6 +74,7 @@ export async function POST(request: NextRequest) {
       metalType = body.metalType;
       finish = body.finish;
       bgStyle = body.bgStyle;
+      featureDescriptor = body.featureDescriptor;
 
       // B-5: Validate that provided image strings are valid URLs or data URIs
       if (jewelryImage && !isValidImageUrl(jewelryImage)) {
@@ -122,7 +125,10 @@ export async function POST(request: NextRequest) {
       resultUrl = await applyJewelryDisplay(jewelryImage, type, mode, { metalType, finish });
     } else {
       // P-4: Pass bgStyle so the modelo prompt can include background instructions
-      resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish, bgStyle });
+      // featureDescriptor: per-photo feature anchor (eg "anillo redondo · oro
+      //   brillante · 3 piedras transparentes · grabados") so Kontext respects
+      //   the actual piece instead of inventing one.
+      resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish, bgStyle, featureDescriptor });
     }
 
     await saveJob({

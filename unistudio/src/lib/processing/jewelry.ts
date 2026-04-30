@@ -260,7 +260,7 @@ export async function applyJewelry(
   modelImageUrl: string,
   jewelryImageUrl: string,
   accessoryType: string,
-  options?: { metalType?: string; finish?: string; bgStyle?: string },
+  options?: { metalType?: string; finish?: string; bgStyle?: string; featureDescriptor?: string },
 ): Promise<string> {
   const placementPrompt = PLACEMENT_PROMPTS[accessoryType];
   if (!placementPrompt) {
@@ -285,6 +285,14 @@ export async function applyJewelry(
     ? ` The background should be ${options.bgStyle}.`
     : '';
 
+  // Inject the per-photo feature descriptor so Kontext anchors the result to
+  // the EXACT piece (anillo redondo · oro · 3 piedras transparentes ·
+  // grabados) instead of generating a generic earring/ring/etc. The descriptor
+  // comes from /api/product-features (Claude Haiku Vision).
+  const featureAnchor = options?.featureDescriptor
+    ? ` The exact piece in the input is: ${options.featureDescriptor}. Reproduce these features faithfully — same shape, same material, same stones, same engravings.`
+    : '';
+
   // Create composite image: [model | jewelry product]
   const compositeDataUrl = await createComposite(modelImageUrl, jewelryImageUrl);
 
@@ -293,7 +301,7 @@ export async function applyJewelry(
 
   // Build the full prompt
   const fullPrompt =
-    placementPrompt + modifierStr + bgInstruction +
+    placementPrompt + modifierStr + bgInstruction + featureAnchor +
     ' Professional jewelry photography quality, photorealistic, high detail.';
 
   // B-3: Added aspect_ratio: '1:1'
