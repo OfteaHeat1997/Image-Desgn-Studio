@@ -19,6 +19,8 @@ import {
   Palette,
   Maximize2,
 } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
 import { useGalleryStore } from "@/stores/gallery-store";
@@ -290,6 +292,11 @@ export default function StaticProductPipelinePage() {
   const [defaultType, setDefaultType] = useState<StaticProductType>("perfume");
   const [defaultBrand, setDefaultBrand] = useState<StaticBrand>("other");
   const previewUrlsRef = useRef<string[]>([]);
+  // Mirror of `jobs` so handleFiles can dedupe synchronously without stale closure.
+  const jobsRef = useRef<Job[]>([]);
+  useEffect(() => { jobsRef.current = jobs; }, [jobs]);
+  // ID of the job currently being zipped (for "Descargar las 3" button per-job spinner)
+  const [zippingJobId, setZippingJobId] = useState<string | null>(null);
 
   // Gap 1 — Batch desde folder del inventario
   const [batchCategories, setBatchCategories] = useState<InventoryCategoryLite[] | null>(null);
@@ -364,8 +371,26 @@ export default function StaticProductPipelinePage() {
       opts?: { pathHint?: (f: File) => string; presetType?: StaticProductType; presetBrand?: StaticBrand },
     ) => {
       if (files.length === 0) return;
+      // Dedupe by filename + size — prevents the "duplicate cards" bug when
+      // the user drops the same folder twice or hits the upload button twice.
+      // Compares against existing jobs AND against duplicates in the same drop.
+      const existingKeys = new Set(
+        jobsRef.current.map((j) => `${j.file.name}::${j.file.size}`),
+      );
+      const seenInDrop = new Set<string>();
+      const uniqueFiles = files.filter((f) => {
+        const key = `${f.name}::${f.size}`;
+        if (existingKeys.has(key) || seenInDrop.has(key)) return false;
+        seenInDrop.add(key);
+        return true;
+      });
+      const skipped = files.length - uniqueFiles.length;
+      if (skipped > 0) {
+        toast.warning(`${skipped} foto${skipped !== 1 ? "s" : ""} duplicada${skipped !== 1 ? "s" : ""} ignorada${skipped !== 1 ? "s" : ""}.`);
+      }
+      if (uniqueFiles.length === 0) return;
       let ambiguousCount = 0;
-      const newJobs: Job[] = files.map((file, i) => {
+      const newJobs: Job[] = uniqueFiles.map((file, i) => {
         const preview = URL.createObjectURL(file);
         previewUrlsRef.current.push(preview);
 
@@ -480,10 +505,16 @@ export default function StaticProductPipelinePage() {
     config: ReturnType<typeof getAdaptiveBgConfig>,
     overridePrompt?: string,
   ): Promise<{ url: string; cost: number }> => {
+    // 90s timeout client-side — Vercel route caps at 60s, but giving us 30s
+    // grace prevents the "infinite spinner" bug when a request hangs (e.g.
+    // Replicate throttling on low budget) instead of returning a clean error.
+    const timeoutSignal = AbortSignal.timeout(90_000);
+
     if (key === "white") {
       const r = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: timeoutSignal,
         body: JSON.stringify({
           imageUrl: inputUrl,
           mode: "fast", // ignored by route when style is solid-color; included for safety
@@ -503,6 +534,7 @@ export default function StaticProductPipelinePage() {
     const r = await fetch("/api/bg-generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: timeoutSignal,
       body: JSON.stringify({
         imageUrl: inputUrl,
         mode: "fast",
@@ -935,14 +967,66 @@ export default function StaticProductPipelinePage() {
                         <p className="truncate text-sm font-medium text-gray-200" title={job.file.name}>
                           {job.file.name}
                         </p>
-                        <button
-                          onClick={() => removeJob(job.id)}
-                          disabled={isRunning}
-                          className="text-gray-500 hover:text-red-400 disabled:opacity-30"
-                          title="Quitar"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {(() => {
+                            const doneOutputs = OUTPUT_STEPS.filter((k) => job.steps[k].status === "done" && job.steps[k].resultUrl);
+                            if (doneOutputs.length === 0) return null;
+                            return (
+                              <button
+                                type="button"
+                                disabled={zippingJobId === job.id}
+                                onClick={async () => {
+                                  setZippingJobId(job.id);
+                                  try {
+                                    const zip = new JSZip();
+                                    const baseName = job.file.name.replace(/\.[^.]+$/, "");
+                                    let added = 0;
+                                    for (const k of doneOutputs) {
+                                      const url = job.steps[k].resultUrl!;
+                                      try {
+                                        const res = await fetch(url);
+                                        if (!res.ok) continue;
+                                        const blob = await res.blob();
+                                        zip.file(`${baseName}-${k}.jpg`, blob);
+                                        added++;
+                                      } catch { /* skip individual failure */ }
+                                    }
+                                    if (added === 0) {
+                                      toast.error("No se pudo descargar ninguna versión.");
+                                      return;
+                                    }
+                                    const zipBlob = await zip.generateAsync({ type: "blob" });
+                                    saveAs(zipBlob, `${baseName}-3versiones.zip`);
+                                    toast.success(`ZIP listo (${added} versión${added !== 1 ? "es" : ""}).`);
+                                  } catch (err) {
+                                    toast.error(err instanceof Error ? err.message : "Error generando ZIP");
+                                  } finally {
+                                    setZippingJobId(null);
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
+                                title={`Descargar ${doneOutputs.length} de 3 versiones como ZIP`}
+                              >
+                                {zippingJobId === job.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Download className="h-3 w-3" />
+                                )}
+                                {doneOutputs.length === 3
+                                  ? "Descargar las 3"
+                                  : `Descargar ${doneOutputs.length}/3`}
+                              </button>
+                            );
+                          })()}
+                          <button
+                            onClick={() => removeJob(job.id)}
+                            disabled={isRunning}
+                            className="text-gray-500 hover:text-red-400 disabled:opacity-30"
+                            title="Quitar"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
@@ -1065,8 +1149,17 @@ export default function StaticProductPipelinePage() {
                                     <span className="text-base">{meta.icon}</span>
                                     {meta.label}
                                   </span>
-                                  <span className="font-mono text-[10px] text-violet-300">
-                                    {step.status === "done" && step.cost > 0 ? `$${step.cost.toFixed(3)}` : meta.costHint}
+                                  <span
+                                    className={cn(
+                                      "font-mono text-[10px]",
+                                      step.status === "error" ? "text-red-400" : "text-violet-300",
+                                    )}
+                                  >
+                                    {step.status === "error"
+                                      ? "Falló"
+                                      : step.status === "done" && step.cost > 0
+                                        ? `$${step.cost.toFixed(3)}`
+                                        : meta.costHint}
                                   </span>
                                 </div>
 
