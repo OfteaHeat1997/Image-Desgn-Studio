@@ -1,5 +1,18 @@
 # UniStudio — Changelog
 
+## 2026-04-30 — Static-product: dedupe, timeout, cost-hint, "Descargar las 3"
+
+Bug report tras testing real con perfumes/colonias. 4 fixes (commit `aa903ba`):
+
+- **#2 Items duplicados**: dedupe por `name+size` al subir (vía `jobsRef` + dedupe dentro del mismo drop). Toast de N ignoradas.
+- **#3 Loading infinito**: `AbortSignal.timeout(90_000)` en `/api/bg-generate` — Replicate throttling ya no cuelga la UI.
+- **#5 Cost hint inconsistente**: si status === "error" muestra "Falló" rojo, no `costHint` original.
+- **#6 "Descargar las 3"**: botón por job con JSZip, bundle `<basename>-3versiones.zip`. Adapta texto si N<3 done.
+
+`#1 (bg-generate mode)` ya arreglado en `f5e57c1` + deployado en `13b91a2`. Error que reportó la usuaria era cache del browser.
+
+⚠ **Replicate low-budget**: artefactos visuales en outputs adaptativos pueden ser throttling, no bug. Verificar billing en replicate.com/account/billing.
+
 ## 2026-04-29 — Static-product: composite-first + 3 outputs + lightbox
 
 Tras feedback real testeando con un perfume Yanbal en producción: el pipeline cambiaba la forma del producto (Kontext Pro lo "redibujaba"), no había preview en grande, y solo generaba 1 output. Las quejas se resuelven en este commit.
