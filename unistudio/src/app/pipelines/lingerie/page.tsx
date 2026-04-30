@@ -2637,7 +2637,7 @@ export default function LingeriePipelinePage() {
         if (!autoMode && (stepDef.id !== "model" || !newSharedModel)) {
           await new Promise<void>((resolve) => {
             const TIMEOUT_MS = 10 * 60 * 1000; // 10 min — si la usuaria cierra tab, no queda pendiente forever
-            let timeoutId: ReturnType<typeof setTimeout>;
+            let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
             const cleanup = () => {
               window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
               clearTimeout(timeoutId);
@@ -2719,7 +2719,7 @@ export default function LingeriePipelinePage() {
           // Wait for user to retry or skip (10 min timeout)
           await new Promise<void>((resolve) => {
             const TIMEOUT_MS = 10 * 60 * 1000;
-            let timeoutId: ReturnType<typeof setTimeout>;
+            let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
             const cleanup = () => {
               window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
               clearTimeout(timeoutId);
