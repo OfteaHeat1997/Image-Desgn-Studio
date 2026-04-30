@@ -33,6 +33,10 @@ import {
   type StaticBrand,
 } from "@/lib/pipelines/static-product";
 import { inferProductContextFromPath } from "@/lib/pipelines/folder-routing";
+import {
+  staticProductDescriptor,
+  type StaticProductFeatures,
+} from "@/lib/processing/product-features";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -79,6 +83,12 @@ interface Job {
   error?: string;
   cost: number;
   steps: Record<StepKey, StepSnapshot>;
+  /**
+   * Features extraídos de ESTA foto vía Claude Vision. Se inyectan en los
+   * prompts de bg-generate para que el fondo respete el frasco real (forma,
+   * color, etiqueta) en vez de usar un template genérico por marca+tipo.
+   */
+  productFeatures?: StaticProductFeatures | null;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -583,6 +593,20 @@ export default function StaticProductPipelinePage() {
       if (!upData.success) throw new Error(upData.error || "Upload failed");
       currentUrl = upData.data.url;
 
+      // 1b. Analyze the uploaded photo features in parallel — ~$0.001, ~3s.
+      // The result is injected into the bg-generate prompts so the background
+      // is built around THIS specific bottle (real shape, color, label) instead
+      // of a generic brand+type template. Fire-and-forget: if it fails the
+      // pipeline keeps going with the legacy template-only prompt.
+      const featuresPromise = fetch("/api/product-features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: currentUrl, category: "static-product" }),
+      })
+        .then((r) => r.json())
+        .then((d) => (d?.success ? (d.data as StaticProductFeatures) : null))
+        .catch(() => null);
+
       // 2. Remove background → step "isolate"
       updateJob(job.id, { status: "isolating" });
       updateStep(job.id, "isolate", { status: "running" });
@@ -624,12 +648,31 @@ export default function StaticProductPipelinePage() {
 
       // 4. Generate the 3 outputs in parallel from the same normalized input.
       //    All 3 share the EXACT same product pixels (composite-first).
+      // Wait for productFeatures (started in step 1b) so we can inject the
+      // per-photo descriptor into the prompt. Cap at 5s so the pipeline never
+      // stalls on a slow Vision call.
       updateJob(job.id, { status: "generating" });
+      const features = await Promise.race([
+        featuresPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      if (features) {
+        updateJob(job.id, { productFeatures: features });
+      }
+
+      // Build the effective prompt: legacy template + per-photo descriptor so
+      // the AI uses THIS bottle's real characteristics (Yanbal vs Cyzone won't
+      // both end up looking like the same generic frasco).
+      const featureSuffix = features
+        ? `. The product in the photo is: ${staticProductDescriptor(features)}. Compose the scene around this exact bottle — preserve its shape, color, label and material.`
+        : "";
+      const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
+
       const sharedInput = currentUrl;
       const [whiteRes, adaptiveRes, verticalRes] = await Promise.all([
-        runOutputStep(job.id, "white", sharedInput, config),
-        runOutputStep(job.id, "adaptive", sharedInput, config),
-        runOutputStep(job.id, "vertical", sharedInput, config),
+        runOutputStep(job.id, "white", sharedInput, enrichedConfig),
+        runOutputStep(job.id, "adaptive", sharedInput, enrichedConfig),
+        runOutputStep(job.id, "vertical", sharedInput, enrichedConfig),
       ]);
       totalCost += whiteRes.cost + adaptiveRes.cost + verticalRes.cost;
 
@@ -1051,6 +1094,39 @@ export default function StaticProductPipelinePage() {
                           ))}
                         </select>
                       </div>
+
+                      {/* Per-photo features detected by Vision — shows that the
+                           pipeline is using THIS bottle, not a generic template */}
+                      {job.productFeatures && (
+                        <div className="rounded border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1.5">
+                          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
+                            ✨ Lo que la IA ve en tu foto
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                              {job.productFeatures.tipo_envase} {job.productFeatures.forma}
+                            </span>
+                            <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                              {job.productFeatures.material_aparente}
+                            </span>
+                            {job.productFeatures.color_envase && (
+                              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                {job.productFeatures.color_envase}
+                              </span>
+                            )}
+                            {job.productFeatures.tapa && (
+                              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                tapa {job.productFeatures.tapa}
+                              </span>
+                            )}
+                            {job.productFeatures.marca_legible && (
+                              <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">
+                                {job.productFeatures.marca_legible}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between gap-2">
                         <span

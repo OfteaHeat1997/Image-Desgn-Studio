@@ -25,6 +25,10 @@ import {
   withJewelryPreserve,
   type JewelrySubType,
 } from "@/lib/pipelines/jewelry";
+import {
+  jewelryDescriptor,
+  type JewelryFeatures,
+} from "@/lib/processing/product-features";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -62,6 +66,12 @@ interface Job {
   error?: string;
   cost: number;
   steps: Record<StepKey, StepSnapshot>;
+  /**
+   * Features extraídos por Claude Vision de ESTA foto (material, acabado,
+   * piedras, color). Se inyectan en el prompt del estante para anclar
+   * Kontext al producto real, no a un template genérico por subType.
+   */
+  productFeatures?: JewelryFeatures | null;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -256,6 +266,18 @@ export default function JewelryPipelinePage() {
       if (!upData.success) throw new Error(upData.error || "Upload failed");
       let workingUrl: string = upData.data.url;
 
+      // 1b. Analyze jewelry features in parallel — extracts material, acabado,
+      // piedras, etc. from THIS photo and injects them into the estante prompt
+      // so Kontext respects the actual piece (not a generic ring/earring).
+      const featuresPromise = fetch("/api/product-features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: workingUrl, category: "jewelry" }),
+      })
+        .then((r) => r.json())
+        .then((d) => (d?.success ? (d.data as JewelryFeatures) : null))
+        .catch(() => null);
+
       // 2. Remove background → step "isolate"
       updateJob(job.id, { status: "isolating" });
       updateStep(job.id, "isolate", { status: "running" });
@@ -302,8 +324,23 @@ export default function JewelryPipelinePage() {
       const isolatedUrl = workingUrl;
 
       // 4. Generate ESTANTE → step "estante"
+      // Wait for vision features (started in step 1b), capped at 5s so the
+      // pipeline never stalls. If null, fall back to the legacy template prompt.
       updateJob(job.id, { status: "generating-estante" });
       updateStep(job.id, "estante", { status: "running" });
+      const features = await Promise.race([
+        featuresPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      if (features) {
+        updateJob(job.id, { productFeatures: features });
+      }
+      const featureSuffix = features
+        ? `. Featuring this exact piece: ${jewelryDescriptor(features)}.`
+        : "";
+      const estantePromptWithFeatures = withJewelryPreserve(
+        config.estantePrompt + featureSuffix,
+      );
       const estanteRes = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -311,7 +348,7 @@ export default function JewelryPipelinePage() {
           imageUrl: isolatedUrl,
           mode: "precise",
           style: "custom",
-          customPrompt: withJewelryPreserve(config.estantePrompt),
+          customPrompt: estantePromptWithFeatures,
           aspectRatio: "1:1",
         }),
       });
@@ -637,6 +674,36 @@ export default function JewelryPipelinePage() {
                             </p>
                           )}
                         </div>
+
+                        {job.productFeatures && (
+                          <div className="rounded border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1.5">
+                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
+                              ✨ Lo que la IA ve en tu foto
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                {job.productFeatures.tipo} · {job.productFeatures.material}
+                              </span>
+                              {job.productFeatures.acabado && (
+                                <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                  {job.productFeatures.acabado}
+                                </span>
+                              )}
+                              {job.productFeatures.piedras && job.productFeatures.num_piedras > 0 && (
+                                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+                                  {job.productFeatures.num_piedras} piedra{job.productFeatures.num_piedras > 1 ? "s" : ""}
+                                  {job.productFeatures.color_piedras.length > 0 &&
+                                    ` (${job.productFeatures.color_piedras.join(", ")})`}
+                                </span>
+                              )}
+                              {job.productFeatures.grabados && (
+                                <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                                  con grabados
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
