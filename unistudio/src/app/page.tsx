@@ -5,85 +5,75 @@ export default function HomePage() {
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold mb-2">UniStudio</h1>
           <p className="text-zinc-400">Tu estudio de fotos con IA para e-commerce</p>
-          <p className="text-lg mt-4 text-zinc-300">¿Qué quieres hacer?</p>
+          <p className="text-lg mt-4 text-zinc-300">¿Qué quieres procesar hoy?</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {/* Card 1 */}
-          <a href="/editor?agent=modelo" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-pink-500/50 transition-all">
-            <div className="text-3xl mb-3">👗</div>
-            <h2 className="text-lg font-semibold mb-1">Cambiar Modelo de mi Ropa</h2>
-            <p className="text-sm text-zinc-400">Sube tu foto de lencería o ropa con modelo → elige nueva modelo → ¡Listo!</p>
+        {/* ----- Sección principal: los 3 pipelines completos ----- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <a href="/pipelines/lingerie" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-pink-500/50 transition-all">
+            <div className="text-3xl mb-3">🩱</div>
+            <h2 className="text-lg font-semibold mb-1">Lencería</h2>
+            <p className="text-sm text-zinc-400">Bras, panties, shapewear, fajas — quita modelo, crea modelo IA, prueba virtual, video</p>
             <span className="inline-block mt-3 px-4 py-1.5 bg-pink-500/20 text-pink-400 rounded-full text-xs">Empezar →</span>
           </a>
 
-          {/* Card 2 */}
-          <a href="/editor?agent=ecommerce" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
+          <a href="/pipelines/static-product" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
             <div className="text-3xl mb-3">🧴</div>
-            <h2 className="text-lg font-semibold mb-1">Fotos de Perfumes y Belleza</h2>
-            <p className="text-sm text-zinc-400">Fotos profesionales de perfumes, cremas, y cuidado personal con fondos de lujo</p>
+            <h2 className="text-lg font-semibold mb-1">Perfumes y Belleza</h2>
+            <p className="text-sm text-zinc-400">Perfumes, cremas, skincare, maquillaje — fondo blanco + adaptativo + vertical 9:16</p>
             <span className="inline-block mt-3 px-4 py-1.5 bg-amber-500/20 text-amber-400 rounded-full text-xs">Empezar →</span>
           </a>
 
-          {/* Card 3 */}
-          <a href="/editor?agent=catalogo" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-yellow-500/50 transition-all">
+          <a href="/pipelines/jewelry" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-yellow-500/50 transition-all">
             <div className="text-3xl mb-3">💎</div>
-            <h2 className="text-lg font-semibold mb-1">Fotos de Joyería</h2>
-            <p className="text-sm text-zinc-400">Exhibidores, fondos de lujo, y fotos profesionales de tu joyería</p>
+            <h2 className="text-lg font-semibold mb-1">Joyería</h2>
+            <p className="text-sm text-zinc-400">Aretes, cadenas, anillos — estante + foto en modelo + video 360°</p>
             <span className="inline-block mt-3 px-4 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">Empezar →</span>
-          </a>
-
-          {/* Card 4 */}
-          <a href="/batch" className="block p-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 transition-all">
-            <div className="text-3xl mb-3">📦</div>
-            <h2 className="text-lg font-semibold mb-1">Procesar Muchas Fotos</h2>
-            <p className="text-sm text-zinc-400">Sube 50+ fotos y aplica el mismo proceso a todas de una vez</p>
-            <span className="inline-block mt-3 px-4 py-1.5 bg-blue-500/20 text-blue-400 rounded-full text-xs">Ir al Batch →</span>
           </a>
         </div>
 
-        {/* Editor link */}
-        <a href="/editor" className="block p-5 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-green-500/50 transition-all text-center">
-          <span className="text-xl mr-2">✏️</span>
-          <span className="font-medium">Editar una Foto Manualmente</span>
-          <span className="text-sm text-zinc-400 ml-2">— Todas las herramientas disponibles</span>
-        </a>
-
-        {/* AI Agents Section */}
-        <div className="mt-12">
-          <h2 className="text-xl font-semibold mb-4">🤖 Automatización con IA</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <a href="/editor?module=ai-agent" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-violet-500/50 transition-all">
-              <h3 className="font-medium">Agente IA</h3>
-              <p className="text-xs text-zinc-500">El AI decide los pasos y ejecuta todo automáticamente</p>
+        {/* ----- Sección secundaria: utilities (no pipelines) -----
+            Removido "Agente IA" porque es redundante para Unistyles —
+            los 3 pipelines de arriba cubren todas las categorías que
+            la marca vende (lencería + cosméticos + joyería). El módulo
+            ai-agent sigue accesible desde "Módulos sueltos" abajo. */}
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold mb-3 text-zinc-400 uppercase tracking-wider">Más opciones</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <a href="/batch" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 transition-all flex items-center gap-3">
+              <span className="text-2xl">📦</span>
+              <div>
+                <h3 className="font-medium">Procesamiento Masivo</h3>
+                <p className="text-xs text-zinc-500">50+ fotos a la vez</p>
+              </div>
             </a>
-            <a href="/batch" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-blue-500/50 transition-all">
-              <h3 className="font-medium">Procesamiento Masivo</h3>
-              <p className="text-xs text-zinc-500">Procesa 50+ imágenes con un pipeline configurable</p>
+            <a href="/editor" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-green-500/50 transition-all flex items-center gap-3">
+              <span className="text-2xl">✏️</span>
+              <div>
+                <h3 className="font-medium">Editar Foto</h3>
+                <p className="text-xs text-zinc-500">Edición manual / retoques</p>
+              </div>
             </a>
-            <a href="/pipelines/lingerie" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 transition-all">
-              <h3 className="font-medium">Pipeline de Lencería</h3>
-              <p className="text-xs text-zinc-500">Bras, panties, shapewear — quita la modelo y crea una nueva</p>
-            </a>
-            <a href="/pipelines/static-product" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
-              <h3 className="font-medium">Pipeline de Estáticos</h3>
-              <p className="text-xs text-zinc-500">Perfumes, cremas, skincare, maquillaje — fondo adaptativo por marca</p>
-            </a>
-            <a href="/pipelines/jewelry" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-yellow-500/50 transition-all">
-              <h3 className="font-medium">Pipeline de Joyería</h3>
-              <p className="text-xs text-zinc-500">Aretes, cadenas, anillos, pulseras — estante + foto en modelo + video 360°</p>
-            </a>
-            <a href="/brand-kit" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all">
-              <h3 className="font-medium">Kit de Marca</h3>
-              <p className="text-xs text-zinc-500">Tu logo, colores, y marca de agua</p>
+            <a href="/brand-kit" className="p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 transition-all flex items-center gap-3">
+              <span className="text-2xl">🎨</span>
+              <div>
+                <h3 className="font-medium">Kit de Marca</h3>
+                <p className="text-xs text-zinc-500">Logo, colores, marca de agua</p>
+              </div>
             </a>
           </div>
         </div>
 
-        {/* All Modules Section */}
-        <div className="mt-12">
-          <h2 className="text-xl font-semibold mb-4">📸 Todos los Módulos</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        {/* ----- Módulos sueltos (avanzado) — colapsado por default ----- */}
+        <details className="mt-8 group">
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-zinc-600 transition-all">
+              <span className="text-sm font-semibold text-zinc-300">📸 Módulos sueltos (avanzado)</span>
+              <span className="text-xs text-zinc-500 group-open:hidden">Tocar para ver →</span>
+              <span className="text-xs text-zinc-500 hidden group-open:inline">Ocultar ↓</span>
+            </div>
+          </summary>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mt-3">
             <a href="/editor?module=bg-remove" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
               <span className="block font-medium">Quitar Fondo</span>
               <span className="text-[10px] text-zinc-500">Gratis / $0.01</span>
@@ -148,8 +138,12 @@ export default function HomePage() {
               <span className="block font-medium">Director Creativo</span>
               <span className="text-[10px] text-zinc-500">Gratis</span>
             </a>
+            <a href="/editor?module=ai-agent" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
+              <span className="block font-medium">Agente IA</span>
+              <span className="text-[10px] text-zinc-500">Genérico</span>
+            </a>
           </div>
-        </div>
+        </details>
 
         {/* Quick links */}
         <div className="flex justify-center gap-6 mt-10 mb-8 text-sm text-zinc-500">
