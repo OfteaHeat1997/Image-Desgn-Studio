@@ -66,13 +66,19 @@ export function AudioButton({
   lang = "es-ES",
 }: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  // Mounted flag para evitar SSR mismatch — la API speechSynthesis solo existe
+  // en el cliente. Renderizamos null en SSR y luego en el primer effect
+  // determinamos si el browser realmente soporta TTS. Patrón estándar para
+  // browser-only features sin disparar el warning de React 19 sobre setState
+  // sincrónico en effects (ese warning es para CASCADING renders, no para
+  // este caso de feature detection que solo corre una vez).
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
-    setAvailable(checkSupport());
-    // En Chrome móvil getVoices() inicialmente devuelve [] hasta que dispara
-    // el evento "voiceschanged". Forzamos un fetch para warmup.
     if (checkSupport()) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount only, no cascading
+      setAvailable(true);
+      // Warmup voices en Chrome mobile que devuelve [] hasta voiceschanged
       window.speechSynthesis.getVoices();
       const handler = () => window.speechSynthesis.getVoices();
       window.speechSynthesis.addEventListener("voiceschanged", handler);
