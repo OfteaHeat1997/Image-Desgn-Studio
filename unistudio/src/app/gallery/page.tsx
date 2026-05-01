@@ -27,7 +27,9 @@ import { ImageCompare } from "@/components/ui/image-compare";
 import { cn } from "@/lib/utils/cn";
 import { useGalleryStore, type GalleryImage } from "@/stores/gallery-store";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
+import { AudioButton } from "@/components/ui/AudioButton";
 
 /* ------------------------------------------------------------------ */
 /*  Filter constants                                                    */
@@ -225,15 +227,33 @@ export default function GalleryPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface text-heading">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Inicio</span>
+        </Link>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Eye className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">Galería</span>
+        </div>
+      </header>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Galeria</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Explora y gestiona tus imagenes procesadas.{" "}
-            <span className="text-gray-500">{images.length} en total</span>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">Tu galería de imágenes</h1>
+          <p className="mt-1 text-sm text-body">
+            Todas tus fotos procesadas, listas para reusar o descargar.{" "}
+            <span className="text-muted">{images.length} en total</span>
           </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text={`Galería. Tienes ${images.length} imágenes procesadas. Selecciónalas y descarga todo en un solo ZIP, o reusa imágenes individuales.`}
+            />
+          </div>
         </div>
 
         {selectedIds.size > 0 && (
@@ -512,6 +532,7 @@ export default function GalleryPage() {
           </div>
         )}
       </Modal>
+      </div>
     </div>
   );
 }
