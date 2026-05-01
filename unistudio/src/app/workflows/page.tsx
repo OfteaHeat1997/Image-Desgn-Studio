@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { AudioButton } from "@/components/ui/AudioButton";
 import {
   Scissors,
   ImageIcon,
@@ -894,20 +895,32 @@ export default function WorkflowsPage() {
   const filtered = filterCat === "all" ? FEATURES : FEATURES.filter((f) => f.category === filterCat);
 
   return (
-    <div className="min-h-screen" style={{ background: "#09090B" }}>
-      <div className="mx-auto max-w-[1100px] px-6 py-10">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/" className="text-[#8A8A90] hover:text-[#F5F5F5] transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <h1 className="text-[32px] font-bold text-[#F5F5F5]">
-              UniStudio — Mapa Completo
-            </h1>
-            <p className="text-[14px] text-[#8A8A90]">
-              Cada feature, que hace, que archivos tocar, con fotos reales de tu inventario Unistyles
-            </p>
+    <div className="min-h-screen bg-surface text-heading">
+      {/* Sticky header coherente con dashboard + pipelines */}
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Inicio</span>
+        </Link>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">Workflows</span>
+        </div>
+      </header>
+      <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-6 md:py-10">
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">
+            UniStudio — Mapa Completo
+          </h1>
+          <p className="mt-1 text-sm text-body">
+            Cada feature, qué hace, qué archivos tocar, con fotos reales de tu inventario Unistyles
+          </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text="Workflows. Mapa completo de UniStudio. Cada feature, qué hace, y los archivos relacionados con tu inventario."
+            />
           </div>
         </div>
 

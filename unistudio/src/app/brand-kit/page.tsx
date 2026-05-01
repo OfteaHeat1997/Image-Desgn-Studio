@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
+import { ChevronLeft, Palette } from "lucide-react";
+import { AudioButton } from "@/components/ui/AudioButton";
 import {
   Save,
   RotateCcw,
@@ -320,14 +323,32 @@ export default function BrandKitPage() {
   }, [updateBrandKit]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface text-heading">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Inicio</span>
+        </Link>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Palette className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">Kit de Marca</span>
+        </div>
+      </header>
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Kit de Marca</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Define la identidad de tu marca para fotografia de producto consistente.
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">Tu Kit de Marca</h1>
+          <p className="mt-1 text-sm text-body">
+            Define la identidad de tu marca: logo, colores y marca de agua. Se aplica automáticamente en todas las fotos.
           </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text="Kit de marca. Define tu logo, colores principales y marca de agua. Se aplican automáticamente en todas las fotos que proceses."
+            />
+          </div>
           {isApiLoading && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -609,6 +630,7 @@ export default function BrandKitPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
