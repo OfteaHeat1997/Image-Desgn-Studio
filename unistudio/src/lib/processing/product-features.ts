@@ -43,6 +43,18 @@ export interface StaticProductFeatures {
   posicion_logo: 'frontal' | 'lateral' | 'trasera' | 'tapa' | null;
   tapa: 'redonda' | 'cuadrada' | 'spray' | 'rosca' | 'pump' | 'sin-tapa' | null;
   detalles_visibles: string[];
+  // Detalles fine-grained agregados para que la IA respete 100% el producto.
+  // El feedback de la usuaria fue: "Vision no identifica el detalle".
+  /** Color exacto de la tapa: "negro", "dorado", "plateado", "rojo", etc. */
+  color_tapa: string | null;
+  /** Texto LITERAL legible en la etiqueta principal (ej "VANILLA FOR MEN", "43°N PARALEL") */
+  texto_etiqueta: string | null;
+  /** Nombre del producto/sub-línea en mayúsculas o como aparece (ej "VANILLA", "ADRENALINE") */
+  nombre_producto: string | null;
+  /** Proporción visual del frasco — ayuda al composite */
+  proporcion: 'mas-alto-que-ancho' | 'mas-ancho-que-alto' | 'cuadrado' | 'rectangular-vertical' | 'rectangular-horizontal' | null;
+  /** Acabado de la superficie del envase */
+  acabado: 'brillante' | 'mate' | 'satinado' | 'frosted' | 'iridiscente' | null;
 }
 
 export interface JewelryFeatures {
@@ -86,20 +98,26 @@ Responde SOLO con JSON válido:
   "hasModel": boolean (¿hay una persona/modelo en la foto?)
 }`,
 
-  'static-product': `Analiza esta foto de producto cosmético/perfume/crema. Extrae features ESPECÍFICOS de ESTA foto, no genéricos.
-Responde SOLO con JSON válido:
+  'static-product': `Analiza esta foto de producto cosmético/perfume/crema/maquillaje. CRITICAL: extrae detalles ESPECÍFICOS de ESTA foto exacta, lee TODO el texto visible literalmente. La usuaria pide que el resultado se base 100% en su foto — NO inventes nada, solo reporta lo que VES.
+
+Responde SOLO con JSON válido (sin markdown, sin comentarios):
 {
   "tipo_envase": "frasco" | "spray" | "tubo" | "caja" | "pote" | "other",
   "forma": "cuadrado" | "cilindrico" | "piramidal" | "redondo" | "rectangular" | "irregular",
+  "proporcion": "mas-alto-que-ancho" | "mas-ancho-que-alto" | "cuadrado" | "rectangular-vertical" | "rectangular-horizontal" | null (cómo es la silueta del frasco),
   "material_aparente": "vidrio-transparente" | "vidrio-opaco" | "plastico" | "metal" | "carton" | "mixto",
-  "color_liquido": string | null (color del líquido si es transparente),
-  "color_envase": string (color del envase),
-  "color_hex": string (hex del color dominante),
-  "etiqueta_visible": boolean,
-  "marca_legible": string | null (texto de marca si es legible),
-  "posicion_logo": "frontal" | "lateral" | "trasera" | "tapa" | null,
+  "acabado": "brillante" | "mate" | "satinado" | "frosted" | "iridiscente" | null (cómo refleja la luz la superficie),
+  "color_liquido": string | null (ej "amarillo dorado", "rosado claro", "azul translúcido" — si el envase es opaco, null),
+  "color_envase": string (color exterior del envase, ej "transparente con tinte amarillo"),
+  "color_hex": string (hex del color dominante visible),
   "tapa": "redonda" | "cuadrada" | "spray" | "rosca" | "pump" | "sin-tapa" | null,
-  "detalles_visibles": [string] (lista específica: "tapa dorada", "etiqueta blanca", "líquido ámbar", "facetas en vidrio")
+  "color_tapa": string | null (color EXACTO de la tapa: "negro mate", "dorado brillante", "plateado", "rojo cereza", "transparente". CRÍTICO — la usuaria reportó que la IA inventaba tapas rojas cuando eran negras),
+  "etiqueta_visible": boolean,
+  "texto_etiqueta": string | null (TEXTO LITERAL completo legible en la etiqueta principal, todo lo que veas — ej "VANILLA FOR MEN", "43°N PARALEL PARFUM", "L'OREAL HYDRA RENEWAL"),
+  "nombre_producto": string | null (el NOMBRE de la sub-línea/producto como aparece, ej "VANILLA", "ADRENALINE", "43°N"),
+  "marca_legible": string | null (marca como aparece, ej "ésika", "Yanbal", "L'Bel", "Cyzone", "Avon"),
+  "posicion_logo": "frontal" | "lateral" | "trasera" | "tapa" | null,
+  "detalles_visibles": [string] (lista de TODOS los detalles distintivos que veas: "tapa cuadrada negra", "fuente serif blanca", "líquido amarillo dorado", "vidrio cuadrado con facetas internas", "etiqueta debajo del centro", "texto en bajo relieve", etc — sé MUY específico)
 }`,
 
   jewelry: `Analiza esta foto de joyería. Extrae features ESPECÍFICOS de ESTA foto, no genéricos.
@@ -292,14 +310,34 @@ export function lingerieDescriptor(f: LingerieFeatures): string {
 
 export function staticProductDescriptor(f: StaticProductFeatures): string {
   const parts: string[] = [];
+  // Forma + proporción (lo más importante visualmente)
   parts.push(`${f.tipo_envase} ${f.forma}`);
+  if (f.proporcion) parts.push(f.proporcion.replace(/-/g, ' '));
+  // Material + acabado
   parts.push(`de ${f.material_aparente}`);
-  if (f.color_liquido) parts.push(`con líquido ${f.color_liquido}`);
-  if (f.color_envase) parts.push(`color ${f.color_envase}`);
-  if (f.tapa) parts.push(`tapa ${f.tapa}`);
+  if (f.acabado) parts.push(`acabado ${f.acabado}`);
+  // Líquido si transparente
+  if (f.color_liquido) parts.push(`con líquido color ${f.color_liquido}`);
+  if (f.color_envase) parts.push(`envase color ${f.color_envase}`);
+  // Tapa con color exacto (CRÍTICO — usuaria reportó tapa negra → roja)
+  if (f.tapa && f.color_tapa) {
+    parts.push(`tapa ${f.tapa} color ${f.color_tapa}`);
+  } else if (f.tapa) {
+    parts.push(`tapa ${f.tapa}`);
+  } else if (f.color_tapa) {
+    parts.push(`tapa color ${f.color_tapa}`);
+  }
+  // Texto literal de la etiqueta — anchora a Schnell para que NO invente otra
+  if (f.texto_etiqueta) parts.push(`con etiqueta que dice literalmente "${f.texto_etiqueta}"`);
+  if (f.nombre_producto && f.nombre_producto !== f.texto_etiqueta) {
+    parts.push(`producto "${f.nombre_producto}"`);
+  }
   if (f.marca_legible) parts.push(`marca "${f.marca_legible}"`);
-  if (f.detalles_visibles.length) parts.push(`detalles: ${f.detalles_visibles.slice(0, 3).join(', ')}`);
-  return parts.join(' ');
+  // Top 5 detalles más específicos (antes era 3)
+  if (f.detalles_visibles.length) {
+    parts.push(`detalles distintivos: ${f.detalles_visibles.slice(0, 5).join(', ')}`);
+  }
+  return parts.join(', ');
 }
 
 export function jewelryDescriptor(f: JewelryFeatures): string {
