@@ -29,6 +29,7 @@ import {
   jewelryDescriptor,
   type JewelryFeatures,
 } from "@/lib/processing/product-features";
+import { AudioButton } from "@/components/ui/AudioButton";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -661,6 +662,12 @@ export default function JewelryPipelinePage() {
           <p className="mt-1 text-sm text-body leading-relaxed">
             Cada pieza recibe el mismo tratamiento que las marcas premium: estante elegante con fondo de mármol, foto en modelo (oreja, cuello, mano o muñeca según el tipo) y video 360° opcional para Reels.
           </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text="Joyería para catálogo de lujo. Cada pieza recibe el mismo tratamiento que las marcas premium: estante elegante con fondo de mármol, foto en modelo en oreja, cuello, mano o muñeca según el tipo, y video 360 grados opcional para Reels."
+            />
+          </div>
         </div>
 
         {/* Defaults + toggles + upload */}
