@@ -134,13 +134,28 @@ async function smartTryOn(
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
-  // For intimate/lingerie garments, use Kolors (no content filter, simpler API)
+  // For intimates: try FASHN first (it accepts a structured garment_image and
+  // preserves the actual product shape better than Kolors, which has no prompt
+  // input and hallucinates generic tank-tops). Fall back to Kolors only when
+  // FASHN rejects the category or fails. Per competitive research May 2026:
+  // FASHN > Kolors for product preservation in lingerie.
   if (isIntimate) {
+    if (process.env.FASHN_API_KEY) {
+      try {
+        const url = await tryOnFashn(modelImage, garmentImage, category, fashnMode);
+        return { url, provider: 'fashn' };
+      } catch (err) {
+        console.warn(
+          '[tryon] FASHN failed for intimate garment, falling back to Kolors:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     const url = await tryOnKolors(modelImage, garmentImage);
     return { url, provider: 'kolors' };
   }
 
-  // Prefer FASHN when API key is configured (highest quality for non-intimate)
+  // Non-intimates: prefer FASHN when API key is configured (highest quality)
   if (process.env.FASHN_API_KEY) {
     try {
       const url = await tryOnFashn(modelImage, garmentImage, category, fashnMode);
@@ -210,9 +225,33 @@ export async function POST(request: NextRequest) {
     const httpModelImage = await ensureHttpUrl(modelImage);
     const httpGarmentImage = await ensureHttpUrl(garmentImage);
 
-    // Force Kolors for lingerie/swimwear — no content filter, FASHN excludes these
-    const effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'auto' =
-      (garmentType === 'lingerie' || garmentType === 'swimwear') ? 'kolors' : provider;
+    // For intimates with provider="auto", smartTryOn handles FASHN-first +
+    // Kolors fallback. Only force Kolors if the user explicitly picked it OR
+    // FASHN_API_KEY is missing. This unblocks the "bra changes shape" bug —
+    // Kolors alone hallucinates generic tank-tops; FASHN preserves the
+    // product silhouette much better.
+    const isIntimateRequest =
+      garmentType === 'lingerie' ||
+      garmentType === 'swimwear' ||
+      garmentType === 'bra' ||
+      garmentType === 'panty' ||
+      garmentType === 'shapewear' ||
+      garmentType === 'underwear' ||
+      garmentType === 'intimate' ||
+      garmentType === 'bikini' ||
+      garmentType === 'bodysuit';
+
+    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'auto' = provider;
+    if (isIntimateRequest && provider === 'auto') {
+      // Let smartTryOn pick (FASHN if available, else Kolors)
+      effectiveProvider = 'auto';
+    } else if (isIntimateRequest && provider === 'kolors' && process.env.FASHN_API_KEY) {
+      // Even when caller forces Kolors, route to smart logic when FASHN is
+      // available — Kolors is the proven failure mode for the "bra changes"
+      // bug. The lingerie page sends provider="kolors" by default; we
+      // override to "auto" to give FASHN a chance first.
+      effectiveProvider = 'auto';
+    }
 
     let resultUrl: string;
     let usedProvider: string;
