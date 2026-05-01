@@ -198,14 +198,14 @@ unistudio/
 
 ## 🧪 Testing — Pipeline Fixes (Apr 30, 2026)
 
-Branch `claude/fix-pipeline-tests-aOzQG` contiene **7 commits** que arreglan los bugs reportados en testing real ("ninguna reconoce, cambia el producto", tarjetas de error mudas, video recortado a la mitad). Antes de mergear a `main`, testear cada pipeline en orden:
+Branch `claude/fix-pipeline-tests-aOzQG` (mergeado a `main`) contiene **9 commits** que arreglan el bug crítico "el producto cambia" + UX profesional. Vercel auto-deployó. Testear cada pipeline en orden:
 
 ### Setup previo
-1. Esperar que Vercel termine el deploy del último commit (`f8b49e4` o más reciente).
-2. Confirmar `ANTHROPIC_API_KEY` está set en Vercel — el análisis de producto y el identity-check lo usan.
-3. Variables opcionales:
-   - `LINGERIE_FLATTEN=0` para **desactivar** el flatten antes de Kolors (úsalo si el fix causa regresión)
-   - `DEBUG_KOLORS=1` para ver logs detallados de Kolors en Vercel function logs
+1. Verificar deploy Ready en `vercel.com/team_9ds1plRD0aD8vy4Ttmr2EnxU/unistudio/deployments` (commit `306df7d` o más reciente).
+2. Confirmar `ANTHROPIC_API_KEY` está set en Vercel — el análisis Vision y el identity-check lo usan.
+3. Variables opcionales solo si algo regresa:
+   - `LINGERIE_FLATTEN=0` → desactiva el flatten antes de Kolors
+   - `DEBUG_KOLORS=1` → logs detallados de Kolors en function logs
 
 ### Test 1 — Lencería (`/pipelines/lingerie`, ref 011841)
 
@@ -239,7 +239,8 @@ Upload: un anillo dorado con piedras + (opcional) una cadena en plata.
 **Lo que tiene que funcionar:**
 - ✅ Chips verdes **✨** muestran `anillo · oro · brillante · 3 piedras transparentes` (los detalles dependen de tu foto).
 - ✅ El "estante" preserva el material — anillo dorado sale dorado (NO plateado), cadena de plata sale plateada (NO dorada).
-- ✅ Si el material cambió: chip ⚠ amarillo `"La joya cambió: oro → plata"`.
+- ✅ **Paso "modelo" (commit `d50d29a`):** la mano/oreja/cuello de la modelo lleva el MISMO anillo/arete/cadena de tu foto, no uno inventado. Antes este paso ignoraba los features extraídos.
+- ✅ Si el material cambió: chip ⚠ amarillo `"La joya cambió: oro → plata"` (en estante o en modelo).
 - ✅ Tooltip **ⓘ** en cada paso (`isolate`, `upscale`, `estante`, `modelo`, `video`) abre panel con info.
 
 ### Test 4 — Batch (`/batch`)
@@ -253,12 +254,25 @@ Pipeline: `bg-remove → bg-generate`.
 - ✅ Sin toast `"Missing required field 'mode'"`.
 - ✅ Si por alguna razón el mode field se pierde: `console.assert` lo grita inmediato en DevTools console (`[batch] bg-generate mode field is missing — regression of f5e57c1`).
 
+### 9 commits desplegados
+
+| Hash | Qué arregla |
+|---|---|
+| `d18f6f0` | Foundation: lib + endpoint `/api/product-features` |
+| `04ec248` | Lencería: white-flatten antes de Kolors (bra→tank-top fix) |
+| `5a3de94` | Estáticos: retry Schnell on content filter / 422 |
+| `1fd21ac` | UX errors visibles + jewelry preserve + video object-contain |
+| `bbac8d4` | Wire features → estáticos + joyería estante (chips ✨) |
+| `602aac2` | Identity-check + warning chips + batch console.assert |
+| `f8b49e4` | STEP_DOCS tooltip ⓘ por paso (paridad con lencería) |
+| `1742d00` | Docs (este testing guide) + prefer-const fix |
+| `d50d29a` | **Joyería paso modelo anclado a features** ⭐ |
+
 ### Verificación de código previa al merge
 
-Las verificaciones automáticas ya pasaron en el dev container del agente:
 - ✅ `npx tsc --noEmit` — **0 errores TypeScript**
 - ✅ `npx eslint` en archivos tocados — **0 errores ESLint** (warnings preexistentes intactos)
-- ⚠ `npx next build` — fallaba solo por Google Fonts (sandbox sin internet); Vercel sí lo baja, el build pasará en deploy
+- ⚠ `npx next build` local fallaba solo por Google Fonts (sandbox sin internet); Vercel sí lo baja, build pasa en deploy
 
 ### Endpoints nuevos (referencia rápida)
 - `POST /api/product-features` — `{ imageUrl, category: "lingerie"|"static-product"|"jewelry" }` → `{ success, data: <FeaturesObject>, cost, cached }`
@@ -274,13 +288,22 @@ Las verificaciones automáticas ya pasaron en el dev container del agente:
 ### Cómo deshacer si algo se rompe en producción
 
 ```bash
-git revert f8b49e4 602aac2 bbac8d4 1fd21ac 5a3de94 04ec248 d18f6f0
+git revert d50d29a f8b49e4 602aac2 bbac8d4 1fd21ac 5a3de94 04ec248 d18f6f0
 git push
 ```
 
 O para deshacer SOLO el flatten de lencería (más quirúrgico):
 - En Vercel project settings → Environment Variables → agregar `LINGERIE_FLATTEN=0`
 - Redeploy
+
+### Si algo no funciona
+
+Dime exacto:
+1. **Qué pipeline** (lencería / estáticos / joyería / batch)
+2. **Qué hiciste** (subí 1 foto, hice click en X)
+3. **Qué viste** (qué mensaje, qué imagen)
+
+Lo arreglo en `claude/fix-pipeline-tests-aOzQG` y mergeo a main cuando esté.
 
 ---
 
