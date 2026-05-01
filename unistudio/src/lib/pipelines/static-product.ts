@@ -104,7 +104,7 @@ export function getAdaptiveBgConfig(
     if (PREMIUM_BRANDS.includes(brand)) {
       return {
         prompt:
-          'empty polished cream marble surface with subtle veining, soft warm golden gradient lighting from side, soft reflections on the empty marble, shallow depth of field with subtle bokeh, Sephora flagship store empty pedestal aesthetic, editorial catalog photography background only, NO products in scene' + HD + NO_DUP,
+          'minimalist luxury photo studio backdrop, polished cream marble pedestal in foreground, soft warm golden gradient bokeh in background (out-of-focus light, NO objects), editorial fragrance catalog aesthetic, magazine-quality empty scene, NO store interior, NO shelves, NO products visible anywhere, NO retail environment, just a clean empty luxury pedestal' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',
@@ -136,7 +136,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'yanbal' || brand === 'lbel') {
       return {
         prompt:
-          'pristine empty white Carrara marble surface with subtle gray veining, soft mirror-like reflection on empty surface, diffused daylight from left, clean spa aesthetic, La Mer flagship empty product display, crisp edges, NO products in frame' + HD + NO_DUP,
+          'pristine empty white Carrara marble pedestal in a clean photo studio, subtle gray veining in marble, soft mirror-like reflection on empty surface, diffused daylight from left, minimalist spa aesthetic, white seamless backdrop, NO products, NO shelves, NO objects, just empty marble in clean studio' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Mármol blanco premium (estilo La Mer)',
@@ -203,7 +203,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'makeup') {
     return {
       prompt:
-        'dramatic matte black empty background with soft rim lighting from the side creating a rich shadow falloff, subtle spotlight on empty surface ready for product placement, luxury cosmetics editorial photography background only, high contrast, MAC flagship empty pedestal aesthetic, NO products in scene' + HD + NO_DUP,
+        'dramatic matte black studio backdrop, soft rim lighting from the side creating rich shadow falloff, subtle spotlight on empty pedestal area, luxury cosmetics editorial photography backdrop only, high contrast minimal scene, NO products, NO store, NO shelves, NO objects, completely empty matte black studio space' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Negro mate dramático (estilo MAC)',
