@@ -140,7 +140,7 @@ export default function HomePage() {
             </a>
             <a href="/editor?module=ai-agent" className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-600 text-sm transition-all">
               <span className="block font-medium">Agente IA</span>
-              <span className="text-[10px] text-zinc-500">Genérico</span>
+              <span className="text-[10px] text-zinc-500">Para producto fuera de las 3 categorías (silla, bolso, libro). El AI lee la foto y decide qué hacer.</span>
             </a>
           </div>
         </details>
