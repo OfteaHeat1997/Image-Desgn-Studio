@@ -1,4 +1,5 @@
 import { COPY } from "@/lib/design/copy";
+import { AudioButton } from "@/components/ui/AudioButton";
 
 /**
  * Dashboard / Home page.
@@ -34,6 +35,12 @@ export default function HomePage() {
             {COPY.dashboard.title}
           </p>
           <p className="mt-1 text-sm text-muted">{COPY.dashboard.subtitle}</p>
+          <div className="mt-3 flex justify-center">
+            <AudioButton
+              variant="inline"
+              text={`${COPY.app.name}. ${COPY.app.tagline}. ${COPY.dashboard.title}. ${COPY.dashboard.subtitle}. Tienes tres pipelines: lencería para bras y panties, perfumes y belleza para cremas y maquillaje, y joyería para anillos y aretes.`}
+            />
+          </div>
         </header>
 
         {/* ── Sección principal: 3 pipelines ──────────────────────── */}
@@ -151,10 +158,15 @@ function PipelineCard({ href, data }: { href: string; data: PipelineCardData }) 
         <h3 className="text-lg md:text-xl font-bold mb-1 text-heading">{data.title}</h3>
         <p className="text-xs text-muted mb-2">{data.tagline}</p>
         <p className="text-sm text-body leading-snug">{data.benefit}</p>
-        <span className="inline-flex items-center gap-1 mt-4 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-dim)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--bg-primary)] transition-default">
-          {data.cta}
-          <span className="transition-transform group-hover:translate-x-0.5">→</span>
-        </span>
+        <div className="mt-4 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-dim)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--bg-primary)] transition-default">
+            {data.cta}
+            <span className="transition-transform group-hover:translate-x-0.5">→</span>
+          </span>
+          <div onClick={(e) => e.preventDefault()}>
+            <AudioButton text={`${data.title}. ${data.tagline}. ${data.benefit}`} size="sm" />
+          </div>
+        </div>
       </div>
     </a>
   );

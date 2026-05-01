@@ -6,6 +6,7 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
   Play,
   StopCircle,
   RotateCcw,
@@ -19,8 +20,10 @@ import {
   FolderOpen,
   Bot,
   ArrowRight,
+  Layers,
   Image as ImageIcon,
 } from "lucide-react";
+import { AudioButton } from "@/components/ui/AudioButton";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -1087,14 +1090,33 @@ export default function BatchPage() {
   /* ---- Render ---- */
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface text-heading">
+      {/* Top nav coherente con dashboard + pipelines */}
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <a href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Inicio</span>
+        </a>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Layers className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">Procesamiento Masivo</span>
+        </div>
+      </header>
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Procesamiento por Lotes</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Sube imagenes, construye un pipeline y procesalas todas de una vez.
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">Procesa muchas fotos a la vez</h1>
+          <p className="mt-1 text-sm text-body">
+            Sube hasta 50 imágenes y aplica el mismo pipeline a todas — perfecto para catálogo de temporada.
           </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text="Procesamiento masivo. Sube hasta 50 fotos y aplica el mismo pipeline a todas. Ideal para catálogo de temporada cuando tienes muchos productos del mismo tipo."
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {isRunning && (
@@ -1736,6 +1758,7 @@ export default function BatchPage() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
