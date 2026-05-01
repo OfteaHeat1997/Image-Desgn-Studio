@@ -38,6 +38,13 @@ import {
   staticProductDescriptor,
   type StaticProductFeatures,
 } from "@/lib/processing/product-features";
+import {
+  SCENE_PRESETS,
+  SCENE_CATEGORY_LABELS,
+  findScenePreset,
+  getScenePresetsForType,
+  type SceneCategory,
+} from "@/lib/pipelines/scene-presets";
 import { AudioButton } from "@/components/ui/AudioButton";
 
 /* ------------------------------------------------------------------ */
@@ -91,6 +98,12 @@ interface Job {
    * color, etiqueta) en vez de usar un template genérico por marca+tipo.
    */
   productFeatures?: StaticProductFeatures | null;
+  /**
+   * Escena manual elegida desde SCENE_PRESETS (mesa elegante, vanity, playa,
+   * café parisino, manos sosteniendo, etc). Si null/undefined usa el default
+   * por brand+tipo (matriz de getAdaptiveBgConfig).
+   */
+  sceneOverride?: string | null;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -793,9 +806,18 @@ export default function StaticProductPipelinePage() {
         updateJob(job.id, brandUpdate);
       }
 
-      // Build the effective prompt: legacy template + per-photo descriptor so
-      // the AI uses THIS bottle's real characteristics (Yanbal vs Cyzone won't
-      // both end up looking like the same generic frasco).
+      // Build the effective prompt:
+      // 1. Si la usuaria eligió escena manual (mesa elegante, vanity, playa,
+      //    manos, etc) usar ESA en vez del default por brand. Esto es el
+      //    pedido directo: "tipo una mesa elegante o una persona con la
+      //    colonia en la mano". El config.prompt se sustituye por el
+      //    preset.prompt.
+      // 2. Sumar el feature descriptor para que el frasco real se preserve.
+      const manualScene = findScenePreset(job.sceneOverride);
+      if (manualScene) {
+        config.prompt = manualScene.prompt;
+        config.label = manualScene.label;
+      }
       const featureSuffix = features
         ? `. The product in the photo is: ${staticProductDescriptor(features)}. Compose the scene around this exact bottle — preserve its shape, color, label and material.`
         : "";
@@ -1257,6 +1279,45 @@ export default function StaticProductPipelinePage() {
                             <option key={k} value={k}>{v}</option>
                           ))}
                         </select>
+                      </div>
+
+                      {/* Selector de escena manual — pedido directo:
+                          "tipo una mesa elegante o una persona con la colonia
+                          en la mano". 14 escenarios curados profesionalmente,
+                          agrupados por categoría. Si no eligen, sale el default
+                          por brand+tipo. */}
+                      <div>
+                        <label className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                          🎨 Escena del fondo
+                          <span className="text-muted normal-case font-normal">— elige o deja en automático</span>
+                        </label>
+                        <select
+                          value={job.sceneOverride ?? "auto"}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateJob(job.id, { sceneOverride: v === "auto" ? null : v });
+                          }}
+                          disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
+                          className="w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-white disabled:opacity-50"
+                        >
+                          <option value="auto">🤖 Automático (decide la IA por marca+tipo)</option>
+                          {(["lujo", "natural", "lifestyle", "romantico", "editorial", "studio"] as SceneCategory[]).map((cat) => {
+                            const presets = getScenePresetsForType(job.productType).filter((p) => p.category === cat);
+                            if (presets.length === 0) return null;
+                            return (
+                              <optgroup key={cat} label={SCENE_CATEGORY_LABELS[cat]}>
+                                {presets.map((p) => (
+                                  <option key={p.id} value={p.id}>{p.icon} {p.label}</option>
+                                ))}
+                              </optgroup>
+                            );
+                          })}
+                        </select>
+                        {job.sceneOverride && (
+                          <p className="mt-1 text-[10px] text-muted leading-tight">
+                            {findScenePreset(job.sceneOverride)?.description}
+                          </p>
+                        )}
                       </div>
 
                       {/* Per-photo features detected by Vision — shows that the
