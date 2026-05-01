@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import Link from "next/link";
 import {
   Undo2,
   Redo2,
@@ -9,10 +10,12 @@ import {
   Maximize,
   Download,
   DollarSign,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal, ModalFooter } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { AudioButton } from "@/components/ui/AudioButton";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -158,6 +161,24 @@ export function Toolbar({
   return (
     <>
       <div className="flex h-12 items-center gap-1 border-b border-surface-lighter bg-surface px-3">
+        {/* Home breadcrumb — coherente con dashboard y pipelines */}
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-muted hover:text-[var(--accent)] hover:bg-surface-light transition-default shrink-0"
+          title="Volver al inicio"
+        >
+          <Home className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">Inicio</span>
+        </Link>
+        <span className="hidden md:inline text-[var(--border-default)] mx-0.5">/</span>
+        <span className="hidden md:inline text-xs font-semibold text-heading mr-1">Editor</span>
+        {/* Audio explicando qué es esta página */}
+        <div className="hidden md:block">
+          <AudioButton
+            size="sm"
+            text="Editor manual. Tienes todas las herramientas individuales para retoques. Selecciona un módulo del lado izquierdo para empezar."
+          />
+        </div>
         {/* Mobile module selector — only visible on small screens */}
         <div className="flex md:hidden flex-1 min-w-0 mr-1">
           <select
