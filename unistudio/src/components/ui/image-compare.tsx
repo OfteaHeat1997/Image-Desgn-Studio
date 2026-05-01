@@ -46,7 +46,11 @@ export function ImageCompare({
   const bothResolved =
     (loaded.before || errored.before) && (loaded.after || errored.after);
 
-  // Reset all transient state when sources change
+  // Reset all transient state when sources change. setState dentro de useEffect
+  // es intencional acá: cuando las imágenes cambian, queremos resetear todo el
+  // state transitorio sincrónicamente. No genera cascading renders porque las
+  // deps son estables (URLs externas).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setLoaded({ before: false, after: false });
     setErrored({ before: false, after: false });
@@ -54,6 +58,7 @@ export function ImageCompare({
     setHasInteracted(false);
     setAspectRatio(null);
   }, [beforeSrc, afterSrc, position]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Measure the largest aspect ratio from both images so both fit in the same box
   const handleAfterLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {

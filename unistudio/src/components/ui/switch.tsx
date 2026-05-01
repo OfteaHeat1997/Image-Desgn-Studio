@@ -38,7 +38,10 @@ export function Switch({
   className,
   id,
 }: SwitchProps) {
-  const switchId = id ?? React.useId();
+  // useId siempre se llama (no condicional). El fallback con `??` ocurre
+  // después, no afecta el orden de hooks.
+  const generatedId = React.useId();
+  const switchId = id ?? generatedId;
 
   const switchElement = (
     <RadixSwitch.Root

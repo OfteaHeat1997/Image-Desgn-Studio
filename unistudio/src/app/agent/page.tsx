@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -279,10 +280,10 @@ function AgentRouterContent() {
   return (
     <div className="min-h-screen bg-black text-white">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/8 bg-black/40 px-6 py-3 backdrop-blur">
-        <a href="/" className="flex items-center gap-2 text-sm font-medium text-gray-400 transition-colors hover:text-white">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-gray-400 transition-colors hover:text-white">
           <ArrowLeft className="h-4 w-4" />
           Inicio
-        </a>
+        </Link>
         <span className="text-gray-700">/</span>
         <div className="flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-violet-400" />
