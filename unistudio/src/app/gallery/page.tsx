@@ -15,7 +15,10 @@ import {
   ChevronRight,
   ImageOff,
   Pencil,
+  Archive,
 } from "lucide-react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
@@ -24,6 +27,7 @@ import { ImageCompare } from "@/components/ui/image-compare";
 import { cn } from "@/lib/utils/cn";
 import { useGalleryStore, type GalleryImage } from "@/stores/gallery-store";
 import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 /* ------------------------------------------------------------------ */
 /*  Filter constants                                                    */
@@ -155,6 +159,50 @@ export default function GalleryPage() {
     }
   }, [filteredImages, selectedIds, downloadImage]);
 
+  /**
+   * Descarga TODAS las seleccionadas como un solo ZIP. Crítico para batches
+   * grandes (la usuaria reportó 200+ imágenes acumuladas en testing). El
+   * download uno-por-uno con delay rompe en navegadores que limitan multi-
+   * download. ZIP soluciona eso y queda más ordenado.
+   */
+  const downloadSelectedAsZip = useCallback(async () => {
+    const selected = filteredImages.filter((img) => selectedIds.has(img.id));
+    if (selected.length === 0) return;
+    toast.info(`Empaquetando ${selected.length} imágenes en ZIP…`);
+    const zip = new JSZip();
+    let added = 0;
+    for (const img of selected) {
+      try {
+        const url = img.resultUrl;
+        if (!url) continue;
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const ext = blob.type.includes("video") ? "mp4"
+          : blob.type.includes("png") ? "png"
+          : blob.type.includes("webp") ? "webp"
+          : "jpg";
+        const safeName = (img.project ?? img.filename ?? "image")
+          .replace(/[^a-z0-9-]/gi, "_")
+          .toLowerCase()
+          .slice(0, 40);
+        const ts = new Date(img.date).toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        zip.file(`${safeName}_${ts}_${img.id.slice(0, 6)}.${ext}`, blob);
+        added++;
+      } catch (err) {
+        console.warn("[gallery] zip skip image:", err);
+      }
+    }
+    if (added === 0) {
+      toast.error("No se pudo descargar ninguna imagen.");
+      return;
+    }
+    const content = await zip.generateAsync({ type: "blob" });
+    const fileName = `unistudio-galeria-${new Date().toISOString().slice(0, 10)}-${added}imgs.zip`;
+    saveAs(content, fileName);
+    toast.success(`ZIP listo: ${added} imágenes (${(content.size / 1024 / 1024).toFixed(1)} MB)`);
+  }, [filteredImages, selectedIds]);
+
   /* ---- Delete ---- */
 
   const deleteSelected = useCallback(() => {
@@ -189,15 +237,25 @@ export default function GalleryPage() {
         </div>
 
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="default">{selectedIds.size} seleccionados</Badge>
             <Button
               variant="outline"
               size="sm"
               leftIcon={<Download className="h-3.5 w-3.5" />}
               onClick={downloadSelected}
+              title="Descargar una por una (lento si son muchas)"
             >
-              Descargar
+              Descargar individual
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Archive className="h-3.5 w-3.5" />}
+              onClick={downloadSelectedAsZip}
+              title="Empaquetar todas en un solo ZIP — recomendado para 10+ fotos"
+            >
+              Descargar ZIP ({selectedIds.size})
             </Button>
             <Button
               variant="ghost"

@@ -55,6 +55,21 @@ export interface StaticProductFeatures {
   proporcion: 'mas-alto-que-ancho' | 'mas-ancho-que-alto' | 'cuadrado' | 'rectangular-vertical' | 'rectangular-horizontal' | null;
   /** Acabado de la superficie del envase */
   acabado: 'brillante' | 'mate' | 'satinado' | 'frosted' | 'iridiscente' | null;
+  // Detalles ULTRA-específicos del vidrio/material para que la IA preserve
+  // textura. La usuaria pidió "botella vidrio cómo se ve, textura, color,
+  // cantidad, todo más detalle mejor".
+  /** Textura específica del envase: "lisa", "facetada", "grabada", "esmerilada", "ondulada" */
+  textura: string | null;
+  /** Nivel de transparencia del envase 0-100 si aplica (100=cristal puro) */
+  transparencia_pct: number | null;
+  /** Cantidad de líquido visible: "lleno", "tres-cuartos", "medio", "un-cuarto", "vacio" */
+  cantidad_liquido: 'lleno' | 'tres-cuartos' | 'medio' | 'un-cuarto' | 'casi-vacio' | 'vacio' | null;
+  /** Brillo/reflejos visibles en el envase: "muchos reflejos", "reflejo lateral", "sin reflejo" */
+  reflejos: string | null;
+  /** Tipografía visible en la etiqueta: "serif blanca", "sans-serif negra", "manuscrita dorada" */
+  tipografia_etiqueta: string | null;
+  /** Ornamentación o decoración visible: "líneas doradas", "filo plateado", "circonias", "grabado de logo" */
+  ornamentacion: string[];
 }
 
 export interface JewelryFeatures {
@@ -98,26 +113,32 @@ Responde SOLO con JSON válido:
   "hasModel": boolean (¿hay una persona/modelo en la foto?)
 }`,
 
-  'static-product': `Analiza esta foto de producto cosmético/perfume/crema/maquillaje. CRITICAL: extrae detalles ESPECÍFICOS de ESTA foto exacta, lee TODO el texto visible literalmente. La usuaria pide que el resultado se base 100% en su foto — NO inventes nada, solo reporta lo que VES.
+  'static-product': `Analiza esta foto de producto cosmético/perfume/crema/maquillaje. CRITICAL: extrae detalles ULTRA-ESPECÍFICOS de ESTA foto exacta, lee TODO el texto visible literalmente, observa textura del vidrio, cantidad de líquido, reflejos. La usuaria pide que el resultado se base 100% en su foto — NO inventes nada, solo reporta lo que VES.
 
 Responde SOLO con JSON válido (sin markdown, sin comentarios):
 {
   "tipo_envase": "frasco" | "spray" | "tubo" | "caja" | "pote" | "other",
   "forma": "cuadrado" | "cilindrico" | "piramidal" | "redondo" | "rectangular" | "irregular",
-  "proporcion": "mas-alto-que-ancho" | "mas-ancho-que-alto" | "cuadrado" | "rectangular-vertical" | "rectangular-horizontal" | null (cómo es la silueta del frasco),
+  "proporcion": "mas-alto-que-ancho" | "mas-ancho-que-alto" | "cuadrado" | "rectangular-vertical" | "rectangular-horizontal" | null (silueta del frasco),
   "material_aparente": "vidrio-transparente" | "vidrio-opaco" | "plastico" | "metal" | "carton" | "mixto",
-  "acabado": "brillante" | "mate" | "satinado" | "frosted" | "iridiscente" | null (cómo refleja la luz la superficie),
-  "color_liquido": string | null (ej "amarillo dorado", "rosado claro", "azul translúcido" — si el envase es opaco, null),
-  "color_envase": string (color exterior del envase, ej "transparente con tinte amarillo"),
-  "color_hex": string (hex del color dominante visible),
+  "acabado": "brillante" | "mate" | "satinado" | "frosted" | "iridiscente" | null (superficie),
+  "textura": string | null (ej "lisa", "facetada con prisma interior", "grabada con líneas verticales", "esmerilada", "ondulada", "con relieve del logo"),
+  "transparencia_pct": number | null (0-100, qué tan transparente es el envase. 100 = cristal puro, 50 = ligeramente translúcido, 0 = opaco),
+  "color_liquido": string | null (ej "amarillo dorado", "rosado claro", "azul translúcido", null si opaco),
+  "cantidad_liquido": "lleno" | "tres-cuartos" | "medio" | "un-cuarto" | "casi-vacio" | "vacio" | null,
+  "color_envase": string (color exterior, ej "transparente con tinte amarillo"),
+  "color_hex": string (hex del color dominante visible, ej "#E8B860"),
+  "reflejos": string | null (ej "reflejos dorados en lateral derecho", "reflejo blanco en parte superior", "sin reflejos visibles"),
   "tapa": "redonda" | "cuadrada" | "spray" | "rosca" | "pump" | "sin-tapa" | null,
-  "color_tapa": string | null (color EXACTO de la tapa: "negro mate", "dorado brillante", "plateado", "rojo cereza", "transparente". CRÍTICO — la usuaria reportó que la IA inventaba tapas rojas cuando eran negras),
+  "color_tapa": string | null (color EXACTO: "negro mate", "dorado brillante", "plateado", "rojo cereza". CRÍTICO — usuaria reportó tapas rojas cuando eran negras),
   "etiqueta_visible": boolean,
-  "texto_etiqueta": string | null (TEXTO LITERAL completo legible en la etiqueta principal, todo lo que veas — ej "VANILLA FOR MEN", "43°N PARALEL PARFUM", "L'OREAL HYDRA RENEWAL"),
-  "nombre_producto": string | null (el NOMBRE de la sub-línea/producto como aparece, ej "VANILLA", "ADRENALINE", "43°N"),
-  "marca_legible": string | null (marca como aparece, ej "ésika", "Yanbal", "L'Bel", "Cyzone", "Avon"),
+  "texto_etiqueta": string | null (TEXTO LITERAL completo legible en la etiqueta principal — ej "VANILLA FOR MEN", "43°N PARALEL PARFUM"),
+  "tipografia_etiqueta": string | null (ej "serif blanca", "sans-serif negra grande", "manuscrita dorada en cursiva"),
+  "nombre_producto": string | null (NOMBRE de la sub-línea, ej "VANILLA", "ADRENALINE", "43°N"),
+  "marca_legible": string | null (marca como aparece — ej "ésika", "Yanbal", "L'Bel", "Cyzone", "Avon", "Salome"),
   "posicion_logo": "frontal" | "lateral" | "trasera" | "tapa" | null,
-  "detalles_visibles": [string] (lista de TODOS los detalles distintivos que veas: "tapa cuadrada negra", "fuente serif blanca", "líquido amarillo dorado", "vidrio cuadrado con facetas internas", "etiqueta debajo del centro", "texto en bajo relieve", etc — sé MUY específico)
+  "ornamentacion": [string] (decoraciones específicas visibles, ej ["filo dorado en cuello", "circonias en lateral", "grabado del logo en bajo relieve"]),
+  "detalles_visibles": [string] (TODOS los detalles distintivos: "tapa cuadrada negra", "fuente serif blanca", "líquido amarillo dorado", "vidrio cuadrado con facetas internas", "etiqueta debajo del centro", "texto en bajo relieve" — al menos 5-8 items, sé MUY específico)
 }`,
 
   jewelry: `Analiza esta foto de joyería. Extrae features ESPECÍFICOS de ESTA foto, no genéricos.
@@ -310,16 +331,23 @@ export function lingerieDescriptor(f: LingerieFeatures): string {
 
 export function staticProductDescriptor(f: StaticProductFeatures): string {
   const parts: string[] = [];
-  // Forma + proporción (lo más importante visualmente)
+  // Forma + proporción
   parts.push(`${f.tipo_envase} ${f.forma}`);
   if (f.proporcion) parts.push(f.proporcion.replace(/-/g, ' '));
-  // Material + acabado
+  // Material + textura + acabado
   parts.push(`de ${f.material_aparente}`);
+  if (f.textura) parts.push(`textura ${f.textura}`);
   if (f.acabado) parts.push(`acabado ${f.acabado}`);
-  // Líquido si transparente
-  if (f.color_liquido) parts.push(`con líquido color ${f.color_liquido}`);
+  if (typeof f.transparencia_pct === 'number') {
+    parts.push(`${f.transparencia_pct}% transparencia`);
+  }
+  // Líquido + cantidad
+  if (f.color_liquido) {
+    const cantidad = f.cantidad_liquido ? `${f.cantidad_liquido} ` : '';
+    parts.push(`${cantidad}con líquido color ${f.color_liquido}`);
+  }
   if (f.color_envase) parts.push(`envase color ${f.color_envase}`);
-  // Tapa con color exacto (CRÍTICO — usuaria reportó tapa negra → roja)
+  // Tapa con color exacto (CRÍTICO)
   if (f.tapa && f.color_tapa) {
     parts.push(`tapa ${f.tapa} color ${f.color_tapa}`);
   } else if (f.tapa) {
@@ -327,15 +355,24 @@ export function staticProductDescriptor(f: StaticProductFeatures): string {
   } else if (f.color_tapa) {
     parts.push(`tapa color ${f.color_tapa}`);
   }
-  // Texto literal de la etiqueta — anchora a Schnell para que NO invente otra
-  if (f.texto_etiqueta) parts.push(`con etiqueta que dice literalmente "${f.texto_etiqueta}"`);
+  // Reflejos
+  if (f.reflejos) parts.push(f.reflejos);
+  // Etiqueta literal
+  if (f.texto_etiqueta) {
+    const tipo = f.tipografia_etiqueta ? ` en ${f.tipografia_etiqueta}` : '';
+    parts.push(`con etiqueta que dice literalmente "${f.texto_etiqueta}"${tipo}`);
+  }
   if (f.nombre_producto && f.nombre_producto !== f.texto_etiqueta) {
     parts.push(`producto "${f.nombre_producto}"`);
   }
   if (f.marca_legible) parts.push(`marca "${f.marca_legible}"`);
-  // Top 5 detalles más específicos (antes era 3)
+  // Ornamentación
+  if (f.ornamentacion && f.ornamentacion.length) {
+    parts.push(`ornamentación: ${f.ornamentacion.slice(0, 3).join(', ')}`);
+  }
+  // Top 6 detalles más específicos
   if (f.detalles_visibles.length) {
-    parts.push(`detalles distintivos: ${f.detalles_visibles.slice(0, 5).join(', ')}`);
+    parts.push(`detalles distintivos: ${f.detalles_visibles.slice(0, 6).join(', ')}`);
   }
   return parts.join(', ');
 }
