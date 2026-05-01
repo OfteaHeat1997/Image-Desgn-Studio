@@ -1,3 +1,5 @@
+"use client";
+
 import { COPY } from "@/lib/design/copy";
 import { AudioButton } from "@/components/ui/AudioButton";
 
