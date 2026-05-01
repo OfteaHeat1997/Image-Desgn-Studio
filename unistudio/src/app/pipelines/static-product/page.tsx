@@ -37,6 +37,7 @@ import {
   staticProductDescriptor,
   type StaticProductFeatures,
 } from "@/lib/processing/product-features";
+import { AudioButton } from "@/components/ui/AudioButton";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -907,6 +908,12 @@ export default function StaticProductPipelinePage() {
           <p className="mt-1 text-sm text-body leading-relaxed">
             Sube tus perfumes y la IA genera los 3 outputs que necesitas: fondo blanco para Amazon, fondo de catálogo estilo Sephora, y formato vertical 9:16 para Reels y Stories — todos cohesivos entre sí.
           </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text="Fotos profesionales para tu catálogo. Sube tus perfumes y la inteligencia artificial genera los tres outputs que necesitas: fondo blanco para Amazon, fondo de catálogo estilo Sephora, y formato vertical 9 a 16 para Reels y Stories. Todos cohesivos entre sí."
+            />
+          </div>
         </div>
 
         {/* Gap 1 — Batch desde inventario local */}
@@ -1306,12 +1313,12 @@ export default function StaticProductPipelinePage() {
                                           <p className="mb-1 text-[10px] leading-tight text-gray-200">{meta.what}</p>
                                           {meta.provider && (
                                             <p className="mt-1.5 text-[9px] text-gray-400">
-                                              <span className="font-semibold text-violet-300">Proveedor:</span> {meta.provider}
+                                              <span className="font-semibold text-[var(--accent)]">Proveedor:</span> {meta.provider}
                                             </p>
                                           )}
                                           {meta.duration && (
                                             <p className="text-[9px] text-gray-400">
-                                              <span className="font-semibold text-violet-300">Tiempo:</span> {meta.duration}
+                                              <span className="font-semibold text-[var(--accent)]">Tiempo:</span> {meta.duration}
                                             </p>
                                           )}
                                           {meta.tips && meta.tips.length > 0 && (
