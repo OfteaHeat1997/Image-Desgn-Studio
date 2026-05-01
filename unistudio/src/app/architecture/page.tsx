@@ -406,29 +406,30 @@ const NAV_ITEMS = [
 
 export default function ArchitecturePage() {
   return (
-    <div className="min-h-screen bg-bg-primary text-gray-200">
-      {/* Header */}
-      <div className="sticky top-0 z-50 border-b border-surface-lighter bg-surface/95 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href="/" className="text-gray-400 hover:text-white transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <h1 className="text-sm font-bold text-gradient">UniStudio</h1>
-          <span className="text-[10px] text-gray-600 uppercase tracking-wider">Arquitectura</span>
-          <div className="flex-1" />
-          <nav className="hidden md:flex gap-1">
-            {NAV_ITEMS.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="text-[10px] px-2 py-1 rounded-md text-gray-400 hover:text-white hover:bg-surface-light transition-colors"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+    <div className="min-h-screen bg-surface text-heading">
+      {/* Header coherente con dashboard + pipelines */}
+      <header className="sticky top-0 z-50 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Inicio</span>
+        </Link>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-heading truncate">Arquitectura</span>
         </div>
-      </div>
+        <div className="flex-1" />
+        <nav className="hidden md:flex gap-1">
+          {NAV_ITEMS.map((item) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              className="text-[10px] px-2 py-1 rounded-md text-muted hover:text-[var(--accent)] hover:bg-surface-light transition-default"
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      </header>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Hero */}
