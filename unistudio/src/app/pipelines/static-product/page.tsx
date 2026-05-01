@@ -61,7 +61,7 @@ type JobStatus = "idle" | "uploading" | "isolating" | "normalizing" | "generatin
  *    different background — guaranteeing the bottle/jar shape is identical
  *    across all 3 outputs.
  */
-type StepKey = "isolate" | "normalize" | "white" | "adaptive" | "vertical";
+type StepKey = "isolate" | "normalize" | "white" | "adaptive" | "vertical" | "lifestyleVideo";
 
 interface StepSnapshot {
   /** URL después de completar este paso */
@@ -104,6 +104,10 @@ interface Job {
    * por brand+tipo (matriz de getAdaptiveBgConfig).
    */
   sceneOverride?: string | null;
+  /** Acción del video lifestyle (spray, mist, rotación, luz, dolly-in). */
+  videoAction?: LifestyleVideoAction;
+  /** Toggle: ¿generar el video lifestyle? Opt-in porque cuesta $0.05 + 60-120s. */
+  generateVideo?: boolean;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -112,7 +116,26 @@ const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
   white: { cost: 0, status: "idle" },
   adaptive: { cost: 0, status: "idle" },
   vertical: { cost: 0, status: "idle" },
+  // Video lifestyle 5s 9:16 — opt-in. Se genera DESPUÉS del adaptive, usando
+  // ese frame como starting image. wan-2.2-fast anima sobre ese frame con un
+  // prompt según la acción elegida (spray, mist, rotación, luz cinemática).
+  lifestyleVideo: { cost: 0, status: "idle" },
 };
+
+/**
+ * Acciones que la usuaria puede elegir para el video lifestyle. Cada una mapea
+ * a un prompt específico que wan-2.2-fast usa para animar el frame estático.
+ */
+type LifestyleVideoAction = "auto" | "spray" | "mist" | "rotacion" | "luz" | "dolly-in";
+
+const LIFESTYLE_VIDEO_ACTIONS: { value: LifestyleVideoAction; label: string; icon: string; promptHint: string }[] = [
+  { value: "auto",      label: "Automático (cinemático suave)", icon: "🎬", promptHint: "subtle camera dolly-in toward the fragrance bottle, soft golden hour light, premium fragrance commercial film, slow elegant motion" },
+  { value: "spray",     label: "Spray de perfume",              icon: "💨", promptHint: "elegant feminine hand entering frame from the right, gracefully spraying the fragrance bottle in slow motion, soft mist particles dispersing in the air, golden hour backlight catching the mist, premium fragrance commercial cinematic" },
+  { value: "mist",      label: "Aroma flotando",                icon: "✨", promptHint: "soft golden mist particles slowly floating around the fragrance bottle, ethereal aromatic clouds rising upward, dreamy slow motion, magical fragrance ad aesthetic" },
+  { value: "rotacion",  label: "Rotación 360° suave",            icon: "🔄", promptHint: "fragrance bottle slowly rotating 360 degrees on its base, smooth continuous motion, professional product showcase video, light catches different facets" },
+  { value: "luz",       label: "Luz cinemática pulsante",        icon: "🌟", promptHint: "cinematic light beams sweeping across the fragrance bottle, dramatic chiaroscuro lighting changes, slow camera push-in, premium luxury fragrance trailer aesthetic" },
+  { value: "dolly-in",  label: "Acercamiento dolly-in",          icon: "📹", promptHint: "smooth cinematic dolly-in camera movement approaching the fragrance bottle, subtle depth of field shift, editorial fragrance film, magazine commercial" },
+];
 
 interface StepMeta {
   label: string;
@@ -189,6 +212,20 @@ const STEP_META: Record<StepKey, StepMeta> = {
     duration: "8–15 s",
     canFail: ["Mismo riesgo que adaptive (filtro NSFW)."],
     tips: ["Usá este output para Reels y Stories."],
+  },
+  lifestyleVideo: {
+    label: "Video Reels lifestyle",
+    icon: "🎬",
+    costHint: "$0.05",
+    description: "Video 5s 9:16 con animación cinemática (spray, mist, rotación). Listo para Reels/Stories/TikTok.",
+    what: "Genera un video corto de 5 segundos en formato vertical 9:16 con animación elegante de tu producto. Elige la acción: spray de perfume con manos, aroma flotando, rotación, luz pulsante. Ideal para redes sociales.",
+    provider: "wan-2.2-fast (Replicate). Anima el frame del adaptive con prompt según acción.",
+    duration: "60–120 s para generar",
+    tips: [
+      "Necesitás haber generado el adaptive primero — el video usa esa imagen como punto de partida.",
+      "Acción 'Spray' agrega manos virtuales aplicando el perfume — más cinemático.",
+      "Si no eliges acción, queda en 'Automático' (dolly-in suave).",
+    ],
   },
 };
 
@@ -361,7 +398,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
       className={cn(
         "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-all cursor-pointer",
         dragOver
-          ? "border-violet-400/60 bg-violet-500/5"
+          ? "border-[var(--accent)]/60 bg-[var(--accent-dim)]"
           : "border-white/10 bg-white/[0.02] hover:border-white/20",
       )}
     >
@@ -830,6 +867,52 @@ export default function StaticProductPipelinePage() {
         runOutputStep(job.id, "vertical", sharedInput, enrichedConfig),
       ]);
       totalCost += whiteRes.cost + adaptiveRes.cost + verticalRes.cost;
+
+      // Optional: video lifestyle 5s 9:16 (opt-in, costs $0.05). Solo se
+      // ejecuta si la usuaria activó el toggle generateVideo en el job.
+      // Toma el frame del adaptive como starting image y lo anima con
+      // wan-2.2-fast según la acción elegida (spray, mist, rotación...).
+      if (job.generateVideo && adaptiveRes.url) {
+        updateStep(job.id, "lifestyleVideo", { status: "running" });
+        try {
+          const action = LIFESTYLE_VIDEO_ACTIONS.find((a) => a.value === (job.videoAction ?? "auto")) ?? LIFESTYLE_VIDEO_ACTIONS[0];
+          const productDesc = job.productFeatures
+            ? staticProductDescriptor(job.productFeatures)
+            : "elegant fragrance bottle";
+          const videoPrompt = `${action.promptHint}. Featured product: ${productDesc}. Premium fragrance commercial video aesthetic, vertical 9:16 format, professional lighting`;
+          const vRes = await fetch("/api/video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: adaptiveRes.url,
+              provider: "wan-2.2-fast",
+              duration: 5,
+              aspectRatio: "9:16",
+              prompt: videoPrompt,
+            }),
+          });
+          const vData = await safeJson(vRes);
+          if (vData.success && vData.data?.url) {
+            const videoCost = vData.cost ?? 0.05;
+            totalCost += videoCost;
+            updateStep(job.id, "lifestyleVideo", {
+              status: "done",
+              resultUrl: vData.data.url,
+              cost: videoCost,
+            });
+          } else {
+            updateStep(job.id, "lifestyleVideo", {
+              status: "error",
+              error: vData.error || "Falló video lifestyle",
+            });
+          }
+        } catch (vErr) {
+          updateStep(job.id, "lifestyleVideo", {
+            status: "error",
+            error: vErr instanceof Error ? vErr.message : String(vErr),
+          });
+        }
+      }
 
       // Optional Gap-6 validator on the adaptive output only (the most likely to
       // surface a "missing product" or "duplicate" issue from Flux).
@@ -1320,6 +1403,50 @@ export default function StaticProductPipelinePage() {
                         )}
                       </div>
 
+                      {/* Toggle "🎬 Generar video Reels" + acción.
+                          Pedido directo: "falta para las redes sociales,
+                          modelo poniéndosela, haciendo spray a la colonia,
+                          un fondo interesante". 5s 9:16 wan-2.2-fast,
+                          opt-in porque suma $0.05 + 60-120s. */}
+                      <div className="rounded border border-[var(--accent)]/20 bg-[var(--accent-dim)] px-2 py-2">
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={job.generateVideo ?? false}
+                            onChange={(e) => updateJob(job.id, { generateVideo: e.target.checked })}
+                            disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
+                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-semibold text-[var(--accent)]">
+                                🎬 Video lifestyle Reels (+$0.05)
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted leading-tight mt-0.5">
+                              5 segundos vertical 9:16 con animación cinemática. Listo para Reels, Stories, TikTok.
+                            </p>
+                          </div>
+                        </label>
+                        {job.generateVideo && (
+                          <div className="mt-2 pl-5">
+                            <label className="text-[10px] uppercase tracking-wider text-muted block mb-1">
+                              Acción del video
+                            </label>
+                            <select
+                              value={job.videoAction ?? "auto"}
+                              onChange={(e) => updateJob(job.id, { videoAction: e.target.value as LifestyleVideoAction })}
+                              disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
+                              className="w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white disabled:opacity-50"
+                            >
+                              {LIFESTYLE_VIDEO_ACTIONS.map((a) => (
+                                <option key={a.value} value={a.value}>{a.icon} {a.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Per-photo features detected by Vision — shows that the
                            pipeline is using THIS bottle, not a generic template */}
                       {job.productFeatures && (
@@ -1345,7 +1472,7 @@ export default function StaticProductPipelinePage() {
                               </span>
                             )}
                             {job.productFeatures.marca_legible && (
-                              <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">
+                              <span className="rounded bg-[var(--accent-dim)] px-1.5 py-0.5 text-[10px] text-[var(--accent)]">
                                 {job.productFeatures.marca_legible}
                               </span>
                             )}
@@ -1355,7 +1482,7 @@ export default function StaticProductPipelinePage() {
 
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="flex items-center gap-1 truncate text-[11px] text-violet-300"
+                          className="flex items-center gap-1 truncate text-[11px] text-[var(--accent)]"
                           title={cfg.prompt}
                         >
                           <Wand2 className="h-3 w-3" />
@@ -1411,7 +1538,7 @@ export default function StaticProductPipelinePage() {
                                 <div className="flex flex-1 flex-col text-[10px]">
                                   <span className="truncate font-medium text-gray-200">{meta.label}</span>
                                   <span className="text-gray-400">
-                                    {step.status === "done" && <><CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" /> {step.cost > 0 && <span className="font-mono text-violet-300">${step.cost.toFixed(3)}</span>}</>}
+                                    {step.status === "done" && <><CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" /> {step.cost > 0 && <span className="font-mono text-[var(--accent)]">${step.cost.toFixed(3)}</span>}</>}
                                     {step.status === "error" && <span className="text-red-400"><AlertCircle className="inline h-2.5 w-2.5" /> falló</span>}
                                     {step.status === "skipped" && "saltado"}
                                     {step.status === "running" && "procesando…"}
@@ -1486,7 +1613,7 @@ export default function StaticProductPipelinePage() {
                                   <span
                                     className={cn(
                                       "font-mono text-[10px]",
-                                      step.status === "error" ? "text-red-400" : "text-violet-300",
+                                      step.status === "error" ? "text-red-400" : "text-[var(--accent)]",
                                     )}
                                   >
                                     {step.status === "error"
@@ -1566,7 +1693,7 @@ export default function StaticProductPipelinePage() {
                                           customPrompt: getAdaptiveBgConfig(job.productType, job.brand).prompt,
                                         })
                                       }
-                                      className="inline-flex items-center gap-1 rounded bg-violet-500/15 px-2 py-1 text-[10px] font-medium text-violet-300 transition hover:bg-violet-500/25"
+                                      className="inline-flex items-center gap-1 rounded bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-medium text-[var(--accent)] transition hover:bg-violet-500/25"
                                       title="Cambiar prompt y re-generar adaptativo + vertical"
                                     >
                                       <Palette className="h-2.5 w-2.5" />
