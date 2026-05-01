@@ -508,6 +508,49 @@ export default function StaticProductPipelinePage() {
           `${ambiguousCount} foto${ambiguousCount !== 1 ? "s" : ""} con nombre compartido entre perfumes y desodorantes — confirma el tipo antes de procesar.`,
         );
       }
+
+      // Auto-detect brand + features INMEDIATAMENTE al subir (no esperar a
+      // que la usuaria pulse "Procesar"). La usuaria reportó: "auto detect
+      // no funciona yo lo puse, debería auto detectar cuando hago upload".
+      // Por job: subimos a /api/upload (HTTP url) → analizamos con Vision →
+      // si detectamos brand del logo, cambiamos el dropdown automáticamente.
+      // Hacemos esto en background para no bloquear el UI; los chips ✨
+      // aparecen cuando termina (~3-5s por foto).
+      newJobs.forEach((job) => {
+        (async () => {
+          try {
+            const form = new FormData();
+            form.append("file", job.file);
+            const upRes = await fetch("/api/upload", { method: "POST", body: form });
+            const upData = await upRes.json();
+            if (!upData?.success) return;
+            const httpUrl: string = upData.data.url;
+            const featRes = await fetch("/api/product-features", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageUrl: httpUrl, category: "static-product" }),
+            });
+            const featData = await featRes.json();
+            if (!featData?.success || !featData.data) return;
+            const features = featData.data as StaticProductFeatures;
+            const detectedBrand = matchBrandFromText(features.marca_legible);
+            setJobs((prev) =>
+              prev.map((j) => {
+                if (j.id !== job.id) return j;
+                const patch: Partial<Job> = { productFeatures: features };
+                // Solo overrideamos brand si la usuaria todavía tiene el
+                // default. Si ya cambió manualmente, respetamos su elección.
+                if (detectedBrand && j.brand === defaultBrand) {
+                  patch.brand = detectedBrand;
+                }
+                return { ...j, ...patch };
+              }),
+            );
+          } catch (err) {
+            console.warn("[static-product] eager features failed:", err);
+          }
+        })();
+      });
     },
     [defaultType, defaultBrand],
   );
