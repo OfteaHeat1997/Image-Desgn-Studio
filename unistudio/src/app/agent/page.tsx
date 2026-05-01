@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { AudioButton } from "@/components/ui/AudioButton";
 import {
   ArrowLeft,
   Upload,
@@ -278,25 +279,31 @@ function AgentRouterContent() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/8 bg-black/40 px-6 py-3 backdrop-blur">
-        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-gray-400 transition-colors hover:text-white">
+    <div className="min-h-screen bg-surface text-heading">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
           <ArrowLeft className="h-4 w-4" />
-          Inicio
+          <span className="hidden sm:inline">Inicio</span>
         </Link>
-        <span className="text-gray-700">/</span>
-        <div className="flex items-center gap-2">
-          <Wand2 className="h-4 w-4 text-violet-400" />
-          <span className="text-sm font-semibold text-white">Agente IA · Router de pipelines</span>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Wand2 className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">Agente IA</span>
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">¿Qué querés procesar?</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Subí una foto (opcional, auto-detecto lencería) o elegí la categoría abajo. Te mando al pipeline correcto con la configuración apropiada para ese tipo de producto.
+      <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">¿Qué querés procesar?</h1>
+          <p className="mt-1 text-sm text-body">
+            Subí una foto (auto-detecto la categoría) o elegí abajo. Te mando al pipeline correcto con la configuración para ese tipo de producto.
           </p>
+          <div className="mt-3">
+            <AudioButton
+              variant="inline"
+              text="Agente IA. Sube una foto y la inteligencia artificial detecta automáticamente si es lencería, perfume o joyería, y te lleva al pipeline correcto."
+            />
+          </div>
         </div>
 
         {/* Optional upload — auto-detects lingerie garments */}

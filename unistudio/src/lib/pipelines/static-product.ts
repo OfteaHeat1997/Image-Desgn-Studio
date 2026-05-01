@@ -90,10 +90,13 @@ export function getAdaptiveBgConfig(
   // Suffijo de calidad agregado a TODOS los prompts — fuerza Flux Pro a producir
   // imágenes nítidas sin artefactos, ampliación-ready para catálogo e-commerce.
   const HD = ', ultra high resolution, 8K, sharp focus, crystal clear details, professional commercial product photography, studio quality lighting, no blur, no artifacts, photo-realistic, magazine quality';
-  // Gap 6 — preemptive anti-duplication. Flux + Kontext Pro a veces generan un
-  // reflejo o segunda copia del producto en el fondo cuando el prompt menciona
-  // "reflejo" o "bokeh" cerca del producto. Este suffijo lo previene.
-  const NO_DUP = ', only ONE product visible in frame, no duplicate bottles or tubes or jars, no ghost copies, single product subject, no multiple instances of the product, background has no product in it';
+  // ANTI-DUP REFORZADO. Antes el suffix decía "no duplicate bottles" pero los
+  // prompts decían "luxury perfume bottle on marble" lo que pedía a Schnell
+  // generar un frasco. Ahora todos los prompts dicen "EMPTY surface" y el
+  // suffix es más agresivo. Bug reportado por usuaria: ve un frasco blurry
+  // detrás del frasco compositeado real.
+  const NO_DUP =
+    ', completely EMPTY scene with NO PRODUCTS visible, no perfume bottles in background, no extra bottles, no shelves with products, no shopping displays, no perfume samples in scene, just the empty surface ready for product placement, NO PRODUCT decoration in background, plain empty area';
   const seed = brandSeed(productType, brand);
 
   // --- Perfumes ---
@@ -101,7 +104,7 @@ export function getAdaptiveBgConfig(
     if (PREMIUM_BRANDS.includes(brand)) {
       return {
         prompt:
-          'luxury perfume bottle on polished cream marble surface with subtle veining, soft warm golden gradient lighting from side, visible glass refraction and crystal-clear reflections on the marble, shallow depth of field with bokeh, Sephora flagship store aesthetic, editorial catalog photography' + HD + NO_DUP,
+          'empty polished cream marble surface with subtle veining, soft warm golden gradient lighting from side, soft reflections on the empty marble, shallow depth of field with subtle bokeh, Sephora flagship store empty pedestal aesthetic, editorial catalog photography background only, NO products in scene' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',
@@ -133,7 +136,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'yanbal' || brand === 'lbel') {
       return {
         prompt:
-          'pristine white Carrara marble surface with subtle gray veining, soft mirror-like reflection beneath the product, diffused daylight from left, clean spa aesthetic, La Mer flagship product photography, crisp edges' + HD + NO_DUP,
+          'pristine empty white Carrara marble surface with subtle gray veining, soft mirror-like reflection on empty surface, diffused daylight from left, clean spa aesthetic, La Mer flagship empty product display, crisp edges, NO products in frame' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Mármol blanco premium (estilo La Mer)',
@@ -164,7 +167,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'sunscreen') {
     return {
       prompt:
-        'defocused warm sandy beach background with golden-hour sun flare, soft turquoise ocean blur in the distance, shallow depth of field, summer sun-protection commercial photography, Coppertone campaign aesthetic, bright and vibrant' + HD + NO_DUP,
+        'empty defocused warm sandy beach background with golden-hour sun flare, soft turquoise ocean blur in the distance, shallow depth of field, summer commercial photography background only, Coppertone campaign empty scene, bright and vibrant, NO sunscreen tubes or bottles in scene' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Playa desenfocada (estilo Coppertone)',
@@ -200,7 +203,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'makeup') {
     return {
       prompt:
-        'dramatic matte black background with soft rim lighting from the side creating a rich shadow falloff, subtle spotlight on the product, luxury cosmetics editorial photography, high contrast, MAC flagship aesthetic, glossy and bold' + HD + NO_DUP,
+        'dramatic matte black empty background with soft rim lighting from the side creating a rich shadow falloff, subtle spotlight on empty surface ready for product placement, luxury cosmetics editorial photography background only, high contrast, MAC flagship empty pedestal aesthetic, NO products in scene' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Negro mate dramático (estilo MAC)',
