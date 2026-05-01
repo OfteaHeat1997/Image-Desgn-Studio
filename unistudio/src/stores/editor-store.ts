@@ -178,7 +178,7 @@ export const useEditorStore = create<EditorStoreState>()((set, get) => ({
 
     // If we are at the tip, save current state so redo can restore it
     let updatedHistory = history;
-    let newIndex = historyIndex;
+    const newIndex = historyIndex;
 
     if (historyIndex === history.length - 1) {
       const currentSnapshot = createSnapshot(layers, selectedLayerId);

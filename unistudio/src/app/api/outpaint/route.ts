@@ -99,7 +99,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let resultUrl: string;
     const cost = PROVIDER_COSTS[provider] ?? 0.05;
 
     // Build outpainting prompt
@@ -115,7 +114,7 @@ export async function POST(request: NextRequest) {
       prompt: fullPrompt,
       aspect_ratio: aspectRatio,
     });
-    resultUrl = await extractOutputUrl(output);
+    const resultUrl: string = await extractOutputUrl(output);
 
     await saveJob({
       operation: 'outpaint',
