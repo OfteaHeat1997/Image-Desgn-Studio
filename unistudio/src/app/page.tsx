@@ -122,22 +122,40 @@ interface PipelineCardData {
   tagline: string;
   benefit: string;
   cta: string;
+  video: string;
 }
 
 function PipelineCard({ href, data }: { href: string; data: PipelineCardData }) {
   return (
     <a
       href={href}
-      className="group block p-5 md:p-6 rounded-xl bg-surface-light border border-[var(--border-default)] hover:border-[var(--accent)] hover:bg-surface-elevated transition-default"
+      className="group block rounded-xl bg-surface-light border border-[var(--border-default)] hover:border-[var(--accent)] hover:bg-surface-elevated transition-default overflow-hidden"
     >
-      <div className="text-3xl md:text-4xl mb-3">{data.icon}</div>
-      <h3 className="text-lg md:text-xl font-bold mb-1 text-heading">{data.title}</h3>
-      <p className="text-xs md:text-sm text-muted mb-2">{data.tagline}</p>
-      <p className="text-sm text-body leading-snug">{data.benefit}</p>
-      <span className="inline-flex items-center gap-1 mt-4 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-dim)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--bg-primary)] transition-default">
-        {data.cta}
-        <span className="transition-transform group-hover:translate-x-0.5">→</span>
-      </span>
+      {/* Video preview — autoplay muted loop, muestra qué hace el pipeline */}
+      <div className="relative aspect-video bg-surface-elevated overflow-hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-default"
+        >
+          <source src={data.video} type="video/mp4" />
+        </video>
+        {/* Overlay gradient para que el icono se lea */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,12,14,0.95)] via-[rgba(12,12,14,0.3)] to-transparent" />
+        <span className="absolute top-3 left-3 text-3xl drop-shadow-lg">{data.icon}</span>
+      </div>
+      <div className="p-4 md:p-5">
+        <h3 className="text-lg md:text-xl font-bold mb-1 text-heading">{data.title}</h3>
+        <p className="text-xs text-muted mb-2">{data.tagline}</p>
+        <p className="text-sm text-body leading-snug">{data.benefit}</p>
+        <span className="inline-flex items-center gap-1 mt-4 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-dim)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--bg-primary)] transition-default">
+          {data.cta}
+          <span className="transition-transform group-hover:translate-x-0.5">→</span>
+        </span>
+      </div>
     </a>
   );
 }
@@ -146,16 +164,31 @@ interface UtilityCardData {
   title: string;
   icon: string;
   benefit: string;
+  video: string;
 }
 
 function UtilityCard({ href, data }: { href: string; data: UtilityCardData }) {
   return (
     <a
       href={href}
-      className="flex items-center gap-3 p-3 md:p-4 rounded-lg bg-surface-light border border-[var(--border-default)] hover:border-[var(--accent-muted)] transition-default"
+      className="group block rounded-lg bg-surface-light border border-[var(--border-default)] hover:border-[var(--accent-muted)] transition-default overflow-hidden"
     >
-      <span className="text-2xl shrink-0">{data.icon}</span>
-      <div className="min-w-0">
+      {/* Mini-video preview en utility cards */}
+      <div className="relative aspect-[16/9] bg-surface-elevated overflow-hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-default"
+        >
+          <source src={data.video} type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,12,14,0.85)] to-transparent" />
+        <span className="absolute top-2 left-2 text-xl drop-shadow">{data.icon}</span>
+      </div>
+      <div className="p-3">
         <h3 className="font-medium text-sm text-heading truncate">{data.title}</h3>
         <p className="text-xs text-muted truncate">{data.benefit}</p>
       </div>

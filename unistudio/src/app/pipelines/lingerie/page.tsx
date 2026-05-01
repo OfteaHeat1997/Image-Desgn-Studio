@@ -2925,26 +2925,26 @@ export default function LingeriePipelinePage() {
   /* ================================================================ */
   if (phase === "setup") {
     return (
-      <div className="min-h-screen" style={{ background: "var(--bg-base, #111)" }}>
-        {/* Top nav */}
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/8 bg-black/40 px-6 py-3 backdrop-blur">
-          <a href="/editor" className="flex items-center gap-2 text-sm font-medium text-gray-400 transition-colors hover:text-white">
+      <div className="min-h-screen bg-surface text-heading">
+        {/* Top nav — design tokens (oro brand) */}
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+          <a href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
             <ChevronLeft className="h-4 w-4" />
-            Editor
+            <span className="hidden sm:inline">Inicio</span>
           </a>
-          <span className="text-gray-700">/</span>
-          <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-violet-400" />
-            <span className="text-sm font-semibold text-white">Pipeline de Lencería</span>
+          <span className="text-[var(--border-default)]">/</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
+            <span className="text-sm font-semibold text-heading truncate">Lencería</span>
           </div>
-          <div className="ml-auto">
-            <span className="rounded-full bg-violet-500/15 px-3 py-1 text-xs font-semibold text-violet-300">
-              Bras · Panties · Shapewear
+          <div className="ml-auto hidden md:block">
+            <span className="rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
+              Bras · Panties · Shapewear · Fajas
             </span>
           </div>
         </header>
 
-        <div className="mx-auto max-w-5xl px-6 py-8">
+        <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8">
           {/* Page title */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-white">Configura tu Pipeline de Lencería</h1>
@@ -3574,24 +3574,24 @@ export default function LingeriePipelinePage() {
   /*  PIPELINE PHASE                                                   */
   /* ================================================================ */
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "var(--bg-base, #111)" }}>
-      {/* Top bar */}
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/8 bg-black/60 px-6 py-3 backdrop-blur">
+    <div className="flex min-h-screen flex-col bg-surface text-heading">
+      {/* Top bar — design tokens (oro brand en vez de violet random) */}
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
         <button
           onClick={() => { if (!isRunning) setPhase("setup"); }}
           className={cn(
-            "flex items-center gap-2 text-sm font-medium transition-colors",
-            isRunning ? "cursor-not-allowed text-gray-600" : "text-gray-400 hover:text-white",
+            "flex items-center gap-2 text-sm font-medium transition-default",
+            isRunning ? "cursor-not-allowed text-disabled" : "text-muted hover:text-[var(--accent)]",
           )}
         >
           <ChevronLeft className="h-4 w-4" />
-          Configuración
+          <span className="hidden sm:inline">Configuración</span>
         </button>
-        <span className="text-gray-700">/</span>
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-violet-400" />
-          <span className="text-sm font-semibold text-white">
-            Pipeline{referenceNumber ? ` — Ref. ${referenceNumber}` : ""}
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">
+            Lencería{referenceNumber ? ` · Ref. ${referenceNumber}` : ""}
           </span>
         </div>
 

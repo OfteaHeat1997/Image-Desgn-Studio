@@ -637,29 +637,29 @@ export default function JewelryPipelinePage() {
   /* ------------------------------------------------------------------ */
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/8 bg-black/40 px-6 py-3 backdrop-blur">
-        <a href="/editor" className="flex items-center gap-2 text-sm font-medium text-gray-400 transition-colors hover:text-white">
+    <div className="min-h-screen bg-surface text-heading">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
+        <a href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
           <ChevronLeft className="h-4 w-4" />
-          Editor
+          <span className="hidden sm:inline">Inicio</span>
         </a>
-        <span className="text-gray-700">/</span>
-        <div className="flex items-center gap-2">
-          <Gem className="h-4 w-4 text-amber-400" />
-          <span className="text-sm font-semibold text-white">Pipeline de Joyería</span>
+        <span className="text-[var(--border-default)]">/</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Gem className="h-4 w-4 text-[var(--accent)] shrink-0" />
+          <span className="text-sm font-semibold text-heading truncate">Joyería</span>
         </div>
-        <div className="ml-auto">
-          <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300">
-            Aretes · Cadenas · Anillos · Pulseras · Sets
+        <div className="ml-auto hidden md:block">
+          <span className="rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
+            Aretes · Cadenas · Anillos · Pulseras
           </span>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">Pipeline de Joyería</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Sube fotos de tus piezas y el pipeline genera: (1) foto de estante con fondo de lujo, (2) foto en modelo con la pieza en el lugar correcto del cuerpo (orejas / cuello / mano / muñeca), (3) video 360° del producto.
+      <div className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">Joyería para catálogo de lujo</h1>
+          <p className="mt-1 text-sm text-body leading-relaxed">
+            Cada pieza recibe el mismo tratamiento que las marcas premium: estante elegante con fondo de mármol, foto en modelo (oreja, cuello, mano o muñeca según el tipo) y video 360° opcional para Reels.
           </p>
         </div>
 

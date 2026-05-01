@@ -32,6 +32,7 @@ export const COPY = {
       tagline: "Bras, panties, shapewear y fajas",
       benefit: "Foto con modelo IA + prueba virtual + video",
       cta: "Empezar",
+      video: "/videos/tryon.mp4",
     },
     beauty: {
       title: "Perfumes y Belleza",
@@ -39,6 +40,7 @@ export const COPY = {
       tagline: "Perfumes, cremas, skincare y maquillaje",
       benefit: "Fondo blanco + catálogo + Reels en un click",
       cta: "Empezar",
+      video: "/videos/bg-generate.mp4",
     },
     jewelry: {
       title: "Joyería",
@@ -46,6 +48,7 @@ export const COPY = {
       tagline: "Aretes, cadenas, anillos y pulseras",
       benefit: "Estante de lujo + foto en modelo + video 360°",
       cta: "Empezar",
+      video: "/videos/jewelry-tryon.mp4",
     },
   },
 
@@ -54,16 +57,19 @@ export const COPY = {
       title: "Procesamiento Masivo",
       icon: "📦",
       benefit: "50+ fotos con un solo click",
+      video: "/videos/batch.mp4",
     },
     editor: {
       title: "Editar foto",
       icon: "✏️",
       benefit: "Retoques manuales con todas las herramientas",
+      video: "/videos/smart-editor.mp4",
     },
     brandKit: {
       title: "Kit de marca",
       icon: "🎨",
       benefit: "Tu logo, colores y marca de agua",
+      video: "/videos/brand-kit.mp4",
     },
   },
 
