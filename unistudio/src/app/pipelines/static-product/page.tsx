@@ -186,6 +186,36 @@ const OUTPUT_STEPS: StepKey[] = ["white", "adaptive", "vertical"];
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Auto-detect brand desde el texto/logo legible en la foto. Vision devuelve
+ * marca_legible como string libre ("ésika", "Yanbal Paris", "L'Bel"). Lo
+ * matcheamos contra BRAND_LABELS normalizando: lowercase, sin acentos, sin
+ * apóstrofos. Si matchea, devolvemos el key del brand. Si no, null.
+ *
+ * Bug que resuelve: subir un frasco ésika y ver "Yanbal" preseleccionado
+ * porque era el default duro. Ahora el default sale de la foto.
+ */
+function matchBrandFromText(brandText: string | null | undefined): StaticBrand | null {
+  if (!brandText || typeof brandText !== "string") return null;
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "") // sin acentos
+      .replace(/['']/g, "") // sin apóstrofos curvos o rectos
+      .replace(/\s+/g, " ")
+      .trim();
+  const target = normalize(brandText);
+  for (const [key, label] of Object.entries(BRAND_LABELS)) {
+    const normalizedLabel = normalize(label);
+    if (target === normalizedLabel) return key as StaticBrand;
+    if (target.includes(normalizedLabel) || normalizedLabel.includes(target)) {
+      return key as StaticBrand;
+    }
+  }
+  return null;
+}
+
 async function safeJson(res: Response): Promise<{ success: boolean; data?: any; error?: string; cost?: number }> {
   const text = await res.text();
   try {
@@ -704,7 +734,20 @@ export default function StaticProductPipelinePage() {
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
       ]);
       if (features) {
-        updateJob(job.id, { productFeatures: features });
+        // Auto-detect brand from logo/text en la foto. Si Vision detecta
+        // "ésika" en el frasco pero la usuaria dejó "Yanbal" como default,
+        // sobreescribimos al brand correcto. Resuelve queja directa: subir
+        // ésika y que aparezca como Yanbal por default es confuso.
+        const detectedBrand = matchBrandFromText(features.marca_legible);
+        const brandUpdate: Partial<Job> = { productFeatures: features };
+        if (detectedBrand && detectedBrand !== job.brand) {
+          brandUpdate.brand = detectedBrand;
+          // Re-derivar config porque cambió la marca
+          const newConfig = getAdaptiveBgConfig(job.productType, detectedBrand);
+          // Actualizar el config local también para que el resto del flow lo vea
+          Object.assign(config, newConfig);
+        }
+        updateJob(job.id, brandUpdate);
       }
 
       // Build the effective prompt: legacy template + per-photo descriptor so
