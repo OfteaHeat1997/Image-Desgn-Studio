@@ -654,7 +654,9 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
       >
         <ImageIcon className="h-6 w-6 text-gray-600" />
         <span className="text-[11px] text-gray-500 leading-tight">
-          {hasError ? "No pudimos cargar la imagen" : "Esperando paso anterior"}
+          {hasError
+            ? "La imagen expiró. Refresca la página y reprocesa."
+            : "Esperando paso anterior"}
         </span>
       </div>
     );
@@ -1955,13 +1957,19 @@ export default function LingeriePipelinePage() {
   const batchAbortRef = useRef(false);
   const stopBatch = useCallback(() => {
     batchAbortRef.current = true;
-    // Abort todos los controllers activos de todos los steps en vuelo
+    // Abort todos los controllers activos de todos los steps en vuelo.
+    // IMPORTANTE: NO limpiamos el state de jobs aquí — la usuaria reportó
+    // "detener pierde la info, debería poder seguir viendo lo que hice".
+    // Lo que ya procesó (steps con status=done) se mantiene visible y
+    // descargable; solo paramos lo que está en vuelo.
     for (const [, ctrl] of abortControllersRef.current) {
       ctrl.abort();
     }
     abortControllersRef.current.clear();
     setIsRunning(false);
-    toast.warning("Batch detenido. Los jobs ya completados se guardaron.");
+    toast.warning(
+      "Procesamiento detenido. Lo que ya completaste se mantiene visible y descargable.",
+    );
   }, []);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string; seed?: number }>>([]);
