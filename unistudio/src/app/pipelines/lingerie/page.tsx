@@ -66,7 +66,57 @@ interface PipelineStep {
   // siguiente rerun usa este provider en vez del default de lencería (Kolors).
   // Limpia al empezar un run exitoso para que el próximo ciclo vuelva al default.
   providerOverride?: TryonProvider;
+  // Pose manual override (frontal/lateral/3-cuartos/espalda/cuerpo-completo).
+  // "auto" = default por stepId. La usuaria puede forzar otra pose desde la UI
+  // antes de procesar. Aplicable a tryon, photoBack, photoFullBody.
+  poseOverride?: PoseOption;
+  // Acción manual override para modelVideo (caminar/posar/girar/etc).
+  // "auto" = default. Aplicable solo a modelVideo.
+  actionOverride?: VideoActionOption;
 }
+
+/**
+ * Opciones de pose manual que la usuaria puede elegir para tryon/photoBack/
+ * photoFullBody. "auto" = default por stepId (frontal en tryon, espalda en
+ * photoBack, full-body en photoFullBody).
+ */
+type PoseOption =
+  | "auto"
+  | "frontal"
+  | "tres-cuartos"
+  | "lateral"
+  | "espalda"
+  | "cuerpo-completo";
+
+const POSE_OPTIONS: { value: PoseOption; label: string; modelCreatePose: string }[] = [
+  { value: "auto",            label: "Automático",        modelCreatePose: "" /* depende del stepId */ },
+  { value: "frontal",         label: "Frontal",           modelCreatePose: "standing-front-view" },
+  { value: "tres-cuartos",    label: "3/4 (diagonal)",    modelCreatePose: "standing-three-quarter-view" },
+  { value: "lateral",         label: "Lateral (perfil)",  modelCreatePose: "standing-side-view" },
+  { value: "espalda",         label: "Espalda",           modelCreatePose: "back-view" },
+  { value: "cuerpo-completo", label: "Cuerpo completo",   modelCreatePose: "standing" },
+];
+
+/**
+ * Acción que ejecuta la modelo en el video. Aplicable a modelVideo.
+ * El producto (bra) se mantiene visible — solo varía qué hace la modelo.
+ */
+type VideoActionOption =
+  | "auto"
+  | "girar-suave"
+  | "caminar-hacia"
+  | "posar-quieta"
+  | "manos-cintura"
+  | "girar-completo";
+
+const VIDEO_ACTION_OPTIONS: { value: VideoActionOption; label: string; promptHint: string }[] = [
+  { value: "auto",            label: "Automático",          promptHint: "movimiento natural posando" },
+  { value: "girar-suave",     label: "Girar suave",         promptHint: "model slowly turning torso left and right, smooth motion" },
+  { value: "caminar-hacia",   label: "Caminar hacia cámara",promptHint: "model walking toward camera, runway style, confident" },
+  { value: "posar-quieta",    label: "Posar quieta",        promptHint: "model holding pose, subtle breathing motion" },
+  { value: "manos-cintura",   label: "Manos en cintura",    promptHint: "model with hands on hips, slight hip sway" },
+  { value: "girar-completo",  label: "Giro 360°",           promptHint: "model rotating 360 degrees, showing full outfit" },
+];
 
 /**
  * Proveedores de try-on disponibles. "auto" deja que /api/tryon elija
@@ -933,10 +983,12 @@ interface StepCardProps {
   onStop?: () => void;
   onSelectCandidate?: (url: string) => void;
   onChangeProvider?: (provider: TryonProvider) => void;
+  onChangePose?: (pose: PoseOption) => void;
+  onChangeAction?: (action: VideoActionOption) => void;
   autoMode: boolean;
 }
 
-function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider }: StepCardProps) {
+function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction }: StepCardProps) {
   const Icon = step.icon;
   // Fallback chain: step's own captured input > chain input > empty. Si los
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
@@ -1073,6 +1125,45 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 {docs.tips.map((t, i) => <li key={i}>{t}</li>)}
               </ul>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual overrides — siempre visibles para que la usuaria pueda elegir
+          ángulo/acción ANTES de procesar (no solo cuando hay error). */}
+      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangePose && step.status !== "done" && step.status !== "accepted" && (
+        <div className="px-5 py-3 border-t border-white/[0.04]">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Pose:</span>
+            <select
+              value={step.poseOverride ?? "auto"}
+              onChange={(e) => onChangePose(e.target.value as PoseOption)}
+              disabled={step.status === "processing"}
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+            >
+              {POSE_OPTIONS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}{p.value === "auto" ? ` (default: ${step.id === "photoBack" ? "espalda" : step.id === "photoFullBody" ? "cuerpo completo" : "frontal"})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {step.id === "modelVideo" && onChangeAction && step.status !== "done" && step.status !== "accepted" && (
+        <div className="px-5 py-3 border-t border-white/[0.04]">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Acción:</span>
+            <select
+              value={step.actionOverride ?? "auto"}
+              onChange={(e) => onChangeAction(e.target.value as VideoActionOption)}
+              disabled={step.status === "processing"}
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+            >
+              {VIDEO_ACTION_OPTIONS.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
+            </select>
           </div>
         </div>
       )}
@@ -1623,6 +1714,17 @@ async function runStep(
    * termina siendo FASHN. Kolors e IDM-VTON lo ignoran.
    */
   fashnMode?: FashnMode,
+  /**
+   * Pose manual elegida por la usuaria desde el step card. Si "auto" o
+   * undefined, se usa el default por stepId (back-view en photoBack,
+   * standing en photoFullBody, etc).
+   */
+  poseOverride?: PoseOption,
+  /**
+   * Acción manual para modelVideo (girar/caminar/posar/etc). Si "auto" o
+   * undefined, se usa el default genérico.
+   */
+  actionOverride?: VideoActionOption,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -1707,7 +1809,12 @@ async function runStep(
     if (!isLingerieFlow) {
       throw new Error("Estas fotos extra solo aplican a lencería.");
     }
-    const newPose = stepId === "photoBack" ? "back-view" : "standing";
+    // Default por stepId: photoBack=back-view, photoFullBody=standing.
+    // Si la usuaria seleccionó pose manual desde la UI (poseOverride), usar esa.
+    const defaultPose = stepId === "photoBack" ? "back-view" : "standing";
+    const newPose = poseOverride && poseOverride !== "auto"
+      ? POSE_OPTIONS.find((p) => p.value === poseOverride)?.modelCreatePose || defaultPose
+      : defaultPose;
     // Bug histórico: para photoFullBody se mandaba
     //   "plain white studio background, full body shot showing legs with nude seamless shaper shorts"
     // al campo `background`. /api/model-create lo embute en "against a X
@@ -1832,6 +1939,14 @@ async function runStep(
     // (inputUrl viene del tryon exitoso), usa ese. Si no, fallback al modelo alone.
     // Así modelVideo produce algo útil incluso cuando tryon falla.
     const modelVideoUrl = inputUrl && inputUrl !== sharedModelUrl ? inputUrl : (sharedModelUrl ?? inputUrl);
+
+    // Acción que ejecuta la modelo: si la usuaria eligió manualmente
+    // (actionOverride) usar esa, sino el default genérico.
+    const actionPrompt = actionOverride && actionOverride !== "auto"
+      ? VIDEO_ACTION_OPTIONS.find((a) => a.value === actionOverride)?.promptHint
+      : "subtle natural movement, confident elegant pose";
+    const fullPrompt = `Fashion model wearing lingerie, ${actionPrompt}, soft studio lighting, editorial fashion photography`;
+
     const res = await fetch("/api/video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1842,7 +1957,7 @@ async function runStep(
         provider: "wan-2.2-fast",
         duration: 5,
         aspectRatio: "9:16",
-        prompt: "Fashion model wearing lingerie, subtle natural movement, confident elegant pose, soft studio lighting, editorial fashion photography",
+        prompt: fullPrompt,
       }),
     });
     const json = await res.json();
@@ -2472,6 +2587,8 @@ export default function LingeriePipelinePage() {
         backGarmentUrl,
         step.providerOverride,
         fashnMode,
+        step.poseOverride,
+        step.actionOverride,
       );
     } finally {
       abortControllersRef.current.delete(key);
@@ -3872,6 +3989,8 @@ export default function LingeriePipelinePage() {
                     onStop={() => stopStep(activeJob.id, step.id)}
                     onSelectCandidate={(url) => updateStep(activeJob.id, step.id, { resultUrl: url })}
                     onChangeProvider={(provider) => updateStep(activeJob.id, step.id, { providerOverride: provider })}
+                    onChangePose={(pose) => updateStep(activeJob.id, step.id, { poseOverride: pose })}
+                    onChangeAction={(action) => updateStep(activeJob.id, step.id, { actionOverride: action })}
                     autoMode={autoMode}
                   />
                 );
