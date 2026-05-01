@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import Link from "next/link";
 import {
   ChevronLeft,
   Upload,
@@ -640,10 +641,10 @@ export default function JewelryPipelinePage() {
   return (
     <div className="min-h-screen bg-surface text-heading">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
-        <a href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
           <ChevronLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Inicio</span>
-        </a>
+        </Link>
         <span className="text-[var(--border-default)]">/</span>
         <div className="flex items-center gap-2 min-w-0">
           <Gem className="h-4 w-4 text-[var(--accent)] shrink-0" />
