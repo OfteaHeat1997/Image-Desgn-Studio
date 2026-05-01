@@ -2504,7 +2504,15 @@ export default function LingeriePipelinePage() {
         const uploaded = await uploadFile(job.file);
         uploadedUrl = uploaded.url;
         falUrl = uploaded.falUrl;
-        setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, uploadedUrl, falUrl } : j));
+        // Fix bug "No pudimos cargar la imagen": el blob URL del preview se
+        // revoca al hacer reload o cuando el browser limpia memoria. Tras
+        // upload exitoso, promovemos previewUrl al HTTP URL persistente para
+        // que la imagen ORIGINAL siga visible después de cualquier refresh.
+        setJobs((prev) => prev.map((j) =>
+          j.id === jobId
+            ? { ...j, uploadedUrl, falUrl, previewUrl: uploadedUrl ?? j.previewUrl }
+            : j,
+        ));
       } catch (err) {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
         toast.error(`Error de carga — ${job.filename}: ${err instanceof Error ? err.message : "Error desconocido"}`);
