@@ -2303,18 +2303,35 @@ export default function LingeriePipelinePage() {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, [pushHistory]);
 
-  /** Carga todo el inventario de bras desde public/inventory/bras/ vía
-   *  /api/inventory/scan-bras. Fetchea cada imagen como blob, la convierte a
-   *  File y usa handleFiles para crear ImageJobs (mismo flow de auto-detect
-   *  y pushHistory que drag-and-drop). En dev y prod funciona igual porque
-   *  las imágenes están en public/. */
+  /** Carga todo el inventario del tipo SELECCIONADO (bras / panties /
+   *  shapewear / fajas / sets) desde public/inventory/<type>/ vía la ruta
+   *  /api/inventory/scan-lingerie?type=<X>. Antes solo cargaba bras (queja
+   *  reportada: "ahora esta solo la función de bra de los folder, si mi mamá
+   *  quiere intentar con pantys ahora no funciona"). Ahora respeta el
+   *  productType actual; si no existe inventario para ese tipo, muestra una
+   *  guía clara de "sube manualmente". */
   const loadInventoryBras = useCallback(async () => {
+    // Mapeo del productType del dropdown (bra/panty/faja/set) al folder
+    // canónico de inventario en plural.
+    const typeMap: Record<string, string> = {
+      bra: "bras",
+      panty: "panties",
+      faja: "shapewear",
+      set: "sets",
+    };
+    const inventoryType = typeMap[productType] ?? "bras";
     setLoadingInventory(true);
     try {
-      const res = await fetch("/api/inventory/scan-bras");
+      const res = await fetch(`/api/inventory/scan-lingerie?type=${inventoryType}`);
       const json = await res.json();
       if (!json.success) {
-        toast.error(`No se pudo escanear el inventario: ${json.error ?? "error desconocido"}`);
+        if (res.status === 404) {
+          toast.warning(
+            `No hay inventario pre-cargado de ${inventoryType}. Subí tus fotos arrastrándolas o tocando el área de upload de arriba.`,
+          );
+        } else {
+          toast.error(`No se pudo escanear el inventario: ${json.error ?? "error desconocido"}`);
+        }
         return;
       }
       type ScannedPhoto = { filename: string; angle: PhotoAngle; color: string | undefined; relativePath: string };
@@ -2357,7 +2374,7 @@ export default function LingeriePipelinePage() {
     } finally {
       setLoadingInventory(false);
     }
-  }, [handleFiles]);
+  }, [handleFiles, productType]);
 
   /** P2: "Comenzar de nuevo" — clear everything (jobs in memory + localStorage
    *  persistence). La ficha técnica y los resultados procesados se limpian,
@@ -3131,15 +3148,15 @@ export default function LingeriePipelinePage() {
                 </div>
                 <UploadZone onFiles={handleFiles} />
 
-                {/* Cargar inventario — fetchea fotos del folder public/inventory/bras/
-                    como blobs y las añade como ImageJobs, saltando el drag-and-drop
-                    para los 20 REFs ya scaneados. */}
-                <div className="mt-3 flex items-center gap-2">
+                {/* Cargar inventario — respeta el productType seleccionado.
+                    bra → bras/, panty → panties/, faja → shapewear/, set → sets/.
+                    Si no hay folder, toast claro "subí manualmente". */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={loadInventoryBras}
                     disabled={loadingInventory}
-                    className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 transition-colors hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-wait"
+                    className="flex items-center gap-2 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent-dim)] px-3 py-2 text-xs font-semibold text-[var(--accent)] transition-default hover:border-[var(--accent)] disabled:opacity-50 disabled:cursor-wait"
                   >
                     {loadingInventory ? (
                       <>
@@ -3149,12 +3166,12 @@ export default function LingeriePipelinePage() {
                     ) : (
                       <>
                         <Package className="h-3.5 w-3.5" />
-                        Cargar inventario BH (20 REFs, 128 fotos)
+                        Cargar inventario de {productType === "bra" ? "Bras" : productType === "panty" ? "Panties" : productType === "faja" ? "Shapewear" : "Sets"}
                       </>
                     )}
                   </button>
-                  <span className="text-[10px] text-gray-500">
-                    Carga todas las fotos de <code className="rounded bg-white/5 px-1">docs/inventory-final/images/bras/</code> de una — podés borrar las que no te interesen.
+                  <span className="text-[10px] text-muted">
+                    Si no hay folder pre-cargado de este tipo, subí tus fotos manualmente arrastrándolas arriba.
                   </span>
                 </div>
 
