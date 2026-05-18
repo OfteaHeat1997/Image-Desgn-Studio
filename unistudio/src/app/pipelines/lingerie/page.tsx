@@ -38,6 +38,102 @@ import { useGalleryStore } from "@/stores/gallery-store";
 import type { ProductSpec } from "@/app/api/analyze-product/route";
 
 /* ------------------------------------------------------------------ */
+/*  Download helpers                                                    */
+/*                                                                      */
+/*  Las URLs de fal.media / replicate.delivery caducan después de       */
+/*  horas/días. Antes usábamos <a href={proxyUrl} download>, lo que     */
+/*  cuando el upstream devolvía 502 abría el JSON de error como tab     */
+/*  ("File wasn't available on site" en Chrome). Ahora bajamos vía      */
+/*  fetch, detectamos expired:true del proxy, y disparamos un Blob      */
+/*  download solo cuando hay archivo real.                              */
+/* ------------------------------------------------------------------ */
+
+function buildProxyHref(url: string, filename: string): string {
+  if (url.startsWith("data:")) return url;
+  if (url.startsWith("/api/proxy-image")) {
+    // Append filename if not already present so Content-Disposition kicks in.
+    return url.includes("filename=")
+      ? url
+      : `${url}${url.includes("?") ? "&" : "?"}filename=${encodeURIComponent(filename)}`;
+  }
+  return `/api/proxy-image?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+}
+
+/**
+ * Descarga un asset upstream con detección de URLs caducadas.
+ * Si el proxy devuelve 502 con expired:true muestra un toast claro en
+ * vez de abrir un JSON tab en Chrome. Para data: URLs hace download
+ * directo (no hay round-trip al servidor).
+ */
+async function downloadAsset(url: string, filename: string): Promise<void> {
+  // data: URLs are already self-contained — direct anchor download works.
+  if (url.startsWith("data:")) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+
+  const href = buildProxyHref(url, filename);
+  try {
+    const res = await fetch(href);
+    if (!res.ok) {
+      // Try to read expired hint from JSON body
+      let expired = false;
+      try {
+        const body = await res.json();
+        expired = body?.expired === true;
+      } catch { /* not JSON, ignore */ }
+      if (expired) {
+        toast.error("Este archivo expiró. Volvé a generarlo desde la galería.");
+      } else {
+        toast.error(`No se pudo descargar (HTTP ${res.status}).`);
+      }
+      return;
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Release the blob URL after the browser starts the download.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch (err) {
+    console.error("[lingerie] downloadAsset failed:", err);
+    toast.error("No se pudo descargar el archivo. Reintentá.");
+  }
+}
+
+/**
+ * Convierte una URL upstream (fal.media / replicate.delivery) a un data: URL
+ * base64 — útil para guardar en la galería de forma persistente, ya que las
+ * URLs originales caducan en horas/días. Devuelve la URL original si ya es
+ * data:/blob: o si la conversión falla (degradación silenciosa).
+ */
+async function urlToDataUrl(url: string): Promise<string> {
+  if (!url || url.startsWith("data:") || url.startsWith("blob:")) return url;
+  try {
+    const res = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+    if (!res.ok) return url;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -792,12 +888,10 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
     if (e.target === e.currentTarget) onClose();
   };
 
-  // Para descargar: usamos el route /api/proxy-image?url=… para forzar el
-  // header content-disposition: attachment cuando sea posible. Si la URL es
-  // ya proxy interno, ponemos download attribute en el anchor.
-  const downloadHref = url.startsWith("/api/proxy-image")
-    ? url
-    : `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  // El proxy /api/proxy-image acepta filename para devolver Content-Disposition
+  // attachment y detecta expired:true cuando el upstream (fal.media) ya caducó.
+  // downloadAsset hace fetch→Blob→download para evitar abrir el JSON de error
+  // como tab cuando la URL caducó (bug previo "File wasn't available on site").
   const filename = `${filenamePrefix ?? "uniestudio"}-${idx + 1}.${isVideo ? "mp4" : "jpg"}`;
 
   return (
@@ -836,18 +930,15 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
               {compareMode ? "Solo resultado" : "Comparar con original"}
             </button>
           )}
-          <a
-            href={downloadHref}
-            download={filename}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); void downloadAsset(url, filename); }}
             className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
             title="Descargar esta imagen"
           >
             <Download className="h-3.5 w-3.5" />
             Descargar
-          </a>
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -1319,19 +1410,21 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               </button>
               {/* Descargar directo sin abrir lightbox */}
               {step.resultUrl && (
-                <a
-                  href={step.resultUrl.startsWith("/api/proxy-image")
-                    ? step.resultUrl
-                    : `/api/proxy-image?url=${encodeURIComponent(step.resultUrl)}`}
-                  download={`unistudio-${step.id}.${isVideo ? "mp4" : "jpg"}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!step.resultUrl) return;
+                    void downloadAsset(
+                      step.resultUrl,
+                      `unistudio-${step.id}.${isVideo ? "mp4" : "jpg"}`,
+                    );
+                  }}
                   className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
                   title="Descargar esta imagen"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Descargar
-                </a>
+                </button>
               )}
               <button
                 onClick={onRerun}
@@ -2904,8 +2997,14 @@ export default function LingeriePipelinePage() {
 
     // Auto-guardar resultados en la galería persistente (gallery-store).
     // Cada step con resultado queda como entry separada para que la usuaria
-    // pueda volver a /gallery y ver/descargar el historial entre sesiones
-    // (el store hace persistencia a localStorage con partialize).
+    // pueda volver a /gallery y ver/descargar el historial entre sesiones.
+    //
+    // Las URLs upstream (fal.media / replicate.delivery) caducan en horas/días,
+    // así que ANTES de guardar convertimos cada URL a un data: base64 — así la
+    // galería sigue descargable indefinidamente. Videos se omiten porque su
+    // base64 es de MB y revientan localStorage; se guardan como URL upstream
+    // (mejor que nada — caducan, pero el costo de descargar y meter MB de
+    // video en gallery-store es peor).
     try {
       const addImages = useGalleryStore.getState().addImages;
       const finalJob = (jobsSnapshot.find((j) => j.id === jobId)) ?? job;
@@ -2914,16 +3013,29 @@ export default function LingeriePipelinePage() {
       const refTag = finalJob.referenceKey ?? '';
       const colorTag = finalJob.color ?? '';
       const labelSuffix = [refTag, colorTag].filter(Boolean).join(' · ');
+
       const galleryItems: Parameters<typeof addImages>[0] = [];
-      for (const [stepId, resultUrl] of Object.entries(stepResults)) {
-        if (!resultUrl) continue;
+      const entries = Object.entries(stepResults).filter(([, u]) => !!u) as Array<[string, string]>;
+
+      // Convertimos a base64 en paralelo (urlToDataUrl ya degrada silenciosamente
+      // si el proxy falla — devuelve la URL original como fallback).
+      const persistentUrls = await Promise.all(
+        entries.map(async ([, resultUrl]) => {
+          const isVideo = resultUrl.includes('.mp4') || resultUrl.includes('.webm') || resultUrl.includes('video');
+          if (isVideo) return resultUrl;
+          return await urlToDataUrl(resultUrl);
+        }),
+      );
+
+      for (let i = 0; i < entries.length; i++) {
+        const [stepId, resultUrl] = entries[i];
         const stepDef = STEP_DEFS.find((s) => s.id === stepId);
         const isVideo = resultUrl.includes('.mp4') || resultUrl.includes('.webm') || resultUrl.includes('video');
         const ext = isVideo ? 'mp4' : 'jpg';
         galleryItems.push({
           id: `lingerie-${stepId}-${ts}-${finalJob.id}`,
           filename: `${baseName}-${stepId}${labelSuffix ? ` (${labelSuffix})` : ''}.${ext}`,
-          resultUrl,
+          resultUrl: persistentUrls[i],
           originalUrl: finalJob.uploadedUrl ?? finalJob.previewUrl,
           date: new Date().toISOString(),
           operations: [stepDef?.label ?? stepId],
@@ -2932,7 +3044,7 @@ export default function LingeriePipelinePage() {
       }
       if (galleryItems.length > 0) {
         addImages(galleryItems);
-        console.log(`[lingerie] ${galleryItems.length} resultados guardados en /gallery`);
+        console.log(`[lingerie] ${galleryItems.length} resultados guardados en /gallery (base64-persistentes)`);
       }
     } catch (galleryErr) {
       // Silent — fallo de la galería no bloquea el pipeline ni molesta con toast
@@ -4038,23 +4150,17 @@ export default function LingeriePipelinePage() {
                             return;
                           }
                           toast.info(`Descargando ${results.length} archivos…`);
-                          // Disparamos un <a download> por cada resultado con delay de
-                          // 200ms entre cada uno para que el browser no los ahogue.
+                          // downloadAsset hace fetch→Blob→download con detección
+                          // de URLs caducadas (toast claro si el upstream ya
+                          // expiró). Delay de 200ms entre cada uno para que el
+                          // browser no los ahogue.
                           for (let i = 0; i < results.length; i++) {
                             const s = results[i];
                             if (!s.resultUrl) continue;
                             const isVideo = s.resultUrl.includes(".mp4") || s.resultUrl.includes(".webm") || s.resultUrl.includes("video");
                             const ext = isVideo ? "mp4" : "jpg";
-                            const href = s.resultUrl.startsWith("/api/proxy-image")
-                              ? s.resultUrl
-                              : `/api/proxy-image?url=${encodeURIComponent(s.resultUrl)}`;
-                            const a = document.createElement("a");
-                            a.href = href;
-                            a.download = `unistudio-${activeJob.referenceKey ?? activeJob.id.slice(0, 6)}-${s.id}.${ext}`;
-                            a.target = "_blank";
-                            document.body.appendChild(a);
-                            a.click();
-                            a.remove();
+                            const filename = `unistudio-${activeJob.referenceKey ?? activeJob.id.slice(0, 6)}-${s.id}.${ext}`;
+                            await downloadAsset(s.resultUrl, filename);
                             if (i < results.length - 1) await new Promise((r) => setTimeout(r, 200));
                           }
                         }}
