@@ -709,6 +709,7 @@ function humanizeStepError(stepId: StepId, rawError?: string): string {
     isolate: "No pudimos aislar la prenda. Probá con una foto más clara donde se vea todo el producto.",
     model: "No pudimos generar la modelo IA. Reintentá o probá con otras configuraciones.",
     tryon: "No pudimos vestir la modelo con tu prenda. Reintentá — si sigue fallando podés saltar este paso y los videos se generan igual.",
+    texturePreserve: "No pudimos restaurar la textura del bra. Si el resultado del try-on ya se ve bien, podés saltar este paso.",
     photoBack: "No pudimos generar la foto de espalda. El resto del pipeline sigue sin problema.",
     photoFullBody: "No pudimos generar la foto de cuerpo completo. El resto del pipeline sigue sin problema.",
     productVideo: "No pudimos generar el video 360°. Reintentá.",
