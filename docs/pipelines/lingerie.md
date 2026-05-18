@@ -81,7 +81,8 @@ RESULTADOS guardados en galería con naming: REF-{sku}-{color}-{ángulo}.jpg + .
 | model-create | **SeedDream 4.5** (fal.ai) | Único modelo de fotografía que permite `enable_safety_checker: false`. Flux/Gemini bloquean cualquier generación con ropa íntima. |
 | tryon | **Kolors v1.5** (fal.ai) | Diseñado para moda comercial. FASHN v1.6 bloquea lencería siempre (política). IDM-VTON a veces funciona pero Replicate tiene filtro activo. |
 | upscale | Real-ESRGAN / Clarity | Estándar, no tiene bloqueos. |
-| video modelo | **wan-2.2-fast** con `num_frames:81 guidance_scale:3.0 negative_prompt` | Sin estos parámetros, duplica el producto en el frame. |
+| video modelo | **Kling 2.6 Pro** (fal-ai/kling-video/v2.6/pro/image-to-video) | wan-2.2-fast generaba personas con look de muñeco (skin waxy, micro-expresiones erráticas, hair sin física). Kling 2.6 Pro preserva identidad facial entre frames y produce movimiento humano natural, apto para catálogo de moda. |
+| video producto (360°) | **wan-2.2-fast** con `num_frames:81 guidance_scale:3.0 negative_prompt` | Sin humano en el frame → la calidad standard es suficiente. Ahorra $0.30 por video vs upgradear a Kling. |
 | video flat-lay | **Ken Burns** | Gratis, suficiente para flat-lay estático con zoom. |
 
 **Proveedores explícitamente prohibidos para este pipeline:**
@@ -116,10 +117,12 @@ El pipeline rutea según `garmentType` detectado por `analyze-image` (Claude Vis
 | `/api/inpaint` (flux-fill-pro, texturePreserve opcional) | ~$0.05 |
 | `/api/enhance` (Sharp) | $0 |
 | `/api/upscale` (opcional) | $0.02–$0.05 |
-| Video modelo (wan-2.2-fast opcional) | $0.05 |
+| Video producto 360° (wan-2.2-fast) | $0.05 |
+| Video modelo (Kling 2.6 Pro, $0.07/s × 5s) | $0.35 |
 | Video flat-lay (Ken Burns) | $0 |
-| **Total 1 referencia, 1 color, 1 pose — con upscale + videos** | **~$0.15** |
-| **Total reusando modelo ya guardada (segunda pasada)** | **~$0.09** |
+| **Total 1 referencia, 1 color, 1 pose — con texturePreserve + upscale + ambos videos** | **~$0.51** |
+| **Total reusando modelo ya guardada (segunda pasada)** | **~$0.46** |
+| **Sin video modelo (catálogo solo fotos)** | **~$0.16** |
 
 ---
 

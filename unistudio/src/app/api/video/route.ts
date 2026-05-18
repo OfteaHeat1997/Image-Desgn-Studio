@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
       provider: providerKey = 'wan-2.2-fast',
       preset,
       prompt: userPrompt,
+      negativePrompt,
       duration = 5,
       aspectRatio = '16:9',
       category = 'product',
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
       provider?: VideoProviderKey;
       preset?: string;
       prompt?: string;
+      negativePrompt?: string;
       duration?: number;
       aspectRatio?: string;
       category?: VideoCategory;
@@ -145,6 +147,11 @@ export async function POST(request: NextRequest) {
             prompt: fullPrompt,
             duration: String(Math.min(duration, 10)),
           };
+          // Kling 2.6 Pro acepta negative_prompt nativamente — útil para
+          // pipeline lencería (modelVideo) que necesita evitar uncanny valley.
+          if (negativePrompt && negativePrompt.trim().length > 0) {
+            falInput.negative_prompt = negativePrompt;
+          }
         } else if (providerKey === 'minimax-hailuo') {
           falInput = {
             image_url: httpImageUrl,

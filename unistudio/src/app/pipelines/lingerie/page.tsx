@@ -527,7 +527,7 @@ const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error
   { id: "photoBack",       label: "Foto Espalda",            description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
   { id: "photoFullBody",   label: "Foto Cuerpo Completo",    description: "Misma modelo de cuerpo entero con short/panty nude + bra (mismo seed, misma identidad)",         icon: User,      cost: "$0.075", enabled: true  },
   { id: "productVideo",    label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
-  { id: "modelVideo",      label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
+  { id: "modelVideo",      label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento humano fotorealista (5s, 9:16). Provider premium Kling 2.6 Pro — apto para catálogo.",    icon: Film,      cost: "$0.35",  enabled: true  },
 ];
 
 function makeSteps(): PipelineStep[] {
@@ -654,17 +654,18 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
     ],
   },
   modelVideo: {
-    what: "Video de la modelo posando con la prenda — movimiento natural, ideal para redes.",
-    provider: "wan-2.2-fast (Replicate). Usa el resultado del tryon; si no hay tryon, la modelo sola.",
+    what: "Video de la modelo posando con la prenda — movimiento humano natural, apto para catálogo de moda. Usa el resultado del tryon (con textura ya restaurada si texturePreserve corrió); si no hay tryon, la modelo sola.",
+    provider: "Kling 2.6 Pro (fal-ai/kling-video/v2.6/pro/image-to-video) — calidad cinematográfica para humanos. wan-2.2-fast (el provider anterior, $0.05) generaba look de muñeco / piel waxy / identidad cambiando entre frames.",
     duration: "60-180 s",
-    costDetail: "$0.05 por video de 5s.",
+    costDetail: "$0.35 por video de 5s (kling-2.6 a $0.07/s).",
     canFail: [
       "Si el tryon falló, el video muestra la modelo con base beige en vez de tu bra.",
-      "wan puede generar movimientos bruscos si el prompt no es específico.",
+      "Kling es más lento que wan — esperá hasta 3 min. Si tarda más, abortá y reintentá.",
     ],
     tips: [
       "Corré primero 'Foto Frontal (tryon)' — así el video usa tu prenda real.",
-      "Reintentá si el movimiento queda feo.",
+      "Activá 'Restaurar Textura' antes — la corrección de tela fluye al video.",
+      "Si querés ahorrar costo, podés desactivar este step (perdés el video, pero las fotos quedan).",
     ],
   },
 };
@@ -725,10 +726,11 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
     isolate: 0.04,       // rango $0.01-$0.04 — SeedDream ghost fallback cuando grounded_sam falla
     model: 0.055,
     tryon: 0.02,
+    texturePreserve: 0.06,  // máscara (~$0.01) + flux-fill-pro inpaint ($0.05)
     photoBack: 0.075,    // model-create (0.055) + tryon (0.02) — nueva modelo con mismo seed + distinta pose
     photoFullBody: 0.075,
-    productVideo: 0.05,
-    modelVideo: 0.05,
+    productVideo: 0.05,  // wan-2.2-fast — calidad standard, ok para producto sin humano
+    modelVideo: 0.35,    // kling-2.6 Pro ($0.07/s × 5s) — premium humano fotorealista
   };
   const enabledSteps = steps.filter((s) => s.enabled);
   let cost = 0;
@@ -2146,16 +2148,20 @@ async function runStep(
 
   if (stepId === "modelVideo") {
     // Usa el URL de la modelo (sharedModelUrl) PRIORITARIAMENTE. Si tryon funcionó
-    // (inputUrl viene del tryon exitoso), usa ese. Si no, fallback al modelo alone.
-    // Así modelVideo produce algo útil incluso cuando tryon falla.
+    // (inputUrl viene del tryon exitoso, o texturePreserve si corrió), usa ese.
+    // Si no, fallback al modelo alone. Así modelVideo produce algo útil incluso
+    // cuando tryon falla.
     const modelVideoUrl = inputUrl && inputUrl !== sharedModelUrl ? inputUrl : (sharedModelUrl ?? inputUrl);
 
     // Acción que ejecuta la modelo: si la usuaria eligió manualmente
-    // (actionOverride) usar esa, sino el default genérico.
+    // (actionOverride) usar esa, sino el default de movimiento humano natural.
     const actionPrompt = actionOverride && actionOverride !== "auto"
       ? VIDEO_ACTION_OPTIONS.find((a) => a.value === actionOverride)?.promptHint
-      : "subtle natural movement, confident elegant pose";
-    const fullPrompt = `Fashion model wearing lingerie, ${actionPrompt}, soft studio lighting, editorial fashion photography`;
+      : "subtle breathing, gentle weight shift from one leg to another, slight head turn, natural blink, hands resting at sides";
+    const fullPrompt = `Realistic woman posing naturally for a fashion catalog wearing lingerie. ${actionPrompt}. Photorealistic skin texture with pores and natural light reflection. Hair moves softly with body movement. No exaggerated motion. Studio lighting consistent across all frames.`;
+    // negative_prompt diseñado para evitar el bug de wan-2.2-fast (look muñeco,
+    // morphing, identidad cambiando entre frames). Kling 2.6 lo acepta nativo.
+    const negativePrompt = "doll-like, plastic skin, waxy face, morphing features, uncanny valley, flickering, identity change, distorted limbs, extra fingers, exaggerated motion, dance moves, jumping, duplicate, split screen";
 
     const res = await fetch("/api/video", {
       method: "POST",
@@ -2164,15 +2170,20 @@ async function runStep(
       body: JSON.stringify({
         imageUrl: modelVideoUrl,
         falImageUrl: falUrl,
-        provider: "wan-2.2-fast",
+        // Kling 2.6 Pro (fal-ai/kling-video/v2.6/pro/image-to-video) — calidad
+        // cinematográfica para humanos. wan-2.2-fast es para productos y genera
+        // personas con look de muñeco / piel waxy / micro-expresiones erráticas.
+        provider: "kling-2.6",
         duration: 5,
         aspectRatio: "9:16",
         prompt: fullPrompt,
+        negativePrompt,
       }),
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "video failed");
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.10 };
+    // Costo: $0.07/s × 5s = $0.35 con kling-2.6.
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.35 };
   }
 
   throw new Error(`Unknown step: ${stepId}`);
