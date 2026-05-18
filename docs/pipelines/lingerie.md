@@ -53,7 +53,16 @@ FOTO ORIGINAL (modelo vistiendo bra/panty/shapewear)
    - máscara: /api/bg-remove con returnMaskOnly:true (grounded_sam B/W)
    - inpaint: flux-fill-pro con prompt que incluye ProductSpec.material
      extraído por Claude Vision en analyze-product (ej "satén elastizado").
-  Output reemplaza el tryon result para downstream (modelVideo).
+  Output reemplaza el tryon result para downstream (modelVideo, photoFullBody).
+
+[PASO 3c] /api/outpaint (provider:flux-fill-pro, direction:'down') — photoFullBody
+  Extiende el canvas del tryon (o texturePreserve) hacia abajo +65% para
+  agregar piernas + panty nude SIN regenerar la modelo. Garantiza misma cara
+  y mismo bra real porque solo agrega canvas vacío y deja que flux-fill-pro
+  rellene la zona inpaint con prompt anclado al upper body. Sin model-create
+  ni tryon adicionales — sale $0.05 en vez de $0.075 de la implementación
+  anterior, que regeneraba la modelo (con bug de identidad distinta entre
+  tryon y full-body).
          |
          v
 [PASO 4] /api/enhance (Sharp local, gratis)
@@ -115,6 +124,7 @@ El pipeline rutea según `garmentType` detectado por `analyze-image` (Claude Vis
 | `/api/model-create` (SeedDream 4.5) | $0.055 — **$0 si reusa modelo guardada** |
 | `/api/tryon` (Kolors v1.5) | $0.02 |
 | `/api/inpaint` (flux-fill-pro, texturePreserve opcional) | ~$0.05 |
+| `/api/outpaint` (flux-fill-pro, photoFullBody) | $0.05 |
 | `/api/enhance` (Sharp) | $0 |
 | `/api/upscale` (opcional) | $0.02–$0.05 |
 | Video producto 360° (wan-2.2-fast) | $0.05 |
@@ -156,6 +166,22 @@ Naming output: `output/lingerie/bra/REF-{sku}/{color}-{angle}-AI.jpg`.
 | 413 al guardar resultado | Payload > 4.5MB en body | Usar `/api/upload` primero, guardar URL — no data URI |
 | Video duplica el producto | wan-2.2-fast sin `negative_prompt` | Pasar `negative_prompt: "duplicate, repeating, clone, multiple bodies"` + `guidance_scale: 3.0` |
 | Foto Espalda muestra un bra distinto al original | Kolors recibió la vista FRONTAL como garment ref y "inventó" la espalda | El step ahora se SALTA con warning si no hay foto etiquetada "espalda". Subí la foto trasera real y reintentá. |
+
+---
+
+## photoFullBody — Outpainting sobre tryon (no regeneración)
+
+El step `photoFullBody` ahora **extiende el canvas del tryon hacia abajo con outpaint flux-fill-pro** en vez de regenerar la modelo con un seed compartido. Es un cambio de estrategia importante:
+
+**Bug previo (corregido):** la implementación anterior corría `model-create(seed=X)` + `Kolors(modelo nueva, prenda)` para photoFullBody. Dos problemas combinados:
+1. **No era full body.** SeedDream con un prompt cargado de detalles de prenda ignoraba el "full body" → mismo crop 3/4 que el tryon.
+2. **No era la misma modelo.** "Mismo seed = misma identidad" es falso en SeedDream — el seed solo controla el ruido inicial; cambiar el prompt produce personas distintas.
+
+**Solución actual:** extender el canvas del resultado del tryon (o de texturePreserve si corrió) hacia abajo un 65% con `direction:'down'` en `/api/outpaint`. El servidor arma el canvas extendido + máscara con Sharp, y llama a flux-fill-pro vía Replicate (que no rechaza lencería como Kontext Pro). El upper body (cara, pelo, bra, torso) se preserva píxel-idéntico; solo se inpaintea la región nueva (piernas + briefs nude + fondo continuo).
+
+**Dependencia explícita:** `photoFullBody` ahora requiere `tryon` completado. Si solo está el isolate, el step se salta con mensaje claro. Si `texturePreserve` corrió, se prefiere ese como base (la textura corregida se mantiene en el resultado).
+
+**Costo:** baja de $0.075 a $0.05 por foto (un solo round-trip Replicate).
 
 ---
 

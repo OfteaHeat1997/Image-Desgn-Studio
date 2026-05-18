@@ -525,7 +525,7 @@ const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error
   { id: "tryon",           label: "Foto Frontal (opcional)", description: "Vestir la modelo IA con TU prenda, vista frontal 3/4. Si falla, el pipeline sigue con el resto.", icon: Shirt,     cost: "$0.02",  enabled: true  },
   { id: "texturePreserve", label: "Restaurar Textura",       description: "Inpaint sobre la zona del bra para recuperar la textura real de la prenda (Kolors la deja satinada/plástica).", icon: Sparkles,  cost: "$0.05",  enabled: true  },
   { id: "photoBack",       label: "Foto Espalda",            description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
-  { id: "photoFullBody",   label: "Foto Cuerpo Completo",    description: "Misma modelo de cuerpo entero con short/panty nude + bra (mismo seed, misma identidad)",         icon: User,      cost: "$0.075", enabled: true  },
+  { id: "photoFullBody",   label: "Foto Cuerpo Completo",    description: "Extiende el resultado del try-on hacia abajo con outpaint — misma cara y mismo bra real, agrega piernas + panty nude. NO regenera la modelo.", icon: User,      cost: "$0.05",  enabled: true  },
   { id: "productVideo",    label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
   { id: "modelVideo",      label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento humano fotorealista (5s, 9:16). Provider premium Kling 2.6 Pro — apto para catálogo.",    icon: Film,      cost: "$0.35",  enabled: true  },
 ];
@@ -626,17 +626,17 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
     ],
   },
   photoFullBody: {
-    what: "Genera una foto de la modelo de cuerpo entero con bra + briefs nude (shaper shorts).",
-    provider: "model-create (SeedDream con mismo seed) + Kolors Try-On.",
-    duration: "30-90 s",
-    costDetail: "$0.075 ($0.055 modelo + $0.02 tryon).",
+    what: "Extiende el resultado del try-on hacia abajo con outpainting — agrega piernas + panty nude SIN regenerar la modelo. Garantiza misma cara y mismo bra real porque solo agrega canvas, no genera persona nueva.",
+    provider: "/api/outpaint (flux-fill-pro con direction:'down', expandRatio:0.65) sobre el resultado del paso tryon (o texturePreserve si corrió).",
+    duration: "20-50 s",
+    costDetail: "$0.05 — outpaint solo, sin model-create ni tryon adicionales (antes era $0.075 con bugs).",
     canFail: [
-      "Si el prompt confunde a SeedDream, los shaper shorts pueden salir como pantalones largos marrones (bug histórico ya fixeado).",
-      "La identidad se preserva con seed — pero la iluminación puede variar vs la frontal.",
+      "Si tryon falló, este step no tiene canvas sobre el cual extender — falla con mensaje claro.",
+      "El outpaint puede generar piernas anatómicamente raras si la pose original es muy de 3/4 — usar pose 'frontal' en tryon para mejor resultado.",
     ],
     tips: [
-      "Si salió mal, rehacé — el seed es el mismo pero el random de la composición cambia.",
-      "Para precisión absoluta, subí una foto real de cuerpo completo y etiquetala como 'Flat lay' o 'Otra'.",
+      "Corré primero 'Foto Frontal (tryon)' — y opcionalmente 'Restaurar Textura' antes — para que el outpaint extienda sobre la mejor versión.",
+      "Si las piernas salen raras, reintentá — flux-fill-pro varía con random seed.",
     ],
   },
   productVideo: {
@@ -728,7 +728,7 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
     tryon: 0.02,
     texturePreserve: 0.06,  // máscara (~$0.01) + flux-fill-pro inpaint ($0.05)
     photoBack: 0.075,    // model-create (0.055) + tryon (0.02) — nueva modelo con mismo seed + distinta pose
-    photoFullBody: 0.075,
+    photoFullBody: 0.05,    // outpaint flux-fill-pro sobre tryon — NO regenera modelo+tryon
     productVideo: 0.05,  // wan-2.2-fast — calidad standard, ok para producto sin humano
     modelVideo: 0.35,    // kling-2.6 Pro ($0.07/s × 5s) — premium humano fotorealista
   };
@@ -1942,13 +1942,50 @@ async function runStep(
     return { resultUrl: json.data.url, cost: json.cost ?? 0.055, newModelUrl: json.data.url, newSeed: generatedSeed };
   }
 
-  // photoBack y photoFullBody: generan una SEGUNDA foto reusando el seed de la
-  // modelo original → misma identidad, distinta pose. Fujo interno:
-  // 1. model-create(seed, pose=back-view|standing-full-body) → modelo en pose nueva
-  // 2. tryon Kolors(modelo nueva, garment aislado) → foto final
-  if (stepId === "photoBack" || stepId === "photoFullBody") {
+  // photoFullBody: extiende el resultado del tryon (o texturePreserve si corrió)
+  // hacia abajo con outpaint flux-fill-pro. Bug previo: usaba model-create +
+  // Kolors con el "mismo seed" pero SeedDream con prompt distinto genera otra
+  // persona — daba modelo diferente al tryon + 3:4 crop (no era full body).
+  // Ahora extiende el canvas, no regenera: misma cara + mismo bra real garantizado.
+  if (stepId === "photoFullBody") {
+    if (!isLingerieFlow) {
+      throw new Error("Foto Cuerpo Completo solo aplica a lencería.");
+    }
+    // inputUrl en este step viene de stepResults.texturePreserve si corrió,
+    // o stepResults.tryon. Si ninguno corrió, fallamos con mensaje claro.
+    if (!inputUrl || inputUrl === sharedModelUrl) {
+      throw new Error("Foto Cuerpo Completo necesita el resultado del Try-On (o de Restaurar Textura). Corré esos pasos primero.");
+    }
+    const promptDown = `Continue the photograph downward to show the full body of the same woman from the upper half. Same skin tone, same body proportions, narrow hips, wearing nude beige seamless briefs (panty), bare legs, standing pose with feet visible, clean white studio background continuing from above, soft studio lighting consistent with the upper half, photorealistic, sharp focus, e-commerce catalog photography. The upper half (face, hair, bra, torso) must remain pixel-identical.`;
+    const negativeDown = "different person, different body, different skin, change of face, change of hairstyle, new clothes on torso, different background, harsh shadows, low quality, plastic skin, distorted limbs, extra fingers, multiple people";
+
+    const outpaintRes = await fetch("/api/outpaint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        imageUrl: inputUrl,
+        provider: "flux-fill-pro",
+        direction: "down",
+        expandRatio: 0.65,
+        prompt: promptDown,
+        negativePrompt: negativeDown,
+      }),
+    });
+    const outpaintJson = await outpaintRes.json();
+    if (!outpaintJson.success) throw new Error(outpaintJson.error || "Foto Cuerpo Completo: outpaint falló");
+    return { resultUrl: outpaintJson.data.url, cost: outpaintJson.data.cost ?? 0.05 };
+  }
+
+  // photoBack: genera una SEGUNDA foto reusando el seed de la modelo original
+  // → distinta pose (espalda). Fujo interno:
+  // 1. model-create(seed, pose=back-view) → modelo de espaldas
+  // 2. tryon Kolors(modelo nueva, foto de espalda real) → foto final
+  // Sin foto de espalda real, el step se salta antes de llegar acá (guard en
+  // processStep) porque Kolors no sabe rotar 180° desde la frontal.
+  if (stepId === "photoBack") {
     if (!isolatedGarmentUrl) {
-      throw new Error(`${stepId === "photoBack" ? "Foto Espalda" : "Foto Cuerpo Completo"} necesita la prenda aislada. Activá el paso 'Aislar Producto'.`);
+      throw new Error("Foto Espalda necesita la prenda aislada. Activá el paso 'Aislar Producto'.");
     }
     if (!isLingerieFlow) {
       throw new Error("Estas fotos extra solo aplican a lencería.");
@@ -2960,6 +2997,19 @@ export default function LingeriePipelinePage() {
           return false;
         }
         inputForStep = stepResults.tryon;
+      } else if (stepDef.id === "photoFullBody") {
+        // photoFullBody hace outpaint downward sobre el resultado del tryon. Si
+        // texturePreserve corrió, usamos ESE (textura ya corregida) — sino, tryon
+        // crudo. Sin ninguno, no podemos extender canvas → skip con mensaje claro.
+        const baseUrl = stepResults.texturePreserve || stepResults.tryon;
+        if (!baseUrl) {
+          updateStep(jobId, stepDef.id, {
+            status: "skipped",
+            error: "Foto Cuerpo Completo necesita el resultado del Try-On. Corré ese paso primero.",
+          });
+          return false;
+        }
+        inputForStep = baseUrl;
       } else if (stepDef.id === "tryon") {
         // tryon → Kolors (fal.ai). Preferir URLs de fal nativas para evitar
         // el round-trip Replicate→fal en ensureFalAccessibleUrl que descarga

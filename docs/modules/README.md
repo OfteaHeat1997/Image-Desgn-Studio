@@ -15,7 +15,7 @@
 | 3 | Enhance | `/api/enhance` | Sharp local | Los 3 pipelines |
 | 4 | Shadows | `/api/shadows` | Sharp (contact/drop/reflection), Replicate Flux (AI relight) | Estáticos, Joyería |
 | 5 | Inpaint | `/api/inpaint` | Flux Fill Dev, Flux Fill Pro, Kontext Pro | **Lencería** (step `texturePreserve` — flux-fill-pro restaura tela del bra post-tryon), uso manual vía editor |
-| 6 | Outpaint | `/api/outpaint` | Flux Kontext Pro | Ninguno (uso manual) |
+| 6 | Outpaint | `/api/outpaint` | Flux Kontext Pro, **Flux Fill Pro** (direction mode con canvas+mask server-side) | **Lencería** (step `photoFullBody` extiende tryon hacia abajo, sin regenerar modelo), uso manual vía editor |
 | 7 | Upscale | `/api/upscale` | Real-ESRGAN, Aura SR, Clarity | Lencería (opcional), Joyería (obligatorio) |
 | 8 | Try-On | `/api/tryon` | Kolors v1.5 (fal), FASHN v1.6, IDM-VTON | Lencería (forzado kolors) |
 | 9 | Model Create | `/api/model-create` | SeedDream 4.5 (fal), Flux Kontext Pro | Lencería, Joyería |
