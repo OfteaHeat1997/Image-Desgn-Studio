@@ -1,5 +1,77 @@
 # UniStudio — Changelog
 
+## 2026-05-18 — Pipeline de lencería: 6 fixes (catálogo subible)
+
+Sesión con 6 fixes consecutivos al pipeline `/pipelines/lingerie` para
+elevar la calidad de "catálogo falso" a "catálogo subible". Bugs reportados
+por la usuaria final + diagnóstico de costos del provider de video.
+
+### Fixes críticos (catálogo era falso o no descargable)
+
+**Descarga de resultados ya no falla** (`e18fff4`):
+- `/api/proxy-image` ahora acepta `filename` y devuelve `Content-Disposition: attachment`. Antes Chrome a veces abría la imagen inline en vez de bajarla.
+- Resultados se persisten como base64 dataURL en `gallery-store` ANTES de guardar — las URLs de fal.media caducan en horas, y la galería quedaba inutil.
+- Cuando upstream devuelve 403/404 (URL caducada), el proxy reporta `expired:true` y la UI muestra toast claro "Este archivo expiró. Volvé a generarlo desde la galería."
+
+**photoBack ya no inventa un bra distinto** (`b4e5afe`):
+- Si la usuaria no subía foto del producto desde atrás, Kolors recibía la vista FRONTAL como garment reference y generaba un bra random (sports bra con criss-cross, mesh, broche al frente — lo opuesto del producto). Resultado: catálogo falso.
+- Guard en `processStep`: si no hay foto del mismo `referenceKey` con angle `"espalda"`, el step se salta con banner amber + botón "Ir a subir foto de espalda" que scrollea al setup.
+- Hint visible en la zona de upload listando qué fotos son obligatorias vs opcionales por step.
+
+**photoFullBody ahora es full body REAL con la misma modelo** (`ad254fc`):
+- Implementación previa: `model-create(seed=X)` + `Kolors(modelo nueva, prenda)`. Dos bugs: (1) SeedDream con prompt cargado ignoraba "full body" → mismo crop 3/4 que el tryon; (2) "mismo seed = misma identidad" es falso en SeedDream (el seed solo controla ruido inicial; cambiar el prompt produce personas distintas).
+- Solución: extender el canvas del tryon (o texturePreserve si corrió) hacia abajo +65% con outpaint flux-fill-pro. Server-side: Sharp arma el canvas extendido y máscara, Replicate corre flux-fill-pro (que no rechaza lencería como Kontext). El upper body (cara, pelo, bra, torso) se preserva píxel-idéntico.
+- Costo: $0.075 → $0.05 por foto. Dependencia nueva: `photoFullBody` requiere `tryon` completado.
+- `/api/outpaint` extendido con modo `direction:'down'`/`'up'`/`'left'`/`'right'` + `expandRatio` + `flux-fill-pro` provider. Modo Kontext aspect-ratio sigue funcionando como antes.
+
+**modelVideo ya no parece muñeco** (`70a7322`):
+- Antes: `wan-2.2-fast` ($0.05) — provider de calidad standard diseñado para objetos. Producía humanos con skin waxy, micro-expresiones erráticas, hair sin física, identidad cambiando entre frames.
+- Ahora: `kling-2.6` Pro (`fal-ai/kling-video/v2.6/pro/image-to-video`) — calidad cinematográfica para humanos. Costo: $0.07/s × 5s = $0.35.
+- Prompt diseñado contra uncanny valley (respiración, weight shift, blink, no morphing) + `negative_prompt` plumb al falInput de kling-2.6 (`/api/video` ahora acepta `negativePrompt`).
+- `productVideo` se queda en wan-2.2-fast (no tiene humano, la diferencia no se nota → ahorra $0.30 por foto).
+
+### Mejoras de calidad visual
+
+**texturePreserve** (`2c5b6b7`):
+- Nuevo step opcional post-tryon que inpaintea la zona del bra con flux-fill-pro para recuperar la textura real (Kolors la deja satinada/plástica genérica).
+- `/api/bg-remove` nuevo flag `returnMaskOnly:true` que reusa el step de grounded_sam como source de máscara B/W cruda, sin componer.
+- El prompt de inpaint incorpora `ProductSpec.material` extraído por Claude Vision en el análisis previo (ej "satén elastizado", "encaje floral", "mesh").
+- Su resultado reemplaza el tryon como input downstream para `modelVideo` y `photoFullBody` (la textura corregida fluye al video y al cuerpo completo).
+- Caveat documentado: flux-fill-pro NO acepta imagen de referencia — la fidelidad de textura depende del prompt-engineering, no de píxeles. Para texturas custom extremas el resultado es aproximación, no copia exacta.
+- Costo +$0.05 por foto (≈$0.01 máscara + $0.05 inpaint).
+
+### Mejoras de performance
+
+**Paralelizar isolate + model** (`9fbc726`):
+- Eran inputs INDEPENDIENTES a tryon (isolate solo usa uploadedUrl; model no usa input, genera persona desde prompts). Ahora corren con `Promise.all` cuando ambos están enabled como los dos primeros steps. Ahorro: ~25-35s por foto.
+- Refactor del body del per-step loop a una función `processStep(stepDef)` reusable. Loop serial sigue funcionando para el resto de steps.
+- Preserva: `AbortController` (ambos abortan junto), multi-sample, saltar manual, sharedModel/seed.
+- Pendiente: extender fases C/D (photoBack+productVideo, photoFullBody+modelVideo en paralelo) — requiere reescritura más grande del orquestador, queda para otra pasada.
+
+### Costos por foto (1 ref, 1 color)
+
+| Configuración | Antes | Después |
+|---|---|---|
+| Solo fotos (frontal+espalda+full body), sin videos | ~$0.15 | ~$0.21 |
+| Solo fotos + texturePreserve | n/a | ~$0.26 |
+| Todo (fotos + texturePreserve + videos producto + video modelo) | ~$0.30 | ~$0.66 |
+| Reusando modelo guardada (segunda pasada) | ~$0.09 | ~$0.51 |
+
+El salto grande viene de modelVideo (wan→kling, +$0.30). Si en batch grande la usuaria quiere bajar costos, puede desactivar el step `modelVideo` desde la UI por job.
+
+### Verificación pendiente (visual, manos de la usuaria)
+
+- **FIX #1 textura del bra:** generar un bra completo con/sin `texturePreserve` activado, comparar lado a lado. Si la textura del bra mejora pero el ajuste se desplaza, bajar strength en runStep (línea ~2120 de page.tsx).
+- **FIX #5 photoFullBody:** confirmar que la cara y el bra de `photoFullBody` son IDÉNTICOS a `tryon`/`texturePreserve` (solo cambia que ahora se ven piernas y panty abajo). Si las piernas salen anatómicamente raras, usar pose 'frontal' en tryon antes (no 3/4).
+- **FIX #6 modelVideo:** comparar un modelVideo viejo (wan-2.2-fast en commits anteriores) contra uno nuevo (kling-2.6). La mejora debe ser obvia: skin con poros, expresiones sutiles, no morphing entre frames.
+
+### Pendientes flagged
+
+- Extender FIX #3 a las fases C y D (paralelizar photoBack+productVideo y photoFullBody+modelVideo). Beneficio adicional: -45s a -90s por foto. No es bloqueante para correctness.
+- Cap de costos para batch grande (toggle "Modo económico" que baje modelVideo a wan-2.2-fast). 50 fotos × $0.35 = $17.50 solo en videos.
+
+---
+
 ## 2026-04-30 — Pipelines: producto 100% basado en la foto subida (7 commits)
 
 Branch `claude/fix-pipeline-tests-aOzQG`. Bug crítico reportado en testing real: _"ninguna reconoce, cambia el producto o cambia lencería o colonia o otras cosas, nunca lo está haciendo correcto"_ + _"esos procesos no me gustan, no funcionan, y son muy básicos, muy malos"_.
