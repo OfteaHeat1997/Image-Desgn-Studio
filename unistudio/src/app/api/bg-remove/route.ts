@@ -77,6 +77,7 @@ function garmentTypeToPrompt(garmentType: string | null): string {
 async function isolateGarment(
   imageUrl: string,
   garmentType: string | null,
+  returnMaskOnly = false,
 ): Promise<string> {
   // Load the image as a buffer so we can both ship it to the segmentation
   // model (needs an HTTP URL) and keep the pixel data locally for masking.
@@ -269,12 +270,19 @@ async function isolateGarment(
 
   console.log(`[bg-remove:isolate] using mask coverage=${bestCoverage.toFixed(3)}`);
 
-  // Compose: prepared RGB + mask as alpha → PNG with only the garment visible.
-  const isolated = await sharp(prepared)
-    .ensureAlpha()
-    .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
-    .png()
-    .toBuffer();
+  // returnMaskOnly: usado por texturePreserve (lingerie pipeline). En vez de
+  // componer la prenda aislada, devolvemos la máscara B/W cruda como PNG
+  // grayscale — necesaria para inpaintear con flux-fill-pro la zona del bra
+  // sobre el resultado del tryon.
+  const isolated = returnMaskOnly
+    ? await sharp(bestMask, { raw: { width, height, channels: 1 } })
+        .png()
+        .toBuffer()
+    : await sharp(prepared)
+        .ensureAlpha()
+        .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
+        .png()
+        .toBuffer();
 
   // Upload the result directly to fal storage — Kolors/Wan se alimentan de fal.
   // Retry 3× antes de fallar. NO caer a Replicate — las URLs api.replicate.com/v1/files/*
@@ -298,11 +306,12 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
     garmentType?: string | null;
+    returnMaskOnly?: boolean;
     options?: Record<string, unknown>;
   };
 
@@ -328,6 +337,26 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
   if (removeSubject) {
     let resultUrl: string;
     let usedProvider = 'grounded-sam-isolate';
+
+    // returnMaskOnly: bypass del fallback SeedDream/rembg. La máscara solo se
+    // saca del primer step (grounded_sam) — los fallbacks producen una imagen
+    // compuesta, no una máscara, así que no aplican. Si grounded_sam falla,
+    // fallamos hacia arriba con error claro.
+    if (returnMaskOnly) {
+      const maskUrl = await isolateGarment(imageUrl, garmentType ?? null, true);
+      await saveJob({
+        operation: 'bg-remove',
+        provider: 'grounded-sam-mask',
+        inputParams: { imageUrl, removeSubject: true, garmentType, returnMaskOnly: true },
+        outputUrl: maskUrl,
+        cost: ISOLATE_COST,
+      });
+      return NextResponse.json({
+        success: true,
+        data: { url: maskUrl, maskUrl, provider: 'grounded-sam-mask' },
+        cost: ISOLATE_COST,
+      });
+    }
 
     try {
       // 1. PRIMARIO — grounded_sam.

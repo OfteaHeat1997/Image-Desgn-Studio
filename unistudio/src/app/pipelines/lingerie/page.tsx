@@ -137,7 +137,7 @@ async function urlToDataUrl(url: string): Promise<string> {
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StepId = "isolate" | "model" | "tryon" | "photoBack" | "photoFullBody" | "productVideo" | "modelVideo";
+type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoBack" | "photoFullBody" | "productVideo" | "modelVideo";
 type StepStatus = "idle" | "pending" | "processing" | "done" | "error" | "skipped" | "accepted";
 type Phase = "setup" | "pipeline";
 
@@ -520,13 +520,14 @@ interface ModelConfig {
 // de modelo en distintas poses (mismo rostro, cuerpo, tono piel). Sin seed
 // compartido serían modelos diferentes en cada foto.
 const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error" | "cost_actual">[] = [
-  { id: "isolate",       label: "Aislar Producto",        description: "Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D", icon: Scissors,  cost: "$0.01-$0.04",  enabled: true  },
-  { id: "model",         label: "Crear Modelo IA",        description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
-  { id: "tryon",         label: "Foto Frontal (opcional)", description: "Vestir la modelo IA con TU prenda, vista frontal 3/4. Si falla, el pipeline sigue con el resto.", icon: Shirt,     cost: "$0.02",  enabled: true  },
-  { id: "photoBack",     label: "Foto Espalda",           description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
-  { id: "photoFullBody", label: "Foto Cuerpo Completo",   description: "Misma modelo de cuerpo entero con short/panty nude + bra (mismo seed, misma identidad)",         icon: User,      cost: "$0.075", enabled: true  },
-  { id: "productVideo",  label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
-  { id: "modelVideo",    label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
+  { id: "isolate",         label: "Aislar Producto",         description: "Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D", icon: Scissors,  cost: "$0.01-$0.04",  enabled: true  },
+  { id: "model",           label: "Crear Modelo IA",         description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
+  { id: "tryon",           label: "Foto Frontal (opcional)", description: "Vestir la modelo IA con TU prenda, vista frontal 3/4. Si falla, el pipeline sigue con el resto.", icon: Shirt,     cost: "$0.02",  enabled: true  },
+  { id: "texturePreserve", label: "Restaurar Textura",       description: "Inpaint sobre la zona del bra para recuperar la textura real de la prenda (Kolors la deja satinada/plástica).", icon: Sparkles,  cost: "$0.05",  enabled: true  },
+  { id: "photoBack",       label: "Foto Espalda",            description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
+  { id: "photoFullBody",   label: "Foto Cuerpo Completo",    description: "Misma modelo de cuerpo entero con short/panty nude + bra (mismo seed, misma identidad)",         icon: User,      cost: "$0.075", enabled: true  },
+  { id: "productVideo",    label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
+  { id: "modelVideo",      label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento natural posando (5s, 9:16)",    icon: Film,      cost: "$0.05",  enabled: true  },
 ];
 
 function makeSteps(): PipelineStep[] {
@@ -586,10 +587,28 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
     canFail: [
       "image_load_error: el archivo intermedio no llegó a fal.ai (suele ser URL temporal caída).",
       "Kolors reinterpreta la prenda en ángulos raros — el frente queda fiel, los laterales varían.",
+      "Tela queda con aspecto satinado/plástico — Kolors la regenera en vez de copiar píxeles. El paso 'Restaurar Textura' corrige esto.",
     ],
     tips: [
       "Este paso es OPCIONAL — si falla, el pipeline sigue con los demás.",
       "Reintentá una vez antes de saltarlo.",
+      "Dejá 'Restaurar Textura' activado para recuperar la tela real después del tryon.",
+    ],
+  },
+  texturePreserve: {
+    what: "Inpaint dirigido sobre la zona del bra para recuperar la textura real (satinada, encaje, mesh) que Kolors aplana en una superficie plástica genérica.",
+    provider: "grounded_sam (máscara del bra) + flux-fill-pro (Replicate, inpaint con prompt de material). Usa ProductSpec.material extraída por Claude Vision en el análisis previo.",
+    duration: "20-50 s",
+    costDetail: "$0.05 (≈$0.01 máscara + $0.05 flux-fill-pro).",
+    canFail: [
+      "Si la máscara del bra no se detecta (poca luz, fondo complejo), el step se salta sin error.",
+      "Inpaint puede correr el ajuste del bra al cuerpo en 1-2 píxeles — si pasa, bajar el strength.",
+      "flux-fill-pro no acepta imagen de referencia directa — la textura se guía por prompt (ProductSpec.material) y prompt-engineering. Para texturas muy específicas (encaje custom, prints), el resultado es aproximado.",
+    ],
+    tips: [
+      "Si el bra original ya se ve bien en el tryon, podés saltar este paso.",
+      "Funciona mejor cuando el productSpec tiene material identificado (ej 'satén elastizado', 'encaje floral').",
+      "Si la textura quedó muy distinta, reintentá — flux-fill-pro varía con random seed.",
     ],
   },
   photoBack: {
@@ -1841,6 +1860,13 @@ async function runStep(
    * undefined, se usa el default genérico.
    */
   actionOverride?: VideoActionOption,
+  /**
+   * Material extraído por Claude Vision en el análisis previo (ej "satén
+   * elastizado", "encaje floral", "mesh transparente"). Lo usa
+   * texturePreserve para guiar el prompt de flux-fill-pro hacia la textura
+   * correcta — flux-fill-pro NO acepta imagen de referencia, solo texto.
+   */
+  materialHint?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -2029,6 +2055,74 @@ async function runStep(
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "tryon failed");
     return { resultUrl: json.data.url, cost: json.cost ?? 0.02 };
+  }
+
+  if (stepId === "texturePreserve") {
+    // Solo aplica a lencería — fuera de ese flujo el step queda como passthrough.
+    if (!isLingerieFlow) {
+      console.warn("[lingerie] texturePreserve: flujo no-lencería, devolviendo input sin cambios");
+      return { resultUrl: inputUrl, cost: 0 };
+    }
+
+    // 1. Obtener máscara B/W de la zona del bra sobre el resultado del tryon.
+    //    Reusamos /api/bg-remove con returnMaskOnly:true — el módulo expone la
+    //    máscara cruda de grounded_sam sin componerla con la imagen.
+    const maskRes = await fetch("/api/bg-remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        imageUrl: inputUrl,
+        provider: "replicate",
+        removeSubject: true,
+        garmentType: garmentTypeForApi,
+        returnMaskOnly: true,
+      }),
+    });
+    const maskJson = await maskRes.json();
+    if (!maskJson.success) {
+      // Si no se detecta la prenda en el tryon (imagen muy oscura, fondo
+      // complejo), no podemos inpaintear — devolvemos el tryon como está y
+      // logueamos. No es un error, solo una mejora opcional que no aplicó.
+      console.warn("[lingerie] texturePreserve: no se pudo extraer máscara, skip");
+      return { resultUrl: inputUrl, cost: 0 };
+    }
+    const maskUrl: string = maskJson.data.maskUrl ?? maskJson.data.url;
+
+    // 2. Inpaint con flux-fill-pro. El prompt incorpora el material extraído
+    //    por Claude Vision (ProductSpec.material) cuando está disponible. NOTA:
+    //    flux-fill-pro NO acepta imagen de referencia — la fidelidad de textura
+    //    depende del prompt-engineering, no de píxeles. Para texturas custom
+    //    extremas el resultado es una aproximación, no una copia exacta.
+    const materialPhrase = materialHint && materialHint.trim().length > 0
+      ? `${materialHint} fabric`
+      : "satin/lace fabric";
+    const garmentNoun =
+      productType === "panty" ? "panty"
+      : productType === "faja" ? "shapewear"
+      : productType === "set" ? "lingerie set"
+      : "bra";
+
+    const inpaintPrompt = `Preserve the exact ${materialPhrase} texture, weave, sheen and material of this ${garmentNoun}. Photorealistic ${materialPhrase} with natural folds, soft highlights, original product color. The garment fit, position and silhouette must remain unchanged. High-detail fabric weave visible.`;
+    const negative = "plastic look, latex, vinyl, smooth artificial surface, fake material, oversaturated, blurry, melted, distorted";
+
+    const inpaintRes = await fetch("/api/inpaint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        imageUrl: inputUrl,
+        maskUrl,
+        prompt: `${inpaintPrompt}. Avoid: ${negative}.`,
+        provider: "flux-fill-pro",
+      }),
+    });
+    const inpaintJson = await inpaintRes.json();
+    if (!inpaintJson.success) {
+      console.warn("[lingerie] texturePreserve: inpaint falló, fallback a tryon original:", inpaintJson.error);
+      return { resultUrl: inputUrl, cost: 0.01 };  // pagamos solo la máscara
+    }
+    return { resultUrl: inpaintJson.data.url, cost: 0.01 + (inpaintJson.data.cost ?? 0.05) };
   }
 
   if (stepId === "productVideo") {
@@ -2706,6 +2800,12 @@ export default function LingeriePipelinePage() {
         ? { ...modelConfig, bodyType: job.suggestedBodyType }
         : modelConfig;
 
+      // ProductSpec.material extraída por Claude Vision en el análisis previo
+      // del job. Lo usa texturePreserve para guiar el prompt de flux-fill-pro
+      // hacia la textura correcta. Si no hay spec (jobs restaurados o análisis
+      // que falló), el step usa un default genérico "satin/lace fabric".
+      const materialHint = job.productSpec?.material?.trim() || undefined;
+
       return await runStep(
         step.id,
         inputUrl,
@@ -2722,6 +2822,7 @@ export default function LingeriePipelinePage() {
         fashnMode,
         step.poseOverride,
         step.actionOverride,
+        materialHint,
       );
     } finally {
       abortControllersRef.current.delete(key);
@@ -2836,9 +2937,18 @@ export default function LingeriePipelinePage() {
       // Determine input: for tryon use sharedModelUrl is handled in runStep
       let inputForStep = lastResultUrl;
       if (stepDef.id === "modelVideo") {
-        // modelVideo usa tryon result (modelo + prenda). Si tryon no corrió,
-        // cae a la modelo IA sola (sharedModel) — es un fallback razonable.
-        inputForStep = stepResults.tryon || newSharedModel || lastResultUrl;
+        // modelVideo usa el resultado del tryon (con textura ya corregida si
+        // texturePreserve corrió). Si nada de eso existe, cae al sharedModel solo.
+        inputForStep = stepResults.texturePreserve || stepResults.tryon || newSharedModel || lastResultUrl;
+      } else if (stepDef.id === "texturePreserve") {
+        // texturePreserve necesita el resultado del tryon — la imagen modelo+prenda
+        // donde Kolors dejó la tela plástica. Sin tryon, no hay nada que corregir.
+        if (!stepResults.tryon) {
+          console.warn("[lingerie] texturePreserve: tryon no corrió, skip");
+          updateStep(jobId, stepDef.id, { status: "skipped", error: "Sin resultado del tryon — no hay nada para texturizar." });
+          return false;
+        }
+        inputForStep = stepResults.tryon;
       } else if (stepDef.id === "tryon") {
         // tryon → Kolors (fal.ai). Preferir URLs de fal nativas para evitar
         // el round-trip Replicate→fal en ensureFalAccessibleUrl que descarga

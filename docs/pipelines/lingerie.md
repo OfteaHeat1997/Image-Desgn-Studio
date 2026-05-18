@@ -47,6 +47,15 @@ FOTO ORIGINAL (modelo vistiendo bra/panty/shapewear)
   Inputs: human_image_url (modelo IA del paso 2), garment_image_url (prenda aislada del paso 1)
          |
          v
+[PASO 3b] /api/inpaint (provider:flux-fill-pro) — texturePreserve
+  Kolors regenera la prenda en superficie satinada/plástica genérica.
+  Este step inpaintea la zona del bra para restaurar la textura real.
+   - máscara: /api/bg-remove con returnMaskOnly:true (grounded_sam B/W)
+   - inpaint: flux-fill-pro con prompt que incluye ProductSpec.material
+     extraído por Claude Vision en analyze-product (ej "satén elastizado").
+  Output reemplaza el tryon result para downstream (modelVideo).
+         |
+         v
 [PASO 4] /api/enhance (Sharp local, gratis)
   Contraste + nitidez + saturación
          |
@@ -104,6 +113,7 @@ El pipeline rutea según `garmentType` detectado por `analyze-image` (Claude Vis
 | `/api/bg-remove` (grounded_sam + composite) | ~$0.01 |
 | `/api/model-create` (SeedDream 4.5) | $0.055 — **$0 si reusa modelo guardada** |
 | `/api/tryon` (Kolors v1.5) | $0.02 |
+| `/api/inpaint` (flux-fill-pro, texturePreserve opcional) | ~$0.05 |
 | `/api/enhance` (Sharp) | $0 |
 | `/api/upscale` (opcional) | $0.02–$0.05 |
 | Video modelo (wan-2.2-fast opcional) | $0.05 |

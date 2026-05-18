@@ -14,7 +14,7 @@
 | 2 | BG Generate | `/api/bg-generate` | Flux Schnell (fast), Flux Pro (precise), Flux Kontext (creative) | Estáticos, Joyería |
 | 3 | Enhance | `/api/enhance` | Sharp local | Los 3 pipelines |
 | 4 | Shadows | `/api/shadows` | Sharp (contact/drop/reflection), Replicate Flux (AI relight) | Estáticos, Joyería |
-| 5 | Inpaint | `/api/inpaint` | Flux Fill Dev, Flux Fill Pro, Kontext Pro | Ninguno actualmente (uso manual vía editor) |
+| 5 | Inpaint | `/api/inpaint` | Flux Fill Dev, Flux Fill Pro, Kontext Pro | **Lencería** (step `texturePreserve` — flux-fill-pro restaura tela del bra post-tryon), uso manual vía editor |
 | 6 | Outpaint | `/api/outpaint` | Flux Kontext Pro | Ninguno (uso manual) |
 | 7 | Upscale | `/api/upscale` | Real-ESRGAN, Aura SR, Clarity | Lencería (opcional), Joyería (obligatorio) |
 | 8 | Try-On | `/api/tryon` | Kolors v1.5 (fal), FASHN v1.6, IDM-VTON | Lencería (forzado kolors) |
@@ -48,6 +48,7 @@ Estos 5 módulos son usados por los 3 pipelines. Cualquier cambio en ellos requi
 | Módulo | Pipeline único que lo usa | Razón |
 |---|---|---|
 | `tryon` | Lencería | Solo lencería hace try-on general. Joyería usa `jewelry-tryon` aparte. |
+| `inpaint` (flux-fill-pro) | Lencería | Step `texturePreserve`: post-tryon, máscara del bra (grounded_sam returnMaskOnly) + inpaint con prompt material para recuperar textura real. |
 | `jewelry-tryon` | Joyería | Composición específica para piezas (orejas/cuello/mano/muñeca). |
 | `bg-generate` | Estáticos + Joyería | Lencería no genera fondos (el tryon ya pone el fondo del modelo). |
 | `shadows` | Estáticos + Joyería | Lencería no agrega sombras (el modelo IA ya tiene iluminación). |
