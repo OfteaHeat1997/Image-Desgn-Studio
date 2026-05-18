@@ -19,6 +19,12 @@ const ALLOWED_HOSTS = [
   'v3.fal.media',
   'storage.googleapis.com',
   'cdn.fal.ai',
+  // FASHN try-on results: cdn.fashn.ai/<uuid>/output_*.png
+  'cdn.fashn.ai',
+  'fashn.ai',
+  // Kling video provider outputs (suelen llegar como fal.media o cdn.fal.ai
+  // pero por las dudas si alguna respuesta directa de Kling pasa por acá).
+  'cdn.kling.ai',
 ];
 
 async function proxyUrl(url: string, filename?: string): Promise<NextResponse> {
