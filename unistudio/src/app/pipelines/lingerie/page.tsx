@@ -2297,11 +2297,36 @@ export default function LingeriePipelinePage() {
       const raw = window.localStorage.getItem("lingerie:pipeline:jobs:v1");
       if (!raw) return [];
       const parsed = JSON.parse(raw) as Array<Omit<ImageJob, "file"> & { file?: never }>;
+      // Re-hydrate step.icon desde STEP_DEFS: las funciones React (forwardRef
+      // de lucide-react) NO son JSON-serializables — al persistir se vuelven {}
+      // y al renderizar <Icon /> con un {} React tira el #130 "got: object".
+      // Reconstruimos los steps desde la definición canónica, conservando solo
+      // el estado dinámico (status, resultUrl, error, enabled, etc) del job.
+      const rehydrateSteps = (persistedSteps: PipelineStep[] | undefined): PipelineStep[] => {
+        const byId = new Map((persistedSteps ?? []).map((s) => [s.id, s]));
+        return STEP_DEFS.map((def) => {
+          const old = byId.get(def.id);
+          return {
+            ...def,
+            status: old?.status ?? "idle",
+            inputUrl: old?.inputUrl,
+            resultUrl: old?.resultUrl,
+            error: old?.error,
+            cost_actual: old?.cost_actual,
+            candidates: old?.candidates,
+            providerOverride: old?.providerOverride,
+            poseOverride: old?.poseOverride,
+            actionOverride: old?.actionOverride,
+            enabled: old?.enabled ?? def.enabled,
+          };
+        });
+      };
       return parsed
         .filter((j) => j.uploadedUrl)  // skip jobs sin upload (no servirían para nada)
         .map((j) => ({
           ...j,
           file: null,
+          steps: rehydrateSteps(j.steps),
           // Si previewUrl era blob (ya muerto) usar uploadedUrl como fallback
           previewUrl: j.previewUrl?.startsWith("blob:") ? (j.uploadedUrl ?? "") : (j.previewUrl ?? j.uploadedUrl ?? ""),
         }));
