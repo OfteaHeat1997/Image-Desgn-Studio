@@ -2788,7 +2788,11 @@ export default function LingeriePipelinePage() {
     // closure). Se populate abajo cada vez que un step completa.
     const stepResults: Partial<Record<StepId, string>> = {};
 
-    for (const stepDef of enabledSteps) {
+    // processStep — extrae el body del per-step loop (antes era inline) para
+    // poder correrlo en paralelo entre isolate + model (FASE A), que son
+    // inputs independientes a tryon. Devuelve `true` si la usuaria abortó
+    // (AbortError) y el caller debe romper el loop.
+    const processStep = async (stepDef: PipelineStep): Promise<boolean> => {
       // Determine input: for tryon use sharedModelUrl is handled in runStep
       let inputForStep = lastResultUrl;
       if (stepDef.id === "modelVideo") {
@@ -2916,8 +2920,8 @@ export default function LingeriePipelinePage() {
         const isAbort = err instanceof Error && (err.name === "AbortError" || /aborted|the user aborted/i.test(rawMsg));
         if (isAbort) {
           updateStep(jobId, stepDef.id, { status: "skipped", error: "Detenido por la usuaria" });
-          // Salir del loop de steps: si paró un paso es porque no quiere seguir.
-          break;
+          // Señal al caller: salir del loop, no procesar más steps.
+          return true;
         }
 
         // Smart fallback: si photoFullBody / photoBack fallan y la usuaria
@@ -2944,7 +2948,7 @@ export default function LingeriePipelinePage() {
               error: undefined,
             });
             stepResults[stepDef.id] = fallback.uploadedUrl;
-            continue;  // Pasa al siguiente step sin marcar error
+            return false;  // Continúa al siguiente step
           }
         }
 
@@ -2990,6 +2994,42 @@ export default function LingeriePipelinePage() {
           // Auto mode: skip errored step and continue
           toast.error(`Error en "${stepDef.label}": ${errorMsg}`);
         }
+      }
+      return false;
+    };
+
+    // FASE A — isolate + model en paralelo
+    //
+    // Son inputs INDEPENDIENTES a tryon: isolate solo necesita uploadedUrl,
+    // y model no usa input alguno (genera persona desde prompts). Antes
+    // corrían secuencial perdiendo ~25-35s por foto. Si la usuaria habilitó
+    // ambos como los dos primeros steps (caso default), los lanzamos juntos.
+    //
+    // Si solo uno está enabled, o el orden cambió, caemos al loop serial
+    // de siempre. Lo mismo si la usuaria abortó durante la fase paralela.
+    const idxIsolate = enabledSteps.findIndex((s) => s.id === "isolate");
+    const idxModel = enabledSteps.findIndex((s) => s.id === "model");
+    const canParallelizePhaseA =
+      idxIsolate === 0 && idxModel === 1 && enabledSteps.length >= 2;
+
+    let startIndex = 0;
+    let aborted = false;
+
+    if (canParallelizePhaseA) {
+      console.log("[lingerie] FASE A: isolate + model en paralelo");
+      const [isolateAborted, modelAborted] = await Promise.all([
+        processStep(enabledSteps[0]),
+        processStep(enabledSteps[1]),
+      ]);
+      aborted = isolateAborted || modelAborted;
+      startIndex = 2;
+    }
+
+    // Loop serial — resto de steps (o todos si no se paralelizó la fase A).
+    if (!aborted) {
+      for (let i = startIndex; i < enabledSteps.length; i++) {
+        const shouldBreak = await processStep(enabledSteps[i]);
+        if (shouldBreak) break;
       }
     }
 
