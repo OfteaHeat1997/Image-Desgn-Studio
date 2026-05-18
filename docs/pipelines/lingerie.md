@@ -142,6 +142,19 @@ Naming output: `output/lingerie/bra/REF-{sku}/{color}-{angle}-AI.jpg`.
 | Timeout en paso 1 | grounded_sam + composite > 60s en Hobby | `vercel.json` ya tiene 300s para `/api/bg-remove` |
 | 413 al guardar resultado | Payload > 4.5MB en body | Usar `/api/upload` primero, guardar URL — no data URI |
 | Video duplica el producto | wan-2.2-fast sin `negative_prompt` | Pasar `negative_prompt: "duplicate, repeating, clone, multiple bodies"` + `guidance_scale: 3.0` |
+| Foto Espalda muestra un bra distinto al original | Kolors recibió la vista FRONTAL como garment ref y "inventó" la espalda | El step ahora se SALTA con warning si no hay foto etiquetada "espalda". Subí la foto trasera real y reintentá. |
+
+---
+
+## photoBack — Requiere foto de espalda real
+
+El step `photoBack` **NO inventa la vista trasera del bra**. Si no subís una foto del producto desde atrás (etiqueta `"espalda"` en el setup), el step se salta con un banner amber en la UI que pide subir la foto y reintentar.
+
+**Razón:** Kolors es virtual try-on, no entiende "rotar la prenda 180°". Si le pasáramos la vista frontal como garment reference, generaría un bra distinto al producto real (broche al frente vs atrás varían entre modelos, el cruce de tirantes puede ser distinto, la banda puede tener detalles propios). Eso producía resultados falsos para el catálogo.
+
+**Cómo se detecta:** el filename ya se mapea automáticamente — `bh negro patras 011473.png` → angle `espalda`. Si quedó mal etiquetada, podés corregir el ángulo desde el dropdown debajo de cada foto en el setup. Una vez la foto está en el job (mismo `referenceKey`) con angle `espalda`, `photoBack` la usa como `backGarmentUrl` y Kolors la respeta píxel a píxel.
+
+**Skip silencioso, no error:** el job NO falla globalmente por `photoBack` skipeado. El resto del pipeline (`tryon`, `photoFullBody`, `productVideo`, `modelVideo`) sigue corriendo normal.
 
 ---
 

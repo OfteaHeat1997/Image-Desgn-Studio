@@ -1309,6 +1309,28 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     </details>
                   )}
                 </div>
+              ) : step.status === "skipped" && step.error ? (
+                /* Skipped con error message: típicamente photoBack sin foto de
+                   espalda real. Banner amber claro (no rojo — no es un fallo,
+                   es una pre-condición no cumplida) explicando qué hacer. */
+                <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-400" />
+                  <p className="text-center text-xs font-medium text-amber-200 leading-snug">
+                    {step.error}
+                  </p>
+                  {step.id === "photoBack" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById("lingerie-upload-area");
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/20"
+                    >
+                      Ir a subir foto de espalda
+                    </button>
+                  )}
+                </div>
               ) : step.candidates && step.candidates.length > 1 ? (
                 // Multi-sample: grid 2×2 de candidatos. resultUrl es el
                 // seleccionado actualmente (borde violeta); click en uno
@@ -2793,6 +2815,24 @@ export default function LingeriePipelinePage() {
     // inputs independientes a tryon. Devuelve `true` si la usuaria abortó
     // (AbortError) y el caller debe romper el loop.
     const processStep = async (stepDef: PipelineStep): Promise<boolean> => {
+      // GUARD photoBack: Kolors es virtual try-on, no rotador. Si solo tiene
+      // la vista FRONTAL del bra inventa un diseño distinto al producto real
+      // (broche/banda/tirantes random). Si la usuaria no subió foto de espalda
+      // etiquetada, saltamos el step con mensaje claro en vez de generar un
+      // resultado falso para el catálogo.
+      if (stepDef.id === "photoBack") {
+        const jobForMatching = { ...job, uploadedUrl, falUrl } as ImageJob;
+        const hasBackPhoto = !!findMatchingPhoto(jobForMatching, jobsSnapshot, ["espalda"])?.uploadedUrl;
+        if (!hasBackPhoto) {
+          updateStep(jobId, "photoBack", {
+            status: "skipped",
+            error: 'No subiste foto del producto desde atrás — no podemos inferirla del frente (Kolors generaría un bra distinto al original). Subí una foto etiquetada "Espalda" en el setup y reintentá.',
+          });
+          console.warn(`[lingerie] photoBack skipeado: ${job.filename} no tiene foto etiquetada "espalda" asociada.`);
+          return false;  // No es abort, sigue al siguiente step
+        }
+      }
+
       // Determine input: for tryon use sharedModelUrl is handled in runStep
       let inputForStep = lastResultUrl;
       if (stepDef.id === "modelVideo") {
@@ -3329,7 +3369,7 @@ export default function LingeriePipelinePage() {
 
                 {/* Uploaded image grid */}
                 {jobs.length > 0 && (
-                  <>
+                  <div id="lingerie-upload-area">
                     <div className="mt-4 mb-2 flex items-center justify-between text-[11px]">
                       <span className="text-gray-400">
                         {jobs.length} foto{jobs.length === 1 ? '' : 's'} · el ángulo se detecta del nombre, pero podés corregirlo abajo de cada foto
@@ -3340,6 +3380,18 @@ export default function LingeriePipelinePage() {
                           Espalda real lista
                         </span>
                       )}
+                    </div>
+                    {/* Hint de qué ángulos desbloquean qué steps. Si la usuaria
+                        solo sube frontal, photoBack se va a saltar — mejor que
+                        lo sepa ANTES de procesar, no después. */}
+                    <div className="mb-3 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[10px] text-gray-400">
+                      <p className="mb-1 font-semibold uppercase tracking-wider text-gray-300">Qué fotos necesitás</p>
+                      <ul className="space-y-0.5">
+                        <li><b className="text-white">Frontal</b> — obligatoria (para tryon y modelo)</li>
+                        <li><b className="text-white">Espalda</b> — opcional, <span className="text-amber-300">necesaria si querés &quot;Foto Espalda&quot;</span> (Kolors no rota 180° solo)</li>
+                        <li><b className="text-white">Lateral / Detalle</b> — opcionales, mejoran fidelidad</li>
+                        <li><b className="text-white">Flat lay</b> — opcional, para video 360° del producto</li>
+                      </ul>
                     </div>
                     {/* Warning de talla vs bodyType: si las fotos tienen tallas que
                         sugieren un bodyType distinto al configurado, avisamos. */}
@@ -3466,7 +3518,7 @@ export default function LingeriePipelinePage() {
                         </div>
                       ))}
                     </div>
-                  </>
+                  </div>
                 )}
               </section>
 
