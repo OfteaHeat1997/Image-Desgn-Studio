@@ -16,8 +16,12 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local development only (hot reload). Production runs on Coolify using the
+  # multi-stage production Dockerfile, NOT this compose file.
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     env_file: .env.local

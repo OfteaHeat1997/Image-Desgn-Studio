@@ -1,5 +1,33 @@
 # UniStudio — Changelog
 
+## 2026-06-06 — Despliegue en Coolify (migración desde Vercel)
+
+UniStudio se migró de Vercel a Coolify (despliegue auto-alojado vía Docker).
+Esta sesión deja el repositorio listo para producción en Coolify.
+
+### Cambios
+
+- **`unistudio/Dockerfile`** reescrito a producción multi-stage
+  (`deps` → `builder` con `next build` → `runner` con `next start`). Conserva el
+  node_modules completo en el runner para no romper las dependencias nativas
+  (sharp, ffmpeg-static, motor de Prisma, WASM de @imgly/background-removal).
+  Binde a `0.0.0.0:3000`.
+- **`unistudio/Dockerfile.dev`** (nuevo): copia del Dockerfile de desarrollo
+  anterior (`npm run dev`) para conservar el hot reload local.
+- **`unistudio/docker-compose.yml`**: el servicio `app` ahora construye con
+  `Dockerfile.dev`, así `npm run docker:up` sigue dando recarga en caliente
+  local. La producción NO usa este compose, usa el Dockerfile en Coolify.
+- **`unistudio/.env.example`** (nuevo): lista completa de variables de entorno
+  (el README lo referenciaba pero no existía). Se añadió la excepción
+  `!.env.example` en `.gitignore`.
+- **`docs/deploy-coolify.md`** (nuevo): guía paso a paso en español
+  (Postgres, app, variables, dominio/HTTPS, timeouts del proxy, migraciones).
+
+### Notas
+
+- `vercel.json` queda obsoleto: los timeouts por ruta de Vercel ya no aplican;
+  en Coolify los maneja el proxy (Traefik). Se documenta en la guía.
+
 ## 2026-05-18 — Pipeline de lencería: 6 fixes (catálogo subible)
 
 Sesión con 6 fixes consecutivos al pipeline `/pipelines/lingerie` para
