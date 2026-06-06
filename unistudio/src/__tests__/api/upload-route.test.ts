@@ -40,9 +40,11 @@ jest.mock('next/server', () => {
 // Mock sharp: return a jest.fn() directly so require('sharp') gives us the mock fn
 jest.mock('sharp', () =>
   jest.fn().mockReturnValue({
-    metadata: jest.fn().mockResolvedValue({ width: 800, height: 600 }),
+    metadata: jest.fn().mockResolvedValue({ width: 800, height: 600, format: 'jpeg' }),
+    rotate: jest.fn().mockReturnThis(),
     resize: jest.fn().mockReturnThis(),
     jpeg: jest.fn().mockReturnThis(),
+    png: jest.fn().mockReturnThis(),
     toBuffer: jest.fn().mockResolvedValue(Buffer.from('compressed-image')),
   }),
 );
