@@ -1905,6 +1905,16 @@ async function runStep(
         "No se pudo aislar la prenda sola (grounded_sam y SeedDream fallaron). El resultado incluye a la modelo, así que el Video 360° del Producto no serviría. Reintentá con otra foto o desactivá el paso 'Aislar Prenda' si querés continuar con la foto original."
       );
     }
+    // Aviso honesto: si el aislado vino de SeedDream (regenerativo), el producto
+    // PUEDE no ser pixel-idéntico al real. Que la usuaria lo revise antes de
+    // mandarlo al catálogo. Cuando vino de grounded_sam (el producto real), no
+    // molestamos con ningún aviso.
+    if (isLingerieFlow && json.data?.regenerated) {
+      toast.warning(
+        "⚠️ Esta foto era difícil de recortar, así que la prenda se regeneró con IA (SeedDream). Revisá que el resultado coincida con tu producto real antes de usarlo en el catálogo — puede tener diferencias.",
+        12000,
+      );
+    }
     return { resultUrl: json.data.url, cost: json.cost ?? 0.01 };
   }
 

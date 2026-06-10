@@ -45,11 +45,15 @@ export const useToastStore = create<ToastStore>((set) => ({
 /*  Convenience helpers                                                 */
 /* ------------------------------------------------------------------ */
 
-export function toast(message: string, variant: ToastVariant = "info") {
-  useToastStore.getState().addToast({ message, variant });
+export function toast(
+  message: string,
+  variant: ToastVariant = "info",
+  duration?: number,
+) {
+  useToastStore.getState().addToast({ message, variant, duration });
 }
 
-toast.success = (msg: string) => toast(msg, "success");
-toast.error = (msg: string) => toast(msg, "error");
-toast.warning = (msg: string) => toast(msg, "warning");
-toast.info = (msg: string) => toast(msg, "info");
+toast.success = (msg: string, duration?: number) => toast(msg, "success", duration);
+toast.error = (msg: string, duration?: number) => toast(msg, "error", duration);
+toast.warning = (msg: string, duration?: number) => toast(msg, "warning", duration);
+toast.info = (msg: string, duration?: number) => toast(msg, "info", duration);
