@@ -31,8 +31,15 @@ export const SUPPORTED_FORMATS = [
 /** Claude Haiku — used for planning, analysis, cheap tasks */
 export const CLAUDE_HAIKU = 'claude-haiku-4-5-20251001';
 
-/** Claude Sonnet — used for creative prompts, complex reasoning */
-export const CLAUDE_SONNET = 'claude-sonnet-4-20250514';
+/**
+ * Claude Sonnet — used for creative prompts, complex reasoning, y Vision
+ * (analyze-product extrae specs reales del bra: copa, tirantes, broche).
+ * Subido 2026-06-10 de claude-sonnet-4-20250514 (Sonnet 4.0) a Sonnet 4.6:
+ * el 4.0 estaba DEPRECADO y se retiraba el 15-jun-2026 (404 → Vision muerta),
+ * y 4.6 es mucho mejor en visión → extrae mejor los detalles de la prenda.
+ * El alias sin fecha siempre apunta a la última versión estable de 4.6.
+ */
+export const CLAUDE_SONNET = 'claude-sonnet-4-6';
 
 // -----------------------------------------------------------------------------
 // API Cost Map (USD per operation)
