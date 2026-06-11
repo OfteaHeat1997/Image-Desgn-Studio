@@ -1,0 +1,56 @@
+# Production Docker Compose for Coolify.
+# Deploys the UniStudio app (built from the production Dockerfile) together
+# with a PostgreSQL database, both managed by Coolify.
+#
+# In Coolify:
+#   Build Pack             -> Docker Compose
+#   Base Directory         -> /unistudio
+#   Docker Compose Location-> /docker-compose.coolify.yml
+#
+# Set the secrets (REPLICATE_API_TOKEN, FAL_KEY, etc.) in Coolify's
+# "Environment Variables" tab. Coolify injects them into the app service.
+#
+# NOTE: docker-compose.yml (the other file) is for LOCAL development only.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Database — points to the db service below.
+      DATABASE_URL: postgresql://unistudio:${POSTGRES_PASSWORD:-unistudio}@db:5432/unistudio
+      # Public URL of your deployment (set your real domain in Coolify).
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      # Required AI providers.
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
+      FAL_KEY: ${FAL_KEY}
+      # Optional AI providers.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      FASHN_API_KEY: ${FASHN_API_KEY}
+      HEDRA_API_KEY: ${HEDRA_API_KEY}
+      GOOGLE_TTS_API_KEY: ${GOOGLE_TTS_API_KEY}
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: unistudio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unistudio}
+      POSTGRES_DB: unistudio
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unistudio"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
