@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
       garmentType,
       garmentDescription,
       provider = 'auto',
+      forceProvider = false,
       fashnMode,
     } = body as {
       modelImage: string;
@@ -192,6 +193,9 @@ export async function POST(request: NextRequest) {
       garmentType?: string;
       garmentDescription?: string;
       provider?: 'idm-vton' | 'fashn' | 'kolors' | 'auto';
+      // Cuando true, la usuaria eligió el proveedor a mano (para testear) y la
+      // ruta lo respeta tal cual — NO aplica el override automático kolors→auto.
+      forceProvider?: boolean;
       // P1-3: FASHN v1.6 mode (performance/balanced/quality). Solo aplica a
       // FASHN; Kolors e IDM-VTON lo ignoran silenciosamente.
       fashnMode?: 'performance' | 'balanced' | 'quality';
@@ -242,7 +246,11 @@ export async function POST(request: NextRequest) {
       garmentType === 'bodysuit';
 
     let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'auto' = provider;
-    if (isIntimateRequest && provider === 'auto') {
+    if (forceProvider && provider !== 'auto') {
+      // La usuaria forzó este proveedor a mano (testing) → respetarlo tal cual,
+      // sin el override automático de abajo. Así puede comparar Kolors vs FASHN.
+      effectiveProvider = provider;
+    } else if (isIntimateRequest && provider === 'auto') {
       // Let smartTryOn pick (FASHN if available, else Kolors)
       effectiveProvider = 'auto';
     } else if (isIntimateRequest && provider === 'kolors' && process.env.FASHN_API_KEY) {

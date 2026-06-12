@@ -163,6 +163,11 @@ interface PipelineStep {
   // siguiente rerun usa este provider en vez del default de lencería (Kolors).
   // Limpia al empezar un run exitoso para que el próximo ciclo vuelva al default.
   providerOverride?: TryonProvider;
+  // Proveedor que REALMENTE produjo el resultado (lo devuelve /api/tryon en
+  // data.provider). Distinto de providerOverride (lo que pidió la usuaria): la
+  // ruta puede caer de FASHN a Kolors en silencio, así que mostramos en la UI
+  // cuál corrió de verdad para que testear sea determinista.
+  usedProvider?: string;
   // Pose manual override (frontal/lateral/3-cuartos/espalda/cuerpo-completo).
   // "auto" = default por stepId. La usuaria puede forzar otra pose desde la UI
   // antes de procesar. Aplicable a tryon, photoBack, photoFullBody.
@@ -1445,6 +1450,45 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           {/* Action buttons — only shown when done and in manual mode */}
           {canInteract && (
             <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/6 pt-4">
+              {/* Proveedor que REALMENTE corrió (badge) + selector para re-testear
+                  con otro. Antes el selector solo salía en error → era imposible
+                  saber/cambiar qué proveedor generó un resultado "exitoso pero
+                  feo". Verde = FASHN (preserva producto), ámbar = Kolors (tiende
+                  a inventar prendas genéricas). */}
+              {(step.usedProvider || (onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody"))) && (
+                <div className="mr-auto flex items-center gap-2">
+                  {step.usedProvider && (
+                    <span
+                      className={`rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                        step.usedProvider === "kolors"
+                          ? "border-amber-500/30 bg-amber-500/15 text-amber-300"
+                          : "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                      }`}
+                      title={
+                        step.usedProvider === "kolors"
+                          ? "Lo generó Kolors, que tiende a inventar prendas genéricas. Si no se parece al producto, cambiá a FASHN y dale Rehacer."
+                          : "Proveedor que generó este resultado."
+                      }
+                    >
+                      {step.usedProvider}
+                    </span>
+                  )}
+                  {onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && (
+                    <select
+                      value={step.providerOverride ?? "auto"}
+                      onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
+                      className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-violet-500/50"
+                      title="Cambiá el proveedor y dale Rehacer para comparar"
+                    >
+                      {TRYON_PROVIDER_OPTIONS.map((p) => (
+                        <option key={p.value} value={p.value} title={p.hint}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
               <button
                 onClick={onSkip}
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
@@ -1870,7 +1914,7 @@ async function runStep(
    * correcta — flux-fill-pro NO acepta imagen de referencia, solo texto.
    */
   materialHint?: string,
-): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number }> {
+): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
@@ -2065,13 +2109,16 @@ async function runStep(
         garmentType: garmentTypeForApi,
         // P1-1: respetar providerOverride si la usuaria lo pidió; sino default kolors
         provider: providerOverride && providerOverride !== "auto" ? providerOverride : "kolors",
+        // Cuando la usuaria eligió un proveedor a mano (para testear), forzar
+        // que la ruta lo honre y NO lo cambie sola (Kolors → auto/FASHN).
+        forceProvider: !!(providerOverride && providerOverride !== "auto"),
         fashnMode,
       }),
     });
     const tryonJson = await tryonRes.json();
     if (!tryonJson.success) throw new Error(tryonJson.error || `${stepId}: tryon failed`);
     const tryonCost = tryonJson.cost ?? 0.02;
-    return { resultUrl: tryonJson.data.url, cost: modelCost + tryonCost };
+    return { resultUrl: tryonJson.data.url, cost: modelCost + tryonCost, usedProvider: tryonJson.data.provider };
   }
 
   if (stepId === "tryon") {
@@ -2099,12 +2146,14 @@ async function runStep(
         provider: providerOverride && providerOverride !== "auto"
           ? providerOverride
           : (isLingerieFlow ? "kolors" : "idm-vton"),
+        // Forzar el proveedor elegido a mano para que la ruta no lo reemplace.
+        forceProvider: !!(providerOverride && providerOverride !== "auto"),
         fashnMode,
       }),
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "tryon failed");
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.02 };
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.02, usedProvider: json.data.provider };
   }
 
   if (stepId === "texturePreserve") {
@@ -2326,6 +2375,7 @@ export default function LingeriePipelinePage() {
             cost_actual: old?.cost_actual,
             candidates: old?.candidates,
             providerOverride: old?.providerOverride,
+            usedProvider: old?.usedProvider,
             poseOverride: old?.poseOverride,
             actionOverride: old?.actionOverride,
             enabled: old?.enabled ?? def.enabled,
@@ -2771,7 +2821,7 @@ export default function LingeriePipelinePage() {
     currentSharedSeed: number | undefined,
     currentIsolatedGarment: string | undefined,
     jobsSnapshot: ImageJob[],
-  ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; candidates?: string[] }> => {
+  ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; candidates?: string[]; usedProvider?: string }> => {
     // P0-3: crear AbortController para este step específico
     const controller = new AbortController();
     const key = `${job.id}:${step.id}`;
@@ -2873,6 +2923,7 @@ export default function LingeriePipelinePage() {
           resultUrl: candidates[0],
           candidates,
           cost: totalCost,
+          usedProvider: results[0]?.usedProvider,
         };
       }
 
@@ -3109,6 +3160,7 @@ export default function LingeriePipelinePage() {
           resultUrl: result.resultUrl,
           cost_actual: result.cost,
           candidates: result.candidates,
+          usedProvider: result.usedProvider,
         });
 
         // Populate local map para que el próximo step pueda leer este resultUrl
