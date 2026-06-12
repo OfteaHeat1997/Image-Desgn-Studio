@@ -169,8 +169,15 @@ async function tryOnSeedDream(
   modelImage: string,
   garmentImage: string,
   garmentType?: string,
+  garmentDescription?: string,
 ): Promise<string> {
   const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
+
+  // Construcción real leída por Claude Vision (cierre, copas, tirantes, etc).
+  // Anclar el modelo a ESTO es lo que evita que invente un zipper o costuras.
+  const spec = garmentDescription?.trim()
+    ? `The real construction of this ${noun} (preserve EXACTLY, do not contradict): ${garmentDescription.trim()}. `
+    : '';
 
   // Order matters: image_urls[0] = person to edit, image_urls[1] = product ref.
   // Prompt stays color-agnostic per project rule — never hardcode a color.
@@ -180,6 +187,7 @@ async function tryOnSeedDream(
     `Replace only their ${noun} with the ${noun} from the second image, matching its exact ` +
     `color, pattern, lace, mesh, straps, trim, seams, cut and construction details precisely. ` +
     `Do not redesign, simplify, or recolor the garment. Keep it identical to the reference. ` +
+    spec +
     // Anti-hallucination: el modelo inventa un zipper central y costuras de copa
     // que no existen. Prohibirlo explícitamente y anclar al cierre real.
     `CRITICAL: do NOT add a zipper, hooks, clasps, buttons, panels, or any seam that is ` +
@@ -224,7 +232,7 @@ async function smartTryOn(
   // only when SeedDream fails.
   if (isIntimate) {
     try {
-      const url = await tryOnSeedDream(modelImage, garmentImage, garmentType);
+      const url = await tryOnSeedDream(modelImage, garmentImage, garmentType, garmentDescription);
       return { url, provider: 'seedream' };
     } catch (err) {
       console.warn(
@@ -361,7 +369,7 @@ export async function POST(request: NextRequest) {
           resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);
           break;
         case 'seedream':
-          resultUrl = await tryOnSeedDream(httpModelImage, httpGarmentImage, garmentType);
+          resultUrl = await tryOnSeedDream(httpModelImage, httpGarmentImage, garmentType, garmentDescription);
           break;
         default:
           return NextResponse.json(

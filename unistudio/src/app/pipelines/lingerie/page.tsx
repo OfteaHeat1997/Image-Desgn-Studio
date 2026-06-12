@@ -1960,6 +1960,31 @@ async function uploadFile(file: File): Promise<{ url: string; falUrl?: string }>
   return { url: json.data.replicateUrl || json.data.url, falUrl: json.data.falUrl };
 }
 
+/**
+ * Arma una descripción compacta de la CONSTRUCCIÓN real del producto leída por
+ * Claude Vision (cierre, copas, tirantes, banda, varilla, detalles). Se inyecta
+ * en el prompt del try-on para anclar al producto real y evitar que SeedDream
+ * invente un zipper o costuras que no existen (reporte usuaria ref 011473).
+ * Devuelve "" si no hay spec útil.
+ */
+function buildGarmentDescription(spec: ProductSpec | null | undefined): string | undefined {
+  if (!spec) return undefined;
+  const g = spec.garment;
+  const parts: string[] = [];
+  if (spec.material?.trim()) parts.push(`material: ${spec.material.trim()}`);
+  if (spec.texture?.trim()) parts.push(`textura: ${spec.texture.trim()}`);
+  if (g?.cup?.trim()) parts.push(`copas: ${g.cup.trim()}`);
+  if (g?.strapStyle?.trim()) parts.push(`tirantes: ${g.strapStyle.trim()}`);
+  if (g?.frontClosure?.trim()) parts.push(`cierre frontal: ${g.frontClosure.trim()}`);
+  if (g?.backClosure?.trim()) parts.push(`cierre trasero: ${g.backClosure.trim()}`);
+  if (g?.band?.trim()) parts.push(`banda: ${g.band.trim()}`);
+  if (g?.underwire?.trim()) parts.push(`varilla: ${g.underwire.trim()}`);
+  if (g?.padding?.trim()) parts.push(`relleno: ${g.padding.trim()}`);
+  if (g?.details?.trim()) parts.push(`detalles: ${g.details.trim()}`);
+  const out = parts.join("; ");
+  return out.length > 0 ? out : undefined;
+}
+
 async function runStep(
   stepId: StepId,
   inputUrl: string,
@@ -2012,6 +2037,12 @@ async function runStep(
    * correcta — flux-fill-pro NO acepta imagen de referencia, solo texto.
    */
   materialHint?: string,
+  /**
+   * Descripción de la construcción real del producto (cierre, copas, tirantes…)
+   * leída por Claude Vision. Se inyecta en el prompt del try-on para que SeedDream
+   * preserve el cierre/costuras reales en vez de inventar (zipper, costura de copa).
+   */
+  garmentDescription?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
@@ -2213,6 +2244,8 @@ async function runStep(
         // que la ruta lo honre y NO lo cambie sola (Kolors → auto/FASHN).
         forceProvider: !!(providerOverride && providerOverride !== "auto"),
         fashnMode,
+        // Construcción real (Claude Vision) → ancla SeedDream al cierre/copas reales.
+        garmentDescription,
       }),
     });
     const tryonJson = await tryonRes.json();
@@ -2251,6 +2284,8 @@ async function runStep(
         // Forzar el proveedor elegido a mano para que la ruta no lo reemplace.
         forceProvider: !!(providerOverride && providerOverride !== "auto"),
         fashnMode,
+        // Construcción real (Claude Vision) → ancla SeedDream al cierre/copas reales.
+        garmentDescription,
       }),
     });
     const json = await res.json();
@@ -3016,6 +3051,10 @@ export default function LingeriePipelinePage() {
               backGarmentUrl,
               step.providerOverride,
               fashnMode,
+              step.poseOverride,
+              step.actionOverride,
+              job.productSpec?.material?.trim() || undefined,
+              buildGarmentDescription(job.productSpec),
             ),
           ),
         );
@@ -3042,6 +3081,8 @@ export default function LingeriePipelinePage() {
       // hacia la textura correcta. Si no hay spec (jobs restaurados o análisis
       // que falló), el step usa un default genérico "satin/lace fabric".
       const materialHint = job.productSpec?.material?.trim() || undefined;
+      // Construcción real del producto (cierre, copas, tirantes…) para anclar el try-on.
+      const garmentDescription = buildGarmentDescription(job.productSpec);
 
       return await runStep(
         step.id,
@@ -3060,6 +3101,7 @@ export default function LingeriePipelinePage() {
         step.poseOverride,
         step.actionOverride,
         materialHint,
+        garmentDescription,
       );
     } finally {
       abortControllersRef.current.delete(key);
