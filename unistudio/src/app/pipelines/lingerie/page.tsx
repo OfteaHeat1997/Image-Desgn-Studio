@@ -1192,6 +1192,25 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Proveedor REAL que generó el resultado — visible SIEMPRE (también
+              cuando el paso ya está "Aceptado"). Verde = FASHN (preserva el
+              producto), ámbar = Kolors (tiende a inventar prendas genéricas). */}
+          {step.usedProvider && (
+            <span
+              className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                step.usedProvider === "kolors"
+                  ? "border-amber-500/30 bg-amber-500/15 text-amber-300"
+                  : "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+              }`}
+              title={
+                step.usedProvider === "kolors"
+                  ? "Lo generó Kolors, que tiende a inventar prendas genéricas. Si no se parece al producto, reintentá con FASHN."
+                  : `Proveedor que generó este resultado: ${step.usedProvider}.`
+              }
+            >
+              {step.usedProvider}
+            </span>
+          )}
           <span className="text-xs font-medium text-gray-500">{step.cost}</span>
           <StatusBadge status={step.status} />
           {/* P0-3: botón DETENER visible solo cuando está procesando y existe un handler */}
@@ -1450,43 +1469,25 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           {/* Action buttons — only shown when done and in manual mode */}
           {canInteract && (
             <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/6 pt-4">
-              {/* Proveedor que REALMENTE corrió (badge) + selector para re-testear
-                  con otro. Antes el selector solo salía en error → era imposible
-                  saber/cambiar qué proveedor generó un resultado "exitoso pero
-                  feo". Verde = FASHN (preserva producto), ámbar = Kolors (tiende
-                  a inventar prendas genéricas). */}
-              {(step.usedProvider || (onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody"))) && (
+              {/* Selector para re-testear con otro proveedor (el badge del
+                  proveedor que corrió está en la cabecera, siempre visible).
+                  Cambiá el proveedor acá y dale Rehacer para comparar Kolors
+                  vs FASHN antes de aceptar. */}
+              {onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && (
                 <div className="mr-auto flex items-center gap-2">
-                  {step.usedProvider && (
-                    <span
-                      className={`rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                        step.usedProvider === "kolors"
-                          ? "border-amber-500/30 bg-amber-500/15 text-amber-300"
-                          : "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-                      }`}
-                      title={
-                        step.usedProvider === "kolors"
-                          ? "Lo generó Kolors, que tiende a inventar prendas genéricas. Si no se parece al producto, cambiá a FASHN y dale Rehacer."
-                          : "Proveedor que generó este resultado."
-                      }
-                    >
-                      {step.usedProvider}
-                    </span>
-                  )}
-                  {onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && (
-                    <select
-                      value={step.providerOverride ?? "auto"}
-                      onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
-                      className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-violet-500/50"
-                      title="Cambiá el proveedor y dale Rehacer para comparar"
-                    >
-                      {TRYON_PROVIDER_OPTIONS.map((p) => (
-                        <option key={p.value} value={p.value} title={p.hint}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500">Proveedor:</span>
+                  <select
+                    value={step.providerOverride ?? "auto"}
+                    onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
+                    className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-violet-500/50"
+                    title="Cambiá el proveedor y dale Rehacer para comparar"
+                  >
+                    {TRYON_PROVIDER_OPTIONS.map((p) => (
+                      <option key={p.value} value={p.value} title={p.hint}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
               <button
