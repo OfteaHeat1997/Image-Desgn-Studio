@@ -180,6 +180,12 @@ async function tryOnSeedDream(
     `Replace only their ${noun} with the ${noun} from the second image, matching its exact ` +
     `color, pattern, lace, mesh, straps, trim, seams, cut and construction details precisely. ` +
     `Do not redesign, simplify, or recolor the garment. Keep it identical to the reference. ` +
+    // Anti-hallucination: el modelo inventa un zipper central y costuras de copa
+    // que no existen. Prohibirlo explícitamente y anclar al cierre real.
+    `CRITICAL: do NOT add a zipper, hooks, clasps, buttons, panels, or any seam that is ` +
+    `not present in the reference ${noun}. Keep the exact closure type shown in the ` +
+    `reference (if it has hook-and-eye clasps, keep hook-and-eye — never a zipper) and ` +
+    `keep the cups exactly as in the reference with no invented center seam or line. ` +
     `Photorealistic fashion e-commerce photography, studio lighting, sharp focus.`;
 
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);

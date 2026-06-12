@@ -189,7 +189,15 @@ export async function modelToGhost(
     `hollow-man effect — visible natural garment shape and interior fabric where the ` +
     `body was, as if worn by an invisible person. Preserve the exact same color, ` +
     `pattern, texture, fabric, and construction details of the ${noun}. Do not change ` +
-    `the color. Professional e-commerce product photography, studio lighting, sharp focus.`;
+    `the color. ` +
+    // Anti-hallucination: SeedDream tiende a inventar un zipper central y costuras
+    // en las copas que NO existen en el producto real (reporte usuaria 011473).
+    `CRITICAL: reproduce the garment exactly as in the photo. Do NOT add, remove, or ` +
+    `redesign any closure, zipper, hooks, clasps, buttons, straps, panels, or seams. ` +
+    `If the front closure is a row of hook-and-eye clasps, keep it as hook-and-eye — ` +
+    `never turn it into a zipper. Keep the exact cup shape with no invented seams or ` +
+    `center lines. Match the original stitching and every construction detail one to one. ` +
+    `Professional e-commerce product photography, studio lighting, sharp focus.`;
 
   // --- Primary provider for lingerie: SeedDream edit on fal.ai (no filter)
   if (isLingerie) {
@@ -229,7 +237,9 @@ export async function modelToGhost(
       const httpUrl = await ensureFalAccessibleUrl(imageUrl);
       const falResult = await runFal('fal-ai/bytedance/seedream/v4/edit', {
         prompt: `Show only the ${noun} from the photo on a plain white background, ` +
-          `hollow 3D product shape, no person, same color as original.`,
+          `hollow 3D product shape, no person, same color as original. ` +
+          `Reproduce the exact closure and seams — do NOT add a zipper, hooks, or any ` +
+          `seam that is not in the original; keep the cups exactly as shown.`,
         image_urls: [httpUrl],
         image_size: 'square_hd',
         num_images: 1,
