@@ -1,5 +1,25 @@
 # UniStudio — Changelog
 
+## 2026-06-12 — Lencería: SeedDream v4 edit como try-on primario (fidelidad del producto)
+
+El try-on de lencería ya no depende de Kolors (re-pinta una prenda genérica → "el
+bra no es el mismo") ni de FASHN (bloquea lencería y caía a Kolors en silencio).
+
+**SeedDream v4 edit como motor primario de try-on** (`40efb08`):
+- `/api/tryon`: nueva `tryOnSeedDream(modelo, prenda)` que llama
+  `fal-ai/bytedance/seedream/v4/edit` con `image_urls:[modelo, prenda]` y
+  `enable_safety_checker:false`. Es un editor multi-imagen: recibe la modelo y la
+  prenda como referencias y EDITA en vez de sintetizar desde un prior de categoría
+  → preserva el producto real (encaje, malla, tirantes, broche, corte). Mismo modelo
+  ya probado sin filtro en el ghost mannequin.
+- Ruteo de íntimos: SeedDream primero, **Kolors como backup** si falla. FASHN sale
+  del camino de lencería (bloqueaba siempre y desperdiciaba ~17s).
+- UI: default lencería `provider:"auto"` (SeedDream→Kolors), `seedream` agregado al
+  selector de proveedor (forzable para A/B), badge actualizado (verde=seedream
+  preservó el producto, ámbar=cayó a Kolors backup).
+- Costo: $0.03 (SeedDream) vs $0.02 (Kolors backup).
+- Docs sincronizadas: `docs/pipelines/lingerie.md` + `docs/modules/README.md`.
+
 ## 2026-05-18 — Pipeline de lencería: 6 fixes (catálogo subible)
 
 Sesión con 6 fixes consecutivos al pipeline `/pipelines/lingerie` para
