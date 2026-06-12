@@ -754,24 +754,78 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Live processing UX — rotating reassurance copy + elapsed timer      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Mensajes que rotan mientras un paso procesa, para acompañar a la usuaria en
+ * vez de dejarla mirando un spinner. 3 líneas por paso (la animación CSS
+ * `lz-copy-track` cicla entre ellas) + un ETA humano. Fallback genérico.
+ */
+const PROCESSING_COPY: Record<string, { copy: [string, string, string]; eta: string }> = {
+  isolate:        { copy: ["Detectando tu prenda…", "Separándola del cuerpo…", "Limpiando el fondo…"], eta: "~30s típico" },
+  model:          { copy: ["Convocando a tu modelo IA…", "Definiendo pose y luz…", "Renderizando piel y cabello…"], eta: "~40s típico" },
+  tryon:          { copy: ["Leyendo tu prenda real…", "Vistiendo a la modelo…", "Ajustando tirantes y corte…"], eta: "~25s típico" },
+  texturePreserve:{ copy: ["Detectando la zona del bra…", "Leyendo la textura del encaje…", "Pintando la tela real…"], eta: "~50s típico" },
+  photoBack:      { copy: ["Buscando la vista de espalda…", "Componiendo broche y banda…", "Afinando los detalles…"], eta: "~40s típico" },
+  photoFullBody:  { copy: ["Extendiendo el lienzo…", "Agregando piernas y briefs…", "Manteniendo la misma modelo…"], eta: "~40s típico" },
+  modelVideo:     { copy: ["Dándole movimiento a la modelo…", "Cuidando la identidad facial…", "Renderizando los frames…"], eta: "~2-3 min típico" },
+  productVideo:   { copy: ["Preparando el giro 360°…", "Renderizando los frames…", "Puliendo el video…"], eta: "~1-2 min típico" },
+};
+const DEFAULT_PROCESSING_COPY: { copy: [string, string, string]; eta: string } = {
+  copy: ["Procesando…", "Trabajando en tu imagen…", "Casi listo…"],
+  eta: "",
+};
+
+/** Cuenta segundos mientras `active` es true; se resetea al activarse. */
+function useElapsedSeconds(active: boolean): number {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const start = Date.now();
+    const tick = () => setSecs(Math.floor((Date.now() - start) / 1000));
+    // first tick on a macrotask (avoids synchronous setState inside the effect)
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [active]);
+  // When inactive, render 0 without touching state synchronously in the effect.
+  return active ? secs : 0;
+}
+
+/** Formatea segundos como m:ss. */
+function fmtClock(total: number): string {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Status badge                                                        */
 /* ------------------------------------------------------------------ */
 
 function StatusBadge({ status }: { status: StepStatus }) {
   const config = {
-    idle:       { label: "Pendiente",    className: "bg-white/5 text-gray-400",      icon: Clock         },
-    pending:    { label: "En cola",      className: "bg-white/5 text-gray-400",      icon: Clock         },
-    processing: { label: "Procesando",   className: "bg-violet-500/20 text-violet-300", icon: Loader2    },
-    done:       { label: "Listo",        className: "bg-emerald-500/20 text-emerald-400", icon: CheckCircle2 },
-    error:      { label: "Error",        className: "bg-red-500/20 text-red-400",    icon: AlertCircle   },
-    skipped:    { label: "Saltado",      className: "bg-white/5 text-gray-500",      icon: SkipForward   },
-    accepted:   { label: "Aceptado",     className: "bg-emerald-500/20 text-emerald-400", icon: CheckCircle2 },
+    idle:       { label: "Pendiente",    className: "bg-white/5 text-gray-400 border-white/10",                          icon: Clock         },
+    pending:    { label: "En cola",      className: "bg-white/5 text-gray-400 border-white/10",                          icon: Clock         },
+    processing: { label: "En vivo",      className: "bg-[var(--accent-dim)] text-[var(--accent-light)] border-[var(--accent)]/25", icon: Loader2 },
+    done:       { label: "Listo",        className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",          icon: CheckCircle2 },
+    error:      { label: "Error",        className: "bg-red-500/15 text-red-300 border-red-500/25",                      icon: AlertCircle   },
+    skipped:    { label: "Saltado",      className: "bg-white/5 text-gray-500 border-white/10",                          icon: SkipForward   },
+    accepted:   { label: "Aceptado",     className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",          icon: CheckCircle2 },
   }[status];
 
   const Icon = config.icon;
   return (
-    <span className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", config.className)}>
-      <Icon className={cn("h-3 w-3", status === "processing" && "animate-spin")} />
+    <span className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium", config.className)}>
+      {status === "processing" ? (
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] lz-dot" />
+      ) : (
+        <Icon className="h-3 w-3" />
+      )}
       {config.label}
     </span>
   );
@@ -937,7 +991,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             </span>
           )}
           {isSelected && (
-            <span className="rounded-md bg-violet-500/30 px-2.5 py-1 font-medium text-violet-200">
+            <span className="rounded-md bg-[var(--accent)]/30 px-2.5 py-1 font-medium text-[var(--accent-light)]">
               ✓ Variante elegida
             </span>
           )}
@@ -950,7 +1004,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
                 compareMode
-                  ? "bg-violet-500 text-white hover:bg-violet-400"
+                  ? "bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent)]"
                   : "bg-white/10 text-white hover:bg-white/20",
               )}
               title="Comparar con la foto original (C)"
@@ -1002,7 +1056,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
                 className="h-full w-full rounded-lg object-contain"
                 style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
               />
-              <span className="absolute right-2 top-2 rounded-md bg-violet-500/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+              <span className="absolute right-2 top-2 rounded-md bg-[var(--accent)]/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
                 Resultado
               </span>
             </div>
@@ -1058,7 +1112,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
               "flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors",
               isSelected
                 ? "bg-emerald-500/30 text-emerald-200 cursor-default"
-                : "bg-violet-500 text-white shadow-lg shadow-violet-500/30 hover:bg-violet-400",
+                : "bg-[var(--accent)] text-[var(--bg-primary)] shadow-lg shadow-[var(--accent)]/30 hover:bg-[var(--accent)]",
             )}
           >
             <Check className="h-4 w-4" />
@@ -1077,7 +1131,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
               onClick={(e) => { e.stopPropagation(); setIdx(i); }}
               className={cn(
                 "relative h-10 w-10 overflow-hidden rounded transition-all",
-                i === idx ? "ring-2 ring-violet-400" : "opacity-60 hover:opacity-100",
+                i === idx ? "ring-2 ring-[var(--accent)]" : "opacity-60 hover:opacity-100",
               )}
             >
               <img src={u} alt={`v${i + 1}`} className="h-full w-full object-cover" />
@@ -1126,18 +1180,23 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
     ? step.candidates
     : (step.resultUrl ? [step.resultUrl] : []);
   const docs = STEP_DOCS[step.id];
+  // UX en vivo: temporizador + microcopy rotativo mientras procesa.
+  const elapsed = useElapsedSeconds(step.status === "processing");
+  const proc = PROCESSING_COPY[step.id] ?? DEFAULT_PROCESSING_COPY;
 
   return (
     <div
       data-step-id={step.id}
       className={cn(
-        "rounded-xl border transition-all duration-200",
-        isActive && step.status !== "idle" && step.status !== "pending"
-          ? "border-violet-500/40 bg-violet-500/[0.04] shadow-lg shadow-violet-500/5"
+        "lz-rise overflow-hidden rounded-2xl border transition-all duration-300",
+        step.status === "processing"
+          ? "border-[var(--accent)]/35 bg-gradient-to-b from-[var(--accent-glow)] to-transparent lz-glow"
+          : isActive && step.status !== "idle" && step.status !== "pending"
+          ? "border-[var(--accent)]/30 bg-[var(--accent-glow)]"
           : step.status === "done" || step.status === "accepted"
           ? "border-emerald-500/20 bg-emerald-500/[0.02]"
           : step.status === "skipped"
-          ? "border-white/5 bg-white/[0.01] opacity-50"
+          ? "border-white/5 bg-white/[0.01] opacity-60"
           : step.status === "error"
           ? "border-red-500/30 bg-red-500/[0.03]"
           : "border-white/8 bg-white/[0.02]",
@@ -1145,33 +1204,33 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
     >
       {/* Card header */}
       <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold shrink-0",
-              step.status === "done" || step.status === "accepted"
-                ? "bg-emerald-500/20 text-emerald-400"
-                : step.status === "processing"
-                ? "bg-violet-500/20 text-violet-400"
-                : step.status === "error"
-                ? "bg-red-500/20 text-red-400"
-                : "bg-white/8 text-gray-400",
-            )}
-          >
-            {step.status === "processing" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : step.status === "done" || step.status === "accepted" ? (
-              <Check className="h-4 w-4" />
-            ) : step.status === "error" ? (
-              <AlertCircle className="h-4 w-4" />
-            ) : (
-              stepNumber
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="relative shrink-0">
+            <div
+              className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors",
+                step.status === "done" || step.status === "accepted"
+                  ? "bg-emerald-500/15 text-emerald-300"
+                  : step.status === "processing"
+                  ? "bg-gradient-to-br from-[var(--accent)]/25 to-[var(--accent-muted)]/15 text-[var(--accent-light)]"
+                  : step.status === "error"
+                  ? "bg-red-500/15 text-red-300"
+                  : isActive
+                  ? "bg-[var(--accent)]/12 text-[var(--accent-light)]"
+                  : "bg-white/[0.06] text-gray-400",
+              )}
+            >
+              <Icon className="h-[18px] w-[18px]" />
+            </div>
+            {(step.status === "done" || step.status === "accepted") && (
+              <span className="lz-pop absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[var(--bg-primary)]">
+                <Check className="h-2.5 w-2.5 text-black/80" />
+              </span>
             )}
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <Icon className="h-3.5 w-3.5 text-gray-400" />
-              <span className="text-sm font-semibold text-white">{step.label}</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-gray-500">Paso {stepNumber}</span>
               {/* P0-4: botón "i" que abre el panel de docs del step */}
               {docs && (
                 <button
@@ -1180,8 +1239,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   className={cn(
                     "flex h-4 w-4 items-center justify-center rounded-full transition-colors",
                     showDocs
-                      ? "bg-violet-500/30 text-violet-200"
-                      : "bg-white/10 text-gray-400 hover:bg-violet-500/20 hover:text-violet-300",
+                      ? "bg-[var(--accent)]/30 text-[var(--accent-light)]"
+                      : "bg-white/10 text-gray-400 hover:bg-[var(--accent)]/20 hover:text-[var(--accent-light)]",
                   )}
                   title="Ver detalles de este paso"
                   aria-label="Ver detalles"
@@ -1190,7 +1249,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 </button>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-gray-500">{step.description}</p>
+            <span className="block truncate text-[15px] font-semibold text-white">{step.label}</span>
+            <p className="mt-0.5 truncate text-xs text-gray-500">{step.description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -1234,28 +1294,28 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {/* P0-4: panel desplegable con docs del step (qué hace, proveedor, costo,
           duración, fallas típicas, tips). Se expande al tocar el ícono "i". */}
       {showDocs && docs && (
-        <div className="border-b border-white/6 bg-violet-500/[0.03] px-5 py-4 text-xs">
+        <div className="border-b border-white/6 bg-[var(--accent)]/[0.03] px-5 py-4 text-xs">
           <div className="space-y-3">
             <div>
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Qué hace</p>
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Qué hace</p>
               <p className="text-gray-300">{docs.what}</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Proveedor</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Proveedor</p>
                 <p className="text-gray-400">{docs.provider}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Duración típica</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Duración típica</p>
                 <p className="text-gray-400">{docs.duration}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Costo</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Costo</p>
                 <p className="text-gray-400">{docs.costDetail}</p>
               </div>
             </div>
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Qué puede fallar</p>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Qué puede fallar</p>
               <ul className="list-disc space-y-0.5 pl-4 text-gray-400">
                 {docs.canFail.map((f, i) => <li key={i}>{f}</li>)}
               </ul>
@@ -1327,7 +1387,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             <div className="flex shrink-0 flex-col items-center gap-1">
               <ArrowRight className={cn(
                 "h-5 w-5",
-                step.status === "processing" ? "text-violet-400 animate-pulse" : "text-gray-600",
+                step.status === "processing" ? "text-[var(--accent)] animate-pulse" : "text-gray-600",
               )} />
             </div>
 
@@ -1335,10 +1395,40 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             <div className="flex-1 min-w-0">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Resultado</p>
               {step.status === "processing" ? (
-                <div className="flex h-40 w-full items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/[0.04]">
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin text-violet-400" />
-                    <span className="text-xs text-violet-400">Generando...</span>
+                <div className="relative flex h-40 w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-glow)]">
+                  {/* skeleton shimmer detrás, como que la imagen se está "revelando" */}
+                  <div className="lz-skeleton absolute inset-0 opacity-40" aria-hidden="true" />
+                  <div className="relative flex flex-col items-center gap-2 px-4 text-center">
+                    {/* ring animado con el tiempo transcurrido en el centro */}
+                    <div className="relative h-12 w-12">
+                      <div
+                        className="lz-spin absolute inset-0 rounded-full"
+                        style={{
+                          background: "conic-gradient(var(--accent) 25%, rgba(255,255,255,0.08) 0)",
+                          WebkitMask: "radial-gradient(closest-side, transparent 66%, #000 67%)",
+                          mask: "radial-gradient(closest-side, transparent 66%, #000 67%)",
+                        }}
+                        aria-hidden="true"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold tabular-nums text-[var(--accent-light)]">
+                        {fmtClock(elapsed)}
+                      </div>
+                    </div>
+                    {/* microcopy que rota para acompañar a la usuaria */}
+                    <div className="h-5 overflow-hidden">
+                      <div className="lz-copy-track">
+                        {proc.copy.map((line, i) => (
+                          <div key={i} className="flex h-5 items-center justify-center text-xs text-[var(--text-secondary)]">
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {proc.eta && <span className="text-[10px] text-gray-500">{proc.eta}</span>}
+                  </div>
+                  {/* barra indeterminada con destello que barre */}
+                  <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-white/5">
+                    <div className="lz-bar-sheen h-full w-full" aria-hidden="true" />
                   </div>
                 </div>
               ) : step.status === "error" ? (
@@ -1386,7 +1476,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 // ABRE el lightbox (no selecciona directo) — la usuaria ve
                 // el detalle al tamaño grande y desde ahí puede elegir.
                 <div>
-                  <p className="mb-1.5 text-[10px] text-violet-300">
+                  <p className="mb-1.5 text-[10px] text-[var(--accent)]">
                     {step.candidates.length} variantes — tocá una para verla grande y elegirla
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -1400,7 +1490,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                           className={cn(
                             "group relative aspect-[3/4] overflow-hidden rounded-md border transition-all",
                             isSelected
-                              ? "border-violet-400 ring-2 ring-violet-400/50"
+                              ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/50"
                               : "border-white/15 hover:border-white/40",
                           )}
                           title={`Tocá para ver variante ${i + 1} en grande${isSelected ? ' (seleccionada)' : ''}`}
@@ -1415,7 +1505,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                             {i + 1}
                           </div>
                           {isSelected && (
-                            <div className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500">
+                            <div className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)]">
                               <Check className="h-2.5 w-2.5 text-white" />
                             </div>
                           )}
@@ -1482,7 +1572,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   <select
                     value={step.providerOverride ?? "auto"}
                     onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
-                    className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-violet-500/50"
+                    className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-[var(--accent)]/50"
                     title="Cambiá el proveedor y dale Rehacer para comparar"
                   >
                     {TRYON_PROVIDER_OPTIONS.map((p) => (
@@ -1495,7 +1585,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               )}
               <button
                 onClick={onSkip}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                className="lz-lift flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white"
               >
                 <SkipForward className="h-3.5 w-3.5" />
                 Saltar
@@ -1511,7 +1601,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       `unistudio-${step.id}.${isVideo ? "mp4" : "jpg"}`,
                     );
                   }}
-                  className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
+                  className="lz-lift flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
                   title="Descargar esta imagen"
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -1520,14 +1610,14 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               )}
               <button
                 onClick={onRerun}
-                className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-300"
+                className="lz-lift flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Rehacer
               </button>
               <button
                 onClick={onAccept}
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/30 px-4 py-2 text-xs font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/30 hover:text-emerald-300"
+                className="lz-lift flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-gradient-to-b from-emerald-400/90 to-emerald-500 px-4 py-2 text-xs font-semibold text-emerald-950 shadow-[0_4px_14px_-4px_rgba(80,200,120,0.5)] hover:brightness-105"
               >
                 <Check className="h-3.5 w-3.5" />
                 Aceptar y continuar
@@ -1546,7 +1636,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   <select
                     value={step.providerOverride ?? "auto"}
                     onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
-                    className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-violet-500/50"
+                    className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-[var(--accent)]/50"
                   >
                     {TRYON_PROVIDER_OPTIONS.map((p) => (
                       <option key={p.value} value={p.value} title={p.hint}>
@@ -1565,7 +1655,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 </button>
                 <button
                   onClick={onRerun}
-                  className="flex items-center gap-2 rounded-lg bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/30 transition-colors hover:bg-violet-400"
+                  className="flex items-center gap-2 rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--bg-primary)] shadow-md transition-colors hover:brightness-105"
                 >
                   <RotateCcw className="h-4 w-4" />
                   {step.providerOverride && step.providerOverride !== "auto"
@@ -1667,9 +1757,9 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
   // Estado de análisis en curso
   if (status === "analyzing") {
     return (
-      <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.05] p-4">
+      <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/[0.05] p-4">
         <div className="flex items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+          <Loader2 className="h-5 w-5 animate-spin text-[var(--accent)]" />
           <div>
             <p className="text-sm font-semibold text-white">Entendiendo el producto…</p>
             <p className="text-xs text-gray-400">Claude Vision está leyendo la foto para extraer color, textura y detalles reales.</p>
@@ -1709,14 +1799,14 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
   if (!spec) return null;
 
   return (
-    <div className="rounded-xl border border-violet-500/20 bg-violet-500/[0.03]">
+    <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.03]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left"
       >
         <div className="flex items-center gap-2.5">
-          <Sparkles className="h-4 w-4 text-violet-400" />
+          <Sparkles className="h-4 w-4 text-[var(--accent)]" />
           <div>
             <p className="text-sm font-semibold text-white">Ficha técnica del producto</p>
             <p className="text-[11px] text-gray-500">Leída por Claude Vision — podés editar cualquier campo antes de que corra el resto.</p>
@@ -1726,12 +1816,12 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
       </button>
 
       {open && (
-        <div className="space-y-4 border-t border-violet-500/15 px-5 py-4">
+        <div className="space-y-4 border-t border-[var(--accent)]/15 px-5 py-4">
           {(["Identidad", "Construcción", "Detalles"] as const).map((group) => {
             const fields = SPEC_FIELDS.filter((f) => f.group === group);
             return (
               <div key={group}>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-violet-300/70">{group}</p>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{group}</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {fields.map((field) => {
                     const value = field.getter(spec) ?? "";
@@ -1743,7 +1833,7 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
                           value={value}
                           placeholder={field.placeholder}
                           onChange={(e) => onChange(field.setter(spec, e.target.value))}
-                          className="rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-violet-500/50"
+                          className="rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
                         />
                       </label>
                     );
@@ -1755,12 +1845,12 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
 
           {spec.notes && (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-violet-300/70">Notas</p>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">Notas</p>
               <textarea
                 value={spec.notes}
                 onChange={(e) => onChange({ ...spec, notes: e.target.value })}
                 rows={2}
-                className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-violet-500/50"
+                className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
               />
             </div>
           )}
@@ -1800,13 +1890,13 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
       className={cn(
         "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 transition-all",
         dragging
-          ? "border-violet-500/60 bg-violet-500/10"
+          ? "border-[var(--accent)]/60 bg-[var(--accent)]/10"
           : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]",
       )}
     >
       <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleChange} />
       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-        <Upload className={cn("h-6 w-6", dragging ? "text-violet-400" : "text-gray-400")} />
+        <Upload className={cn("h-6 w-6", dragging ? "text-[var(--accent)]" : "text-gray-400")} />
       </div>
       <div className="text-center">
         <p className="text-sm font-semibold text-white">Arrastra las fotos aquí</p>
@@ -3700,8 +3790,8 @@ export default function LingeriePipelinePage() {
                       const namedGroups = Array.from(groups.entries()).filter(([k]) => k !== "sin-ref");
                       if (namedGroups.length === 0) return null;
                       return (
-                        <div className="mb-3 rounded-md border border-violet-500/20 bg-violet-500/[0.04] px-3 py-2 text-[11px]">
-                          <span className="font-semibold text-violet-300">
+                        <div className="mb-3 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] px-3 py-2 text-[11px]">
+                          <span className="font-semibold text-[var(--accent)]">
                             {namedGroups.length} producto{namedGroups.length === 1 ? '' : 's'} detectado{namedGroups.length === 1 ? '' : 's'}:
                           </span>{' '}
                           {namedGroups.map(([ref, colorSet], i) => (
@@ -3763,7 +3853,7 @@ export default function LingeriePipelinePage() {
                               </div>
                             )}
                             {job.referenceKey && (
-                              <div className="absolute left-1 bottom-1 rounded-md bg-violet-500/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                              <div className="absolute left-1 bottom-1 rounded-md bg-[var(--accent)]/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
                                 REF {job.referenceKey}
                               </div>
                             )}
@@ -3775,7 +3865,7 @@ export default function LingeriePipelinePage() {
                             <select
                               value={job.photoAngle}
                               onChange={(e) => updateJobAngle(job.id, e.target.value as PhotoAngle)}
-                              className="flex-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-1 text-[10px] text-white outline-none focus:border-violet-500/50"
+                              className="flex-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-1 text-[10px] text-white outline-none focus:border-[var(--accent)]/50"
                             >
                               {PHOTO_ANGLE_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value} title={o.hint}>{o.label}</option>
@@ -3896,7 +3986,7 @@ export default function LingeriePipelinePage() {
                       value={referenceNumber}
                       onChange={(e) => setReferenceNumber(e.target.value)}
                       placeholder="ej. 011473"
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20"
+                      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/20"
                     />
                   </div>
                   <div>
@@ -3904,7 +3994,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={productType}
                       onChange={(e) => setProductType(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-violet-500/50"
+                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="bra">Brassiere / Top</option>
                       <option value="panty">Panty / Ropa interior</option>
@@ -3929,7 +4019,7 @@ export default function LingeriePipelinePage() {
                         className={cn(
                           "flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all",
                           step.enabled
-                            ? "border-violet-500/30 bg-violet-500/[0.06]"
+                            ? "border-[var(--accent)]/30 bg-[var(--accent)]/[0.06]"
                             : "border-white/6 bg-white/[0.01] opacity-60",
                         )}
                       >
@@ -3937,7 +4027,7 @@ export default function LingeriePipelinePage() {
                           type="checkbox"
                           checked={step.enabled}
                           onChange={() => toggleStep(step.id)}
-                          className="accent-violet-500"
+                          className="accent-[var(--accent)]"
                         />
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/5 text-xs font-bold text-gray-500">
                           {idx + 1}
@@ -3976,7 +4066,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={modelConfig.skinTone}
                       onChange={(e) => setModelConfig((m) => ({ ...m, skinTone: e.target.value }))}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-violet-500/50"
+                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="light">Clara</option>
                       <option value="medium-light">Medio clara</option>
@@ -3990,7 +4080,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={modelConfig.bodyType}
                       onChange={(e) => setModelConfig((m) => ({ ...m, bodyType: e.target.value }))}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-violet-500/50"
+                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="slim">Delgada</option>
                       <option value="regular">Regular</option>
@@ -4003,7 +4093,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={modelConfig.ageRange}
                       onChange={(e) => setModelConfig((m) => ({ ...m, ageRange: e.target.value }))}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-violet-500/50"
+                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="18-25">18 – 25 años</option>
                       <option value="26-35">26 – 35 años</option>
@@ -4022,7 +4112,7 @@ export default function LingeriePipelinePage() {
                     className={cn(
                       "flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-xs transition-all",
                       autoMode
-                        ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
+                        ? "border-[var(--accent)]/40 bg-[var(--accent)]/15 text-[var(--accent)]"
                         : "border-white/8 bg-white/[0.02] text-gray-400 hover:border-white/15",
                     )}
                   >
@@ -4035,7 +4125,7 @@ export default function LingeriePipelinePage() {
                     className={cn(
                       "flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-xs transition-all",
                       !autoMode
-                        ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
+                        ? "border-[var(--accent)]/40 bg-[var(--accent)]/15 text-[var(--accent)]"
                         : "border-white/8 bg-white/[0.02] text-gray-400 hover:border-white/15",
                     )}
                   >
@@ -4069,7 +4159,7 @@ export default function LingeriePipelinePage() {
                           "flex w-full flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition-all",
                           isDisabled && "cursor-not-allowed opacity-50",
                           !isDisabled && selected
-                            ? "border-violet-500/50 bg-violet-500/10"
+                            ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                             : !isDisabled
                             ? "border-white/8 bg-white/[0.02] hover:border-white/20"
                             : "border-white/8 bg-white/[0.01]",
@@ -4079,7 +4169,7 @@ export default function LingeriePipelinePage() {
                           <div className="flex items-center gap-1.5">
                             <span className={cn(
                               "text-xs font-semibold",
-                              selected ? "text-violet-200" : "text-gray-300",
+                              selected ? "text-[var(--accent-light)]" : "text-gray-300",
                             )}>
                               {opt.label}
                             </span>
@@ -4127,14 +4217,14 @@ export default function LingeriePipelinePage() {
                         className={cn(
                           "flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 transition-all",
                           selected
-                            ? "border-violet-500/50 bg-violet-500/10"
+                            ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                             : "border-white/8 bg-white/[0.02] hover:border-white/20",
                         )}
                         title={opt.hint}
                       >
                         <span className={cn(
                           "text-xs font-semibold",
-                          selected ? "text-violet-200" : "text-gray-300",
+                          selected ? "text-[var(--accent-light)]" : "text-gray-300",
                         )}>
                           {opt.label}
                         </span>
@@ -4146,7 +4236,7 @@ export default function LingeriePipelinePage() {
               </section>
 
               {/* Cost summary + launch */}
-              <section className="rounded-xl border border-violet-500/20 bg-violet-500/[0.04] p-5">
+              <section className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] p-5">
                 <h2 className="mb-4 text-sm font-semibold text-white">Resumen</h2>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -4160,7 +4250,7 @@ export default function LingeriePipelinePage() {
                   <div className="my-3 border-t border-white/8" />
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-400">Costo estimado</span>
-                    <span className="text-base font-bold text-violet-300">
+                    <span className="text-base font-bold text-[var(--accent)]">
                       ${estimatedCost.toFixed(3)}
                     </span>
                   </div>
@@ -4172,13 +4262,13 @@ export default function LingeriePipelinePage() {
                   className={cn(
                     "mt-5 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-all",
                     jobs.length > 0
-                      ? "bg-violet-600 text-white hover:bg-violet-500 active:scale-[0.98]"
+                      ? "bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent)] active:scale-[0.98]"
                       : "cursor-not-allowed bg-white/5 text-gray-500",
                   )}
                 >
                   <Play className="h-4 w-4" />
                   Iniciar Pipeline
-                  {jobs.length > 0 && <span className="ml-1 text-violet-300">({jobs.length} fotos)</span>}
+                  {jobs.length > 0 && <span className="ml-1 text-[var(--accent)]">({jobs.length} fotos)</span>}
                 </button>
 
                 {jobs.length === 0 && (
@@ -4210,10 +4300,13 @@ export default function LingeriePipelinePage() {
           <span className="hidden sm:inline">Configuración</span>
         </button>
         <span className="text-[var(--border-default)]">/</span>
-        <div className="flex items-center gap-2 min-w-0">
-          <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
-          <span className="text-sm font-semibold text-heading truncate">
-            Lencería{referenceNumber ? ` · Ref. ${referenceNumber}` : ""}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-muted)] text-[var(--bg-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+            <Sparkles className="h-3.5 w-3.5" />
+          </span>
+          <span className="min-w-0 truncate">
+            <span className="font-serif text-[15px] font-semibold text-white">Lencería <span className="text-[var(--accent)]">Studio</span></span>
+            {referenceNumber ? <span className="ml-2 text-xs text-gray-500">Ref. {referenceNumber}</span> : null}
           </span>
         </div>
 
@@ -4221,7 +4314,7 @@ export default function LingeriePipelinePage() {
         <div className="ml-auto flex items-center gap-4">
           {isRunning && (
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
               <span className="text-sm text-gray-400">
                 Procesando {activeJobIndex + 1} de {jobs.length}…
               </span>
@@ -4266,14 +4359,14 @@ export default function LingeriePipelinePage() {
                   <div
                     className={cn(
                       "h-full transition-all duration-500",
-                      done === jobs.length ? "bg-emerald-500" : "bg-violet-500",
+                      done === jobs.length ? "bg-emerald-500" : "bg-[var(--accent)]",
                     )}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-gray-400 whitespace-nowrap">
                   {done > 0 && <span className="text-emerald-400">{done} listo{done > 1 ? 's' : ''}</span>}
-                  {active > 0 && <span className="text-violet-400">{active} procesando</span>}
+                  {active > 0 && <span className="text-[var(--accent)]">{active} procesando</span>}
                   {errors > 0 && <span className="text-red-400">{errors} error{errors > 1 ? 'es' : ''}</span>}
                   {pending > 0 && <span>{pending} en cola</span>}
                   <span className="text-gray-500">·</span>
@@ -4309,7 +4402,7 @@ export default function LingeriePipelinePage() {
                 className={cn(
                   "flex w-full items-center gap-2.5 rounded-lg p-2 text-left transition-all",
                   idx === activeJobIndex
-                    ? "border border-violet-500/30 bg-violet-500/10"
+                    ? "border border-[var(--accent)]/30 bg-[var(--accent)]/10"
                     : "border border-transparent hover:bg-white/[0.03]",
                 )}
               >
@@ -4325,7 +4418,7 @@ export default function LingeriePipelinePage() {
                     </div>
                   )}
                   {job.status === "active" && (
-                    <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500">
+                    <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)]">
                       <Loader2 className="h-2.5 w-2.5 animate-spin text-white" />
                     </div>
                   )}
@@ -4379,18 +4472,30 @@ export default function LingeriePipelinePage() {
                       }, 0);
                     const spent = activeJob.totalCost;
                     const pct = Math.min(100, Math.round((done / total) * 100));
+                    void pct;
                     return (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <div className="h-1 flex-1 min-w-[80px] max-w-[160px] overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className={cn(
-                              "h-full transition-all",
-                              activeJob.status === "done" ? "bg-emerald-500" : "bg-violet-500",
-                            )}
-                            style={{ width: `${pct}%` }}
-                          />
+                      <div className="mt-2 flex items-center gap-2.5">
+                        <div className="flex items-center gap-1">
+                          {activeJob.steps.filter((s) => s.enabled).map((s) => (
+                            <span
+                              key={s.id}
+                              title={s.label}
+                              className={cn(
+                                "h-1.5 w-5 rounded-full transition-colors",
+                                s.status === "done" || s.status === "accepted"
+                                  ? "bg-emerald-500"
+                                  : s.status === "processing"
+                                  ? "bg-[var(--accent)]"
+                                  : s.status === "error"
+                                  ? "bg-red-500"
+                                  : s.status === "skipped"
+                                  ? "bg-white/15"
+                                  : "bg-white/10",
+                              )}
+                            />
+                          ))}
                         </div>
-                        <span className="text-[10px] text-gray-500">
+                        <span className="text-[10px] tabular-nums text-gray-500">
                           {done}/{total} · ${spent.toFixed(3)} / ~${estimated.toFixed(2)}
                         </span>
                       </div>
@@ -4523,7 +4628,7 @@ export default function LingeriePipelinePage() {
                             if (i < results.length - 1) await new Promise((r) => setTimeout(r, 200));
                           }
                         }}
-                        className="flex items-center gap-1.5 rounded-lg bg-violet-500 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-violet-500/30 hover:bg-violet-400"
+                        className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-[var(--bg-primary)] shadow-md hover:brightness-105"
                       >
                         <Download className="h-3.5 w-3.5" />
                         Descargar todos
