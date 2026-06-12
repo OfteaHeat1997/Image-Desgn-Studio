@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Upload,
@@ -1188,7 +1189,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
     <div
       data-step-id={step.id}
       className={cn(
-        "lz-rise overflow-hidden rounded-2xl border transition-all duration-300",
+        "lz-rise rounded-2xl border transition-all duration-300",
         step.status === "processing"
           ? "border-[var(--accent)]/35 bg-gradient-to-b from-[var(--accent-glow)] to-transparent lz-glow"
           : isActive && step.status !== "idle" && step.status !== "pending"
@@ -1668,8 +1669,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
         </div>
       )}
 
-      {/* Lightbox: solo se monta cuando lightboxIdx tiene valor */}
-      {lightboxIdx !== null && lightboxImages.length > 0 && (
+      {/* Lightbox: portal a document.body para que el modal `fixed` NO quede
+          atrapado por el transform/overflow del card (si no, se mal-posiciona,
+          tapa la página y bloquea scroll/clicks). Solo se monta con lightboxIdx. */}
+      {lightboxIdx !== null && lightboxImages.length > 0 && createPortal(
         <ImageLightbox
           images={lightboxImages}
           startIndex={lightboxIdx}
@@ -1681,7 +1684,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           // chain), que es lo que se está transformando. Usuaria ve "antes vs
           // después" side-by-side para evaluar fidelidad del producto.
           compareWith={inputUrl}
-        />
+        />,
+        document.body,
       )}
     </div>
   );
