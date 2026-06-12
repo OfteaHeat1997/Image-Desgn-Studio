@@ -41,10 +41,16 @@ FOTO ORIGINAL (modelo vistiendo bra/panty/shapewear)
   Si ya existe modelo guardada para esta referencia (tabla AiModel) → skip este step
          |
          v
-[PASO 3] /api/tryon (provider:kolors, garmentType:bra|panty|shapewear)
-  fal-ai/kling/v1-5/kolors-virtual-try-on
-  Category routing: tops (bra) / bottoms (panty) / one-pieces (shapewear)
-  Inputs: human_image_url (modelo IA del paso 2), garment_image_url (prenda aislada del paso 1)
+[PASO 3] /api/tryon (provider:auto → SeedDream edit, garmentType:bra|panty|shapewear)
+  PRIMARIO: fal-ai/bytedance/seedream/v4/edit — editor multi-imagen.
+    image_urls: [modelo IA (paso 2), prenda aislada (paso 1)]
+    Prompt: "viste a esta persona con la prenda EXACTA de la 2ª imagen,
+    preservando encaje/tirantes/cortes; no rediseñar ni recolorear".
+    enable_safety_checker:false → no bloquea lencería. Preserva el producto
+    real mucho mejor que Kolors (edita en vez de re-pintar genérico).
+  BACKUP: fal-ai/kling/v1-5/kolors-virtual-try-on (si SeedDream falla)
+    Category routing: tops (bra) / bottoms (panty) / one-pieces (shapewear)
+  El badge en la UI muestra el proveedor real: verde=seedream, ámbar=kolors.
          |
          v
 [PASO 3b] /api/inpaint (provider:flux-fill-pro) — texturePreserve
@@ -88,7 +94,9 @@ RESULTADOS guardados en galería con naming: REF-{sku}-{color}-{ángulo}.jpg + .
 |---|---|---|
 | bg-remove (aislamiento) | **grounded_sam** (Replicate, schananas) | Grounding DINO detecta "bra"/"panty" como objeto y SAM segmenta. Flux Kontext Pro rechaza lencería con error E005 (content policy no desactivable). |
 | model-create | **SeedDream 4.5** (fal.ai) | Único modelo de fotografía que permite `enable_safety_checker: false`. Flux/Gemini bloquean cualquier generación con ropa íntima. |
-| tryon | **Kolors v1.5** (fal.ai) | Diseñado para moda comercial. FASHN v1.6 bloquea lencería siempre (política). IDM-VTON a veces funciona pero Replicate tiene filtro activo. |
+| tryon (primario) | **SeedDream v4 edit** (fal.ai) | Editor multi-imagen (modelo + prenda como referencias). Edita en vez de sintetizar desde un prior de categoría → preserva el producto REAL (encaje, malla, tirantes, broche, corte). `enable_safety_checker:false` → no bloquea lencería (igual que en el ghost). Es lo que Kolors no puede: no "re-pinta" una prenda genérica. |
+| tryon (backup) | **Kolors v1.5** (fal.ai) | Fallback si SeedDream falla. Rápido y diseñado para moda comercial, pero tiende a inventar prendas genéricas en lencería compleja. |
+| ~~tryon FASHN~~ | **NO** para lencería | FASHN v1.6 bloquea lencería siempre (política) → desperdiciaba ~17s antes de caer. Solo se usa en no-íntimos. IDM-VTON: filtro Replicate intermitente. |
 | upscale | Real-ESRGAN / Clarity | Estándar, no tiene bloqueos. |
 | video modelo | **Kling 2.6 Pro** (fal-ai/kling-video/v2.6/pro/image-to-video) | wan-2.2-fast generaba personas con look de muñeco (skin waxy, micro-expresiones erráticas, hair sin física). Kling 2.6 Pro preserva identidad facial entre frames y produce movimiento humano natural, apto para catálogo de moda. |
 | video producto (360°) | **wan-2.2-fast** con `num_frames:81 guidance_scale:3.0 negative_prompt` | Sin humano en el frame → la calidad standard es suficiente. Ahorra $0.30 por video vs upgradear a Kling. |
@@ -122,7 +130,7 @@ El pipeline rutea según `garmentType` detectado por `analyze-image` (Claude Vis
 | `/api/upload` | $0 |
 | `/api/bg-remove` (grounded_sam + composite) | ~$0.01 |
 | `/api/model-create` (SeedDream 4.5) | $0.055 — **$0 si reusa modelo guardada** |
-| `/api/tryon` (Kolors v1.5) | $0.02 |
+| `/api/tryon` (SeedDream v4 edit, primario) | $0.03 — **$0.02 si cae a Kolors backup** |
 | `/api/inpaint` (flux-fill-pro, texturePreserve opcional) | ~$0.05 |
 | `/api/outpaint` (flux-fill-pro, photoFullBody) | $0.05 |
 | `/api/enhance` (Sharp) | $0 |
@@ -203,7 +211,7 @@ El step `photoBack` **NO inventa la vista trasera del bra**. Si no subís una fo
 |---|---|---|
 | `bg-remove` | `/api/bg-remove` | `removeSubject:true` + `garmentType` |
 | `model-create` | `/api/model-create` | SeedDream 4.5 con seed compartido |
-| `tryon` | `/api/tryon` | Forzar `provider:kolors` |
+| `tryon` | `/api/tryon` | `provider:auto` → SeedDream v4 edit primario, Kolors backup |
 | `enhance` | `/api/enhance` | Preset lingerie |
 | `upscale` | `/api/upscale` | Opcional |
 | `video` | `/api/video` | wan-2.2-fast o kenburns |

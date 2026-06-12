@@ -17,7 +17,7 @@
 | 5 | Inpaint | `/api/inpaint` | Flux Fill Dev, Flux Fill Pro, Kontext Pro | **Lencería** (step `texturePreserve` — flux-fill-pro restaura tela del bra post-tryon), uso manual vía editor |
 | 6 | Outpaint | `/api/outpaint` | Flux Kontext Pro, **Flux Fill Pro** (direction mode con canvas+mask server-side) | **Lencería** (step `photoFullBody` extiende tryon hacia abajo, sin regenerar modelo), uso manual vía editor |
 | 7 | Upscale | `/api/upscale` | Real-ESRGAN, Aura SR, Clarity | Lencería (opcional), Joyería (obligatorio) |
-| 8 | Try-On | `/api/tryon` | Kolors v1.5 (fal), FASHN v1.6, IDM-VTON | Lencería (forzado kolors) |
+| 8 | Try-On | `/api/tryon` | **SeedDream v4 edit (fal, primario lencería)**, Kolors v1.5 (fal, backup), FASHN v1.6 (solo no-íntimos), IDM-VTON | Lencería (`auto` → SeedDream, cae a Kolors) |
 | 9 | Model Create | `/api/model-create` | SeedDream 4.5 (fal), Flux Kontext Pro | Lencería, Joyería |
 | 10 | Ghost Mannequin | `/api/ghost-mannequin` | SeedDream edit, Flux Kontext Pro | Ninguno (reemplazado por Lencería para lencería real) |
 | 11 | Jewelry Try-On | `/api/jewelry-tryon` | Flux Kontext Pro | Joyería |
@@ -47,7 +47,7 @@ Estos 5 módulos son usados por los 3 pipelines. Cualquier cambio en ellos requi
 
 | Módulo | Pipeline único que lo usa | Razón |
 |---|---|---|
-| `tryon` | Lencería | Solo lencería hace try-on general. Joyería usa `jewelry-tryon` aparte. |
+| `tryon` | Lencería | Solo lencería hace try-on general. Primario SeedDream v4 edit (preserva producto), Kolors backup. Joyería usa `jewelry-tryon` aparte. |
 | `inpaint` (flux-fill-pro) | Lencería | Step `texturePreserve`: post-tryon, máscara del bra (grounded_sam returnMaskOnly) + inpaint con prompt material para recuperar textura real. |
 | `jewelry-tryon` | Joyería | Composición específica para piezas (orejas/cuello/mano/muñeca). |
 | `bg-generate` | Estáticos + Joyería | Lencería no genera fondos (el tryon ya pone el fondo del modelo). |

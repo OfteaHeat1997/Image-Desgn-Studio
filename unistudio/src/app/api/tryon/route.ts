@@ -18,6 +18,29 @@ const PROVIDER_COSTS: Record<string, number> = {
   'idm-vton': 0.02,
   fashn: 0.05,
   kolors: 0.02,
+  seedream: 0.03,
+};
+
+// Human-readable noun per garment type — used in the SeedDream edit prompt so
+// the model knows what it is replacing. Color is intentionally NOT here: prompts
+// must stay color-agnostic (products come in any colorway).
+const GARMENT_NOUN: Record<string, string> = {
+  lingerie: 'lingerie piece',
+  bra: 'bra',
+  panty: 'panties',
+  panties: 'panties',
+  shapewear: 'shapewear garment',
+  faja: 'shapewear garment',
+  fajas: 'shapewear garment',
+  bodysuit: 'bodysuit',
+  swimwear: 'swimwear piece',
+  bikini: 'bikini piece',
+  underwear: 'underwear piece',
+  intimate: 'intimate garment',
+  tops: 'top',
+  bottoms: 'bottom garment',
+  'one-pieces': 'one-piece garment',
+  dresses: 'dress',
 };
 
 // Garment types that should prefer IDM-VTON (better for delicate/revealing garments)
@@ -123,6 +146,58 @@ async function tryOnKolors(
   }
 }
 
+/**
+ * Virtual try-on using SeedDream v4 edit on fal.ai.
+ *
+ * This is NOT a try-on model — it is an instruction-driven multi-image EDITOR.
+ * We feed it BOTH the model photo and the isolated garment as references and
+ * instruct it to dress the person in that exact garment. Because it edits the
+ * existing person instead of synthesizing a garment from a category prior, it
+ * preserves the real product (lace, mesh, straps, trim, seams, cut) far better
+ * than Kolors/FASHN, which "repaint" a generic look-alike.
+ *
+ * SeedDream has NO content filter (enable_safety_checker:false), so unlike FASHN
+ * (blocks lingerie) and Flux Kontext (E005), it actually runs on bras/panties.
+ * Same model already proven in the ghost-mannequin step.
+ *
+ * @param modelImage   - URL of the person/model image (first reference).
+ * @param garmentImage - URL of the isolated garment image (second reference).
+ * @param garmentType  - Specific garment type, used to pick the prompt noun.
+ * @returns URL of the try-on result image.
+ */
+async function tryOnSeedDream(
+  modelImage: string,
+  garmentImage: string,
+  garmentType?: string,
+): Promise<string> {
+  const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
+
+  // Order matters: image_urls[0] = person to edit, image_urls[1] = product ref.
+  // Prompt stays color-agnostic per project rule — never hardcode a color.
+  const prompt =
+    `Dress the person in the first image with the exact ${noun} shown in the second image. ` +
+    `Keep the person's face, hair, body, skin tone, pose and the background completely unchanged. ` +
+    `Replace only their ${noun} with the ${noun} from the second image, matching its exact ` +
+    `color, pattern, lace, mesh, straps, trim, seams, cut and construction details precisely. ` +
+    `Do not redesign, simplify, or recolor the garment. Keep it identical to the reference. ` +
+    `Photorealistic fashion e-commerce photography, studio lighting, sharp focus.`;
+
+  const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
+  const garmentImageUrl = await ensureFalAccessibleUrl(garmentImage);
+
+  const result = await runFal('fal-ai/bytedance/seedream/v4/edit', {
+    prompt,
+    image_urls: [humanImageUrl, garmentImageUrl],
+    image_size: 'portrait_16_9',
+    num_images: 1,
+    enable_safety_checker: false,
+  });
+
+  const url = result?.images?.[0]?.url;
+  if (!url) throw new Error('SeedDream edit completed but returned no image');
+  return url;
+}
+
 // Smart routing: picks the best provider based on garment type
 async function smartTryOn(
   modelImage: string,
@@ -134,22 +209,22 @@ async function smartTryOn(
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
-  // For intimates: try FASHN first (it accepts a structured garment_image and
-  // preserves the actual product shape better than Kolors, which has no prompt
-  // input and hallucinates generic tank-tops). Fall back to Kolors only when
-  // FASHN rejects the category or fails. Per competitive research May 2026:
-  // FASHN > Kolors for product preservation in lingerie.
+  // For intimates: try SeedDream v4 edit FIRST. It is a multi-image instruction
+  // editor (person + garment as references) that preserves the real product —
+  // lace, mesh, straps, trim, cut — far better than Kolors, which repaints a
+  // generic look-alike. SeedDream has no content filter so it actually runs on
+  // bras/panties; FASHN blocks lingerie (wasted ~17s before falling back) and
+  // Flux Kontext returns E005, so neither is in this path. Fall back to Kolors
+  // only when SeedDream fails.
   if (isIntimate) {
-    if (process.env.FASHN_API_KEY) {
-      try {
-        const url = await tryOnFashn(modelImage, garmentImage, category, fashnMode);
-        return { url, provider: 'fashn' };
-      } catch (err) {
-        console.warn(
-          '[tryon] FASHN failed for intimate garment, falling back to Kolors:',
-          err instanceof Error ? err.message : err,
-        );
-      }
+    try {
+      const url = await tryOnSeedDream(modelImage, garmentImage, garmentType);
+      return { url, provider: 'seedream' };
+    } catch (err) {
+      console.warn(
+        '[tryon] SeedDream failed for intimate garment, falling back to Kolors:',
+        err instanceof Error ? err.message : err,
+      );
     }
     const url = await tryOnKolors(modelImage, garmentImage);
     return { url, provider: 'kolors' };
@@ -192,7 +267,7 @@ export async function POST(request: NextRequest) {
       category: string;
       garmentType?: string;
       garmentDescription?: string;
-      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'auto';
+      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'auto';
       // Cuando true, la usuaria eligió el proveedor a mano (para testear) y la
       // ruta lo respeta tal cual — NO aplica el override automático kolors→auto.
       forceProvider?: boolean;
@@ -245,19 +320,18 @@ export async function POST(request: NextRequest) {
       garmentType === 'bikini' ||
       garmentType === 'bodysuit';
 
-    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'auto' = provider;
+    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'auto' = provider;
     if (forceProvider && provider !== 'auto') {
       // La usuaria forzó este proveedor a mano (testing) → respetarlo tal cual,
-      // sin el override automático de abajo. Así puede comparar Kolors vs FASHN.
+      // sin el override automático de abajo. Así puede comparar SeedDream vs
+      // Kolors vs FASHN y leer el badge para saber cuál corrió de verdad.
       effectiveProvider = provider;
-    } else if (isIntimateRequest && provider === 'auto') {
-      // Let smartTryOn pick (FASHN if available, else Kolors)
-      effectiveProvider = 'auto';
-    } else if (isIntimateRequest && provider === 'kolors' && process.env.FASHN_API_KEY) {
-      // Even when caller forces Kolors, route to smart logic when FASHN is
-      // available — Kolors is the proven failure mode for the "bra changes"
-      // bug. The lingerie page sends provider="kolors" by default; we
-      // override to "auto" to give FASHN a chance first.
+    } else if (isIntimateRequest && (provider === 'auto' || provider === 'kolors')) {
+      // Lencería sin forzar → siempre a smartTryOn, que prueba SeedDream v4 edit
+      // primero (preserva el producto real) y cae a Kolors si falla. La página
+      // manda provider="kolors" por default; lo mandamos a "auto" para que
+      // SeedDream tenga el primer turno. No depende de FASHN_API_KEY: FASHN
+      // bloquea lencería y ya no está en este camino.
       effectiveProvider = 'auto';
     }
 
@@ -280,11 +354,14 @@ export async function POST(request: NextRequest) {
         case 'kolors':
           resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);
           break;
+        case 'seedream':
+          resultUrl = await tryOnSeedDream(httpModelImage, httpGarmentImage, garmentType);
+          break;
         default:
           return NextResponse.json(
             {
               success: false,
-              error: `Proveedor "${effectiveProvider}" no soportado. Usa "fashn", "idm-vton", o "auto".`,
+              error: `Proveedor "${effectiveProvider}" no soportado. Usa "seedream", "fashn", "idm-vton", "kolors", o "auto".`,
             },
             { status: 400 },
           );

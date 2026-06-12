@@ -224,12 +224,13 @@ const VIDEO_ACTION_OPTIONS: { value: VideoActionOption; label: string; promptHin
  * Proveedores de try-on disponibles. "auto" deja que /api/tryon elija
  * (Kolors para lencería, FASHN/IDM-VTON para otros).
  */
-type TryonProvider = "kolors" | "fashn" | "idm-vton" | "auto";
+type TryonProvider = "seedream" | "kolors" | "fashn" | "idm-vton" | "auto";
 
 const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: string }[] = [
-  { value: "auto",     label: "Automático",   hint: "El sistema elige (Kolors para lencería)" },
-  { value: "kolors",   label: "Kolors",        hint: "Default para lencería · rápido · $0.02" },
-  { value: "fashn",    label: "FASHN v1.6",    hint: "Alta calidad · mejor preservación de textura · $0.05" },
+  { value: "auto",     label: "Automático",   hint: "El sistema elige (SeedDream para lencería)" },
+  { value: "seedream", label: "SeedDream edit", hint: "Default lencería · preserva el producto real (encaje, tirantes) · $0.03" },
+  { value: "kolors",   label: "Kolors",        hint: "Backup · rápido · tiende a inventar prendas genéricas · $0.02" },
+  { value: "fashn",    label: "FASHN v1.6",    hint: "Bloquea lencería · útil solo para no-íntimos · $0.05" },
   { value: "idm-vton", label: "IDM-VTON",      hint: "Backup · $0.02" },
 ];
 
@@ -586,17 +587,18 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
   },
   tryon: {
     what: "Viste la modelo de IA con TU prenda — la prenda real, preservando color y cortes.",
-    provider: "Kolors Virtual Try-On (fal.ai) para lencería. FASHN v1.6 para otras categorías.",
+    provider: "SeedDream v4 edit (fal.ai) para lencería — editor multi-imagen (modelo + prenda) que preserva el producto real. Kolors queda de backup si SeedDream falla. FASHN v1.6 solo para no-íntimos.",
     duration: "10-30 s",
-    costDetail: "$0.02 con Kolors; $0.05 con FASHN.",
+    costDetail: "$0.03 con SeedDream; $0.02 con Kolors (backup); $0.05 con FASHN.",
     canFail: [
       "image_load_error: el archivo intermedio no llegó a fal.ai (suele ser URL temporal caída).",
-      "Kolors reinterpreta la prenda en ángulos raros — el frente queda fiel, los laterales varían.",
-      "Tela queda con aspecto satinado/plástico — Kolors la regenera en vez de copiar píxeles. El paso 'Restaurar Textura' corrige esto.",
+      "Si el badge dice 'kolors' (ámbar), SeedDream falló para esta prenda y cayó al backup — Kolors reinterpreta y puede inventar.",
+      "Tela queda con aspecto satinado/plástico cuando corre Kolors. El paso 'Restaurar Textura' corrige esto.",
     ],
     tips: [
       "Este paso es OPCIONAL — si falla, el pipeline sigue con los demás.",
-      "Reintentá una vez antes de saltarlo.",
+      "Mirá el BADGE: verde 'seedream' = preservó el producto; ámbar 'kolors' = cayó al backup.",
+      "Si querés comparar, forzá un proveedor a mano en el selector de abajo y reintentá.",
       "Dejá 'Restaurar Textura' activado para recuperar la tela real después del tryon.",
     ],
   },
@@ -1193,8 +1195,9 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
         </div>
         <div className="flex items-center gap-3">
           {/* Proveedor REAL que generó el resultado — visible SIEMPRE (también
-              cuando el paso ya está "Aceptado"). Verde = FASHN (preserva el
-              producto), ámbar = Kolors (tiende a inventar prendas genéricas). */}
+              cuando el paso ya está "Aceptado"). Verde = SeedDream (preserva el
+              producto real), ámbar = Kolors (cayó al backup, tiende a inventar
+              prendas genéricas → SeedDream falló para esta prenda). */}
           {step.usedProvider && (
             <span
               className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
@@ -1204,7 +1207,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               }`}
               title={
                 step.usedProvider === "kolors"
-                  ? "Lo generó Kolors, que tiende a inventar prendas genéricas. Si no se parece al producto, reintentá con FASHN."
+                  ? "Cayó a Kolors (backup): SeedDream falló para esta prenda. Kolors tiende a inventar prendas genéricas. Reintentá o subí mejor la prenda aislada."
                   : `Proveedor que generó este resultado: ${step.usedProvider}.`
               }
             >
@@ -2108,8 +2111,10 @@ async function runStep(
         garmentImage: garmentForTryon,
         category,
         garmentType: garmentTypeForApi,
-        // P1-1: respetar providerOverride si la usuaria lo pidió; sino default kolors
-        provider: providerOverride && providerOverride !== "auto" ? providerOverride : "kolors",
+        // P1-1: respetar providerOverride si la usuaria lo pidió; sino "auto".
+        // En lencería "auto" → la ruta prueba SeedDream edit primero (preserva el
+        // producto) y cae a Kolors solo si falla. El badge muestra el real.
+        provider: providerOverride && providerOverride !== "auto" ? providerOverride : "auto",
         // Cuando la usuaria eligió un proveedor a mano (para testear), forzar
         // que la ruta lo honre y NO lo cambie sola (Kolors → auto/FASHN).
         forceProvider: !!(providerOverride && providerOverride !== "auto"),
@@ -2143,10 +2148,12 @@ async function runStep(
         garmentImage: inputUrl,
         category,
         garmentType: garmentTypeForApi,
-        // P1-1: respetar providerOverride si existe; sino default del flow
+        // P1-1: respetar providerOverride si existe; sino default del flow.
+        // Lencería → "auto" (ruta prueba SeedDream edit primero, cae a Kolors si
+        // falla); no-lencería → IDM-VTON.
         provider: providerOverride && providerOverride !== "auto"
           ? providerOverride
-          : (isLingerieFlow ? "kolors" : "idm-vton"),
+          : (isLingerieFlow ? "auto" : "idm-vton"),
         // Forzar el proveedor elegido a mano para que la ruta no lo reemplace.
         forceProvider: !!(providerOverride && providerOverride !== "auto"),
         fashnMode,
