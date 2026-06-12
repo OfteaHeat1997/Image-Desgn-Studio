@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { CLAUDE_HAIKU } from "@/lib/utils/constants";
 import type {
   AgentPlanRequest,
   AgentPlanResponse,
@@ -717,7 +718,7 @@ Return ONLY valid JSON. No markdown. No explanation.`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: CLAUDE_HAIKU,
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
