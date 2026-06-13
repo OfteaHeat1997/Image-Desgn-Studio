@@ -164,8 +164,11 @@ async function isolateGarment(
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[bg-remove:isolate] grounded_sam threw (${msg}) — falling back to plain rembg on whole image`);
-    return await removeBgReplicate(preparedDataUrl);
+    // NO caer a rembg acá: rembg deja a la MODELO (quita solo el fondo) → catálogo
+    // con persona en vez de prenda. Lanzamos para que el route caiga al Uwear flat-lay
+    // (producto-solo fiel) o, sin key, al hard-fail honesto.
+    console.warn(`[bg-remove:isolate] grounded_sam threw (${msg}) — throwing so caller uses Uwear flat-lay`);
+    throw new Error(`grounded_sam falló: ${msg}`);
   }
 
   // Normalize the output shape into a flat array of URL strings
@@ -294,8 +297,10 @@ async function isolateGarment(
   }
 
   if (!bestMask) {
-    console.warn('[bg-remove:isolate] no usable mask from grounded_sam — falling back to rembg on whole image');
-    return await removeBgReplicate(preparedDataUrl);
+    // NO caer a rembg: dejaría a la modelo. Lanzamos para que el route use Uwear
+    // flat-lay (producto-solo) o el hard-fail honesto. rembg solo deja a la persona.
+    console.warn('[bg-remove:isolate] no usable mask from grounded_sam — throwing so caller uses Uwear flat-lay');
+    throw new Error('grounded_sam no produjo una máscara usable de la prenda');
   }
 
   console.log(`[bg-remove:isolate] using mask coverage=${bestCoverage.toFixed(3)}`);
