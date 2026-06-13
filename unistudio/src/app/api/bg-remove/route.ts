@@ -409,22 +409,16 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       // 2. FALLBACK FIEL — Uwear flat-lay (genera un producto-solo limpio desde la
       //    foto real). NO es regeneración tipo SeedDream ghost: Uwear está orientado
       //    a fidelidad de prenda. Da un producto flotante usable para el Video 360°.
-      //    Solo si hay UWEAR_API_KEY configurada.
+      //    Si hay UWEAR_API_KEY, NO atrapamos su error: la usuaria configuró Uwear,
+      //    así que queremos ver el error real (no esconderlo bajo rembg, que para
+      //    lencería no sirve). Si NO hay key, caemos a rembg-last-resort (hard-fail).
       if (process.env.UWEAR_API_KEY?.trim()) {
-        try {
-          resultUrl = await generateUwearFlatLay({
-            name: `${garmentType ?? 'garment'} ${Date.now()}`,
-            frontUrl: imageUrl,
-          });
-          usedProvider = 'uwear-flatlay';
-          console.log('[bg-remove:removeSubject] usando Uwear flat-lay (producto fiel)');
-        } catch (uwErr) {
-          console.warn(
-            `[bg-remove:removeSubject] Uwear flat-lay falló (${uwErr instanceof Error ? uwErr.message : uwErr}) — rembg-last-resort`,
-          );
-          resultUrl = await removeBgReplicate(imageUrl);
-          usedProvider = 'rembg-last-resort';
-        }
+        resultUrl = await generateUwearFlatLay({
+          name: `${garmentType ?? 'garment'} ${Date.now()}`,
+          frontUrl: imageUrl,
+        });
+        usedProvider = 'uwear-flatlay';
+        console.log('[bg-remove:removeSubject] usando Uwear flat-lay (producto fiel)');
       } else {
         // 3. ÚLTIMO RECURSO — rembg plano. Conserva la modelo en foreground. La
         //    pipeline lencería detecta 'rembg-last-resort' y hard-failea con mensaje claro.
