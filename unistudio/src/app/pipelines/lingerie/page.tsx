@@ -982,6 +982,108 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
 }
 
 /* ------------------------------------------------------------------ */
+/*  BeforeAfterSlider — comparador deslizable estilo plataforma luxury */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Comparador "antes / después" con un divisor deslizable (estilo Lyst / SSENSE /
+ * luxury fashion). La imagen "antes" (foto original / input del paso) se revela
+ * a la izquierda del divisor; la "después" (resultado del paso) queda debajo y
+ * se ve a la derecha. Arrastrar el slider (o el rango) mueve el corte.
+ *
+ * Cae de vuelta a un ImageThumb simple cuando:
+ *  - no hay `after` todavía (el paso aún no terminó), o
+ *  - el resultado es un video (los videos no se comparan con clip-path).
+ * Así "cada proceso" muestra el filtro antes/después sin romperse en los pasos
+ * de video (modelVideo / 360).
+ */
+function BeforeAfterSlider({
+  before,
+  after,
+  label,
+  className,
+}: {
+  before?: string;
+  after?: string;
+  label: string;
+  className?: string;
+}) {
+  const [pos, setPos] = useState(50); // 0..100 — posición del divisor
+  const [beforeErr, setBeforeErr] = useState(false);
+  const [afterErr, setAfterErr] = useState(false);
+
+  const afterIsVideo =
+    !!after && (after.includes(".mp4") || after.includes(".webm") || after.includes("video"));
+
+  // Sin "después" aún, o es video, o alguna imagen falló → fallback al thumb normal.
+  if (!before || !after || afterIsVideo || beforeErr || afterErr) {
+    return <ImageThumb url={after ?? before} label={label} className={className} />;
+  }
+
+  return (
+    <div
+      className={cn(
+        "relative select-none overflow-hidden rounded-lg border border-white/10",
+        className,
+      )}
+      style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
+    >
+      {/* DESPUÉS (resultado) — capa de fondo, ocupa todo */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={after}
+        alt={`${label} — después`}
+        className="absolute inset-0 h-full w-full object-contain"
+        onError={() => setAfterErr(true)}
+        draggable={false}
+      />
+      {/* ANTES (original) — capa encima, recortada por clip-path hasta el divisor */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={before}
+        alt={`${label} — antes`}
+        className="absolute inset-0 h-full w-full object-contain"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+        onError={() => setBeforeErr(true)}
+        draggable={false}
+      />
+
+      {/* Etiquetas */}
+      <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/90">
+        Antes
+      </span>
+      <span className="pointer-events-none absolute right-2 top-2 rounded bg-rose-600/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
+        Después
+      </span>
+
+      {/* Línea divisora + asa */}
+      <div
+        className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow-[0_0_6px_rgba(0,0,0,0.6)]"
+        style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
+      >
+        <div className="absolute top-1/2 left-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+            <polyline points="9 18 15 12 9 6" transform="translate(0 0)" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Rango invisible que controla la posición (cubre toda la imagen) */}
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={pos}
+        onChange={(e) => setPos(Number(e.target.value))}
+        aria-label={`Comparar antes y después de ${label}`}
+        className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  ImageLightbox — modal full-screen para ver/comparar/descargar      */
 /* ------------------------------------------------------------------ */
 
@@ -1437,6 +1539,37 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {/* Card body — before/after comparison */}
       {(step.status !== "idle" && step.status !== "pending") && (
         <div className="p-5">
+          {/* Paso terminado con una sola imagen → comparador deslizable
+              "antes/después" estilo plataforma luxury (cada proceso lo muestra).
+              Los estados processing/error/skipped/multi-sample/video usan el
+              layout de dos paneles de abajo. */}
+          {(step.status === "done" || step.status === "accepted") &&
+          step.resultUrl &&
+          !isVideo &&
+          !(step.candidates && step.candidates.length > 1) ? (
+            <div className="space-y-2">
+              <BeforeAfterSlider
+                before={step.originalUrl ?? inputUrl}
+                after={step.resultUrl}
+                label={step.label}
+                className="h-72 w-full"
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-gray-500">
+                  Arrastrá el divisor para comparar antes y después
+                </p>
+                <button
+                  type="button"
+                  onClick={() => step.resultUrl && setLightboxIdx(0)}
+                  className="flex items-center gap-1 rounded-md bg-white/5 px-2 py-1 text-[10px] font-medium text-white/80 transition-colors hover:bg-white/10"
+                  title="Ver en grande + descargar"
+                >
+                  <Maximize2 className="h-3 w-3" />
+                  Ver grande
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="flex items-center gap-4">
             {/* Input (before) */}
             <div className="flex-1 min-w-0">
@@ -1623,6 +1756,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               )}
             </div>
           </div>
+          )}
 
           {/* Action buttons — only shown when done and in manual mode */}
           {canInteract && (
@@ -4402,7 +4536,7 @@ export default function LingeriePipelinePage() {
                   Art Direction (look del shoot)
                 </h2>
                 <p className="mb-3 text-[11px] text-gray-500">
-                  El "look" como preset reutilizable — da consistencia a todo el catálogo. Se aplica a la modelo y al try-on.
+                  El &ldquo;look&rdquo; como preset reutilizable — da consistencia a todo el catálogo. Se aplica a la modelo y al try-on.
                 </p>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {ART_DIRECTIONS.map((ad) => {
