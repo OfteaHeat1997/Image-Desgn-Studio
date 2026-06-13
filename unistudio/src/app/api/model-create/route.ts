@@ -129,9 +129,12 @@ function buildModelPrompt(options: ModelCreateOptions): string {
     parts.push('against a clean studio white background');
   }
 
-  // Quality modifiers — emphasize commercial/catalog context
+  // Quality modifiers — emphasize commercial/catalog context.
+  // NO hardcodear "full body shot": para lencería el pose pedido es medio cuerpo
+  // (cabeza a cintura) y "full body shot" hacía que el generador cortara la cabeza
+  // o forzara cuerpo completo. El encuadre lo decide el pose (parts ya lo incluye).
   parts.push(
-    'Professional commercial catalog photography, full body shot, high resolution, soft studio lighting, sharp focus, e-commerce product listing style, editorial fashion magazine quality, fully clothed, tasteful, SFW',
+    'Professional commercial catalog photography, high resolution, soft studio lighting, sharp focus, e-commerce product listing style, editorial fashion magazine quality, the complete head and face must be fully visible and never cropped, tasteful, SFW',
   );
 
   // Custom details
