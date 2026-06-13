@@ -2335,7 +2335,11 @@ async function runStep(
       signal: abortSignal,
       body: JSON.stringify({
         modelImage: sharedModelUrl,
-        garmentImage: inputUrl,
+        // Uwear castea su propia modelo + extrae el garment él mismo (remove_background),
+        // así que le damos la FOTO REAL del producto (falUrl) en vez del aislado — que
+        // para prendas difíciles se regenera y sale falso. Otros proveedores
+        // (SeedDream/Kolors/IDM) sí necesitan el garment aislado limpio.
+        garmentImage: providerOverride === "uwear" ? (falUrl ?? inputUrl) : inputUrl,
         category,
         garmentType: garmentTypeForApi,
         // P1-1: respetar providerOverride si existe; sino default del flow.
