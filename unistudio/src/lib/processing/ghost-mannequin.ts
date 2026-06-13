@@ -233,10 +233,11 @@ export async function modelToGhost(
     // Spec real de Claude Vision: ancla el cierre/copas/etc. SeedDream tiende a
     // dibujar un zipper donde hay ganchos — este dato lo corrige.
     (hint
-      ? `The product spec read from the real photo is: "${hint}". Follow it EXACTLY. ` +
-        `If the spec says the front closure is hook-and-eye clasps (ganchos), the result ` +
-        `MUST show that column of small hook-and-eye clasps down the center — NOT a zipper. ` +
-        `Only show a zipper if the spec explicitly says zipper. `
+      ? `The product spec read from the real photo is: "${hint}". Follow it EXACTLY for the ` +
+        `closure type — and NEVER substitute one closure for another: ` +
+        `if the spec names hook-and-eye clasps (ganchos), show that column of small clasps and NOT a zipper; ` +
+        `if it names a zipper, show a zipper and NOT clasps; ` +
+        `if it names buttons, show buttons; if it says no closure / pull-on, show no closure at all. `
       : '') +
     `Professional e-commerce product photography, studio lighting, sharp focus.`;
 
