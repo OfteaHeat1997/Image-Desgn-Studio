@@ -34,29 +34,16 @@ const ISOLATE_COST = 0.01;
  * Negative mask prompt for grounded_sam — regions to SUBTRACT from the garment
  * mask. We intentionally vary this by garment type.
  *
- * Torso-covering garments (bra, shapewear, bodysuit, lingerie, set, swimwear):
- * a full-coverage support bra / faja / bodysuit occupies most of the torso, so
- * suppressing "torso/waist/body" made Grounding DINO miss the garment entirely
- * → empty/poor mask → the pipeline fell back to the REGENERATIVE SeedDream path,
- * which invents a DIFFERENT product (reporte usuaria: bra de soporte con cierre
- * frontal salió como un push-up genérico de aro). For these we only subtract
- * regions that are unambiguously NOT the garment: skin, face, hair, arm,
- * shoulder, neck, background.
- *
- * Panties sit low on the hips, so torso/waist/thigh/leg skin around them is
- * safe (and helpful) to suppress.
+ * RESTAURADO al negative prompt de mayo (commit f1e4a59), que SÍ producía una
+ * máscara buena del bra de soporte. Hoy lo había cambiado (sacar torso/waist) con
+ * la hipótesis de que ayudaba a prendas de cobertura completa, pero en mayo —con
+ * torso/waist incluidos— grounded_sam funcionaba para ESTE bra. Restaurar lo conocido.
  */
 function garmentNegativePrompt(garmentType: string | null): string {
-  const base = 'skin,face,hair,arm,shoulder,neck,background';
-  switch (garmentType) {
-    case 'panty':
-      return `${base},torso,waist,thigh,leg,hip`;
-    default:
-      // bra, lingerie, bodysuit, shapewear, swimwear, set, and unknown — treat
-      // as torso-covering. NEVER subtract torso/waist/body or we erase the
-      // product itself and force the regenerative fallback.
-      return base;
-  }
+  // Prompt de mayo (probado): suprime piel/cuerpo/cara/pelo/brazo/hombro/cuello/torso/cintura/fondo.
+  const may = 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background';
+  // Panties van bajo en cadera → además suprimir muslo/pierna.
+  return garmentType === 'panty' ? `${may},thigh,leg,hip` : may;
 }
 
 /**
@@ -404,35 +391,22 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // porque nunca regeneramos — o es el producto real, o es un error honesto.
     const regenerated = false;
 
-    // Lencería con Uwear configurado → usar Uwear flat-lay DIRECTO (su extractor de
-    // producto-solo). grounded_sam falla seguido con bras de soporte (deja a la
-    // modelo), así que vamos directo al método que da la prenda sola. Determinístico.
-    if (process.env.UWEAR_API_KEY?.trim()) {
-      try {
+    // PRIMARIO — grounded_sam (segmentación del producto REAL), como en mayo cuando
+    // funcionaba. Si grounded_sam falla/no enmascara, lanza → Uwear flat-lay (producto
+    // solo) si hay key, o rembg-last-resort (hard-fail honesto) si no.
+    try {
+      resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg})`);
+      if (process.env.UWEAR_API_KEY?.trim()) {
         resultUrl = await generateUwearFlatLay({
           name: `${garmentType ?? 'garment'} ${Date.now()}`,
           frontUrl: imageUrl,
         });
         usedProvider = 'uwear-flatlay';
-        console.log('[bg-remove:removeSubject] Uwear flat-lay (producto solo, directo)');
-      } catch (uwErr) {
-        // Si Uwear flat-lay falla, respaldo grounded_sam; si también falla, rembg.
-        const m = uwErr instanceof Error ? uwErr.message : String(uwErr);
-        console.warn(`[bg-remove:removeSubject] Uwear flat-lay falló (${m}) — respaldo grounded_sam`);
-        try {
-          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-        } catch {
-          resultUrl = await removeBgReplicate(imageUrl);
-          usedProvider = 'rembg-last-resort';
-        }
-      }
-    } else {
-      // Sin Uwear: grounded_sam → rembg-last-resort (hard-fail honesto).
-      try {
-        resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
+        console.log('[bg-remove:removeSubject] Uwear flat-lay (respaldo, producto solo)');
+      } else {
         resultUrl = await removeBgReplicate(imageUrl);
         usedProvider = 'rembg-last-resort';
       }
