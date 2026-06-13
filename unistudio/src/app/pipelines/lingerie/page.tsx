@@ -2119,7 +2119,11 @@ async function runStep(
       headers: { "Content-Type": "application/json" },
       signal: abortSignal,
       body: JSON.stringify({
-        imageUrl: inputUrl,
+        // Preferir falUrl (URL PÚBLICA de fal): el uploadedUrl/inputUrl suele ser un
+        // URL de Replicate protegido (api.replicate.com/v1/files) que requiere auth
+        // → el navegador muestra "expiró", y NI grounded_sam NI Uwear lo pueden bajar
+        // (401 "could not download"). El falUrl es público y lo bajan todos.
+        imageUrl: falUrl ?? inputUrl,
         provider: "replicate",
         // Lingerie input usually shows a model wearing the garment — we need
         // grounded_sam to strip the person and return ONLY the product, not
