@@ -3525,11 +3525,29 @@ export default function LingeriePipelinePage() {
         // photoFullBody hace outpaint downward sobre el resultado del tryon. Si
         // texturePreserve corrió, usamos ESE (textura ya corregida) — sino, tryon
         // crudo. Sin ninguno, no podemos extender canvas → skip con mensaje claro.
-        const baseUrl = stepResults.texturePreserve || stepResults.tryon;
+        //
+        // Fallback robusto: el mapa local `stepResults` puede no tener el tryon
+        // (closures / orden), pero el resultado SÍ está renderizado en el estado
+        // del job. Lo leemos de ahí antes de saltar — así el paso deja de quedar
+        // "Saltado/sin output" cuando la Foto Frontal sí corrió (bug reportado).
+        let baseUrl = stepResults.texturePreserve || stepResults.tryon;
+        if (!baseUrl) {
+          baseUrl = await new Promise<string | undefined>((resolve) => {
+            setJobs((prev) => {
+              const j = prev.find((jj) => jj.id === jobId);
+              const tx = j?.steps.find((s) => s.id === "texturePreserve");
+              const ty = j?.steps.find((s) => s.id === "tryon");
+              const pick = (st?: PipelineStep) =>
+                st && (st.status === "done" || st.status === "accepted") ? st.resultUrl : undefined;
+              resolve(pick(tx) || pick(ty));
+              return prev;
+            });
+          });
+        }
         if (!baseUrl) {
           updateStep(jobId, stepDef.id, {
             status: "skipped",
-            error: "Foto Cuerpo Completo necesita el resultado del Try-On. Corré ese paso primero.",
+            error: "Foto Cuerpo Completo necesita el resultado del Try-On (Foto Frontal). Activá y corré la Foto Frontal primero.",
           });
           return false;
         }
