@@ -2536,6 +2536,7 @@ export default function LingeriePipelinePage() {
         autoMode: boolean;
         generationMode: GenerationMode;
         fashnMode: FashnMode;
+        artDirection: ArtDirectionId;
         referenceNumber: string;
       }> : null;
     } catch { return null; }
