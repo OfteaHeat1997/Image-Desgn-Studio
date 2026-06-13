@@ -151,6 +151,10 @@ interface PipelineStep {
   enabled: boolean;
   status: StepStatus;
   inputUrl?: string;
+  // Override de la imagen "Original/antes" que se muestra en la tarjeta. Para el
+  // try-on lo usamos para mostrar la MODELO nueva (antes) en vez del garment, así
+  // la Foto Frontal se ve como un antes/después: modelo → modelo con el bra puesto.
+  originalUrl?: string;
   resultUrl?: string;
   error?: string;
   cost_actual?: number;
@@ -1438,7 +1442,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             <div className="flex-1 min-w-0">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Original</p>
               <ImageThumb
-                url={inputUrl}
+                url={step.originalUrl ?? inputUrl}
                 label="Sin imagen"
                 className="h-40 w-full"
               />
@@ -3406,6 +3410,9 @@ export default function LingeriePipelinePage() {
           cost_actual: result.cost,
           candidates: result.candidates,
           usedProvider: result.usedProvider,
+          // Foto Frontal: mostrar la MODELO nueva como "Original/antes" (en vez del
+          // garment) → la tarjeta queda como antes/después: modelo → modelo con el bra.
+          ...(stepDef.id === "tryon" && newSharedModel ? { originalUrl: newSharedModel } : {}),
         });
 
         // Populate local map para que el próximo step pueda leer este resultUrl
