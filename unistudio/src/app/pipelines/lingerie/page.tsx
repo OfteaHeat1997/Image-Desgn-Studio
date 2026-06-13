@@ -2340,6 +2340,8 @@ async function runStep(
         // para prendas difíciles se regenera y sale falso. Otros proveedores
         // (SeedDream/Kolors/IDM) sí necesitan el garment aislado limpio.
         garmentImage: providerOverride === "uwear" ? (falUrl ?? inputUrl) : inputUrl,
+        // Foto real de espalda del MISMO REF → Uwear genera desde frente+espalda.
+        garmentBackUrl: providerOverride === "uwear" ? backGarmentUrl : undefined,
         category,
         garmentType: garmentTypeForApi,
         // P1-1: respetar providerOverride si existe; sino default del flow.
@@ -3078,14 +3080,16 @@ export default function LingeriePipelinePage() {
         }
       }
 
-      // P0-2: si estamos en photoBack (modo default o multi-sample), buscamos
-      // foto real de espalda para pasarla como garment reference a Kolors.
+      // Foto real de ESPALDA del mismo REF (tagged angle="espalda"). Se usa:
+      //  - photoBack: como garment reference para la vista trasera.
+      //  - tryon con Uwear: como clothing_item_back_url, así Uwear genera desde
+      //    frente + espalda reales (clava broche, banda y racerback de CADA bra).
       let backGarmentUrl: string | undefined;
-      if (step.id === "photoBack" && generationMode !== "face-swap") {
+      if ((step.id === "photoBack" || step.id === "tryon") && generationMode !== "face-swap") {
         const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
         if (matchingBack?.uploadedUrl && matchingBack.id !== job.id) {
           backGarmentUrl = matchingBack.uploadedUrl;
-          console.log(`[lingerie] photoBack: encontrada foto real de espalda (${matchingBack.filename})`);
+          console.log(`[lingerie] ${step.id}: encontrada foto real de espalda (${matchingBack.filename})`);
         }
       }
 

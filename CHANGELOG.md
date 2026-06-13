@@ -1,5 +1,20 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Uwear: try-on usa frente + espalda reales por REF (fidelidad por producto)
+
+Para que CADA bra del catálogo (cada REF, color y talla) salga fiel a sus propias fotos,
+el try-on con Uwear ahora registra el clothing item con la foto real de **frente Y espalda**
+del mismo REF, no solo el frente. Uwear genera la modelo desde ambas → clava broche, banda y
+racerback del producto real.
+
+- `lingerie/page.tsx`: el cómputo de `backGarmentUrl` (foto tagged angle="espalda" del mismo
+  `referenceKey`) ahora cubre también el step `tryon` (antes solo `photoBack`). Se pasa
+  `garmentBackUrl` al body de `/api/tryon` cuando el proveedor es Uwear.
+- `/api/tryon`: `tryOnUwear()` acepta `garmentBackUrl` y lo manda como `backUrl` →
+  `createUwearClothingItem({ frontUrl, backUrl })` (`clothing_item_back_url`).
+- Resuelve el "cada bra es diferente": nunca se inventa nada; cada producto se genera desde
+  SUS dos fotos reales. Color = foto real del color; talla = bodyType de la modelo (ya existía).
+
 ## 2026-06-13 — REGRESIÓN ARREGLADA: quitar (de nuevo) el SeedDream ghost que inventaba el bra
 
 La usuaria notó que su pipeline producía resultados FIELES en mayo y los rompió después.

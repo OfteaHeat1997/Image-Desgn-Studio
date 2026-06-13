@@ -239,6 +239,7 @@ async function tryOnUwear(
   garmentType?: string,
   garmentDescription?: string,
   scenePrompt?: string,
+  garmentBackUrl?: string,
 ): Promise<string> {
   const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.seedream;
   const isQwen = modelSlug.startsWith('qwen');
@@ -253,6 +254,9 @@ async function tryOnUwear(
   const clothingItemId = await createUwearClothingItem({
     name: `${noun} ${Date.now()}`,
     frontUrl: garmentImage,
+    // Real back photo of the same REF (if the user tagged one) → Uwear nails the
+    // closure, band and racerback from the actual product, not a guess.
+    backUrl: garmentBackUrl,
     processingMode: 'remove_background',
   });
 
@@ -416,6 +420,7 @@ export async function POST(request: NextRequest) {
       forceProvider = false,
       fashnMode,
       scenePrompt,
+      garmentBackUrl,
     } = body as {
       modelImage: string;
       garmentImage: string;
@@ -432,6 +437,8 @@ export async function POST(request: NextRequest) {
       // Art direction (look del shoot) inyectado al prompt de SeedDream/Uwear.
       // Otros proveedores (warp-based) lo ignoran.
       scenePrompt?: string;
+      // Foto real de espalda del producto. Solo la usa Uwear (clothing_item_back_url).
+      garmentBackUrl?: string;
     };
 
     if (!modelImage) {
@@ -520,8 +527,9 @@ export async function POST(request: NextRequest) {
           break;
         case 'uwear':
           // Uwear casts its own model → it ignores httpModelImage and uses the
-          // garment image to register a clothing item, then generates a model.
-          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription, scenePrompt);
+          // garment image(s) to register a clothing item, then generates a model.
+          // Pass the real front + (optional) back photo for max fidelity.
+          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription, scenePrompt, garmentBackUrl);
           break;
         default:
           return NextResponse.json(
