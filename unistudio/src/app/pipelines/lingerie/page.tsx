@@ -1011,6 +1011,108 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
 }
 
 /* ------------------------------------------------------------------ */
+/*  BeforeAfterSlider — comparador deslizable estilo plataforma luxury */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Comparador "antes / después" con un divisor deslizable (estilo luxury
+ * fashion). Va SOLO en el panel derecho (Resultado) de cada paso: la imagen
+ * "antes" (input/original del paso) se revela a la izquierda del divisor; la
+ * "después" (resultado) se ve a la derecha. Arrastrar el rango mueve el corte.
+ *
+ * Cae a un <img> simple del resultado cuando no hay `before` o alguna imagen
+ * falla. No se usa en video (el caller ya filtra esos casos).
+ */
+function BeforeAfterSlider({
+  before,
+  after,
+  label,
+  className,
+}: {
+  before?: string;
+  after: string;
+  label: string;
+  className?: string;
+}) {
+  const [pos, setPos] = useState(50); // 0..100 — posición del divisor
+  const [beforeErr, setBeforeErr] = useState(false);
+
+  // Sin "antes" válido → solo mostramos el resultado (después).
+  if (!before || beforeErr) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={after}
+        alt={label}
+        className={cn("rounded-lg object-contain", className)}
+        style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "relative select-none overflow-hidden rounded-lg border border-white/10",
+        className,
+      )}
+      style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
+    >
+      {/* DESPUÉS (resultado) — capa de fondo, ocupa todo */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={after}
+        alt={`${label} — después`}
+        className="absolute inset-0 h-full w-full object-contain"
+        draggable={false}
+      />
+      {/* ANTES (original) — capa encima, recortada por clip-path hasta el divisor */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={before}
+        alt={`${label} — antes`}
+        className="absolute inset-0 h-full w-full object-contain"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+        onError={() => setBeforeErr(true)}
+        draggable={false}
+      />
+
+      {/* Etiquetas */}
+      <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white/90">
+        Antes
+      </span>
+      <span className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-rose-600/80 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white">
+        Después
+      </span>
+
+      {/* Línea divisora + asa */}
+      <div
+        className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow-[0_0_6px_rgba(0,0,0,0.6)]"
+        style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
+      >
+        <div className="absolute top-1/2 left-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Rango invisible que controla la posición (cubre toda la imagen) */}
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={pos}
+        onChange={(e) => setPos(Number(e.target.value))}
+        aria-label={`Comparar antes y después de ${label}`}
+        className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  ImageLightbox — modal full-screen para ver/comparar/descargar      */
 /* ------------------------------------------------------------------ */
 
@@ -1612,7 +1714,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     })}
                   </div>
                 </div>
-              ) : (
+              ) : isVideo ? (
                 <button
                   type="button"
                   onClick={() => step.resultUrl && setLightboxIdx(0)}
@@ -1620,28 +1722,14 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   className="group relative block w-full text-left disabled:cursor-not-allowed"
                   title={step.resultUrl ? "Tocá para ver en grande + descargar" : undefined}
                 >
-                  {isVideo ? (
-                    <video
-                      src={step.resultUrl}
-                      className="h-40 w-full rounded-lg object-contain bg-black"
-                      muted
-                      loop
-                      autoPlay
-                      playsInline
-                    />
-                  ) : (
-                    <img
-                      src={step.resultUrl}
-                      alt="Resultado"
-                      className="h-40 w-full rounded-lg object-contain"
-                      style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
-                    />
-                  )}
-                  {(step.status === "accepted") && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-emerald-500/20 pointer-events-none">
-                      <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                    </div>
-                  )}
+                  <video
+                    src={step.resultUrl}
+                    className="h-40 w-full rounded-lg object-contain bg-black"
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
                   {step.resultUrl && (
                     <div className="absolute right-1.5 top-1.5 flex h-7 items-center gap-1 rounded-md bg-black/60 px-2 opacity-0 transition-opacity group-hover:opacity-100">
                       <Maximize2 className="h-3.5 w-3.5 text-white" />
@@ -1649,6 +1737,35 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     </div>
                   )}
                 </button>
+              ) : step.resultUrl ? (
+                // Comparador antes/después SOLO en el panel derecho (Resultado).
+                // El "antes" es el input del paso (foto original / resultado del
+                // paso previo); el "después" es el resultado de este paso.
+                <div className="group relative">
+                  <BeforeAfterSlider
+                    before={step.originalUrl ?? inputUrl}
+                    after={step.resultUrl}
+                    label={step.label}
+                    className="h-40 w-full"
+                  />
+                  {(step.status === "accepted") && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-emerald-500/20 pointer-events-none">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                    </div>
+                  )}
+                  {/* "Ver grande" por encima del slider (z-10) para abrir el lightbox */}
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIdx(0)}
+                    className="absolute right-1.5 bottom-1.5 z-10 flex h-7 items-center gap-1 rounded-md bg-black/60 px-2 opacity-0 transition-opacity group-hover:opacity-100"
+                    title="Ver en grande + descargar"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5 text-white" />
+                    <span className="text-[10px] font-medium text-white">Ver grande</span>
+                  </button>
+                </div>
+              ) : (
+                <ImageThumb url={undefined} label="Sin imagen" className="h-40 w-full" />
               )}
             </div>
           </div>
