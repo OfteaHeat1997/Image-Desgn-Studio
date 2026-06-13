@@ -18,6 +18,7 @@ import {
 import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
+import { generateUwearFlatLay } from '@/lib/api/uwear';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
@@ -403,14 +404,33 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[bg-remove:removeSubject] grounded_sam falló (${msg}) — caída directa a rembg-last-resort (NO se regenera)`,
-      );
-      // 2. ÚLTIMO RECURSO — rembg plano. Conserva la modelo en foreground. La
-      //    pipeline lencería detecta 'rembg-last-resort' y hard-failea con mensaje
-      //    claro. NUNCA inventa el producto (SeedDream ghost regenerativo removido).
-      resultUrl = await removeBgReplicate(imageUrl);
-      usedProvider = 'rembg-last-resort';
+      console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg})`);
+
+      // 2. FALLBACK FIEL — Uwear flat-lay (genera un producto-solo limpio desde la
+      //    foto real). NO es regeneración tipo SeedDream ghost: Uwear está orientado
+      //    a fidelidad de prenda. Da un producto flotante usable para el Video 360°.
+      //    Solo si hay UWEAR_API_KEY configurada.
+      if (process.env.UWEAR_API_KEY?.trim()) {
+        try {
+          resultUrl = await generateUwearFlatLay({
+            name: `${garmentType ?? 'garment'} ${Date.now()}`,
+            frontUrl: imageUrl,
+          });
+          usedProvider = 'uwear-flatlay';
+          console.log('[bg-remove:removeSubject] usando Uwear flat-lay (producto fiel)');
+        } catch (uwErr) {
+          console.warn(
+            `[bg-remove:removeSubject] Uwear flat-lay falló (${uwErr instanceof Error ? uwErr.message : uwErr}) — rembg-last-resort`,
+          );
+          resultUrl = await removeBgReplicate(imageUrl);
+          usedProvider = 'rembg-last-resort';
+        }
+      } else {
+        // 3. ÚLTIMO RECURSO — rembg plano. Conserva la modelo en foreground. La
+        //    pipeline lencería detecta 'rembg-last-resort' y hard-failea con mensaje claro.
+        resultUrl = await removeBgReplicate(imageUrl);
+        usedProvider = 'rembg-last-resort';
+      }
     }
 
     await saveJob({

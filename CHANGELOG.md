@@ -1,5 +1,25 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Aislar Producto: fallback FIEL con Uwear flat-lay (para el Video 360°)
+
+La usuaria necesita DOS outputs: foto en modelo (try-on) Y video 360° (producto flotando).
+El 360 necesita el producto recortado, pero grounded_sam falla con este bra y, tras quitar
+el SeedDream ghost (regenerativo), el paso fallaba duro → sin 360.
+
+**Fix:** cuando grounded_sam falla, si hay `UWEAR_API_KEY`, "Aislar Producto" ahora usa
+**Uwear flat-lay** (`generate_flat_lay`) — genera un producto-solo limpio desde la foto real.
+A diferencia del SeedDream ghost, Uwear está orientado a **fidelidad de prenda**, así que da un
+producto flotante usable para el 360 sin inventar uno genérico.
+
+- `uwear.ts`: nueva `generateUwearFlatLay({ frontUrl, backUrl? })` → POST /clothing-item con
+  `clothing_processing_mode: 'generate_flat_lay'`, devuelve `clothing_item_url`.
+- `bg-remove/route.ts`: cascada removeSubject → grounded_sam → **Uwear flat-lay** (si hay key)
+  → rembg-last-resort. provider `uwear-flatlay` (no dispara el hard-fail ni el aviso de regenerado).
+- Resultado: **foto** (Uwear try-on, frente+espalda) + **360** (Uwear flat-lay) → ambos outputs.
+
+> Experimental: depende de que `generate_flat_lay` devuelva el url en la respuesta del POST.
+> Si Uwear lo procesa async, habrá que pollear — se ajusta con el primer error real.
+
 ## 2026-06-13 — Uwear: try-on usa frente + espalda reales por REF (fidelidad por producto)
 
 Para que CADA bra del catálogo (cada REF, color y talla) salga fiel a sus propias fotos,

@@ -86,6 +86,41 @@ export async function createUwearClothingItem(params: {
   return json.clothing_item_id;
 }
 
+/**
+ * Generate a clean flat-lay (product-only) image from a garment photo via Uwear's
+ * `generate_flat_lay` processing, and return the Uwear-hosted flat-lay URL.
+ *
+ * Used as a FAITHFUL "isolate" for the 360 product video when grounded_sam can't
+ * cut the product. Uwear is fidelity-focused (extracts the real product), so this
+ * is far better than the old regenerative SeedDream ghost. Front (+optional back).
+ */
+export async function generateUwearFlatLay(params: {
+  name: string;
+  frontUrl: string;
+  backUrl?: string;
+}): Promise<string> {
+  const form = new FormData();
+  form.append('clothing_item_name', params.name);
+  form.append('clothing_item_url', params.frontUrl);
+  if (params.backUrl) form.append('clothing_item_back_url', params.backUrl);
+  form.append('clothing_processing_mode', 'generate_flat_lay');
+
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
+    method: 'POST',
+    headers: authHeader(),
+    body: form,
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Uwear flat-lay /clothing-item ${res.status}: ${txt.slice(0, 400)}`);
+  }
+  const json = (await res.json()) as { clothing_item_url?: string };
+  if (!json?.clothing_item_url) {
+    throw new Error('Uwear flat-lay: respuesta sin clothing_item_url');
+  }
+  return json.clothing_item_url;
+}
+
 /** Create a generation job. Returns generation_id (poll it for the result). */
 export async function createUwearGeneration(params: {
   clothingItemId: number;
