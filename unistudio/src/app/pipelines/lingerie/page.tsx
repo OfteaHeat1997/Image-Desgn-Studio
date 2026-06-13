@@ -481,6 +481,35 @@ function detectColor(filename: string): string | undefined {
 }
 
 /**
+ * Traduce el color detectado (español) a la frase de panty en inglés para el
+ * prompt de cuerpo completo, de modo que el brief HAGA JUEGO con el bra.
+ * "beige"/sin color → nude (neutro seguro). Cualquier otro → ese color.
+ */
+function pantyColorPhrase(color?: string): string {
+  const map: Record<string, string> = {
+    negro: "black",
+    blanco: "white",
+    rojo: "red",
+    rosa: "pink",
+    azul: "blue",
+    verde: "green",
+    gris: "gray",
+    morado: "purple",
+    amarillo: "yellow",
+    naranja: "orange",
+    marrón: "brown",
+    dorado: "gold",
+    plateado: "silver",
+    turquesa: "turquoise",
+    beige: "nude beige skin-tone",
+  };
+  const en = color ? map[color] : undefined;
+  // Sin color detectado o beige → nude neutro. Resto → "<color> seamless briefs".
+  return en && color !== "beige" ? `${en} seamless briefs (panty) matching the bra color`
+    : "nude beige skin-tone seamless briefs (panty)";
+}
+
+/**
  * Swatch (dot de color) para mostrar en el badge. Devuelve un HEX aproximado
  * para cada color detectable. Si no está en el map, devuelve gris neutro.
  */
@@ -2246,6 +2275,13 @@ async function runStep(
    * y al `scenePrompt` del try-on. Si no se pasa, usa el primer preset (catálogo blanco).
    */
   artDirectionId?: string,
+  /**
+   * Color detectado del producto (job.color, ej "negro", "rojo", "beige"). Lo usa
+   * photoFullBody para que el panty/brief del cuerpo completo HAGA JUEGO con el bra
+   * (bra negro → panty negro), en vez de hardcodear beige nude. Si no se detecta,
+   * cae a "skin-tone nude" como neutro seguro.
+   */
+  garmentColor?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
   // Brief creativo elegido. Fallback al primer preset si el id no matchea.
   const artDir = ART_DIRECTIONS.find((a) => a.id === artDirectionId) ?? ART_DIRECTIONS[0];
@@ -2358,7 +2394,10 @@ async function runStep(
     if (!inputUrl || inputUrl === sharedModelUrl) {
       throw new Error("Foto Cuerpo Completo necesita el resultado del Try-On (o de Restaurar Textura). Corré esos pasos primero.");
     }
-    const promptDown = `Continue the photograph downward to show the full body of the same woman from the upper half. Same skin tone, same body proportions, narrow hips, wearing nude beige seamless briefs (panty), bare legs, standing pose with feet visible, clean white studio background continuing from above, soft studio lighting consistent with the upper half, photorealistic, sharp focus, e-commerce catalog photography. The upper half (face, hair, bra, torso) must remain pixel-identical.`;
+    // El panty del cuerpo completo hace JUEGO con el color del bra (bra negro →
+    // panty negro). Si no se detectó color, cae a nude neutro.
+    const pantyPhrase = pantyColorPhrase(garmentColor);
+    const promptDown = `Continue the photograph downward to show the full body of the same woman from the upper half. Same skin tone, same body proportions, narrow hips, wearing ${pantyPhrase}, bare legs, standing pose with feet visible, clean white studio background continuing from above, soft studio lighting consistent with the upper half, photorealistic, sharp focus, e-commerce catalog photography. The upper half (face, hair, bra, torso) must remain pixel-identical.`;
     const negativeDown = "different person, different body, different skin, change of face, change of hairstyle, new clothes on torso, different background, harsh shadows, low quality, plastic skin, distorted limbs, extra fingers, multiple people";
 
     const outpaintRes = await fetch("/api/outpaint", {
@@ -3292,6 +3331,7 @@ export default function LingeriePipelinePage() {
               job.productSpec?.material?.trim() || undefined,
               buildGarmentDescription(job.productSpec),
               artDirection,
+              job.color,
             ),
           ),
         );
@@ -3340,6 +3380,7 @@ export default function LingeriePipelinePage() {
         materialHint,
         garmentDescription,
         artDirection,
+        job.color,
       );
     } finally {
       abortControllersRef.current.delete(key);
