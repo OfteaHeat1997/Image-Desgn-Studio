@@ -1,5 +1,26 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Aislar Producto: dejar de inventar otro bra en prendas de cobertura completa
+
+**Síntoma (reporte usuaria):** un bra de soporte de cierre frontal salía del paso
+"Aislar Producto" convertido en un push-up genérico de aro — "no es lo mismo".
+
+**Causa:** el paso 1 aísla con `grounded_sam` (segmenta el producto REAL pixel a
+pixel). Cuando falla, cae a SeedDream, que es **regenerativo** e inventa la prenda.
+grounded_sam estaba fallando para bras de cobertura completa / shapewear / bodysuit
+porque el `negative_mask_prompt` traía `torso,waist`: como esos productos ocupan
+casi todo el torso, el detector los suprimía y no encontraba máscara → fallback
+regenerativo → producto distinto.
+
+**Fix** (`bg-remove/route.ts`):
+- Nuevo `garmentNegativePrompt(garmentType)`: el negative prompt ahora depende del
+  tipo. Para prendas que cubren torso (bra, shapewear, bodysuit, lingerie, set,
+  swimwear) **ya no se suprime `torso/waist/body`** — solo zonas que claramente no
+  son la prenda (piel, cara, pelo, brazo, hombro, cuello, fondo).
+- `panty` mantiene `torso,waist,thigh,leg,hip` en el negative (va bajo en cadera).
+- Log de `grounded_sam` ahora incluye el negative prompt para diagnóstico.
+- Doc sincronizada: `docs/pipelines/lingerie.md` (fila nueva de troubleshooting).
+
 ## 2026-06-12 — Lencería: SeedDream v4 edit como try-on primario (fidelidad del producto)
 
 El try-on de lencería ya no depende de Kolors (re-pinta una prenda genérica → "el

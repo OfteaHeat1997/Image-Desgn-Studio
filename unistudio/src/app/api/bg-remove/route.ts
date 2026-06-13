@@ -31,6 +31,35 @@ const PROVIDER_COSTS: Record<string, number> = {
 const ISOLATE_COST = 0.01;
 
 /**
+ * Negative mask prompt for grounded_sam — regions to SUBTRACT from the garment
+ * mask. We intentionally vary this by garment type.
+ *
+ * Torso-covering garments (bra, shapewear, bodysuit, lingerie, set, swimwear):
+ * a full-coverage support bra / faja / bodysuit occupies most of the torso, so
+ * suppressing "torso/waist/body" made Grounding DINO miss the garment entirely
+ * → empty/poor mask → the pipeline fell back to the REGENERATIVE SeedDream path,
+ * which invents a DIFFERENT product (reporte usuaria: bra de soporte con cierre
+ * frontal salió como un push-up genérico de aro). For these we only subtract
+ * regions that are unambiguously NOT the garment: skin, face, hair, arm,
+ * shoulder, neck, background.
+ *
+ * Panties sit low on the hips, so torso/waist/thigh/leg skin around them is
+ * safe (and helpful) to suppress.
+ */
+function garmentNegativePrompt(garmentType: string | null): string {
+  const base = 'skin,face,hair,arm,shoulder,neck,background';
+  switch (garmentType) {
+    case 'panty':
+      return `${base},torso,waist,thigh,leg,hip`;
+    default:
+      // bra, lingerie, bodysuit, shapewear, swimwear, set, and unknown — treat
+      // as torso-covering. NEVER subtract torso/waist/body or we erase the
+      // product itself and force the regenerative fallback.
+      return base;
+  }
+}
+
+/**
  * Map our internal garmentType values to the exact text prompt that
  * grounded_sam (Grounding DINO under the hood) responds to best.
  */
@@ -105,7 +134,8 @@ async function isolateGarment(
   if (!width || !height) throw new Error('Could not read image dimensions');
 
   const maskPrompt = garmentTypeToPrompt(garmentType);
-  console.log(`[bg-remove:isolate] running grounded_sam prompt="${maskPrompt}" size=${width}x${height}`);
+  const negPrompt = garmentNegativePrompt(garmentType);
+  console.log(`[bg-remove:isolate] running grounded_sam prompt="${maskPrompt}" neg="${negPrompt}" size=${width}x${height}`);
 
   // Upload the prepared JPEG so Replicate can fetch it by URL
   const preparedDataUrl = `data:image/jpeg;base64,${prepared.toString('base64')}`;
@@ -128,7 +158,7 @@ async function isolateGarment(
       {
         image: httpInput,
         mask_prompt: maskPrompt,
-        negative_mask_prompt: 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background',
+        negative_mask_prompt: garmentNegativePrompt(garmentType),
         adjustment_factor: 0,
       },
     );

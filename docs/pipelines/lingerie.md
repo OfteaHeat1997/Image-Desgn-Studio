@@ -168,6 +168,7 @@ Naming output: `output/lingerie/bra/REF-{sku}/{color}-{angle}-AI.jpg`.
 | Síntoma | Causa probable | Fix |
 |---|---|---|
 | Paso 1 devuelve imagen con anotaciones/overlay | Selector de máscara eligió la imagen de debug de grounded_sam | Subir threshold de purity B/W a ≥0.9 (ya implementado) |
+| **Paso 1 (Aislar) devuelve OTRO producto** (push-up genérico en vez del bra de soporte real) | grounded_sam falló y cayó al fallback **regenerativo SeedDream**, que inventa la prenda. Falla porque el `negative_mask_prompt` traía `torso,waist` → en bras de cobertura completa / shapewear / bodysuit el producto ocupa el torso, el detector lo suprimía y no encontraba máscara | El negative prompt ahora es por `garmentType`: para prendas que cubren torso (bra/shapewear/bodysuit/lingerie/set/swimwear) NO se suprime `torso/waist/body`. Solo `panty` los mantiene (ver `garmentNegativePrompt` en `bg-remove/route.ts`) |
 | Paso 2 falla con content policy | SeedDream filter no desactivado o prompt demasiado explícito | Usar prompt "simple beige swim top and matching briefs" — NO usar "bikini" ni "nude" |
 | Paso 3 pega la prenda en el lugar incorrecto del cuerpo | `garmentType` mal detectado → category incorrecta en Kolors | Validar `garmentType` antes de llamar tryon; forzar desde UI si hace falta |
 | Timeout en paso 1 | grounded_sam + composite > 60s en Hobby | `vercel.json` ya tiene 300s para `/api/bg-remove` |
