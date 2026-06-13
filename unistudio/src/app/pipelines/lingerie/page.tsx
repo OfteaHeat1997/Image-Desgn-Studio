@@ -2136,7 +2136,7 @@ async function runStep(
     // Mejor fallar acá con mensaje claro que generar un video 360° inútil.
     if (isLingerieFlow && json.data?.provider === 'rembg-last-resort') {
       throw new Error(
-        "No se pudo aislar la prenda sola (grounded_sam y SeedDream fallaron). El resultado incluye a la modelo, así que el Video 360° del Producto no serviría. Reintentá con otra foto o desactivá el paso 'Aislar Prenda' si querés continuar con la foto original."
+        "No se pudo recortar la prenda sola (esta foto es difícil para el recorte automático). NO inventamos un producto falso — preferimos avisarte. Para el catálogo: DESACTIVÁ el paso 'Aislar Producto' y en el Try-on usá el proveedor 'Uwear' (usa tu foto real, no necesita el recorte). El Video 360° sí necesita el recorte: para ese, reintentá con una foto de la prenda sola o más limpia."
       );
     }
     // Aviso honesto: si el aislado vino de SeedDream (regenerativo), el producto
