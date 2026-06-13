@@ -238,6 +238,7 @@ async function tryOnUwear(
   category: string,
   garmentType?: string,
   garmentDescription?: string,
+  scenePrompt?: string,
 ): Promise<string> {
   const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.seedream;
   const isQwen = modelSlug.startsWith('qwen');
@@ -258,7 +259,9 @@ async function tryOnUwear(
   const prompt =
     `Photorealistic e-commerce catalog photo of a female model wearing the ${noun}, ` +
     `standing front view, clean white studio background, soft even studio lighting, sharp focus. ` +
-    `Keep the ${noun} exactly as provided — same closure, straps, band, cups and construction; do not redesign it.`;
+    `Keep the ${noun} exactly as provided — same closure, straps, band, cups and construction; do not redesign it.` +
+    // Art direction (look del shoot) inyectado desde el pipeline.
+    (scenePrompt?.trim() ? ` Art direction: ${scenePrompt.trim()}` : '');
 
   // Qwen Intimate only supports 768X1024 / 1024X1280 and 1 ref; SeedDream supports 2K + aspect ratios.
   const generationId = await createUwearGeneration({
@@ -299,6 +302,7 @@ async function tryOnSeedDream(
   garmentImage: string,
   garmentType?: string,
   garmentDescription?: string,
+  scenePrompt?: string,
 ): Promise<string> {
   const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
 
@@ -323,7 +327,10 @@ async function tryOnSeedDream(
     `not present in the reference ${noun}. Keep the exact closure type shown in the ` +
     `reference (if it has hook-and-eye clasps, keep hook-and-eye — never a zipper) and ` +
     `keep the cups exactly as in the reference with no invented center seam or line. ` +
-    `Photorealistic fashion e-commerce photography, studio lighting, sharp focus.`;
+    `Photorealistic fashion e-commerce photography, studio lighting, sharp focus.` +
+    // Art direction (look del shoot) inyectado desde el pipeline. Describe escena/luz,
+    // NO la prenda — la prenda ya está anclada arriba al producto real.
+    (scenePrompt?.trim() ? ` Art direction: ${scenePrompt.trim()}` : '');
 
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
   const garmentImageUrl = await ensureFalAccessibleUrl(garmentImage);
@@ -349,6 +356,7 @@ async function smartTryOn(
   garmentType?: string,
   garmentDescription?: string,
   fashnMode?: 'performance' | 'balanced' | 'quality',
+  scenePrompt?: string,
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
@@ -361,7 +369,7 @@ async function smartTryOn(
   // only when SeedDream fails.
   if (isIntimate) {
     try {
-      const url = await tryOnSeedDream(modelImage, garmentImage, garmentType, garmentDescription);
+      const url = await tryOnSeedDream(modelImage, garmentImage, garmentType, garmentDescription, scenePrompt);
       return { url, provider: 'seedream' };
     } catch (err) {
       console.warn(
@@ -404,6 +412,7 @@ export async function POST(request: NextRequest) {
       provider = 'auto',
       forceProvider = false,
       fashnMode,
+      scenePrompt,
     } = body as {
       modelImage: string;
       garmentImage: string;
@@ -417,6 +426,9 @@ export async function POST(request: NextRequest) {
       // P1-3: FASHN v1.6 mode (performance/balanced/quality). Solo aplica a
       // FASHN; Kolors e IDM-VTON lo ignoran silenciosamente.
       fashnMode?: 'performance' | 'balanced' | 'quality';
+      // Art direction (look del shoot) inyectado al prompt de SeedDream/Uwear.
+      // Otros proveedores (warp-based) lo ignoran.
+      scenePrompt?: string;
     };
 
     if (!modelImage) {
@@ -482,7 +494,7 @@ export async function POST(request: NextRequest) {
     let usedProvider: string;
 
     if (effectiveProvider === 'auto' || !effectiveProvider) {
-      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription, fashnMode);
+      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription, fashnMode, scenePrompt);
       resultUrl = result.url;
       usedProvider = result.provider;
     } else {
@@ -498,7 +510,7 @@ export async function POST(request: NextRequest) {
           resultUrl = await tryOnKolors(httpModelImage, httpGarmentImage);
           break;
         case 'seedream':
-          resultUrl = await tryOnSeedDream(httpModelImage, httpGarmentImage, garmentType, garmentDescription);
+          resultUrl = await tryOnSeedDream(httpModelImage, httpGarmentImage, garmentType, garmentDescription, scenePrompt);
           break;
         case 'leffa':
           resultUrl = await tryOnLeffa(httpModelImage, httpGarmentImage, category);
@@ -506,7 +518,7 @@ export async function POST(request: NextRequest) {
         case 'uwear':
           // Uwear casts its own model → it ignores httpModelImage and uses the
           // garment image to register a clothing item, then generates a model.
-          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription);
+          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription, scenePrompt);
           break;
         default:
           return NextResponse.json(

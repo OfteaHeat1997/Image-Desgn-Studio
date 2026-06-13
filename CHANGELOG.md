@@ -1,5 +1,27 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Lencería: Art Directions (Parte 1 del roadmap de exactitud estilo Uwear)
+
+Primer paso del roadmap de `docs/research/uwear-accuracy-playbook.md`: traer el concepto
+de **Art Direction** (brief creativo reutilizable) de Uwear al pipeline de lencería, para
+pasar de prompts improvisados por step a un "look" estructurado y consistente.
+
+**Cambios (todo en lencería + módulo tryon, sin 4º pipeline):**
+- `lingerie/page.tsx`: nuevo `ART_DIRECTIONS` (3 presets: **Catálogo blanco** (default),
+  **Editorial suave**, **Lifestyle natural**), cada uno con `modelBackground` (para
+  model-create) y `scenePrompt` (para el try-on). Estado `artDirection` persistido en
+  settings. Selector visual nuevo en el setup. Se inyecta:
+  - en **model-create** → `background: artDir.modelBackground`;
+  - en **try-on** (tryon + photoBack) → nuevo campo `scenePrompt`.
+  Threaded como param opcional al final de `runStep` (seguro: si un call site lo omite, compila).
+- `/api/tryon`: acepta `scenePrompt` y lo **appendea** al prompt de `tryOnSeedDream` y
+  `tryOnUwear` ("Art direction: …"). Proveedores warp-based (Kolors/IDM/Leffa) lo ignoran.
+  Threaded por `smartTryOn` y el switch del handler.
+- Color-agnóstico (regla del proyecto): los briefs describen escena/luz, nunca el color del producto.
+- Doc: `docs/pipelines/lingerie.md`.
+
+**Siguiente en el roadmap:** Parte 2 = galería de modelos demo + avatar reusable; Parte 3 = QA loop.
+
 ## 2026-06-13 — Try-on: integrado Uwear.ai como proveedor (SeedDream 4.5 / Qwen Intimate)
 
 Tras validar a mano que Uwear respeta el bra de soporte (textura/costuras/malla),

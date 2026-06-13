@@ -386,6 +386,58 @@ const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: str
 ];
 
 /**
+ * Art Direction = brief creativo reutilizable (concepto tomado de Uwear). En vez
+ * de prompts improvisados por step, la usuaria elige un "look" y ese brief
+ * estructurado se inyecta en model-create (background) y en el try-on (scenePrompt).
+ * Es el mayor salto de consistencia del catálogo (ver docs/research/uwear-accuracy-playbook.md).
+ * Color-agnóstico por regla del proyecto — nunca hardcodear color del producto.
+ */
+type ArtDirectionId = "catalogo-blanco" | "editorial-suave" | "lifestyle-natural";
+
+interface ArtDirection {
+  id: ArtDirectionId;
+  label: string;
+  desc: string;
+  /** Fondo para model-create (reemplaza el "plain white studio background"). */
+  modelBackground: string;
+  /** Brief que se inyecta al prompt del try-on (seedream/uwear). */
+  scenePrompt: string;
+}
+
+const ART_DIRECTIONS: ArtDirection[] = [
+  {
+    id: "catalogo-blanco",
+    label: "Catálogo blanco",
+    desc: "E-commerce limpio: fondo blanco, luz pareja de softbox, color fiel, textura/costuras/cierre preservados. Default — el equivalente al 'Basic white photoshoot' de Uwear.",
+    modelBackground: "clean seamless pure white studio background",
+    scenePrompt:
+      "Clean elevated e-commerce studio photography, plain white seamless background, " +
+      "soft even softbox lighting, true-to-garment color, sharp focus, polished and minimal. " +
+      "Preserve the exact fabric texture, stitching, closures and silhouette of the garment.",
+  },
+  {
+    id: "editorial-suave",
+    label: "Editorial suave",
+    desc: "Look revista: luz cálida direccional, sombras suaves, fondo neutro tenue. Más estético, sigue mostrando bien el producto.",
+    modelBackground: "soft warm neutral studio background with a gentle gradient",
+    scenePrompt:
+      "Soft editorial fashion photography, warm directional key light with gentle soft shadows, " +
+      "neutral muted background, elegant and aspirational, sharp focus on the garment. " +
+      "Keep the garment's true color, texture, stitching and construction intact.",
+  },
+  {
+    id: "lifestyle-natural",
+    label: "Lifestyle natural",
+    desc: "Contexto real: luz natural suave, ambiente luminoso desenfocado. Para redes y campañas, no para listings de marketplace.",
+    modelBackground: "bright airy lifestyle interior with soft natural window light, softly blurred",
+    scenePrompt:
+      "Natural lifestyle photography, soft diffused window light, bright airy interior softly blurred behind, " +
+      "relaxed authentic mood, sharp focus on the garment. " +
+      "Preserve the garment's real color, texture, stitching and fit.",
+  },
+];
+
+/**
  * Detecta el color desde el nombre del archivo. Cubre la paleta típica del
  * catálogo Unistyles + sinónimos comunes en español y algunos en inglés.
  * Returns undefined si no matchea — entonces la usuaria no ve badge de color
@@ -2045,7 +2097,14 @@ async function runStep(
    * preserve el cierre/costuras reales en vez de inventar (zipper, costura de copa).
    */
   garmentDescription?: string,
+  /**
+   * Art Direction elegida (id). Inyecta el brief al `background` de model-create
+   * y al `scenePrompt` del try-on. Si no se pasa, usa el primer preset (catálogo blanco).
+   */
+  artDirectionId?: string,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
+  // Brief creativo elegido. Fallback al primer preset si el id no matchea.
+  const artDir = ART_DIRECTIONS.find((a) => a.id === artDirectionId) ?? ART_DIRECTIONS[0];
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
@@ -2116,7 +2175,7 @@ async function runStep(
         bodyType: modelConfig.bodyType,
         pose,
         expression: "confident natural",
-        background: "plain white studio background",
+        background: artDir.modelBackground,
         garmentType: garmentTypeForApi,
         seed: generatedSeed,
         // Tag the saved AiModel with this reference so future runs for same SKU can reuse
@@ -2248,6 +2307,8 @@ async function runStep(
         fashnMode,
         // Construcción real (Claude Vision) → ancla SeedDream al cierre/copas reales.
         garmentDescription,
+        // Art Direction: brief del look inyectado al prompt del try-on (seedream/uwear).
+        scenePrompt: artDir.scenePrompt,
       }),
     });
     const tryonJson = await tryonRes.json();
@@ -2288,6 +2349,8 @@ async function runStep(
         fashnMode,
         // Construcción real (Claude Vision) → ancla SeedDream al cierre/copas reales.
         garmentDescription,
+        // Art Direction: brief del look inyectado al prompt del try-on (seedream/uwear).
+        scenePrompt: artDir.scenePrompt,
       }),
     });
     const json = await res.json();
@@ -2543,6 +2606,8 @@ export default function LingeriePipelinePage() {
   // P1-3: calidad FASHN — solo aplica cuando tryon usa FASHN (override manual
   // o flow non-lencería). Kolors e IDM-VTON lo ignoran.
   const [fashnMode, setFashnMode] = useState<FashnMode>(persistedSettings?.fashnMode ?? "balanced");
+  // Art Direction (look del shoot) — brief reutilizable inyectado a model-create + try-on.
+  const [artDirection, setArtDirection] = useState<ArtDirectionId>(persistedSettings?.artDirection ?? "catalogo-blanco");
   const [sharedModelUrl, setSharedModelUrl] = useState<string | undefined>();
   // Seed compartido entre poses: photoBack + photoFullBody lo reusan para que
   // SeedDream genere la MISMA modelo (mismo rostro + cuerpo + piel) en distinta
@@ -2630,12 +2695,13 @@ export default function LingeriePipelinePage() {
           autoMode,
           generationMode,
           fashnMode,
+          artDirection,
           referenceNumber,
         }));
       } catch { /* localStorage quota o disabled — silently ignore */ }
     }, 400);
     return () => clearTimeout(timer);
-  }, [productType, modelConfig, autoMode, generationMode, fashnMode, referenceNumber]);
+  }, [productType, modelConfig, autoMode, generationMode, fashnMode, artDirection, referenceNumber]);
 
   // Persistencia de jobs: guarda el array entero (sin `file`, que no
   // serializa) cada vez que cambia. Debounce 800ms porque jobs cambia mucho
@@ -3057,6 +3123,7 @@ export default function LingeriePipelinePage() {
               step.actionOverride,
               job.productSpec?.material?.trim() || undefined,
               buildGarmentDescription(job.productSpec),
+              artDirection,
             ),
           ),
         );
@@ -3104,11 +3171,12 @@ export default function LingeriePipelinePage() {
         step.actionOverride,
         materialHint,
         garmentDescription,
+        artDirection,
       );
     } finally {
       abortControllersRef.current.delete(key);
     }
-  }, [modelConfig, productType, referenceNumber, generationMode, findMatchingPhoto, fashnMode]);
+  }, [modelConfig, productType, referenceNumber, generationMode, findMatchingPhoto, fashnMode, artDirection]);
 
   /* ---- Process one job sequentially ---- */
   const processJob = useCallback(async (
@@ -4242,6 +4310,46 @@ export default function LingeriePipelinePage() {
                     ⚠️ Requiere que etiquetes tus fotos con su ángulo (Frontal/Espalda/Cuerpo). El face-swap solo se aplica a las fotos reales que subiste; las vistas sin foto real caen al modo clásico automáticamente.
                   </p>
                 )}
+              </section>
+
+              {/* Art Direction — brief reutilizable del "look" del shoot. Inyecta
+                  el fondo a model-create y el scenePrompt al try-on. Parte 1 del
+                  roadmap Uwear (ver docs/research/uwear-accuracy-playbook.md):
+                  prompts improvisados → preset estructurado = consistencia. */}
+              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                  Art Direction (look del shoot)
+                </h2>
+                <p className="mb-3 text-[11px] text-gray-500">
+                  El "look" como preset reutilizable — da consistencia a todo el catálogo. Se aplica a la modelo y al try-on.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {ART_DIRECTIONS.map((ad) => {
+                    const selected = artDirection === ad.id;
+                    return (
+                      <button
+                        key={ad.id}
+                        type="button"
+                        onClick={() => setArtDirection(ad.id)}
+                        className={cn(
+                          "flex flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition-all",
+                          selected
+                            ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
+                            : "border-white/8 bg-white/[0.02] hover:border-white/20",
+                        )}
+                        title={ad.desc}
+                      >
+                        <span className={cn(
+                          "text-xs font-semibold",
+                          selected ? "text-[var(--accent-light)]" : "text-gray-300",
+                        )}>
+                          {ad.label}
+                        </span>
+                        <span className="text-[10px] leading-tight text-gray-500 line-clamp-3">{ad.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </section>
 
               {/* P1-3: calidad de FASHN — solo aplica cuando tryon usa FASHN

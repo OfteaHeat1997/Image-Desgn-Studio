@@ -165,6 +165,24 @@ Naming output: `output/lingerie/bra/REF-{sku}/{color}-{angle}-AI.jpg`.
 
 ---
 
+## Art Directions (look reutilizable)
+
+Concepto tomado de Uwear (ver `docs/research/uwear-accuracy-playbook.md`). En vez de
+prompts improvisados por step, la usuaria elige un **brief creativo** en el setup y ese
+look se inyecta de forma consistente en toda la generación. Definidos en
+`lingerie/page.tsx` (`ART_DIRECTIONS`):
+
+| Preset | model-create background | Para qué |
+|---|---|---|
+| **Catálogo blanco** (default) | fondo blanco seamless | Listings de marketplace, e-commerce limpio |
+| **Editorial suave** | neutro cálido con gradiente | Catálogo web / campañas más estéticas |
+| **Lifestyle natural** | interior luminoso desenfocado | Redes / campañas (no marketplace) |
+
+Cada preset aporta `modelBackground` (→ `/api/model-create`) y `scenePrompt` (→ `/api/tryon`,
+appendeado al prompt de SeedDream/Uwear como "Art direction: …"). Los proveedores warp-based
+(Kolors, IDM-VTON, Leffa) ignoran `scenePrompt`. Los briefs son **color-agnósticos**: describen
+escena y luz, nunca el color del producto.
+
 ## Troubleshooting
 
 | Síntoma | Causa probable | Fix |
