@@ -3305,7 +3305,12 @@ export default function LingeriePipelinePage() {
 
       // Determine input: for tryon use sharedModelUrl is handled in runStep
       let inputForStep = lastResultUrl;
-      if (stepDef.id === "modelVideo") {
+      if (stepDef.id === "isolate") {
+        // Paso 1: mostrar/procesar con el falUrl PÚBLICO (el uploadedUrl es el de
+        // Replicate privado → el navegador muestra "La imagen expiró"). Así la foto
+        // original se ve a la izquierda y grounded_sam/ghost reciben una imagen legible.
+        inputForStep = falUrl || uploadedUrl || lastResultUrl;
+      } else if (stepDef.id === "modelVideo") {
         // modelVideo usa el resultado del tryon (con textura ya corregida si
         // texturePreserve corrió). Si nada de eso existe, cae al sharedModel solo.
         inputForStep = stepResults.texturePreserve || stepResults.tryon || newSharedModel || lastResultUrl;
