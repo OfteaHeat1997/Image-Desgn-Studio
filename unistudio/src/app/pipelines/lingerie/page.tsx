@@ -2176,7 +2176,12 @@ async function runStep(
 
   if (stepId === "model") {
     if (sharedModelUrl) return { resultUrl: sharedModelUrl, cost: 0 };
-    const pose = productType === "bra" ? "upper-body front-facing" : "full-body front-facing";
+    // Bra → MEDIO CUERPO (de la cabeza a la cintura). El cuerpo completo se arma
+    // después en el paso photoFullBody con outpaint. Si la modelo sale cuerpo
+    // completo acá, la frontal queda mal y el full-body se rompe.
+    const pose = productType === "bra"
+      ? "half-length upper-body portrait, framed from the top of the head to the waist, front-facing, NOT full body, no legs"
+      : "full-body front-facing";
     // Generamos seed cliente-side y lo pasamos a model-create. Guardamos el seed
     // para que photoBack + photoFullBody puedan reusar la misma identidad de
     // modelo cambiando solo la pose.
@@ -2192,9 +2197,8 @@ async function runStep(
         bodyType: modelConfig.bodyType,
         pose,
         expression: "confident natural",
-        // Fondo blanco limpio FIJO (como era antes). NO usar artDir acá: el wording
-        // de art direction hacía que SeedDream metiera softbox/cosas de estudio atrás.
-        background: "plain white studio background",
+        // Fondo blanco ecommerce ESTRICTO — sin softbox, equipo de estudio, props ni escenas.
+        background: "plain pure-white seamless background only, no studio equipment, no softbox, no props, no scenery",
         garmentType: garmentTypeForApi,
         seed: generatedSeed,
         // Tag the saved AiModel with this reference so future runs for same SKU can reuse
@@ -3321,9 +3325,18 @@ export default function LingeriePipelinePage() {
         // original se ve a la izquierda y grounded_sam/ghost reciben una imagen legible.
         inputForStep = falUrl || uploadedUrl || lastResultUrl;
       } else if (stepDef.id === "modelVideo") {
-        // modelVideo usa el resultado del tryon (con textura ya corregida si
-        // texturePreserve corrió). Si nada de eso existe, cae al sharedModel solo.
-        inputForStep = stepResults.texturePreserve || stepResults.tryon || newSharedModel || lastResultUrl;
+        // modelVideo usa SOLO el try-on (modelo IA + tu prenda) o la modelo IA.
+        // NUNCA cae a la foto original (es copyright de Leonisa). Si no hay try-on
+        // ni modelo, se salta con mensaje claro.
+        const base = stepResults.texturePreserve || stepResults.tryon || newSharedModel;
+        if (!base) {
+          updateStep(jobId, stepDef.id, {
+            status: "skipped",
+            error: "El video de la modelo necesita la Foto Frontal (try-on). Corré ese paso primero — no usamos tu foto original (copyright).",
+          });
+          return false;
+        }
+        inputForStep = base;
       } else if (stepDef.id === "texturePreserve") {
         // texturePreserve necesita el resultado del tryon — la imagen modelo+prenda
         // donde Kolors dejó la tela plástica. Sin tryon, no hay nada que corregir.
