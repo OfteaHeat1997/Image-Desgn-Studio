@@ -42,9 +42,32 @@ export const UWEAR_MODEL_SLUGS = {
 } as const;
 
 /**
+ * Fetch an image (http(s) or data URL) into a Blob on OUR server, so we can upload
+ * the raw bytes to Uwear. Uwear's own fetch of our temporary URLs (fal/replicate/
+ * proxy) can fail with "Could not download file from URL (upstream returned 401)"
+ * — expired or auth-protected links. Relaying bytes avoids that entirely.
+ */
+async function fetchImageBlob(url: string): Promise<Blob> {
+  if (url.startsWith('data:')) {
+    const m = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) throw new Error('data URL inválida para Uwear');
+    return new Blob([Buffer.from(m[2], 'base64')], { type: m[1] || 'image/jpeg' });
+  }
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `No se pudo descargar la imagen para Uwear (HTTP ${res.status}). ` +
+      `Probablemente la foto expiró — re-subila y reprocesá.`,
+    );
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  return new Blob([buf], { type: res.headers.get('content-type') || 'image/jpeg' });
+}
+
+/**
  * Register a clothing item from product image URL(s). Returns clothing_item_id.
- * `clothing_item_url` accepts an http(s) URL or a base64 data URL; we pass http
- * URLs (large base64 in a form field is discouraged by the API).
+ * We download the image(s) server-side and upload the BYTES (photo_file /
+ * back_photo_file) instead of passing URLs — Uwear can't always fetch our temp URLs.
  *
  * clothing_processing_mode:
  *   - 'none'              store as-is (use when you pass an already-clean image)
@@ -61,8 +84,10 @@ export async function createUwearClothingItem(params: {
 }): Promise<number> {
   const form = new FormData();
   form.append('clothing_item_name', params.name);
-  form.append('clothing_item_url', params.frontUrl);
-  if (params.backUrl) form.append('clothing_item_back_url', params.backUrl);
+  form.append('photo_file', await fetchImageBlob(params.frontUrl), 'front.jpg');
+  if (params.backUrl) {
+    form.append('back_photo_file', await fetchImageBlob(params.backUrl), 'back.jpg');
+  }
   if (params.description) form.append('description', params.description);
   if (params.descriptionBack) form.append('description_back', params.descriptionBack);
   // Default to remove_background: it cleans the garment AND auto-generates the
@@ -101,8 +126,10 @@ export async function generateUwearFlatLay(params: {
 }): Promise<string> {
   const form = new FormData();
   form.append('clothing_item_name', params.name);
-  form.append('clothing_item_url', params.frontUrl);
-  if (params.backUrl) form.append('clothing_item_back_url', params.backUrl);
+  form.append('photo_file', await fetchImageBlob(params.frontUrl), 'front.jpg');
+  if (params.backUrl) {
+    form.append('back_photo_file', await fetchImageBlob(params.backUrl), 'back.jpg');
+  }
   form.append('clothing_processing_mode', 'generate_flat_lay');
 
   const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
