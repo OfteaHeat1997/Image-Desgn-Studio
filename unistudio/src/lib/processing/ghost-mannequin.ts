@@ -190,10 +190,11 @@ export async function modelToGhost(
       ? `You are given TWO reference photos of the SAME ${noun}: the first is the FRONT ` +
         `view, the second is the BACK view. Use BOTH to reconstruct the garment accurately. `
       : '') +
-    `Isolate only the ${noun} and remove the person completely. ` +
-    `The ${noun} should float on a pure white background with a 3D invisible-mannequin ` +
-    `hollow-man effect — visible natural garment shape and interior fabric where the ` +
-    `body was, as if worn by an invisible person. ` +
+    `Show ONLY the ${noun} BY ITSELF on a pure white background — a clean flat product ` +
+    `packshot. Remove the person completely. There must be NO body, NO mannequin, NO ` +
+    `invisible mannequin, NO dress form, NO neck, NO shoulders, NO torso and NO body shape ` +
+    `of any kind. Just the standalone ${noun} laid out / floating flat on white, keeping ` +
+    `its natural garment shape. ` +
     (hasBack
       ? `Reproduce the back details (racerback straps, back mesh panels, band) correctly ` +
         `from the BACK reference — do NOT erase or flatten the back. `
@@ -258,10 +259,10 @@ export async function modelToGhost(
     if (isLingerie) {
       const httpUrl = await ensureFalAccessibleUrl(imageUrl);
       const falResult = await runFal('fal-ai/bytedance/seedream/v4/edit', {
-        prompt: `Show only the ${noun} from the photo on a plain white background, ` +
-          `hollow 3D product shape, no person, same color as original. ` +
-          `Reproduce the exact closure and seams — do NOT add a zipper, hooks, or any ` +
-          `seam that is not in the original; keep the cups exactly as shown.`,
+        prompt: `Show ONLY the ${noun} by itself on a plain white background — flat product ` +
+          `packshot, NO body, NO mannequin, NO neck/shoulders/torso, no person. Same color as original. ` +
+          `Reproduce the EXACT closure and seams shown in the photo — do NOT add or invent any ` +
+          `closure/seam that is not in the original; keep the cups and panels exactly as shown.`,
         image_urls: [httpUrl],
         image_size: 'square_hd',
         num_images: 1,
