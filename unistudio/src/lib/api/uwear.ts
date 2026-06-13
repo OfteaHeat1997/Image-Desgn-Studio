@@ -172,7 +172,7 @@ export async function createUwearGeneration(params: {
   };
   if (params.aspectRatio) body.aspect_ratio = params.aspectRatio;
   if (params.resolution) body.resolution = params.resolution;
-  if (params.artDirectionId != null) body.art_direction_id = params.artDirectionId;
+  if (params.artDirectionId !== undefined && params.artDirectionId !== null) body.art_direction_id = params.artDirectionId;
 
   const res = await fetch(`${UWEAR_BASE_URL}/generation`, {
     method: 'POST',
