@@ -1033,7 +1033,10 @@ interface ImageLightboxProps {
  */
 function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix, compareWith }: ImageLightboxProps) {
   const [idx, setIdx] = useState(Math.max(0, Math.min(startIndex, images.length - 1)));
-  const [compareMode, setCompareMode] = useState(false);
+  // Arranca EN modo comparación cuando hay una foto "antes" → al abrir full screen
+  // se ve directo el antes/después (Original | Resultado) sin tener que buscar el
+  // botón. Si es video, el render cae al reproductor igual (canCompare lo filtra).
+  const [compareMode, setCompareMode] = useState<boolean>(!!compareWith);
   const url = images[idx];
   const isVideo = url && (url.includes(".mp4") || url.includes(".webm"));
   const isSelected = url === selectedUrl;
@@ -1760,10 +1763,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           onClose={() => setLightboxIdx(null)}
           onSelect={onSelectCandidate}
           filenamePrefix={`unistudio-${step.id}`}
-          // Referencia para el modo comparación: el input del step (o el del
-          // chain), que es lo que se está transformando. Usuaria ve "antes vs
-          // después" side-by-side para evaluar fidelidad del producto.
-          compareWith={inputUrl}
+          // Referencia para el modo comparación (antes): para la Foto Frontal es
+          // la MODELO nueva (originalUrl); para el resto, el input del step. Así
+          // el full screen abre en "antes vs después" con la referencia correcta.
+          compareWith={step.originalUrl ?? inputUrl}
         />,
         document.body,
       )}
