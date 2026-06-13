@@ -1,5 +1,31 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Try-on: Leffa como proveedor alternativo (otro enfoque, no generativo)
+
+A pedido de la usuaria ("vamos a probar otro proveedor"), se agrega **Leffa**
+(`fal-ai/leffa/virtual-tryon`) como proveedor seleccionable en `/api/tryon`.
+
+**Por qué Leffa y no otro generativo:** la investigación de la sesión confirmó que
+cambiar SeedDream por otro motor *generativo* (FASHN, Kolors, Flux) NO mejora la
+fidelidad — todos re-dibujan. Leffa (CVPR 2025) es un try-on real que **warpea la
+prenda** sobre la persona en vez de sintetizarla desde un prior de categoría, así
+que no "normaliza" un producto atípico. Es lo más cercano a un enfoque distinto que
+podemos probar **sin crear cuentas nuevas** (usa la FAL_KEY existente).
+
+**Cambios:**
+- `/api/tryon`: nueva `tryOnLeffa(modelo, prenda, category)` → `fal-ai/leffa/virtual-tryon`
+  con `garment_type` mapeado (tops→upper_body, bottoms→lower_body, dresses). Flatten a
+  blanco de la prenda (gated por `LINGERIE_FLATTEN`, igual que Kolors). Maneja ambos
+  shapes de salida (`images[0].url` / `image.url`).
+- Provider `leffa` agregado a los tipos, `PROVIDER_COSTS` ($0.04) y el switch del handler.
+- UI lencería: opción **"Leffa (probar)"** en el selector de proveedor del try-on, para
+  A/B contra SeedDream desde el retry de un paso.
+- Docs: `docs/pipelines/lingerie.md` (fila nueva en la tabla de proveedores).
+
+**Caveat documentado:** Leffa está entrenado en apparel estándar (upper/lower/dresses);
+un bra mapea a `upper_body` y los resultados en lencería son hit-or-miss. Es para
+**probar y comparar**, no una garantía de fidelidad.
+
 ## 2026-06-13 — HALLAZGO: SeedDream (y todo motor generativo) NO clona bras de soporte atípicos
 
 **Conclusión validada en sesión con la usuaria (reporte sobre bra de soporte/postura

@@ -225,11 +225,12 @@ const VIDEO_ACTION_OPTIONS: { value: VideoActionOption; label: string; promptHin
  * Proveedores de try-on disponibles. "auto" deja que /api/tryon elija
  * (Kolors para lencería, FASHN/IDM-VTON para otros).
  */
-type TryonProvider = "seedream" | "kolors" | "fashn" | "idm-vton" | "auto";
+type TryonProvider = "seedream" | "leffa" | "kolors" | "fashn" | "idm-vton" | "auto";
 
 const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: string }[] = [
   { value: "auto",     label: "Automático",   hint: "El sistema elige (SeedDream para lencería)" },
   { value: "seedream", label: "SeedDream edit", hint: "Default lencería · preserva el producto real (encaje, tirantes) · $0.03" },
+  { value: "leffa",    label: "Leffa (probar)", hint: "OTRO proveedor · warpea la prenda real en vez de re-dibujarla · probalo si SeedDream te cambia el producto · $0.04" },
   { value: "kolors",   label: "Kolors",        hint: "Backup · rápido · tiende a inventar prendas genéricas · $0.02" },
   { value: "fashn",    label: "FASHN v1.6",    hint: "Bloquea lencería · útil solo para no-íntimos · $0.05" },
   { value: "idm-vton", label: "IDM-VTON",      hint: "Backup · $0.02" },

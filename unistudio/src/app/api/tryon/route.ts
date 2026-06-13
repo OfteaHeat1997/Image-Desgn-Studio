@@ -19,6 +19,7 @@ const PROVIDER_COSTS: Record<string, number> = {
   fashn: 0.05,
   kolors: 0.02,
   seedream: 0.03,
+  leffa: 0.04,
 };
 
 // Human-readable noun per garment type — used in the SeedDream edit prompt so
@@ -144,6 +145,64 @@ async function tryOnKolors(
     });
     throw err;
   }
+}
+
+/**
+ * Virtual try-on using Leffa on fal.ai — `fal-ai/leffa/virtual-tryon`.
+ *
+ * Leffa (CVPR 2025) learns flow fields in attention to preserve fine garment
+ * texture/detail. Unlike SeedDream (a generative editor that re-draws and tends
+ * to "normalize" an atypical product into a category prior), Leffa is a true
+ * try-on: it WARPS the actual garment pixels onto the person, so it doesn't
+ * reinvent the product. Trained on standard apparel (upper/lower/dresses), so a
+ * bra maps to garment_type "upper_body" — results on lingerie are hit-or-miss
+ * but it's a genuinely different approach to test against SeedDream.
+ *
+ * Uses the existing FAL_KEY (no new account). No content-filter flag exposed.
+ *
+ * @param modelImage   - URL of the person/model image.
+ * @param garmentImage - URL of the isolated garment image.
+ * @param category     - tops | bottoms | dresses | one-pieces (mapped to Leffa).
+ * @returns URL of the try-on result image.
+ */
+async function tryOnLeffa(
+  modelImage: string,
+  garmentImage: string,
+  category: string,
+): Promise<string> {
+  // Flatten the (often transparent) isolated garment to a white-bg JPEG. Like
+  // Kolors, a true VTON model anchors better to a solid garment image than to a
+  // transparent PNG. Gated behind LINGERIE_FLATTEN to match Kolors behaviour.
+  let prepGarment = garmentImage;
+  if (process.env.LINGERIE_FLATTEN !== '0') {
+    try {
+      prepGarment = await flattenToWhite(garmentImage);
+    } catch (err) {
+      console.warn('[tryon:leffa] flattenToWhite failed, using original garment URL:', err);
+    }
+  }
+
+  // Leffa garment_type: upper_body | lower_body | dresses. Bras/tops → upper_body.
+  const garmentType =
+    category === 'bottoms'
+      ? 'lower_body'
+      : category === 'one-pieces' || category === 'dresses'
+        ? 'dresses'
+        : 'upper_body';
+
+  const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
+  const garmentImageUrl = await ensureFalAccessibleUrl(prepGarment);
+
+  const result = await runFal('fal-ai/leffa/virtual-tryon', {
+    human_image_url: humanImageUrl,
+    garment_image_url: garmentImageUrl,
+    garment_type: garmentType,
+  });
+
+  // fal try-on models vary in output shape — handle both { images:[{url}] } and { image:{url} }.
+  const url = result?.images?.[0]?.url ?? result?.image?.url;
+  if (!url) throw new Error('Leffa try-on completed but returned no image');
+  return url;
 }
 
 /**
@@ -281,7 +340,7 @@ export async function POST(request: NextRequest) {
       category: string;
       garmentType?: string;
       garmentDescription?: string;
-      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'auto';
+      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'leffa' | 'auto';
       // Cuando true, la usuaria eligió el proveedor a mano (para testear) y la
       // ruta lo respeta tal cual — NO aplica el override automático kolors→auto.
       forceProvider?: boolean;
@@ -334,7 +393,7 @@ export async function POST(request: NextRequest) {
       garmentType === 'bikini' ||
       garmentType === 'bodysuit';
 
-    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'auto' = provider;
+    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'leffa' | 'auto' = provider;
     if (forceProvider && provider !== 'auto') {
       // La usuaria forzó este proveedor a mano (testing) → respetarlo tal cual,
       // sin el override automático de abajo. Así puede comparar SeedDream vs
@@ -371,11 +430,14 @@ export async function POST(request: NextRequest) {
         case 'seedream':
           resultUrl = await tryOnSeedDream(httpModelImage, httpGarmentImage, garmentType, garmentDescription);
           break;
+        case 'leffa':
+          resultUrl = await tryOnLeffa(httpModelImage, httpGarmentImage, category);
+          break;
         default:
           return NextResponse.json(
             {
               success: false,
-              error: `Proveedor "${effectiveProvider}" no soportado. Usa "seedream", "fashn", "idm-vton", "kolors", o "auto".`,
+              error: `Proveedor "${effectiveProvider}" no soportado. Usa "seedream", "leffa", "fashn", "idm-vton", "kolors", o "auto".`,
             },
             { status: 400 },
           );
