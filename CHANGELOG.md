@@ -1,5 +1,28 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — REGRESIÓN ARREGLADA: quitar (de nuevo) el SeedDream ghost que inventaba el bra
+
+La usuaria notó que su pipeline producía resultados FIELES en mayo y los rompió después.
+Investigación de git lo confirma — es una regresión, no el API:
+
+- **2026-05-18 (`f1e4a59`)**: se QUITÓ el SeedDream ghost del cascade de "Aislar Producto"
+  *porque inventaba el bra* (regenerativo, no segmentación → producía un producto distinto;
+  contaminaba todo el catálogo downstream).
+- **2026-06-10 (`595c2df`)**: se RE-AGREGÓ ("aislar volvió a funcionar" en el sentido de que
+  no moría, pero a costa de inventar la prenda otra vez).
+
+**Fix (revertir a la conducta de mayo):** `bg-remove/route.ts` vuelve a cascada de 2 niveles:
+`grounded_sam` (segmentación pixel-real) → `rembg-last-resort` (error honesto que la pipeline
+lencería ya detecta y hard-failea). **Eliminado el paso regenerativo SeedDream ghost** y su
+import. `regenerated` queda siempre `false` → nunca más el aviso "se regeneró con IA" ni un
+bra falso silencioso en el catálogo.
+
+**Diferencia input→output:** segmentación = recorta los pixeles reales de tu prenda;
+regeneración = dibuja un producto nuevo (≠ el tuyo). Volvemos a solo segmentar.
+
+Para fotos donde el recorte falla: el catálogo se saca con **Uwear** (foto real) — ya integrado
+y arreglado hoy para no usar el aislado. El ghost mannequin explícito sigue en `/api/ghost-mannequin`.
+
 ## 2026-06-13 — Lencería: Art Directions (Parte 1 del roadmap de exactitud estilo Uwear)
 
 Primer paso del roadmap de `docs/research/uwear-accuracy-playbook.md`: traer el concepto
