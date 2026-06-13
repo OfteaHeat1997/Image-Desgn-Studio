@@ -211,10 +211,10 @@ export async function modelToGhost(
     // la parte de atrás. Reporte usuaria: "delante y atrás mezclados".
     (hasBack
       ? ''
-      : `Show the product from the EXACT SAME viewing angle as the reference photo — the ` +
-        `FRONT view. Do NOT rotate the garment, do NOT turn it around, do NOT show the back, ` +
-        `and do NOT invent or add any back panel, racerback, or rear straps that are not ` +
-        `visible from the front in the reference. Only what the front photo shows. `) +
+      : `Show the product STRAIGHT FROM THE FRONT, camera directly facing it, perfectly ` +
+        `symmetrical front view — exactly like the reference photo. Do NOT use a 3/4 angle, ` +
+        `do NOT show it from the side or in profile, do NOT rotate or tilt the garment, and ` +
+        `do NOT show the back. Only the flat front the reference shows, just with subtle 3D volume. `) +
     (hasBack
       ? `Reproduce the back details (racerback straps, back mesh panels, band) correctly ` +
         `from the BACK reference — do NOT erase or flatten the back. `
