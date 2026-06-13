@@ -16,15 +16,32 @@ Plataforma de fotografía de moda IA construida para ecommerce, con **API REST r
   - **SeedDream 4.5** — según Uwear, el mejor para lencería/underwear hoy.
 - Pricing pay-as-you-go ($0.10/crédito), sin suscripción.
 
+**Evaluación profunda (Uwear vs Camclo3D) — 2026-06-13:**
+- **API de Uwear (confirmada vía docs.dev.uwear.ai):** endpoint `external_create_generation`,
+  Bearer auth. La prenda se manda con `clothing_item_data`: `clothing_item_name`,
+  `description`, `description_back`, **`external_clothing_item_url` (frente)** y
+  **`external_clothing_item_back_url` (espalda, opcional)**. Otros params: `prompt`,
+  `model_name`, `num_images`, camera angle (full body / midshot / back shot / auto),
+  `use_image_enhancement` (1 crédito; 0 si false). Modelos: Gemini Flash 2/Pro, GPT
+  Image 2, **SeedDream 4.5**, **Qwen Intimate**, **drape_v2_5** (Drape2).
+- **VENTAJA CLAVE para este caso:** Uwear acepta **foto de frente Y de espalda** de la
+  prenda → la usuaria YA tiene ambas del bra de soporte (frente con broche + espalda
+  racerback). Es lo que ningún otro proveedor probado permitía (todos tomaban 1 imagen).
+- **Modelo recomendado:** **Qwen Intimate** primero (más permisivo + consistencia de
+  identidad para íntimos). Alternativas a comparar: **SeedDream 4.5** (mejor detalle de
+  lencería según Uwear) y **drape_v2_5** (mejor fidelidad general desde flat-lay).
+- **Camclo3D: descartado por ahora** — no publica detalles de API ni política de
+  lencería; Uwear gana por API documentada + soporte explícito de íntimos + input
+  frente/espalda. Reevaluar solo si Uwear no alcanza.
+- **100 créditos gratis** al crear cuenta + créditos de test para API.
+
 **Bloqueante (acción de la usuaria):** crear cuenta en Uwear + generar API key +
-agregarla a Vercel como `UWEAR_API_KEY`. Recién con la key se puede leer la doc
-autenticada (UWEAR.md) y cablear `tryOnUwear()` en `/api/tryon` (modelo Qwen Intimate
-primero). Integración PENDIENTE hasta tener la key.
+agregarla a Vercel como `UWEAR_API_KEY`. Recién con la key se cabla `tryOnUwear()` en
+`/api/tryon` (Qwen Intimate primero, frente+espalda). Integración PENDIENTE hasta tener la key.
 
 **Caveat honesto:** es lo mejor-en-clase y sí admite lencería, pero ninguna IA
 garantiza clonar un bra de soporte atípico al 100%. El único método 100% fiel sigue
-siendo recorte del producto real (foto del bra solo). Uwear es la mejor apuesta de
-try-on generativo que además NO bloquea íntimos.
+siendo recorte del producto real. Uwear es la mejor apuesta de try-on que NO bloquea íntimos.
 
 ## 2026-06-13 — Try-on: Leffa como proveedor alternativo (otro enfoque, no generativo)
 
