@@ -1,5 +1,24 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Comparador antes/después en cada paso + panty del cuerpo completo con color del bra
+
+Dos pedidos de la usuaria cerrados:
+
+**1. Comparador deslizable "antes/después" en CADA proceso** (estilo plataforma luxury).
+Nuevo componente `BeforeAfterSlider` en `lingerie/page.tsx`: divisor arrastrable que revela la
+foto original (input del paso) sobre el resultado vía `clip-path`, con etiquetas Antes/Después,
+asa central y `<input type=range>` invisible. Cada paso terminado con una sola imagen lo muestra a
+ancho completo; los estados processing/error/skipped/multi-sample/video conservan el layout de dos
+paneles. Botón "Ver grande" abre el lightbox.
+
+**2. Panty del cuerpo completo hace JUEGO con el color del bra.** Antes `photoFullBody` hardcodeaba
+"nude beige briefs" para cualquier producto. Ahora el nuevo helper `pantyColorPhrase(job.color)`
+traduce el color detectado al brief del prompt de outpaint: bra negro → panty negro, rojo → rojo,
+etc. Sin color detectado (o beige) → nude neutro. `runStep` recibe `garmentColor`, thread-eado
+desde `executeStep` en ambos call sites (multi-sample y normal).
+
+- Fix incidental: comillas sin escapar en el texto de Art Direction que bloqueaban el build.
+
 ## 2026-06-13 — Aislar Producto: fallback FIEL con Uwear flat-lay (para el Video 360°)
 
 La usuaria necesita DOS outputs: foto en modelo (try-on) Y video 360° (producto flotando).
