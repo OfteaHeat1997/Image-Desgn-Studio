@@ -404,36 +404,42 @@ interface ArtDirection {
   scenePrompt: string;
 }
 
+// Regla de fondo para ecommerce: TODAS las art directions usan fondo BLANCO limpio
+// (sin gente, runway, jardín, exteriores ni props). Solo cambia la LUZ/mood, nunca el
+// fondo — la usuaria pidió que todos los fondos estén listos para ecommerce.
+const ECOMMERCE_BG =
+  "Plain pure-white seamless e-commerce studio background ONLY. ABSOLUTELY NO people, " +
+  "no audience, no crowd, no runway, no catwalk, no outdoor, no garden, no trees, no " +
+  "furniture, no props, no scenery of any kind. Just the model on a clean white sweep. " +
+  "Catalog packshot. Preserve the garment's exact color, texture, stitching and closure.";
+
 const ART_DIRECTIONS: ArtDirection[] = [
   {
     id: "catalogo-blanco",
     label: "Catálogo blanco",
-    desc: "E-commerce limpio: fondo blanco, luz pareja de softbox, color fiel, textura/costuras/cierre preservados. Default — el equivalente al 'Basic white photoshoot' de Uwear.",
-    modelBackground: "clean seamless pure white studio background",
+    desc: "E-commerce limpio: fondo blanco, luz pareja de softbox, color fiel. Default.",
+    modelBackground: "clean seamless pure white studio background, no props, no scenery",
     scenePrompt:
-      "Clean elevated e-commerce studio photography, plain white seamless background, " +
-      "soft even softbox lighting, true-to-garment color, sharp focus, polished and minimal. " +
-      "Preserve the exact fabric texture, stitching, closures and silhouette of the garment.",
+      "Clean e-commerce studio photography, soft even softbox lighting, sharp focus, polished and minimal. " +
+      ECOMMERCE_BG,
   },
   {
     id: "editorial-suave",
     label: "Editorial suave",
-    desc: "Look revista: luz cálida direccional, sombras suaves, fondo neutro tenue. Más estético, sigue mostrando bien el producto.",
-    modelBackground: "soft warm neutral studio background with a gentle gradient",
+    desc: "Mismo fondo blanco ecommerce, pero con luz cálida direccional (más estético).",
+    modelBackground: "clean seamless pure white studio background, no props, no scenery",
     scenePrompt:
-      "Soft editorial fashion photography, warm directional key light with gentle soft shadows, " +
-      "neutral muted background, elegant and aspirational, sharp focus on the garment. " +
-      "Keep the garment's true color, texture, stitching and construction intact.",
+      "Editorial e-commerce studio photography, warm directional key light with gentle soft shadows, elegant, sharp focus. " +
+      ECOMMERCE_BG,
   },
   {
     id: "lifestyle-natural",
-    label: "Lifestyle natural",
-    desc: "Contexto real: luz natural suave, ambiente luminoso desenfocado. Para redes y campañas, no para listings de marketplace.",
-    modelBackground: "bright airy lifestyle interior with soft natural window light, softly blurred",
+    label: "Luz natural",
+    desc: "Mismo fondo blanco ecommerce, con luz natural suave (look más fresco).",
+    modelBackground: "clean seamless pure white studio background, no props, no scenery",
     scenePrompt:
-      "Natural lifestyle photography, soft diffused window light, bright airy interior softly blurred behind, " +
-      "relaxed authentic mood, sharp focus on the garment. " +
-      "Preserve the garment's real color, texture, stitching and fit.",
+      "E-commerce studio photography with soft natural daylight, fresh and bright, sharp focus. " +
+      ECOMMERCE_BG,
   },
 ];
 
