@@ -3705,6 +3705,23 @@ export default function LingeriePipelinePage() {
       // Check si la usuaria apretó "Detener todo el batch"
       if (batchAbortRef.current) break;
       const job = jobsSnapshot[i];
+
+      // UN PRODUCTO POR REF: si esta foto es una VISTA SECUNDARIA (espalda/lado/detalle)
+      // y existe una foto PRINCIPAL (frontal/flat) del MISMO REF, NO la procesamos como
+      // producto aparte — queda como REFERENCIA (la usa el paso Foto Espalda del producto
+      // principal vía findMatchingPhoto). Así frente+espalda son UN producto, no dos.
+      const isSecondaryView = job.photoAngle === "espalda" || job.photoAngle === "lado" || job.photoAngle === "detalle";
+      const hasPrimarySameRef = jobsSnapshot.some((j) =>
+        j.id !== job.id &&
+        (j.photoAngle === "frontal" || j.photoAngle === "flat" || j.photoAngle === "otra") &&
+        (j.referenceKey === job.referenceKey || (!j.referenceKey && !job.referenceKey)),
+      );
+      if (isSecondaryView && hasPrimarySameRef) {
+        console.log(`[lingerie] ${job.filename}: vista "${job.photoAngle}" del REF ${job.referenceKey ?? "?"} → referencia, no se procesa aparte`);
+        setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "done" } : j));
+        continue;
+      }
+
       setActiveJobIndex(i);
       setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "active" } : j));
       const { newSharedModel, newSharedSeed } = await processJob(job.id, jobsSnapshot, currentSharedModel, currentSharedSeed);
