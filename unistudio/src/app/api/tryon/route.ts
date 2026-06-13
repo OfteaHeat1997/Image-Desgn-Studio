@@ -246,10 +246,13 @@ async function tryOnUwear(
 
   // Register the garment as a Uwear clothing item. The garment image must be an
   // http URL Uwear can fetch (ensured by the route before calling).
+  // We intentionally do NOT pass our own description: with remove_background,
+  // Uwear runs its OWN AI vision on the real photo (which clearly shows the
+  // hook-and-eye closure). Sending a Claude-Vision description risked biasing it
+  // (e.g. mislabeling the closure as a zipper) and damaging fidelity.
   const clothingItemId = await createUwearClothingItem({
     name: `${noun} ${Date.now()}`,
     frontUrl: garmentImage,
-    description: garmentDescription,
     processingMode: 'remove_background',
   });
 
