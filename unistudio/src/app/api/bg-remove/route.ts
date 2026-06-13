@@ -18,6 +18,7 @@ import {
 import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
+import { modelToGhost } from '@/lib/processing/ghost-mannequin';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
@@ -390,18 +391,25 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // porque nunca regeneramos — o es el producto real, o es un error honesto.
     const regenerated = false;
 
-    // ESTABLE: grounded_sam (segmentación del producto real). Si falla → rembg-last-resort,
-    // que devuelve JSON y la pipeline lo detecta con un error claro (NO crashea la función).
-    // El Ghost mannequin (SeedDream) se quitó de acá porque hacía crashear el endpoint (500
-    // "An error occurred"). La extracción del producto flotando desde foto-con-modelo no es
-    // confiable; para eso se usa una foto del producto solo.
+    // grounded_sam (recorte real) → GHOST MANNEQUIN (SeedDream, producto flotando — esto
+    // es lo que la usuaria confirmó que SÍ funciona con el URL público) → rembg-last-resort.
+    // El ghost va en su propio try/catch: si falla, NO crashea (cae a rembg con JSON).
     try {
       resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
-      resultUrl = await removeBgReplicate(imageUrl);
-      usedProvider = 'rembg-last-resort';
+      console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — ghost mannequin`);
+      try {
+        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined);
+        resultUrl = ghost.url;
+        usedProvider = `ghost-mannequin (${ghost.provider})`;
+        console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
+      } catch (ghostErr) {
+        const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
+        console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — rembg-last-resort`);
+        resultUrl = await removeBgReplicate(imageUrl);
+        usedProvider = 'rembg-last-resort';
+      }
     }
 
     await saveJob({
