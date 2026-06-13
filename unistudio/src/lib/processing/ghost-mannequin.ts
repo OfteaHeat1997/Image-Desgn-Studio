@@ -190,15 +190,15 @@ export async function modelToGhost(
     `body was, as if worn by an invisible person. Preserve the exact same color, ` +
     `pattern, texture, fabric, and construction details of the ${noun}. Do not change ` +
     `the color. ` +
-    // Anti-hallucination: SeedDream tiende a inventar un zipper central que NO existe
-    // (el producto real usa ganchos hook-and-eye). Reporte usuaria 011473 — reforzado.
-    `CRITICAL — closure rule: the front closure is a vertical column of small ` +
-    `HOOK-AND-EYE clasps (a busk closure), NOT a zipper. There is absolutely NO zipper, ` +
-    `NO metal zip slider, NO zipper teeth, NO pull tab. Render the front center as a flat ` +
-    `column of hook-and-eye clasps exactly like the original. Never add a zipper. ` +
-    `Also: reproduce the garment exactly as in the photo — do NOT add, remove, or redesign ` +
-    `any straps, mesh panels, seams or cup shape; no invented center lines. Match the ` +
-    `original stitching and every construction detail one to one. ` +
+    // Anti-hallucination GENÉRICO (no hardcodear el tipo de cierre — debe servir para
+    // CUALQUIER producto: ganchos, zipper, botones, sin cierre). La fuente de verdad es
+    // la FOTO de referencia, no una descripción fija. SeedDream tiende a inventar cierres.
+    `CRITICAL: preserve the EXACT closure shown in the reference photo, whatever it is — ` +
+    `a column of hook-and-eye clasps, a zipper, buttons, or none. Do NOT change, add, ` +
+    `remove or invent any closure: if the reference shows hook-and-eye clasps keep them as ` +
+    `hook-and-eye; if it shows a zipper keep the zipper. Reproduce the closure, straps, ` +
+    `mesh panels, seams and cup shape one-to-one with the reference — no invented center ` +
+    `lines or details. Match the original stitching and construction exactly. ` +
     `Professional e-commerce product photography, studio lighting, sharp focus.`;
 
   // --- Primary provider for lingerie: SeedDream edit on fal.ai (no filter)
