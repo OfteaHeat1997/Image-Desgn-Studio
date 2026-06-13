@@ -176,20 +176,30 @@ export async function modelToFlat(imageUrl: string): Promise<string> {
 export async function modelToGhost(
   imageUrl: string,
   garmentType?: string,
+  backImageUrl?: string,
 ): Promise<{ url: string; provider: string }> {
   const normalizedType = (garmentType ?? '').toLowerCase();
   const isLingerie = LINGERIE_TYPES.has(normalizedType);
   const noun = GARMENT_NOUN[normalizedType] ?? 'garment';
+  const hasBack = !!backImageUrl;
 
   // Prompt emphasizes: remove person entirely, keep product exactly, hollow 3D
   // effect. Color intentionally unspecified so any colorway survives.
   const ghostPrompt =
-    `Isolate only the ${noun} from this photo and remove the person completely. ` +
+    (hasBack
+      ? `You are given TWO reference photos of the SAME ${noun}: the first is the FRONT ` +
+        `view, the second is the BACK view. Use BOTH to reconstruct the garment accurately. `
+      : '') +
+    `Isolate only the ${noun} and remove the person completely. ` +
     `The ${noun} should float on a pure white background with a 3D invisible-mannequin ` +
     `hollow-man effect — visible natural garment shape and interior fabric where the ` +
-    `body was, as if worn by an invisible person. Preserve the exact same color, ` +
-    `pattern, texture, fabric, and construction details of the ${noun}. Do not change ` +
-    `the color. ` +
+    `body was, as if worn by an invisible person. ` +
+    (hasBack
+      ? `Reproduce the back details (racerback straps, back mesh panels, band) correctly ` +
+        `from the BACK reference — do NOT erase or flatten the back. `
+      : '') +
+    `Preserve the exact same color, pattern, texture, fabric, and construction details ` +
+    `of the ${noun}. Do not change the color. ` +
     // Anti-hallucination GENÉRICO (no hardcodear el tipo de cierre — debe servir para
     // CUALQUIER producto: ganchos, zipper, botones, sin cierre). La fuente de verdad es
     // la FOTO de referencia, no una descripción fija. SeedDream tiende a inventar cierres.
@@ -205,9 +215,19 @@ export async function modelToGhost(
   if (isLingerie) {
     try {
       const httpUrl = await ensureFalAccessibleUrl(imageUrl);
+      // Pasar AMBAS fotos (frente + espalda) como referencia para que SeedDream
+      // reconstruya bien la espalda y no la borre/invente.
+      const imageUrls = [httpUrl];
+      if (backImageUrl) {
+        try {
+          imageUrls.push(await ensureFalAccessibleUrl(backImageUrl));
+        } catch (e) {
+          console.warn('[ghost] no se pudo preparar la foto de espalda:', e instanceof Error ? e.message : e);
+        }
+      }
       const falResult = await runFal('fal-ai/bytedance/seedream/v4/edit', {
         prompt: ghostPrompt,
-        image_urls: [httpUrl],
+        image_urls: imageUrls,
         image_size: 'square_hd',
         num_images: 1,
         enable_safety_checker: false,

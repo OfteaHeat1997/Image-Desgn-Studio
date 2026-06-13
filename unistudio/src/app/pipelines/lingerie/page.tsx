@@ -2124,6 +2124,9 @@ async function runStep(
         // → el navegador muestra "expiró", y NI grounded_sam NI Uwear lo pueden bajar
         // (401 "could not download"). El falUrl es público y lo bajan todos.
         imageUrl: falUrl ?? inputUrl,
+        // Foto de espalda real del MISMO REF (pública) → el ghost la usa como 2ª
+        // referencia para reconstruir bien la espalda y no borrarla/inventarla.
+        backImageUrl: backGarmentUrl,
         provider: "replicate",
         // Lingerie input usually shows a model wearing the garment — we need
         // grounded_sam to strip the person and return ONLY the product, not
@@ -3091,11 +3094,13 @@ export default function LingeriePipelinePage() {
       //  - tryon con Uwear: como clothing_item_back_url, así Uwear genera desde
       //    frente + espalda reales (clava broche, banda y racerback de CADA bra).
       let backGarmentUrl: string | undefined;
-      if ((step.id === "photoBack" || step.id === "tryon") && generationMode !== "face-swap") {
+      if ((step.id === "isolate" || step.id === "photoBack" || step.id === "tryon") && generationMode !== "face-swap") {
         const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
-        if (matchingBack?.uploadedUrl && matchingBack.id !== job.id) {
-          backGarmentUrl = matchingBack.uploadedUrl;
-          console.log(`[lingerie] ${step.id}: encontrada foto real de espalda (${matchingBack.filename})`);
+        if (matchingBack && matchingBack.id !== job.id) {
+          // Preferir el falUrl PÚBLICO (el uploadedUrl es el de Replicate privado que
+          // ni SeedDream ni Uwear pueden bajar). Así el ghost/try-on recibe la espalda real.
+          backGarmentUrl = matchingBack.falUrl ?? matchingBack.uploadedUrl;
+          if (backGarmentUrl) console.log(`[lingerie] ${step.id}: foto real de espalda (${matchingBack.filename})`);
         }
       }
 
