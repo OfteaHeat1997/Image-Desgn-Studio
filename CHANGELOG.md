@@ -1,5 +1,31 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — DECISIÓN DE PROVEEDOR: Uwear.ai (permite lencería + fidelidad + API)
+
+Requisitos de la usuaria: un proveedor que (1) **permita prendas íntimas** sin
+bloqueos de contenido, (2) **funcione** preservando el producto, (3) costo no importa.
+
+**Elegido: Uwear.ai** ([uwear.ai/api](https://uwear.ai/api), docs en docs.dev.uwear.ai).
+Plataforma de fotografía de moda IA construida para ecommerce, con **API REST real**:
+- Auth: `Authorization: Bearer <API_KEY>`.
+- `POST /api/v1/generation` (crear) → `GET /api/v1/generation/{id}` (poll, estados
+  Created → Ongoing → Done). Async, soporta packshot/flat-lay → on-model.
+- **Admite lencería explícitamente** (no es como FASHN que bloquea). Modelos internos:
+  - **Qwen Intimate** (sobre Qwen-Image-Edit de Alibaba, afinado para prendas íntimas;
+    prioriza consistencia de identidad entre el catálogo) — la opción más permisiva.
+  - **SeedDream 4.5** — según Uwear, el mejor para lencería/underwear hoy.
+- Pricing pay-as-you-go ($0.10/crédito), sin suscripción.
+
+**Bloqueante (acción de la usuaria):** crear cuenta en Uwear + generar API key +
+agregarla a Vercel como `UWEAR_API_KEY`. Recién con la key se puede leer la doc
+autenticada (UWEAR.md) y cablear `tryOnUwear()` en `/api/tryon` (modelo Qwen Intimate
+primero). Integración PENDIENTE hasta tener la key.
+
+**Caveat honesto:** es lo mejor-en-clase y sí admite lencería, pero ninguna IA
+garantiza clonar un bra de soporte atípico al 100%. El único método 100% fiel sigue
+siendo recorte del producto real (foto del bra solo). Uwear es la mejor apuesta de
+try-on generativo que además NO bloquea íntimos.
+
 ## 2026-06-13 — Try-on: Leffa como proveedor alternativo (otro enfoque, no generativo)
 
 A pedido de la usuaria ("vamos a probar otro proveedor"), se agrega **Leffa**
