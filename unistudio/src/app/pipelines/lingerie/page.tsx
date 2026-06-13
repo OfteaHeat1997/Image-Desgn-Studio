@@ -4726,6 +4726,14 @@ export default function LingeriePipelinePage() {
             <span className="font-serif text-[15px] font-semibold text-white">Lencería <span className="text-[var(--accent)]">Studio</span></span>
             {referenceNumber ? <span className="ml-2 text-xs text-gray-500">Ref. {referenceNumber}</span> : null}
           </span>
+          {/* Sello de build: muestra el commit que está VIVO en este deploy. Si no
+              coincide con el último push, estás viendo un build viejo (cache/deploy). */}
+          <span
+            className="ml-2 shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-gray-500"
+            title="Versión del build que está sirviendo Vercel ahora mismo"
+          >
+            build {process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev"}
+          </span>
         </div>
 
         {/* Overall progress */}
