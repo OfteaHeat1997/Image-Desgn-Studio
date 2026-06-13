@@ -198,11 +198,13 @@ export async function modelToGhost(
       ? `You are given TWO reference photos of the SAME ${noun}: the first is the FRONT ` +
         `view, the second is the BACK view. Use BOTH to reconstruct the garment accurately. `
       : '') +
-    `Show ONLY the ${noun} BY ITSELF on a pure white background — a clean flat product ` +
-    `packshot. Remove the person completely. There must be NO body, NO mannequin, NO ` +
-    `invisible mannequin, NO dress form, NO neck, NO shoulders, NO torso and NO body shape ` +
-    `of any kind. Just the standalone ${noun} laid out / floating flat on white, keeping ` +
-    `its natural garment shape. ` +
+    `Show ONLY the ${noun} on a pure white background as a professional GHOST-MANNEQUIN ` +
+    `product photo: the garment keeps a natural, filled 3D shape — as if worn by an ` +
+    `INVISIBLE mannequin — with the cups, band and straps holding their real volume and ` +
+    `the hollow inside subtly visible. Remove the person COMPLETELY: no skin, no face, ` +
+    `no hair, no neck, no shoulders, no arms, no visible body — only the empty garment ` +
+    `floating in its 3D form. Do NOT show a real mannequin or any solid body; the body ` +
+    `itself is invisible, only the ${noun} is visible. ` +
     // Bloquear el ÁNGULO al de la foto (genérico): SeedDream tiende a rotar la
     // prenda y dibujar la espalda/racerback mezclada con el frente. Forzamos que
     // muestre SOLO la misma vista de la referencia (la frontal) y que no invente
@@ -285,8 +287,10 @@ export async function modelToGhost(
     if (isLingerie) {
       const httpUrl = await ensureFalAccessibleUrl(imageUrl);
       const falResult = await runFal('fal-ai/bytedance/seedream/v4/edit', {
-        prompt: `Show ONLY the ${noun} by itself on a plain white background — flat product ` +
-          `packshot, NO body, NO mannequin, NO neck/shoulders/torso, no person. Same color as original. ` +
+        prompt: `Show ONLY the ${noun} on a plain white background as a ghost-mannequin product ` +
+          `photo: natural filled 3D shape as if worn by an INVISIBLE mannequin (cups/band/straps ` +
+          `hold their volume, hollow inside subtly visible), but NO visible person — no skin, face, ` +
+          `neck, shoulders or arms, and no solid mannequin. Front view, same color as original. ` +
           `Reproduce the EXACT closure and seams shown in the photo — do NOT add or invent any ` +
           `closure/seam that is not in the original; keep the cups and panels exactly as shown.`,
         image_urls: [httpUrl],
