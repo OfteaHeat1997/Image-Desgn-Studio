@@ -404,29 +404,35 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // porque nunca regeneramos — o es el producto real, o es un error honesto.
     const regenerated = false;
 
-    try {
-      // 1. PRIMARIO — grounded_sam (segmentación pixel-perfect del producto real).
-      resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg})`);
-
-      // 2. FALLBACK FIEL — Uwear flat-lay (genera un producto-solo limpio desde la
-      //    foto real). NO es regeneración tipo SeedDream ghost: Uwear está orientado
-      //    a fidelidad de prenda. Da un producto flotante usable para el Video 360°.
-      //    Si hay UWEAR_API_KEY, NO atrapamos su error: la usuaria configuró Uwear,
-      //    así que queremos ver el error real (no esconderlo bajo rembg, que para
-      //    lencería no sirve). Si NO hay key, caemos a rembg-last-resort (hard-fail).
-      if (process.env.UWEAR_API_KEY?.trim()) {
+    // Lencería con Uwear configurado → usar Uwear flat-lay DIRECTO (su extractor de
+    // producto-solo). grounded_sam falla seguido con bras de soporte (deja a la
+    // modelo), así que vamos directo al método que da la prenda sola. Determinístico.
+    if (process.env.UWEAR_API_KEY?.trim()) {
+      try {
         resultUrl = await generateUwearFlatLay({
           name: `${garmentType ?? 'garment'} ${Date.now()}`,
           frontUrl: imageUrl,
         });
         usedProvider = 'uwear-flatlay';
-        console.log('[bg-remove:removeSubject] usando Uwear flat-lay (producto fiel)');
-      } else {
-        // 3. ÚLTIMO RECURSO — rembg plano. Conserva la modelo en foreground. La
-        //    pipeline lencería detecta 'rembg-last-resort' y hard-failea con mensaje claro.
+        console.log('[bg-remove:removeSubject] Uwear flat-lay (producto solo, directo)');
+      } catch (uwErr) {
+        // Si Uwear flat-lay falla, respaldo grounded_sam; si también falla, rembg.
+        const m = uwErr instanceof Error ? uwErr.message : String(uwErr);
+        console.warn(`[bg-remove:removeSubject] Uwear flat-lay falló (${m}) — respaldo grounded_sam`);
+        try {
+          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+        } catch {
+          resultUrl = await removeBgReplicate(imageUrl);
+          usedProvider = 'rembg-last-resort';
+        }
+      }
+    } else {
+      // Sin Uwear: grounded_sam → rembg-last-resort (hard-fail honesto).
+      try {
+        resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
         resultUrl = await removeBgReplicate(imageUrl);
         usedProvider = 'rembg-last-resort';
       }
