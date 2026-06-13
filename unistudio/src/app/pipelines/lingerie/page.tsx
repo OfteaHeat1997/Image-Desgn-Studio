@@ -2174,7 +2174,19 @@ async function runStep(
         garmentDescription,
       }),
     });
-    const json = await res.json();
+    // El servidor a veces devuelve una página de error HTML (timeout/crash de la
+    // función), no JSON → res.json() tiraba "Unexpected token 'A', 'An error o'...".
+    // Leemos texto y parseamos a mano para dar un mensaje claro y reintentable.
+    const rawText = await res.text();
+    let json: { success?: boolean; error?: string; data?: { provider?: string; regenerated?: boolean; url?: string }; cost?: number };
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      throw new Error(
+        "El recorte tardó demasiado o el servidor se cayó (no devolvió un resultado válido). " +
+        "Dale 'Rehacer' — casi siempre funciona al reintentar. Si vuelve a fallar, probá con una foto más liviana.",
+      );
+    }
     if (!json.success) throw new Error(json.error || "bg-remove failed");
     // Hard-fail en lencería cuando isolate cayó al último recurso rembg plano:
     // ese provider solo quita el fondo pero DEJA A LA MODELO como foreground.
@@ -2195,7 +2207,9 @@ async function runStep(
         12000,
       );
     }
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.01 };
+    const isolatedUrl = json.data?.url;
+    if (!isolatedUrl) throw new Error("El recorte no devolvió una imagen. Dale 'Rehacer'.");
+    return { resultUrl: isolatedUrl, cost: json.cost ?? 0.01 };
   }
 
   // Step "background" (Fondo Profesional) removed 2026-04-21 — era para pipeline
