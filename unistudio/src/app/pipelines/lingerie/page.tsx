@@ -3700,6 +3700,19 @@ export default function LingeriePipelinePage() {
       return match ? { ...j, uploadedUrl: match.uploadedUrl, falUrl: match.falUrl } : j;
     }));
 
+    // Marcar las vistas SECUNDARIAS (espalda/lado/detalle) que tienen una foto
+    // PRINCIPAL del mismo REF como referencia (status "done") DESDE YA — así no
+    // quedan "En cola": no son productos aparte, son referencia del producto principal.
+    setJobs((prev) => prev.map((j) => {
+      const isSecondary = j.photoAngle === "espalda" || j.photoAngle === "lado" || j.photoAngle === "detalle";
+      const hasPrimary = prev.some((p) =>
+        p.id !== j.id &&
+        (p.photoAngle === "frontal" || p.photoAngle === "flat" || p.photoAngle === "otra") &&
+        (p.referenceKey === j.referenceKey || (!p.referenceKey && !j.referenceKey)),
+      );
+      return isSecondary && hasPrimary ? { ...j, status: "done" as const } : j;
+    }));
+
     batchAbortRef.current = false;
     for (let i = 0; i < jobsSnapshot.length; i++) {
       // Check si la usuaria apretó "Detener todo el batch"
