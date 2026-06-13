@@ -328,12 +328,15 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
     garmentType?: string | null;
     returnMaskOnly?: boolean;
+    // Spec de construcción (Claude Vision) — se pasa al ghost para que no invente
+    // el cierre (ej dibujar zipper donde hay ganchos).
+    garmentDescription?: string;
     options?: Record<string, unknown>;
   };
 
@@ -406,7 +409,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       try {
         // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
         // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
-        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined);
+        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
         resultUrl = ghost.url;
         usedProvider = `ghost-mannequin (${ghost.provider})`;
         console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);

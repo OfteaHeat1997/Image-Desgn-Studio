@@ -177,11 +177,19 @@ export async function modelToGhost(
   imageUrl: string,
   garmentType?: string,
   backImageUrl?: string,
+  /**
+   * Construcción real leída por Claude Vision (ej "cierre frontal: 3 ganchos
+   * centrales; copas: preformada; tirantes: anchos"). Se inyecta al prompt para
+   * que SeedDream NO invente el cierre (tiende a dibujar un zipper donde hay
+   * ganchos). Es DINÁMICO por producto — un producto con zipper diría zipper.
+   */
+  constructionHint?: string,
 ): Promise<{ url: string; provider: string }> {
   const normalizedType = (garmentType ?? '').toLowerCase();
   const isLingerie = LINGERIE_TYPES.has(normalizedType);
   const noun = GARMENT_NOUN[normalizedType] ?? 'garment';
   const hasBack = !!backImageUrl;
+  const hint = constructionHint?.trim();
 
   // Prompt emphasizes: remove person entirely, keep product exactly, hollow 3D
   // effect. Color intentionally unspecified so any colorway survives.
@@ -220,6 +228,14 @@ export async function modelToGhost(
     `hook-and-eye; if it shows a zipper keep the zipper. Reproduce the closure, straps, ` +
     `mesh panels, seams and cup shape one-to-one with the reference — no invented center ` +
     `lines or details. Match the original stitching and construction exactly. ` +
+    // Spec real de Claude Vision: ancla el cierre/copas/etc. SeedDream tiende a
+    // dibujar un zipper donde hay ganchos — este dato lo corrige.
+    (hint
+      ? `The product spec read from the real photo is: "${hint}". Follow it EXACTLY. ` +
+        `If the spec says the front closure is hook-and-eye clasps (ganchos), the result ` +
+        `MUST show that column of small hook-and-eye clasps down the center — NOT a zipper. ` +
+        `Only show a zipper if the spec explicitly says zipper. `
+      : '') +
     `Professional e-commerce product photography, studio lighting, sharp focus.`;
 
   // --- Primary provider for lingerie: SeedDream edit on fal.ai (no filter)

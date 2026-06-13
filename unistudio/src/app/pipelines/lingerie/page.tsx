@@ -2169,6 +2169,9 @@ async function runStep(
         // run plain rembg which keeps the person as foreground.
         removeSubject: isLingerieFlow,
         garmentType: garmentTypeForApi,
+        // Spec de construcción (Claude Vision) → el ghost no inventa el cierre
+        // (ej dibujar zipper donde el bra real tiene ganchos).
+        garmentDescription,
       }),
     });
     const json = await res.json();
