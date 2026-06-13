@@ -1,5 +1,30 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — Try-on: integrado Uwear.ai como proveedor (SeedDream 4.5 / Qwen Intimate)
+
+Tras validar a mano que Uwear respeta el bra de soporte (textura/costuras/malla),
+se integra como proveedor seleccionable del try-on.
+
+**Cambios:**
+- Nuevo cliente `src/lib/api/uwear.ts` (5º provider client; lee `UWEAR_API_KEY` con
+  `.trim()` como fal/replicate/fashn/withoutbg). Funciones: `createUwearClothingItem`
+  (POST /clothing-item, multipart, frente[+espalda]), `createUwearGeneration`
+  (POST /generation), `pollUwearGeneration` (GET /generation/{id} hasta status `Done`).
+- `/api/tryon`: nueva `tryOnUwear()` → registra la prenda como clothing item, genera
+  con `model_slug: seedream-v4-5` (overrideable con `UWEAR_MODEL_SLUG`; Qwen Intimate =
+  `qwen-rapid-aio-v23`), modelo virtual (`avatar_id:null`), poll, devuelve la URL.
+- Provider `uwear` agregado a tipos, `PROVIDER_COSTS` (~$0.20) y el switch del handler.
+  Uwear **ignora `modelImage`** (castea su propia modelo) → usa solo la prenda.
+- UI lencería: opción **"Uwear (dedicado)"** en el selector de proveedor del try-on.
+- Docs: `docs/pipelines/lingerie.md` (fila nueva en la tabla de proveedores).
+
+**Requiere:** `UWEAR_API_KEY` en Vercel. Sin la key, el proveedor lanza un error claro
+y el resto del pipeline sigue intacto (es opt-in, no toca el flujo default).
+
+**Pendientes (follow-up):** (1) pasar frente + espalda reales del producto (hoy manda
+solo la imagen de prenda que recibe el step); (2) consistencia de modelo entre vistas
+vía avatar guardado (`avatar_id`) en vez de modelo virtual por llamada.
+
 ## 2026-06-13 — DECISIÓN DE PROVEEDOR: Uwear.ai (permite lencería + fidelidad + API)
 
 Requisitos de la usuaria: un proveedor que (1) **permita prendas íntimas** sin

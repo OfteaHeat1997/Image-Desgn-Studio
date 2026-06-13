@@ -8,6 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runModel, extractOutputUrl, ensureHttpUrl } from '@/lib/api/replicate';
 import { runFashn, pollFashn } from '@/lib/api/fashn';
 import { runFal, ensureFalAccessibleUrl } from '@/lib/api/fal';
+import {
+  createUwearClothingItem,
+  createUwearGeneration,
+  pollUwearGeneration,
+  UWEAR_MODEL_SLUGS,
+} from '@/lib/api/uwear';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { toIdmVtonCategory, toFashnCategory } from '@/lib/utils/tryon-categories';
@@ -20,6 +26,7 @@ const PROVIDER_COSTS: Record<string, number> = {
   kolors: 0.02,
   seedream: 0.03,
   leffa: 0.04,
+  uwear: 0.2,
 };
 
 // Human-readable noun per garment type — used in the SeedDream edit prompt so
@@ -206,6 +213,69 @@ async function tryOnLeffa(
 }
 
 /**
+ * Virtual try-on using Uwear.ai — a dedicated fashion-photography platform.
+ *
+ * Unlike the fal/Replicate models, Uwear GENERATES its own model (virtual model
+ * by default) wearing a "clothing item" we register from the garment image. It
+ * explicitly supports lingerie/intimates (no content block like FASHN) via
+ * SeedDream 4.5 (default, `seedream-v4-5`) and Qwen Intimate (`qwen-rapid-aio-v23`,
+ * needs a verified workspace). Model slug is overridable via UWEAR_MODEL_SLUG.
+ *
+ * NOTE: Uwear ignores the AI `modelImage` — it casts its own model. For
+ * multi-view consistency you would create a Uwear avatar and reuse avatar_id;
+ * this first integration uses a virtual model per call. Best fidelity comes from
+ * feeding the ORIGINAL product photo as the garment (Uwear does its own bg
+ * removal + AI-vision description). Requires UWEAR_API_KEY.
+ *
+ * @param garmentImage        - URL of the garment (front) image to register.
+ * @param category            - tops | bottoms | dresses | one-pieces.
+ * @param garmentType         - specific type, used for the prompt noun.
+ * @param garmentDescription  - real construction (closure/cups/straps) to anchor fidelity.
+ * @returns URL of the generated try-on image.
+ */
+async function tryOnUwear(
+  garmentImage: string,
+  category: string,
+  garmentType?: string,
+  garmentDescription?: string,
+): Promise<string> {
+  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.seedream;
+  const isQwen = modelSlug.startsWith('qwen');
+  const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
+
+  // Register the garment as a Uwear clothing item. The garment image must be an
+  // http URL Uwear can fetch (ensured by the route before calling).
+  const clothingItemId = await createUwearClothingItem({
+    name: `${noun} ${Date.now()}`,
+    frontUrl: garmentImage,
+    description: garmentDescription,
+    processingMode: 'remove_background',
+  });
+
+  // Prompt describes the MODEL/scene, NOT the garment anatomy (Uwear captures
+  // that from the clothing item). Color-agnostic per project rule. We still add
+  // a fidelity reminder so it keeps the exact closure/straps.
+  const prompt =
+    `Photorealistic e-commerce catalog photo of a female model wearing the ${noun}, ` +
+    `standing front view, clean white studio background, soft even studio lighting, sharp focus. ` +
+    `Keep the ${noun} exactly as provided — same closure, straps, band, cups and construction; do not redesign it.`;
+
+  // Qwen Intimate only supports 768X1024 / 1024X1280 and 1 ref; SeedDream supports 2K + aspect ratios.
+  const generationId = await createUwearGeneration({
+    clothingItemId,
+    modelSlug,
+    prompt,
+    numImages: 1,
+    camera: 'auto',
+    aspectRatio: isQwen ? undefined : '3:4',
+    resolution: isQwen ? '1024X1280' : '2K',
+    avatarId: null,
+  });
+
+  return await pollUwearGeneration(generationId);
+}
+
+/**
  * Virtual try-on using SeedDream v4 edit on fal.ai.
  *
  * This is NOT a try-on model — it is an instruction-driven multi-image EDITOR.
@@ -340,7 +410,7 @@ export async function POST(request: NextRequest) {
       category: string;
       garmentType?: string;
       garmentDescription?: string;
-      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'leffa' | 'auto';
+      provider?: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'leffa' | 'uwear' | 'auto';
       // Cuando true, la usuaria eligió el proveedor a mano (para testear) y la
       // ruta lo respeta tal cual — NO aplica el override automático kolors→auto.
       forceProvider?: boolean;
@@ -393,7 +463,7 @@ export async function POST(request: NextRequest) {
       garmentType === 'bikini' ||
       garmentType === 'bodysuit';
 
-    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'leffa' | 'auto' = provider;
+    let effectiveProvider: 'idm-vton' | 'fashn' | 'kolors' | 'seedream' | 'leffa' | 'uwear' | 'auto' = provider;
     if (forceProvider && provider !== 'auto') {
       // La usuaria forzó este proveedor a mano (testing) → respetarlo tal cual,
       // sin el override automático de abajo. Así puede comparar SeedDream vs
@@ -433,11 +503,16 @@ export async function POST(request: NextRequest) {
         case 'leffa':
           resultUrl = await tryOnLeffa(httpModelImage, httpGarmentImage, category);
           break;
+        case 'uwear':
+          // Uwear casts its own model → it ignores httpModelImage and uses the
+          // garment image to register a clothing item, then generates a model.
+          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription);
+          break;
         default:
           return NextResponse.json(
             {
               success: false,
-              error: `Proveedor "${effectiveProvider}" no soportado. Usa "seedream", "leffa", "fashn", "idm-vton", "kolors", o "auto".`,
+              error: `Proveedor "${effectiveProvider}" no soportado. Usa "seedream", "leffa", "uwear", "fashn", "idm-vton", "kolors", o "auto".`,
             },
             { status: 400 },
           );
