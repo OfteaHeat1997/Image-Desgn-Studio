@@ -328,11 +328,8 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, backImageUrl, provider, removeSubject, garmentType, returnMaskOnly, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, options } = body as {
     imageUrl: string;
-    // Foto de espalda real del MISMO producto → se pasa al ghost como 2ª referencia
-    // para que reconstruya bien la espalda (no la borre/invente).
-    backImageUrl?: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
     garmentType?: string | null;
@@ -403,7 +400,10 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — ghost mannequin`);
       try {
-        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, backImageUrl ?? undefined);
+        // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
+        // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
+        // Una sola foto da un resultado más fiel (el que la usuaria validó como mejor).
+        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined);
         resultUrl = ghost.url;
         usedProvider = `ghost-mannequin (${ghost.provider})`;
         console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
