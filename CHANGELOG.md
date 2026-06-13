@@ -1,5 +1,30 @@
 # UniStudio — Changelog
 
+## 2026-06-13 — HALLAZGO: SeedDream (y todo motor generativo) NO clona bras de soporte atípicos
+
+**Conclusión validada en sesión con la usuaria (reporte sobre bra de soporte/postura
+de cierre frontal, REF tipo 189307/212624):**
+
+SeedDream v4 edit — usado tanto en "Aislar Producto" (fallback ghost) como en el
+try-on de lencería — **NO preserva prendas poco comunes**. Es un modelo GENERATIVO:
+re-dibuja la prenda desde un prior de categoría, así que "normaliza" un bra sin aro
+de tirantes anchos y cierre frontal a un bra típico **con aro y tirantes finos**. Se
+probó SeedDream, Kolors y FASHN "alta calidad" — **ninguno** clona el producto, y
+**no es por la calidad/resolución de la foto** (las fotos de entrada eran buenas):
+el problema es el enfoque generativo, no el input.
+
+**Implicancia para futuros devs / decisiones de API:**
+- Cambiar de un API generativo a OTRO generativo (FASHN, Kolors, Flux Kontext, otro
+  edit model) **NO** arregla la fidelidad — todos re-dibujan.
+- Los únicos caminos FIELES (sin re-dibujar) son:
+  1. **Recorte por segmentación** (grounded_sam / un servicio de cutout/matting) sobre
+     una foto de la **prenda sola** → idéntico, sin invención.
+  2. **Face-swap** (`/api/face-swap`) sobre la foto real on-model → producto, cuerpo,
+     pose y luz intactos; solo cambia la cara. Es el modo "Cambiar cara sobre tu foto
+     real" del pipeline de lencería.
+- **Pendiente de decisión (usuaria):** evaluar/integrar un servicio de cutout dedicado
+  para "Aislar Producto" en vez del fallback generativo SeedDream. Ver discusión abajo.
+
 ## 2026-06-13 — Aislar Producto: dejar de inventar otro bra en prendas de cobertura completa
 
 **Síntoma (reporte usuaria):** un bra de soporte de cierre frontal salía del paso
