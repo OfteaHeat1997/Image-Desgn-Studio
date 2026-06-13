@@ -2179,7 +2179,9 @@ async function runStep(
         bodyType: modelConfig.bodyType,
         pose,
         expression: "confident natural",
-        background: artDir.modelBackground,
+        // Fondo blanco limpio FIJO (como era antes). NO usar artDir acá: el wording
+        // de art direction hacía que SeedDream metiera softbox/cosas de estudio atrás.
+        background: "plain white studio background",
         garmentType: garmentTypeForApi,
         seed: generatedSeed,
         // Tag the saved AiModel with this reference so future runs for same SKU can reuse
