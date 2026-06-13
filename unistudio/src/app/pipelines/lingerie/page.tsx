@@ -4865,8 +4865,13 @@ export default function LingeriePipelinePage() {
                 }}
               />
 
-              {/* Step cards */}
-              {activeJob.steps.filter((s) => s.enabled).map((step, idx, arr) => {
+              {/* Step cards.
+                  MERGE Paso 2 + 3: ocultamos la tarjeta de "Crear Modelo IA"
+                  (sigue ejecutándose por dentro, solo no se muestra suelta). La
+                  Foto Frontal es la tarjeta unida: su panel Original muestra la
+                  modelo nueva (step.originalUrl) y Resultado la modelo con el bra.
+                  Pedido repetido de la usuaria desde las 10am. */}
+              {activeJob.steps.filter((s) => s.enabled && s.id !== "model").map((step, idx, arr) => {
                 const prevStep = arr[idx - 1];
                 const isActive = step.status === "processing" || (step.status === "done" && !autoMode);
                 return (

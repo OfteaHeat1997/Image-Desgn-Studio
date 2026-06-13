@@ -195,6 +195,16 @@ export async function modelToGhost(
     `invisible mannequin, NO dress form, NO neck, NO shoulders, NO torso and NO body shape ` +
     `of any kind. Just the standalone ${noun} laid out / floating flat on white, keeping ` +
     `its natural garment shape. ` +
+    // Bloquear el ÁNGULO al de la foto (genérico): SeedDream tiende a rotar la
+    // prenda y dibujar la espalda/racerback mezclada con el frente. Forzamos que
+    // muestre SOLO la misma vista de la referencia (la frontal) y que no invente
+    // la parte de atrás. Reporte usuaria: "delante y atrás mezclados".
+    (hasBack
+      ? ''
+      : `Show the product from the EXACT SAME viewing angle as the reference photo — the ` +
+        `FRONT view. Do NOT rotate the garment, do NOT turn it around, do NOT show the back, ` +
+        `and do NOT invent or add any back panel, racerback, or rear straps that are not ` +
+        `visible from the front in the reference. Only what the front photo shows. `) +
     (hasBack
       ? `Reproduce the back details (racerback straps, back mesh panels, band) correctly ` +
         `from the BACK reference — do NOT erase or flatten the back. `
