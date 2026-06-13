@@ -394,28 +394,28 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // porque nunca regeneramos — o es el producto real, o es un error honesto.
     const regenerated = false;
 
-    // grounded_sam (recorte real) → GHOST MANNEQUIN (SeedDream) → rembg-last-resort.
-    // RESTAURADO a como funcionaba (la usuaria lo confirmó): cuando grounded_sam
-    // no logra recortar la prenda de esta foto, el ghost de SeedDream devuelve el
-    // producto flotando. Sí, SeedDream a veces varía el cierre — para eso está
-    // "Rehacer" (regenera) y el aviso de revisión. Pero darle un resultado es lo
-    // que ella necesita; el hard-fail sin producto NO sirve para su catálogo.
-    // El ghost va en su propio try/catch: si falla, cae a rembg con JSON.
+    // GHOST MANNEQUIN (SeedDream, look 3D) PRIMERO → grounded_sam → rembg.
+    //
+    // Antes corría grounded_sam primero, pero: (1) da un recorte PLANO, no el look
+    // 3D que la usuaria eligió; (2) con sus fotos siempre falla y reintenta, y esa
+    // espera ANTES del ghost hacía TIMEOUT de la función ("An error occurred", no
+    // JSON). Como ella quiere el ghost 3D, lo ponemos directo: rápido y el look
+    // correcto. grounded_sam queda solo de fallback si el ghost falla.
     try {
-      resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — ghost mannequin`);
+      // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
+      // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
+      const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+      resultUrl = ghost.url;
+      usedProvider = `ghost-mannequin (${ghost.provider})`;
+      console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
+    } catch (ghostErr) {
+      const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
+      console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
       try {
-        // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
-        // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
-        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
-        resultUrl = ghost.url;
-        usedProvider = `ghost-mannequin (${ghost.provider})`;
-        console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
-      } catch (ghostErr) {
-        const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
-        console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — rembg-last-resort`);
+        resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
         resultUrl = await removeBgReplicate(imageUrl);
         usedProvider = 'rembg-last-resort';
       }
