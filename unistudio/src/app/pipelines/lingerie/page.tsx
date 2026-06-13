@@ -4243,14 +4243,19 @@ export default function LingeriePipelinePage() {
               </section>
 
               {/* P1-3: calidad de FASHN — solo aplica cuando tryon usa FASHN
-                  (via provider override en retry o flow non-lencería). Para
-                  el default lencería sigue siendo Kolors que no tiene modes. */}
+                  (via provider override en retry o flow non-lencería). El
+                  default de lencería es SeedDream (preserva la prenda real),
+                  con Kolors de backup. Por eso este panel es AVANZADO/opcional:
+                  no nombramos FASHN como si fuera el motor o confundimos. */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                  Calidad de Try-on (FASHN)
+                  Calidad de Try-on (avanzado)
                 </h2>
                 <p className="mb-3 text-[11px] text-gray-500">
-                  Solo aplica cuando usas FASHN (eligiéndolo en el retry). Kolors default no tiene modos.
+                  El try-on de lencería usa <span className="font-semibold text-gray-300">SeedDream</span> por
+                  default (preserva tu prenda real), con Kolors de backup. Este control SOLO afecta si forzás
+                  FASHN manualmente al reintentar un paso — y FASHN bloquea lencería, así que normalmente no lo
+                  vas a necesitar.
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {FASHN_MODE_OPTIONS.map((opt) => {

@@ -21,6 +21,13 @@ regenerativo → producto distinto.
 - Log de `grounded_sam` ahora incluye el negative prompt para diagnóstico.
 - Doc sincronizada: `docs/pipelines/lingerie.md` (fila nueva de troubleshooting).
 
+**UI — cartel "FASHN" engañoso (confusión usuaria "frontend dice FASHN no SeedDream"):**
+- El panel de setup decía **"Calidad de Try-on (FASHN)"** con copy "Kolors default",
+  cuando el motor real de lencería es **SeedDream** (Kolors de backup) y FASHN ni
+  corre (bloquea íntimos). Renombrado a **"Calidad de Try-on (avanzado)"** y copy
+  honesto: aclara que el default es SeedDream y que el control solo afecta si forzás
+  FASHN a mano al reintentar.
+
 ## 2026-06-12 — Lencería: SeedDream v4 edit como try-on primario (fidelidad del producto)
 
 El try-on de lencería ya no depende de Kolors (re-pinta una prenda genérica → "el
