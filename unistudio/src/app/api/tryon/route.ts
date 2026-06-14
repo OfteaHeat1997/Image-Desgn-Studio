@@ -279,6 +279,14 @@ async function tryOnUwear(
     // Art direction (look del shoot) inyectado desde el pipeline.
     (scenePrompt?.trim() ? ` Art direction: ${scenePrompt.trim()}` : '');
 
+  // Art Direction efectiva: la que pasa el caller, o un default global vía env
+  // UWEAR_ART_DIRECTION_ID (la usuaria elige UNA de sus art directions y la setea en
+  // Vercel). Sin nada seteado → null = comportamiento actual. NaN guard por las dudas.
+  const envArtDir = process.env.UWEAR_ART_DIRECTION_ID?.trim();
+  const envArtDirNum = envArtDir ? Number(envArtDir) : NaN;
+  const effectiveArtDir =
+    artDirectionId ?? (Number.isFinite(envArtDirNum) ? envArtDirNum : null);
+
   // Qwen Intimate only supports 768X1024 / 1024X1280 and 1 ref; SeedDream supports 2K + aspect ratios.
   const generationId = await createUwearGeneration({
     clothingItemId,
@@ -289,7 +297,7 @@ async function tryOnUwear(
     aspectRatio: isQwen ? undefined : '3:4',
     resolution: isQwen ? '1024X1280' : '2K',
     avatarId: null,
-    artDirectionId: artDirectionId ?? null,
+    artDirectionId: effectiveArtDir,
   });
 
   return await pollUwearGeneration(generationId);
