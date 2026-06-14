@@ -618,15 +618,17 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // rechaza alucinaciones y reintenta; si tras 4 intentos ninguna pasa, cae al
     // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
     // en error.
-    if (method === 'grounded-sam') {
-      // Modo "recorte real" explícito: SOLO píxeles reales (plano, 100% fiel).
-      if (!(await tryGroundedSam())) await rembgLastResort();
-    } else {
-      // DEFAULT: ghost pulido (apunta al look ghost-mannequin) con guardia de fidelidad
-      // → si ninguna tirada pasa, recorte real fiel → último recurso rembg.
+    if (method === 'ghost') {
+      // Solo si la usuaria PIDE el ghost (look pulido, pero la textura PUEDE cambiar
+      // porque SeedDream redibuja). Con guardia de fidelidad + reintentos.
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
+    } else {
+      // DEFAULT: RECORTE REAL — tus píxeles reales, TU textura exacta (plano, nunca
+      // inventa ni cambia la tela). Es lo único fiel a la textura. Si grounded_sam no
+      // logra máscara, último recurso rembg. NADA de ghost por default.
+      if (!(await tryGroundedSam())) await rembgLastResort();
     }
 
     await saveJob({
