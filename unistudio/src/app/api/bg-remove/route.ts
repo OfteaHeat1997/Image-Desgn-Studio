@@ -318,12 +318,14 @@ async function isolateGarment(
     }
   }
 
-  // No mask passed purity: try the candidate with the HIGHEST purity as long
-  // as it's still reasonably high (>=0.75) — sometimes JPEG compression
-  // drags purity down. Better than the annotated overlay.
+  // No mask passed purity: try the candidate with the HIGHEST purity. Bajamos el
+  // umbral a 0.55 (antes 0.75): las fotos CON modelo (prenda oscura sobre cuerpo,
+  // JPEG) dan máscaras válidas pero menos "puras", y se rechazaban → "no se pudo
+  // recortar". Los overlays anotados (con bounding boxes) puntúan ~0.3-0.5, así
+  // que 0.55 sigue descartándolos pero acepta la máscara real borderline.
   if (!bestMask && candidates.length) {
     const byPurity = [...candidates]
-      .filter((c) => c.purity >= 0.75 && c.coverage >= 0.001 && c.coverage <= 0.9)
+      .filter((c) => c.purity >= 0.55 && c.coverage >= 0.001 && c.coverage <= 0.95)
       .sort((a, b) => b.purity - a.purity)[0];
     if (byPurity) {
       console.warn(
