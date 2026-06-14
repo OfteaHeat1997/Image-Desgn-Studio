@@ -244,10 +244,12 @@ async function tryOnUwear(
   // null/undefined, Uwear genera sin art direction = comportamiento actual.
   artDirectionId?: number | null,
 ): Promise<string> {
-  // Qwen Intimate por default: es el modelo de Uwear orientado a lencería/intimates
-  // (la usuaria confirmó que da el mejor resultado — satén y cierre reales). Se puede
-  // sobreescribir con UWEAR_MODEL_SLUG en Vercel (ej volver a seedream-v4-5).
-  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.qwenIntimate;
+  // Gemini Flash 2 ('nano-banana-2') por DEFAULT: es el modelo default de Uwear,
+  // realism 5 y NO requiere empresa verificada. Qwen Intimate (qwen-rapid-aio-v23)
+  // requiresVerifiedCompany:true → si la cuenta no está verificada, Uwear lo rechaza y
+  // el try-on caía a la modelo reusable (el bug que reportó la usuaria). Se puede
+  // sobreescribir con UWEAR_MODEL_SLUG en Vercel (ej qwen-rapid-aio-v23 si verificás).
+  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.geminiFlash;
   const isQwen = modelSlug.startsWith('qwen');
   const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
 

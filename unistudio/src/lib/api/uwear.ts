@@ -34,9 +34,15 @@ function authHeader(): Record<string, string> {
   return { Authorization: `Bearer ${getUwearKey()}` };
 }
 
-/** Model slugs from the Uwear catalog. SeedDream 4.5 is available to all; Qwen
- *  Intimate requires a verified workspace (manual approval). */
+/** Model slugs from the Uwear catalog.
+ *  - geminiFlash ('nano-banana-2'): DEFAULT de Uwear, realism 5, NO requiere empresa
+ *    verificada. Es el que produce las fotos realistas. Default nuestro para lencería.
+ *  - qwenIntimate ('qwen-rapid-aio-v23'): purpose-built para intimates PERO
+ *    requiresVerifiedCompany:true → si la cuenta no está verificada, Uwear lo RECHAZA y
+ *    el try-on cae a la modelo reusable. Por eso ya NO es el default.
+ *  - seedream ('seedream-v4-5'): alternativa sin verificación, realism 4. */
 export const UWEAR_MODEL_SLUGS = {
+  geminiFlash: 'nano-banana-2',
   seedream: 'seedream-v4-5',
   qwenIntimate: 'qwen-rapid-aio-v23',
 } as const;
