@@ -1556,7 +1556,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Método:</span>
             <select
-              value={step.isolateMethodOverride ?? "grounded-sam"}
+              value={step.isolateMethodOverride ?? "ghost"}
               onChange={(e) => onChangeIsolateMethod(e.target.value as IsolateMethod)}
               disabled={step.status === "processing"}
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
@@ -1567,7 +1567,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             </select>
           </div>
           <p className="mt-1.5 text-[10px] text-gray-500">
-            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "grounded-sam"))?.hint}
+            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "ghost"))?.hint}
           </p>
         </div>
       )}
@@ -2316,8 +2316,11 @@ async function runStep(
         // → el navegador muestra "expiró", y NI grounded_sam NI Uwear lo pueden bajar
         // (401 "could not download"). El falUrl es público y lo bajan todos.
         imageUrl: falUrl ?? inputUrl,
-        // Foto de espalda real del MISMO REF (pública) → el ghost la usa como 2ª
-        // referencia para reconstruir bien la espalda y no borrarla/inventarla.
+        // Foto de espalda real del MISMO REF (pública): el ghost la usa SOLO como
+        // REFERENCIA de construcción (tirantes, banda, paneles) para reconstruir el
+        // bra fiel — PERO el resultado es vista FRONTAL pura. El prompt del ghost
+        // fuerza front-only y prohíbe mezclar/mostrar la espalda en el output, así que
+        // es fiel a la construcción de atrás SIN el artefacto de frente+espalda mezclados.
         backImageUrl: backGarmentUrl,
         provider: "replicate",
         // Lingerie input usually shows a model wearing the garment — we need
@@ -2328,8 +2331,9 @@ async function runStep(
         // Spec de construcción (Claude Vision) → el ghost no inventa el cierre
         // (ej dibujar zipper donde el bra real tiene ganchos).
         garmentDescription,
-        // Método de recorte elegido (recorte real fiel / ghost 3D / auto).
-        isolateMethod: isolateMethod ?? "grounded-sam",
+        // Método de recorte elegido. Default 'ghost' (3D frontal, fondo blanco —
+        // como funcionaba en mayo). Si falla, el backend cae a recorte real → rembg.
+        isolateMethod: isolateMethod ?? "ghost",
       }),
     });
     // El servidor a veces devuelve una página de error HTML (timeout/crash de la
@@ -2360,9 +2364,9 @@ async function runStep(
     // mandarlo al catálogo. Cuando vino de grounded_sam (el producto real), no
     // molestamos con ningún aviso.
     if (isLingerieFlow && json.data?.regenerated) {
-      toast.warning(
-        "⚠️ Esta foto era difícil de recortar, así que la prenda se regeneró con IA (SeedDream). Revisá que el resultado coincida con tu producto real antes de usarlo en el catálogo — puede tener diferencias.",
-        12000,
+      toast.info(
+        "El producto se generó en 3D con IA (ghost). Revisá que coincida con tu producto real antes de mandarlo al catálogo — puede tener pequeñas diferencias.",
+        9000,
       );
     }
     const isolatedUrl = json.data?.url;

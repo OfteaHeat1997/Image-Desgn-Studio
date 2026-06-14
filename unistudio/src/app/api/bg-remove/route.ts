@@ -445,19 +445,19 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       });
     }
 
-    // regenerated queda SIEMPRE en false: ya no hay paso regenerativo (SeedDream
-    // ghost) en el cascade. Se conserva en la respuesta por compatibilidad con la
-    // pipeline (que lo lee), pero nunca dispara el aviso "se regeneró con IA"
-    // porque nunca regeneramos — o es el producto real, o es un error honesto.
-    const regenerated = false;
+    // regenerated: true cuando el resultado lo produjo el ghost (SeedDream regenera
+    // el producto). Lo lee la pipeline para avisarle a la usuaria "se regeneró con
+    // IA, revisá" antes de mandarlo al catálogo. false = recorte real fiel.
+    let regenerated = false;
 
-    // Método de recorte (lo elige la usuaria en Paso 1). Default: recorte real.
-    //   'grounded-sam' → SOLO recorte real (pixeles de su foto, FIEL). NO regenera.
-    //                    Si falla, rembg-last-resort (hard-fail honesto). Sin ghost.
-    //   'ghost'        → SeedDream 3D (regenera) con validación + reintento.
-    //   'auto'         → recorte real → ghost → rembg.
-    // Uwear flat-lay NO está: da "Flat lay failed" para estos bras.
-    const method = isolateMethod ?? 'grounded-sam';
+    // Método de recorte (lo elige la usuaria en Paso 1). Default: 'ghost' — el look
+    // 3D con fondo blanco, derecho al frente, COMO FUNCIONABA EN MAYO. grounded_sam
+    // (recorte real) sale PLANO y además falla seguido con estos bras, así que NO es
+    // el default. NUNCA se queda en error: si el ghost falla, cae a recorte real y,
+    // último recurso, rembg.
+    //   'ghost'                 → ghost 3D primero → recorte real → rembg.
+    //   'grounded-sam' / 'auto' → recorte real → ghost 3D → rembg.
+    const method = isolateMethod ?? 'ghost';
     const MAX_GHOST_ATTEMPTS = 3;
 
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
@@ -494,6 +494,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
           }
           resultUrl = ghost.url;
           usedProvider = `ghost-mannequin (${ghost.provider})`;
+          regenerated = true;
           return true;
         } catch (e) {
           console.warn(`[bg-remove:removeSubject] ghost intento ${attempt} falló (${e instanceof Error ? e.message : e})`);
@@ -502,6 +503,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       if (lastUrl) {
         resultUrl = lastUrl;
         usedProvider = `ghost-mannequin (${lastProv}) [revisar: posible persona]`;
+        regenerated = true;
         return true;
       }
       return false;
@@ -513,16 +515,16 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       usedProvider = 'rembg-last-resort';
     };
 
+    // NUNCA se queda en error. La usuaria pidió que FUNCIONE: preferimos un ghost 3D
+    // usable (con aviso "revisá") a un error rojo.
     if (method === 'grounded-sam') {
-      // SOLO recorte real (fiel). NUNCA ghost — la usuaria NO quiere regenerar.
-      // Si falla, NO caemos a rembg (taparía el error): lanzamos el error REAL de
-      // grounded_sam para que se vea en "Ver detalle técnico" y poder diagnosticar.
+      // Recorte real (fiel) primero; si grounded_sam no logra máscara, cae al ghost
+      // 3D (regenera) y, último recurso, rembg. groundedSamError queda en el log.
       if (!(await tryGroundedSam())) {
-        throw new Error(
-          `Recorte real (grounded_sam) no pudo aislar la prenda. Detalle: ${groundedSamError || 'no devolvió una máscara usable'}`,
-        );
+        if (!(await tryGhost())) await rembgLastResort();
       }
     } else if (method === 'ghost') {
+      // Ghost 3D primero (look 3D frontal). Si falla, recorte real; luego rembg.
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
