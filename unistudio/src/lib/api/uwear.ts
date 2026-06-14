@@ -185,6 +185,26 @@ export async function isolateProductWithUwear(params: {
   return json.clothing_item_url;
 }
 
+/**
+ * Lista las Art Directions de la cuenta Uwear (presets de mood/iluminación/color que
+ * dan el look editorial). GET /art-directions. Devuelve [{ id, name }] para el selector.
+ * Solo-lectura — no genera nada ni cobra.
+ */
+export async function listUwearArtDirections(): Promise<Array<{ id: number; name: string }>> {
+  const res = await fetch(`${UWEAR_BASE_URL}/art-directions?items_per_page=50`, {
+    method: 'GET',
+    headers: authHeader(),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Uwear /art-directions ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  const json = (await res.json()) as { data?: Array<{ art_direction_id?: number; name?: string }> };
+  return (json.data ?? [])
+    .filter((d) => typeof d.art_direction_id === 'number')
+    .map((d) => ({ id: d.art_direction_id as number, name: d.name ?? `Art Direction ${d.art_direction_id}` }));
+}
+
 /** Create a generation job. Returns generation_id (poll it for the result). */
 export async function createUwearGeneration(params: {
   clothingItemId: number;

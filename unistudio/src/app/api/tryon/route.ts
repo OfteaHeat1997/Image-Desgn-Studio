@@ -240,6 +240,9 @@ async function tryOnUwear(
   garmentDescription?: string,
   scenePrompt?: string,
   garmentBackUrl?: string,
+  // Art Direction de Uwear (preset editorial de luz/escena/color). Opcional: si es
+  // null/undefined, Uwear genera sin art direction = comportamiento actual.
+  artDirectionId?: number | null,
 ): Promise<string> {
   // Qwen Intimate por default: es el modelo de Uwear orientado a lencería/intimates
   // (la usuaria confirmó que da el mejor resultado — satén y cierre reales). Se puede
@@ -286,6 +289,7 @@ async function tryOnUwear(
     aspectRatio: isQwen ? undefined : '3:4',
     resolution: isQwen ? '1024X1280' : '2K',
     avatarId: null,
+    artDirectionId: artDirectionId ?? null,
   });
 
   return await pollUwearGeneration(generationId);
@@ -376,6 +380,7 @@ async function smartTryOn(
   garmentDescription?: string,
   fashnMode?: 'performance' | 'balanced' | 'quality',
   scenePrompt?: string,
+  artDirectionId?: number | null,
 ): Promise<{ url: string; provider: string }> {
   const isIntimate = garmentType ? IDM_VTON_PREFERRED_TYPES.has(garmentType) : false;
 
@@ -393,7 +398,7 @@ async function smartTryOn(
     // SeedDream → Kolors sin romper el pipeline.
     if (process.env.UWEAR_API_KEY?.trim()) {
       try {
-        const url = await tryOnUwear(garmentImage, category, garmentType, garmentDescription, scenePrompt);
+        const url = await tryOnUwear(garmentImage, category, garmentType, garmentDescription, scenePrompt, undefined, artDirectionId);
         return { url, provider: 'uwear' };
       } catch (err) {
         console.warn(
@@ -448,6 +453,7 @@ export async function POST(request: NextRequest) {
       fashnMode,
       scenePrompt,
       garmentBackUrl,
+      artDirectionId,
     } = body as {
       modelImage: string;
       garmentImage: string;
@@ -466,6 +472,8 @@ export async function POST(request: NextRequest) {
       scenePrompt?: string;
       // Foto real de espalda del producto. Solo la usa Uwear (clothing_item_back_url).
       garmentBackUrl?: string;
+      // Art Direction de Uwear (preset editorial). Solo la usa Uwear. Opcional.
+      artDirectionId?: number | null;
     };
 
     if (!modelImage) {
@@ -531,7 +539,7 @@ export async function POST(request: NextRequest) {
     let usedProvider: string;
 
     if (effectiveProvider === 'auto' || !effectiveProvider) {
-      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription, fashnMode, scenePrompt);
+      const result = await smartTryOn(httpModelImage, httpGarmentImage, category, garmentType, garmentDescription, fashnMode, scenePrompt, artDirectionId);
       resultUrl = result.url;
       usedProvider = result.provider;
     } else {
@@ -556,7 +564,7 @@ export async function POST(request: NextRequest) {
           // Uwear casts its own model → it ignores httpModelImage and uses the
           // garment image(s) to register a clothing item, then generates a model.
           // Pass the real front + (optional) back photo for max fidelity.
-          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription, scenePrompt, garmentBackUrl);
+          resultUrl = await tryOnUwear(httpGarmentImage, category, garmentType, garmentDescription, scenePrompt, garmentBackUrl, artDirectionId);
           break;
         default:
           return NextResponse.json(
