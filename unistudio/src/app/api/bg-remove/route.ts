@@ -20,6 +20,7 @@ import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
+import { CLAUDE_HAIKU } from '@/lib/utils/constants';
 
 const PROVIDER_COSTS: Record<string, number> = {
   replicate: 0.01,
@@ -29,6 +30,56 @@ const PROVIDER_COSTS: Record<string, number> = {
 
 // Cost of the garment isolation path (grounded_sam + local compositing)
 const ISOLATE_COST = 0.01;
+
+/**
+ * Valida si un recorte TODAVÍA tiene una persona/modelo (SeedDream a veces no la
+ * quita y devuelve la imagen casi igual). Usa Claude Vision (Haiku). Devuelve:
+ *   true  = hay una persona visible (recorte malo → reintentar)
+ *   false = producto solo (recorte bueno)
+ *   null  = no se pudo validar (sin API key / error) → el caller acepta el result
+ */
+async function ghostStillHasPerson(imageUrl: string): Promise<boolean | null> {
+  const key = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!key) return null;
+  try {
+    let mediaType = 'image/png';
+    let base64: string;
+    if (imageUrl.startsWith('data:')) {
+      const m = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!m) return null;
+      mediaType = m[1];
+      base64 = m[2];
+    } else {
+      const r = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
+      if (!r.ok) return null;
+      mediaType = r.headers.get('content-type') || 'image/png';
+      base64 = Buffer.from(await r.arrayBuffer()).toString('base64');
+    }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: CLAUDE_HAIKU,
+        max_tokens: 10,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: 'Is there a visible human PERSON or MODEL (face, skin, arms, torso, legs) in this image? This should be a product-only photo of a garment with NO person. Answer ONLY "yes" or "no".' },
+          ],
+        }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = String(data?.content?.[0]?.text ?? '').toLowerCase();
+    if (text.includes('yes')) return true;
+    if (text.includes('no')) return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Negative mask prompt for grounded_sam — regions to SUBTRACT from the garment
@@ -402,13 +453,40 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Uwear flat-lay REMOVIDO: la usuaria confirmó que Uwear da "Flat lay failed"
     // para TODOS sus bras — su flat-lay no soporta este tipo de prenda. (Uwear SÍ
     // sirve para la foto CON modelo vía Qwen Intimate, que es otro camino — el try-on.)
+    // AUTO-REINTENTO + VALIDACIÓN: SeedDream a veces devuelve la imagen casi igual
+    // (la modelo SIGUE ahí) y antes se marcaba "Listo" igual. Ahora, tras cada
+    // recorte, Claude Vision verifica si quedó una persona; si sí, reintenta solo
+    // (hasta 3 veces). Así el Paso 1 sale producto-solo sin que la usuaria pelee.
+    const MAX_GHOST_ATTEMPTS = 3;
+    let ghostOk = false;
+    let lastGhostUrl = '';
+    let lastGhostProvider = '';
     try {
-      // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
-      // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
-      const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
-      resultUrl = ghost.url;
-      usedProvider = `ghost-mannequin (${ghost.provider})`;
-      console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
+      for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS && !ghostOk; attempt++) {
+        // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
+        // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
+        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+        lastGhostUrl = ghost.url;
+        lastGhostProvider = ghost.provider;
+        const hasModel = await ghostStillHasPerson(ghost.url);
+        if (hasModel === true) {
+          console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: todavía hay una persona — reintento`);
+          continue; // SeedDream no quitó la modelo → reintentar
+        }
+        // hasModel false o null (sin validación) → aceptamos el resultado.
+        resultUrl = ghost.url;
+        usedProvider = `ghost-mannequin (${ghost.provider})`;
+        ghostOk = true;
+        console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider}) intento ${attempt}`);
+      }
+      // Si tras los reintentos SIEMPRE quedó una persona, usamos igual el último
+      // (mejor que nada) pero marcamos para que la pipeline avise revisar.
+      if (!ghostOk && lastGhostUrl) {
+        resultUrl = lastGhostUrl;
+        usedProvider = `ghost-mannequin (${lastGhostProvider}) [revisar: posible persona]`;
+        ghostOk = true;
+      }
+      if (!ghostOk) throw new Error('ghost no produjo resultado');
     } catch (ghostErr) {
       const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
       console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
