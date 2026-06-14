@@ -148,6 +148,43 @@ export async function generateUwearFlatLay(params: {
   return json.clothing_item_url;
 }
 
+/**
+ * Faithful product isolate via Uwear's `remove_background` processing. A diferencia
+ * de `generate_flat_lay` (que devolvía "Flat lay failed" con varios bras), este modo
+ * extrae el PRODUCTO REAL quitando fondo + modelo — 100% de fidelidad, NO regenera
+ * ni inventa la prenda. Front (+ opcional back) para que Uwear reconstruya la pieza
+ * real. Devuelve la URL de la imagen producto-solo hospedada por Uwear.
+ */
+export async function isolateProductWithUwear(params: {
+  name: string;
+  frontUrl: string;
+  backUrl?: string;
+}): Promise<string> {
+  const form = new FormData();
+  form.append('clothing_item_name', params.name);
+  form.append('photo_file', await fetchImageBlob(params.frontUrl), 'front.jpg');
+  if (params.backUrl) {
+    form.append('back_photo_file', await fetchImageBlob(params.backUrl), 'back.jpg');
+  }
+  // remove_background: extrae la prenda real (no flat_lay, que fallaba con bras).
+  form.append('clothing_processing_mode', 'remove_background');
+
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
+    method: 'POST',
+    headers: authHeader(),
+    body: form,
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Uwear remove-bg /clothing-item ${res.status}: ${txt.slice(0, 400)}`);
+  }
+  const json = (await res.json()) as { clothing_item_url?: string; clothing_item_id?: number };
+  if (!json?.clothing_item_url) {
+    throw new Error('Uwear remove-bg: respuesta sin clothing_item_url (no se pudo extraer el producto)');
+  }
+  return json.clothing_item_url;
+}
+
 /** Create a generation job. Returns generation_id (poll it for the result). */
 export async function createUwearGeneration(params: {
   clothingItemId: number;

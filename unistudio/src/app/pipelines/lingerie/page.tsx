@@ -256,7 +256,7 @@ type IsolateMethod = "grounded-sam" | "ghost" | "auto";
 const ISOLATE_METHOD_OPTIONS: { value: IsolateMethod; label: string; hint: string }[] = [
   { value: "grounded-sam", label: "Recorte real (fiel)", hint: "Recorta los píxeles REALES de tu foto — NO inventa. Tu producto exacto. Puede salir más plano. (grounded_sam)" },
   { value: "ghost",        label: "Ghost 3D (regenera)", hint: "SeedDream redibuja el producto con volumen 3D — se ve lindo pero PUEDE cambiar textura/forma (otro producto)." },
-  { value: "auto",         label: "Automático",          hint: "Intenta recorte real primero; si falla, ghost 3D; si falla, quita fondo." },
+  { value: "auto",         label: "Automático (fidelidad)", hint: "Recomendado. Extrae tu producto REAL con Uwear (no inventa, 100% fiel); si falla, recorte real; si falla, ghost 3D." },
 ];
 
 /**
@@ -1556,7 +1556,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Método:</span>
             <select
-              value={step.isolateMethodOverride ?? "ghost"}
+              value={step.isolateMethodOverride ?? "auto"}
               onChange={(e) => onChangeIsolateMethod(e.target.value as IsolateMethod)}
               disabled={step.status === "processing"}
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
@@ -1567,7 +1567,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             </select>
           </div>
           <p className="mt-1.5 text-[10px] text-gray-500">
-            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "ghost"))?.hint}
+            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "auto"))?.hint}
           </p>
         </div>
       )}
@@ -2331,9 +2331,9 @@ async function runStep(
         // Spec de construcción (Claude Vision) → el ghost no inventa el cierre
         // (ej dibujar zipper donde el bra real tiene ganchos).
         garmentDescription,
-        // Método de recorte elegido. Default 'ghost' (3D frontal, fondo blanco —
-        // como funcionaba en mayo). Si falla, el backend cae a recorte real → rembg.
-        isolateMethod: isolateMethod ?? "ghost",
+        // Método de recorte elegido. Default 'auto' = FIDELIDAD primero: el backend
+        // prueba Uwear (extrae tu producto REAL, no inventa) → recorte real → ghost.
+        isolateMethod: isolateMethod ?? "auto",
       }),
     });
     // El servidor a veces devuelve una página de error HTML (timeout/crash de la
