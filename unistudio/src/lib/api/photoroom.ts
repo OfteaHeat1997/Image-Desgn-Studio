@@ -31,11 +31,10 @@ const PHOTOROOM_EDIT_URL = 'https://image-api.photoroom.com/v2/edit';
 async function enhanceSatinSheen(png: Buffer): Promise<Buffer> {
   try {
     return await sharp(png)
-      // Contraste más fuerte: los reflejos del satén resaltan sobre el negro = glossy.
-      // Subir el primer número (a) = más brillo/contraste. Bajarlo = más suave.
-      .linear(1.32, -30)
-      .modulate({ brightness: 1.03, saturation: 1.05 })
-      .sharpen({ sigma: 0.9 })
+      // MUY suave: el contraste fuerte + sharpen hacían que el satén pareciera PLÁSTICO
+      // (reflejos duros). Ahora apenas un toque de contraste, SIN sharpen, para no
+      // endurecer los reflejos. Casi como el Photoroom crudo (que ya estaba bien).
+      .linear(1.06, -5)
       .png()
       .toBuffer();
   } catch {
