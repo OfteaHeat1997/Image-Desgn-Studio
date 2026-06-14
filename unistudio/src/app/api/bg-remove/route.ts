@@ -19,6 +19,7 @@ import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
+import { ghostMannequinPhotoroom } from '@/lib/api/photoroom';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 import { CLAUDE_HAIKU, CLAUDE_SONNET } from '@/lib/utils/constants';
 
@@ -614,6 +615,24 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       usedProvider = 'rembg-last-resort';
     };
 
+    // PHOTOROOM Ghost Mannequin API: servicio dedicado que quita la modelo y deja el
+    // producto flotando 3D sobre blanco, preservando la tela visible (no es un editor
+    // generativo libre). Es el método recomendado tras la investigación. Si la key no
+    // está, o Photoroom filtra la lencería, tira error → el caller cae al siguiente.
+    const tryPhotoroom = async (): Promise<boolean> => {
+      try {
+        const png = await ghostMannequinPhotoroom(imageUrl);
+        // Persistir en fal para downstream estable (la pipeline espera una URL).
+        resultUrl = await uploadToFalStorage(png, 'image/png', 'photoroom-ghost.png');
+        usedProvider = 'photoroom-ghost-mannequin';
+        console.log('[bg-remove:removeSubject] Photoroom ghost-mannequin OK');
+        return true;
+      } catch (e) {
+        console.warn(`[bg-remove:removeSubject] Photoroom falló (${e instanceof Error ? e.message : e})`);
+        return false;
+      }
+    };
+
     // PLAN aprobado: ghost pulido con GUARDIA Claude Vision por default. El guardia
     // rechaza alucinaciones y reintenta; si tras 4 intentos ninguna pasa, cae al
     // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
@@ -621,11 +640,18 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     if (method === 'grounded-sam') {
       // Modo recorte real explícito: solo píxeles reales (plano, textura exacta).
       if (!(await tryGroundedSam())) await rembgLastResort();
-    } else {
-      // DEFAULT: ghost (como la imagen buena de ayer) con GUARDIA Claude Vision que
-      // reintenta hasta pescar una tirada fiel (cierre+malla+forma+textura). Si en los
-      // intentos ninguna pasa → recorte real fiel → rembg.
+    } else if (method === 'ghost') {
+      // Ghost generativo validado (selección explícita). Puede alucinar; el guardia
+      // Claude Vision reintenta. Si ninguna pasa → recorte real → rembg.
       if (!(await tryGhost())) {
+        if (!(await tryGroundedSam())) await rembgLastResort();
+      }
+    } else {
+      // DEFAULT (recomendado tras la investigación): PHOTOROOM Ghost Mannequin —
+      // servicio dedicado que quita la modelo y deja el producto 3D fiel a la tela.
+      // Si falla (sin key / filtro / error) → recorte real fiel → rembg. NO usa el
+      // ghost generativo por default (era el que alucinaba).
+      if (!(await tryPhotoroom())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
     }
