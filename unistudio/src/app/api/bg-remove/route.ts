@@ -19,6 +19,7 @@ import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
+import { generateUwearGhostProduct } from '@/lib/api/uwear';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
@@ -328,7 +329,7 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, backImageUrl, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
@@ -337,6 +338,8 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Spec de construcción (Claude Vision) — se pasa al ghost para que no invente
     // el cierre (ej dibujar zipper donde hay ganchos).
     garmentDescription?: string;
+    // Foto de espalda real del MISMO producto → Uwear la usa para reconstruir fiel.
+    backImageUrl?: string;
     options?: Record<string, unknown>;
   };
 
@@ -401,23 +404,51 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // espera ANTES del ghost hacía TIMEOUT de la función ("An error occurred", no
     // JSON). Como ella quiere el ghost 3D, lo ponemos directo: rápido y el look
     // correcto. grounded_sam queda solo de fallback si el ghost falla.
+    // CASCADA del recorte (lo que pidió la usuaria): Uwear PRIMERO — plataforma
+    // ESPECIALIZADA en moda que registra tu prenda real (frente+espalda), borra la
+    // modelo y genera el producto en 3D ghost-mannequin FIEL (no inventa como el
+    // SeedDream crudo). Respaldos: ghost SeedDream → grounded_sam → rembg.
     try {
-      // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
-      // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
-      const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
-      resultUrl = ghost.url;
-      usedProvider = `ghost-mannequin (${ghost.provider})`;
-      console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
-    } catch (ghostErr) {
-      const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
-      console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
+      const uwearUrl = await generateUwearGhostProduct({
+        frontUrl: imageUrl,
+        backUrl: backImageUrl,
+        garmentType: garmentType ?? null,
+      });
+      // Las URLs de Uwear expiran (~4h) → re-hospedar en fal para downstream estable.
+      let stable = uwearUrl;
       try {
-        resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
-        resultUrl = await removeBgReplicate(imageUrl);
-        usedProvider = 'rembg-last-resort';
+        const r = await fetch(uwearUrl);
+        if (r.ok) {
+          const buf = Buffer.from(await r.arrayBuffer());
+          stable = await uploadToFalStorage(buf, r.headers.get('content-type') || 'image/png', 'uwear-ghost.png');
+        }
+      } catch (e) {
+        console.warn('[bg-remove:removeSubject] no se pudo re-hospedar Uwear en fal:', e instanceof Error ? e.message : e);
+      }
+      resultUrl = stable;
+      usedProvider = 'uwear-ghost-product';
+      console.log('[bg-remove:removeSubject] Uwear ghost-product OK');
+    } catch (uwErr) {
+      const um = uwErr instanceof Error ? uwErr.message : String(uwErr);
+      console.warn(`[bg-remove:removeSubject] Uwear falló (${um}) — ghost SeedDream`);
+      try {
+        // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
+        // las dos vistas y dibujara un maniquí con un corte distinto.
+        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+        resultUrl = ghost.url;
+        usedProvider = `ghost-mannequin (${ghost.provider})`;
+        console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
+      } catch (ghostErr) {
+        const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
+        console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
+        try {
+          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
+          resultUrl = await removeBgReplicate(imageUrl);
+          usedProvider = 'rembg-last-resort';
+        }
       }
     }
 

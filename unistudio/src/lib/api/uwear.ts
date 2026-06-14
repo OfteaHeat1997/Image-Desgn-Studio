@@ -262,3 +262,60 @@ export async function pollUwearGeneration(
   }
   throw new Error('Uwear: la generación no completó dentro del tiempo límite.');
 }
+
+/** Nouns por tipo de prenda para el prompt (color-agnóstico). */
+const UWEAR_GHOST_NOUN: Record<string, string> = {
+  bra: 'bra', lingerie: 'lingerie piece', panty: 'panties', shapewear: 'shapewear garment',
+  faja: 'shapewear garment', bodysuit: 'bodysuit', swimwear: 'swimwear piece',
+  bikini: 'bikini piece', set: 'lingerie set',
+};
+
+/**
+ * GHOST-MANNEQUIN del PRODUCTO vía Uwear (plataforma especializada en moda):
+ *   1. Registra tu prenda REAL (frente + espalda) como clothing item → Uwear corre
+ *      su propia visión y la preserva fiel (ganchos, malla, banda, tirantes).
+ *   2. Genera una foto PRODUCTO-SOLO estilo ghost/maniquí invisible — SIN persona —
+ *      en 3D sobre fondo blanco. Usa SeedDream (flexible para packshots de producto).
+ * Es lo que la usuaria pidió: Uwear borra la modelo y deja el producto en 3D fiel.
+ * Devuelve la URL hospedada por Uwear (expira ~4h → el caller debe persistirla).
+ */
+export async function generateUwearGhostProduct(params: {
+  frontUrl: string;
+  backUrl?: string;
+  garmentType?: string | null;
+}): Promise<string> {
+  const noun = UWEAR_GHOST_NOUN[(params.garmentType ?? '').toLowerCase()] ?? 'garment';
+  // SeedDream: a diferencia de Qwen Intimate (fuerza una modelo), permite packshot
+  // de producto sin persona. Se puede sobreescribir con UWEAR_GHOST_SLUG en Vercel.
+  const modelSlug = process.env.UWEAR_GHOST_SLUG?.trim() || UWEAR_MODEL_SLUGS.seedream;
+
+  const clothingItemId = await createUwearClothingItem({
+    name: `ghost-${noun} ${Date.now()}`,
+    frontUrl: params.frontUrl,
+    backUrl: params.backUrl,
+    processingMode: 'remove_background',
+  });
+
+  const prompt =
+    `Professional e-commerce GHOST MANNEQUIN product photo of the ${noun}: the garment ` +
+    `shown in 3D as if worn by a COMPLETELY INVISIBLE mannequin — natural filled volume, ` +
+    `straps and band holding their shape, hollow neckline. ABSOLUTELY NO human model, NO ` +
+    `person, NO body, NO skin, NO face — only the ${noun} itself floating on a pure white ` +
+    `studio background, front view, soft even lighting, sharp focus. Keep the ${noun} EXACTLY ` +
+    `as provided — same closure, straps, band, cups, mesh panels and construction; do not ` +
+    `redesign, add or remove any detail.`;
+
+  const generationId = await createUwearGeneration({
+    clothingItemId,
+    modelSlug,
+    prompt,
+    numImages: 1,
+    camera: 'auto',
+    aspectRatio: '3:4',
+    resolution: '2K',
+    avatarId: null,
+  });
+
+  return await pollUwearGeneration(generationId);
+}
+
