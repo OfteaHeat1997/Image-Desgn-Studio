@@ -354,15 +354,28 @@ async function isolateGarment(
   // componer la prenda aislada, devolvemos la máscara B/W cruda como PNG
   // grayscale — necesaria para inpaintear con flux-fill-pro la zona del bra
   // sobre el resultado del tryon.
-  const isolated = returnMaskOnly
-    ? await sharp(bestMask, { raw: { width, height, channels: 1 } })
-        .png()
-        .toBuffer()
-    : await sharp(prepared)
-        .ensureAlpha()
-        .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
-        .png()
-        .toBuffer();
+  //
+  // Recorte normal: (1) suavizamos el borde de la máscara con un blur leve
+  // (anti-alias → corte más limpio, sin escalones) y (2) componemos sobre FONDO
+  // BLANCO (la usuaria lo quiere en blanco, no transparente). flatten usa el alpha
+  // de la máscara para fundir el borde contra el blanco → recorte prolijo.
+  let isolated: Buffer;
+  if (returnMaskOnly) {
+    isolated = await sharp(bestMask, { raw: { width, height, channels: 1 } })
+      .png()
+      .toBuffer();
+  } else {
+    const smoothMask = await sharp(bestMask, { raw: { width, height, channels: 1 } })
+      .blur(1.2)
+      .raw()
+      .toBuffer();
+    isolated = await sharp(prepared)
+      .ensureAlpha()
+      .joinChannel(smoothMask, { raw: { width, height, channels: 1 } })
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
+      .png()
+      .toBuffer();
+  }
 
   // Upload the result directly to fal storage — Kolors/Wan se alimentan de fal.
   // Retry 3× antes de fallar. NO caer a Replicate — las URLs api.replicate.com/v1/files/*
