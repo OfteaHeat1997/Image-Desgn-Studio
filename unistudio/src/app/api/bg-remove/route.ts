@@ -379,7 +379,7 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
@@ -388,6 +388,9 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Spec de construcción (Claude Vision) — se pasa al ghost para que no invente
     // el cierre (ej dibujar zipper donde hay ganchos).
     garmentDescription?: string;
+    // Método de recorte: 'grounded-sam' (recorte real fiel, DEFAULT) | 'ghost'
+    // (SeedDream 3D regenera) | 'auto' (real → ghost → rembg).
+    isolateMethod?: 'grounded-sam' | 'ghost' | 'auto';
     options?: Record<string, unknown>;
   };
 
@@ -445,58 +448,75 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // porque nunca regeneramos — o es el producto real, o es un error honesto.
     const regenerated = false;
 
-    // Cascada del recorte (producto solo):
-    //   1. GHOST (SeedDream) — look 3D flotante (regenera; puede diferir en detalle).
-    //   2. grounded_sam — recorte plano de pixeles reales (a veces falla).
-    //   3. rembg-last-resort — deja la modelo (hard-fail en la pipeline).
-    //
-    // Uwear flat-lay REMOVIDO: la usuaria confirmó que Uwear da "Flat lay failed"
-    // para TODOS sus bras — su flat-lay no soporta este tipo de prenda. (Uwear SÍ
-    // sirve para la foto CON modelo vía Qwen Intimate, que es otro camino — el try-on.)
-    // AUTO-REINTENTO + VALIDACIÓN: SeedDream a veces devuelve la imagen casi igual
-    // (la modelo SIGUE ahí) y antes se marcaba "Listo" igual. Ahora, tras cada
-    // recorte, Claude Vision verifica si quedó una persona; si sí, reintenta solo
-    // (hasta 3 veces). Así el Paso 1 sale producto-solo sin que la usuaria pelee.
+    // Método de recorte (lo elige la usuaria en Paso 1). Default: recorte real.
+    //   'grounded-sam' → SOLO recorte real (pixeles de su foto, FIEL). NO regenera.
+    //                    Si falla, rembg-last-resort (hard-fail honesto). Sin ghost.
+    //   'ghost'        → SeedDream 3D (regenera) con validación + reintento.
+    //   'auto'         → recorte real → ghost → rembg.
+    // Uwear flat-lay NO está: da "Flat lay failed" para estos bras.
+    const method = isolateMethod ?? 'grounded-sam';
     const MAX_GHOST_ATTEMPTS = 3;
-    let ghostOk = false;
-    let lastGhostUrl = '';
-    let lastGhostProvider = '';
-    try {
-      for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS && !ghostOk; attempt++) {
-        // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
-        // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
-        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
-        lastGhostUrl = ghost.url;
-        lastGhostProvider = ghost.provider;
-        const hasModel = await ghostStillHasPerson(ghost.url);
-        if (hasModel === true) {
-          console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: todavía hay una persona — reintento`);
-          continue; // SeedDream no quitó la modelo → reintentar
-        }
-        // hasModel false o null (sin validación) → aceptamos el resultado.
-        resultUrl = ghost.url;
-        usedProvider = `ghost-mannequin (${ghost.provider})`;
-        ghostOk = true;
-        console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider}) intento ${attempt}`);
-      }
-      // Si tras los reintentos SIEMPRE quedó una persona, usamos igual el último
-      // (mejor que nada) pero marcamos para que la pipeline avise revisar.
-      if (!ghostOk && lastGhostUrl) {
-        resultUrl = lastGhostUrl;
-        usedProvider = `ghost-mannequin (${lastGhostProvider}) [revisar: posible persona]`;
-        ghostOk = true;
-      }
-      if (!ghostOk) throw new Error('ghost no produjo resultado');
-    } catch (ghostErr) {
-      const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
-      console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
+
+    // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
+    const tryGroundedSam = async (): Promise<boolean> => {
       try {
         resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+        usedProvider = 'grounded-sam-isolate';
+        return true;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
-        resultUrl = await removeBgReplicate(imageUrl);
-        usedProvider = 'rembg-last-resort';
+        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${err instanceof Error ? err.message : err})`);
+        return false;
+      }
+    };
+
+    // ghost (SeedDream 3D, regenera) con validación: tras cada intento, Claude
+    // Vision revisa si quedó una persona; si sí, reintenta (hasta 3). Si SeedDream
+    // nunca la quita, devuelve el último marcado "revisar".
+    const tryGhost = async (): Promise<boolean> => {
+      let lastUrl = '';
+      let lastProv = '';
+      for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS; attempt++) {
+        try {
+          const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+          lastUrl = ghost.url;
+          lastProv = ghost.provider;
+          const hasModel = await ghostStillHasPerson(ghost.url);
+          if (hasModel === true) {
+            console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: todavía hay una persona — reintento`);
+            continue;
+          }
+          resultUrl = ghost.url;
+          usedProvider = `ghost-mannequin (${ghost.provider})`;
+          return true;
+        } catch (e) {
+          console.warn(`[bg-remove:removeSubject] ghost intento ${attempt} falló (${e instanceof Error ? e.message : e})`);
+        }
+      }
+      if (lastUrl) {
+        resultUrl = lastUrl;
+        usedProvider = `ghost-mannequin (${lastProv}) [revisar: posible persona]`;
+        return true;
+      }
+      return false;
+    };
+
+    const rembgLastResort = async () => {
+      console.warn('[bg-remove:removeSubject] cayendo a rembg-last-resort (deja la modelo → hard-fail en pipeline)');
+      resultUrl = await removeBgReplicate(imageUrl);
+      usedProvider = 'rembg-last-resort';
+    };
+
+    if (method === 'grounded-sam') {
+      // SOLO recorte real (fiel). NUNCA ghost — la usuaria NO quiere regenerar.
+      if (!(await tryGroundedSam())) await rembgLastResort();
+    } else if (method === 'ghost') {
+      if (!(await tryGhost())) {
+        if (!(await tryGroundedSam())) await rembgLastResort();
+      }
+    } else {
+      // auto: recorte real primero (fiel), luego ghost, luego rembg.
+      if (!(await tryGroundedSam())) {
+        if (!(await tryGhost())) await rembgLastResort();
       }
     }
 

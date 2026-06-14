@@ -168,6 +168,12 @@ interface PipelineStep {
   // siguiente rerun usa este provider en vez del default de lencería (Kolors).
   // Limpia al empezar un run exitoso para que el próximo ciclo vuelva al default.
   providerOverride?: TryonProvider;
+  // Paso 1 (Aislar Producto): método de recorte elegido por la usuaria.
+  //   "auto"         = cascada default (recorte real → ghost → rembg)
+  //   "grounded-sam" = SOLO recorte real (pixeles de tu foto, FIEL, puede salir plano)
+  //   "ghost"        = SeedDream 3D (regenera, look 3D pero puede diferir)
+  // Permite probar cuál sirve para cada producto sin adivinar.
+  isolateMethodOverride?: IsolateMethod;
   // Proveedor que REALMENTE produjo el resultado (lo devuelve /api/tryon en
   // data.provider). Distinto de providerOverride (lo que pidió la usuaria): la
   // ruta puede caer de FASHN a Kolors en silencio, así que mostramos en la UI
@@ -239,6 +245,18 @@ const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: strin
   { value: "kolors",   label: "Kolors",        hint: "Backup · rápido · tiende a inventar prendas genéricas · $0.02" },
   { value: "fashn",    label: "FASHN v1.6",    hint: "Bloquea lencería · útil solo para no-íntimos · $0.05" },
   { value: "idm-vton", label: "IDM-VTON",      hint: "Backup · $0.02" },
+];
+
+/**
+ * Método de recorte para el Paso 1 (Aislar Producto). La usuaria puede elegir
+ * entre el recorte real (FIEL) y el ghost 3D (regenera). Default: recorte real.
+ */
+type IsolateMethod = "grounded-sam" | "ghost" | "auto";
+
+const ISOLATE_METHOD_OPTIONS: { value: IsolateMethod; label: string; hint: string }[] = [
+  { value: "grounded-sam", label: "Recorte real (fiel)", hint: "Recorta los píxeles REALES de tu foto — NO inventa. Tu producto exacto. Puede salir más plano. (grounded_sam)" },
+  { value: "ghost",        label: "Ghost 3D (regenera)", hint: "SeedDream redibuja el producto con volumen 3D — se ve lindo pero PUEDE cambiar textura/forma (otro producto)." },
+  { value: "auto",         label: "Automático",          hint: "Intenta recorte real primero; si falla, ghost 3D; si falla, quita fondo." },
 ];
 
 /**
@@ -1360,10 +1378,11 @@ interface StepCardProps {
   onChangeProvider?: (provider: TryonProvider) => void;
   onChangePose?: (pose: PoseOption) => void;
   onChangeAction?: (action: VideoActionOption) => void;
+  onChangeIsolateMethod?: (method: IsolateMethod) => void;
   autoMode: boolean;
 }
 
-function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction }: StepCardProps) {
+function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const Icon = step.icon;
   // Fallback chain: step's own captured input > chain input > empty. Si los
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
@@ -1527,6 +1546,29 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               </ul>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Paso 1: selector de MÉTODO de recorte. Recorte real (fiel) por default;
+          ghost 3D (regenera) opcional. La usuaria elige cuál sirve por producto. */}
+      {step.id === "isolate" && onChangeIsolateMethod && step.status !== "done" && step.status !== "accepted" && (
+        <div className="px-5 py-3 border-t border-white/[0.04]">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Método:</span>
+            <select
+              value={step.isolateMethodOverride ?? "grounded-sam"}
+              onChange={(e) => onChangeIsolateMethod(e.target.value as IsolateMethod)}
+              disabled={step.status === "processing"}
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+            >
+              {ISOLATE_METHOD_OPTIONS.map((m) => (
+                <option key={m.value} value={m.value} title={m.hint}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1.5 text-[10px] text-gray-500">
+            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "grounded-sam"))?.hint}
+          </p>
         </div>
       )}
 
@@ -2246,6 +2288,12 @@ async function runStep(
    * cae a "skin-tone nude" como neutro seguro.
    */
   garmentColor?: string,
+  /**
+   * Paso 1: método de recorte elegido por la usuaria (recorte real / ghost 3D /
+   * auto). Se manda a /api/bg-remove como isolateMethod. Default en la ruta:
+   * recorte real primero (fiel).
+   */
+  isolateMethod?: IsolateMethod,
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
   // Brief creativo elegido. Fallback al primer preset si el id no matchea.
   const artDir = ART_DIRECTIONS.find((a) => a.id === artDirectionId) ?? ART_DIRECTIONS[0];
@@ -2280,6 +2328,8 @@ async function runStep(
         // Spec de construcción (Claude Vision) → el ghost no inventa el cierre
         // (ej dibujar zipper donde el bra real tiene ganchos).
         garmentDescription,
+        // Método de recorte elegido (recorte real fiel / ghost 3D / auto).
+        isolateMethod: isolateMethod ?? "grounded-sam",
       }),
     });
     // El servidor a veces devuelve una página de error HTML (timeout/crash de la
@@ -3319,6 +3369,7 @@ export default function LingeriePipelinePage() {
               buildGarmentDescription(job.productSpec),
               artDirection,
               job.color,
+              step.isolateMethodOverride,
             ),
           ),
         );
@@ -3368,6 +3419,7 @@ export default function LingeriePipelinePage() {
         garmentDescription,
         artDirection,
         job.color,
+        step.isolateMethodOverride,
       );
     } finally {
       abortControllersRef.current.delete(key);
@@ -5033,6 +5085,7 @@ export default function LingeriePipelinePage() {
                     onChangeProvider={(provider) => updateStep(activeJob.id, step.id, { providerOverride: provider })}
                     onChangePose={(pose) => updateStep(activeJob.id, step.id, { poseOverride: pose })}
                     onChangeAction={(action) => updateStep(activeJob.id, step.id, { actionOverride: action })}
+                    onChangeIsolateMethod={(method) => updateStep(activeJob.id, step.id, { isolateMethodOverride: method })}
                     autoMode={autoMode}
                   />
                 );
