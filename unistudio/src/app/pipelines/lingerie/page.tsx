@@ -1011,6 +1011,109 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
 }
 
 /* ------------------------------------------------------------------ */
+/*  BeforeAfterSlider — comparador deslizable (a prueba de fallos)      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Comparador antes/después con divisor deslizable, en el panel derecho de cada
+ * paso. La imagen "antes" (input) se revela a la izquierda del divisor; el
+ * "después" (resultado) se ve a la derecha.
+ *
+ * A PRUEBA DE FALLOS (la versión anterior se rompía mostrando texto crudo cuando
+ * una imagen expiraba): si el resultado falta/es video/falla, o si la imagen
+ * "antes" falla, cae a un <ImageThumb> limpio (placeholder "La imagen expiró").
+ * NUNCA muestra alt-text roto ni etiquetas encimadas.
+ */
+function BeforeAfterSlider({
+  before,
+  after,
+  label,
+  className,
+}: {
+  before?: string;
+  after?: string;
+  label: string;
+  className?: string;
+}) {
+  const [pos, setPos] = useState(50);
+  const [beforeErr, setBeforeErr] = useState(false);
+  const [afterErr, setAfterErr] = useState(false);
+
+  const afterIsVideo =
+    !!after && (after.includes(".mp4") || after.includes(".webm") || after.includes("video"));
+
+  // Sin resultado, o es video, o el resultado falló → ImageThumb (maneja video y
+  // el placeholder de expirada limpiamente).
+  if (!after || afterIsVideo || afterErr) {
+    return <ImageThumb url={afterErr ? undefined : after} label={label} className={className} />;
+  }
+  // Sin "antes" válido (o falló) → mostramos solo el resultado, sin slider.
+  if (!before || beforeErr) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={after}
+        alt=""
+        className={cn("rounded-lg object-contain", className)}
+        style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
+        onError={() => setAfterErr(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn("relative select-none overflow-hidden rounded-lg border border-white/10", className)}
+      style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={after}
+        alt=""
+        className="absolute inset-0 h-full w-full object-contain"
+        onError={() => setAfterErr(true)}
+        draggable={false}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={before}
+        alt=""
+        className="absolute inset-0 h-full w-full object-contain"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+        onError={() => setBeforeErr(true)}
+        draggable={false}
+      />
+      <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white/90">
+        Antes
+      </span>
+      <span className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-rose-600/80 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white">
+        Después
+      </span>
+      <div
+        className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow-[0_0_6px_rgba(0,0,0,0.6)]"
+        style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
+      >
+        <div className="absolute top-1/2 left-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={pos}
+        onChange={(e) => setPos(Number(e.target.value))}
+        aria-label={`Comparar antes y después de ${label}`}
+        className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  ImageLightbox — modal full-screen para ver/comparar/descargar      */
 /* ------------------------------------------------------------------ */
 
@@ -1616,29 +1719,34 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => step.resultUrl && setLightboxIdx(0)}
-                  disabled={!step.resultUrl}
-                  className="group relative block w-full text-left disabled:cursor-not-allowed"
-                  title={step.resultUrl ? "Tocá para ver en grande + descargar" : undefined}
-                >
-                  {/* ImageThumb maneja video, imagen y URL expirada (placeholder
-                      limpio "La imagen expiró"). Sin slider — la vista de dos
-                      paneles Original | Resultado es la estable. */}
-                  <ImageThumb url={step.resultUrl} label="Resultado" className="h-40 w-full" />
+                <div className="group relative">
+                  {/* Comparador antes/después (a prueba de fallos): "antes" = input
+                      del paso, "después" = resultado. NO va dentro de un <button>
+                      porque el slider tiene su propio <input range> (conflicto de
+                      anidado). El botón "Ver grande" va aparte, arriba con z-10. */}
+                  <BeforeAfterSlider
+                    before={step.originalUrl ?? inputUrl}
+                    after={step.resultUrl}
+                    label="Resultado"
+                    className="h-40 w-full"
+                  />
                   {(step.status === "accepted") && (
                     <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-emerald-500/20 pointer-events-none">
                       <CheckCircle2 className="h-8 w-8 text-emerald-400" />
                     </div>
                   )}
                   {step.resultUrl && (
-                    <div className="absolute right-1.5 top-1.5 flex h-7 items-center gap-1 rounded-md bg-black/60 px-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => setLightboxIdx(0)}
+                      className="absolute right-1.5 bottom-1.5 z-10 flex h-7 items-center gap-1 rounded-md bg-black/60 px-2 opacity-0 transition-opacity group-hover:opacity-100"
+                      title="Ver en grande + descargar"
+                    >
                       <Maximize2 className="h-3.5 w-3.5 text-white" />
                       <span className="text-[10px] font-medium text-white">Ver grande</span>
-                    </div>
+                    </button>
                   )}
-                </button>
+                </div>
               )}
             </div>
           </div>
