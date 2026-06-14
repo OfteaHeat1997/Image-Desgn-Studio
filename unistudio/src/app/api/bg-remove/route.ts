@@ -136,7 +136,7 @@ async function ghostMatchesProduct(
             { type: 'image', source: { type: 'base64', media_type: ref.mediaType, data: ref.data } },
             { type: 'text', text: `IMAGE 2 is an AI-generated product photo that must show the SAME ${noun} with NO person:` },
             { type: 'image', source: { type: 'base64', media_type: out.mediaType, data: out.data } },
-            { type: 'text', text: `Is IMAGE 2 a FAITHFUL reproduction of the exact same ${noun} as IMAGE 1 — same closure type (hook-and-eye clasps vs zipper vs none), same strap width and style, same mesh/panel layout, same cut and silhouette — with NO visible person/face/skin and NO invented, removed or distorted details?${hint ? ' Real construction spec: ' + hint + '.' : ''} Answer ONLY "yes" (faithful AND no person) or "no" (anything invented/distorted/different, or a person is visible).` },
+            { type: 'text', text: `Compare IMAGE 2 to the real ${noun} in IMAGE 1. IMAGE 2 PASSES only if ALL of these are true: (a) SAME closure type (hook-and-eye clasps vs zipper vs none), same strap width and style, same mesh/panel layout, same cut and silhouette; (b) the fabric looks like REAL photographed cloth with natural satin sheen and folds — NOT a plastic, rubbery, cartoonish, CGI or doll-like texture; (c) it shows ONE single front product — NOT two mannequins, NOT a front+back collage, NOT multiple views; (d) NO visible human person, face or skin.${hint ? ' Real construction spec: ' + hint + '.' : ''} Answer ONLY "yes" if ALL of (a)(b)(c)(d) pass, or "no" if ANY one of them fails.` },
           ],
         }],
       }),
@@ -618,17 +618,17 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // rechaza alucinaciones y reintenta; si tras 4 intentos ninguna pasa, cae al
     // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
     // en error.
-    if (method === 'ghost') {
-      // Solo si la usuaria PIDE el ghost (look pulido, pero la textura PUEDE cambiar
-      // porque SeedDream redibuja). Con guardia de fidelidad + reintentos.
+    if (method === 'grounded-sam') {
+      // Modo recorte real explícito: solo píxeles reales (plano, textura exacta).
+      if (!(await tryGroundedSam())) await rembgLastResort();
+    } else {
+      // DEFAULT: ghost VALIDADO — apunta al look profesional FIEL (como funcionó ayer).
+      // El guardia Claude Vision rechaza tiradas con textura de muñeco, estructura
+      // distinta, collage front+atrás o persona, y reintenta. Si ninguna pasa en 4
+      // intentos → recorte real fiel → último recurso rembg.
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
-    } else {
-      // DEFAULT: RECORTE REAL — tus píxeles reales, TU textura exacta (plano, nunca
-      // inventa ni cambia la tela). Es lo único fiel a la textura. Si grounded_sam no
-      // logra máscara, último recurso rembg. NADA de ghost por default.
-      if (!(await tryGroundedSam())) await rembgLastResort();
     }
 
     await saveJob({
