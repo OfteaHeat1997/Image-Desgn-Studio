@@ -577,12 +577,21 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // mostramos una alucinación). Si no hay ANTHROPIC_API_KEY, los guardias devuelven
     // null y aceptamos la 1ª tirada (sin validación posible).
     const tryGhost = async (): Promise<boolean> => {
+      // COMBO: el ghost parte del RECORTE LIMPIO de tu producto, NO de la foto con la
+      // modelo. En la foto con modelo los brazos tapan la malla lateral, así que el
+      // ghost la imagina/borra. Con el recorte limpio ve ganchos+malla y los COPIA.
+      // El recorte se calcula UNA sola vez y se reusa en todos los reintentos.
+      let ghostInput = imageUrl;
+      try {
+        ghostInput = await isolateGarment(imageUrl, garmentType ?? null);
+        console.log('[bg-remove:removeSubject] combo: ghost desde el recorte real (no la foto con modelo)');
+      } catch (cutErr) {
+        console.warn(`[bg-remove:removeSubject] recorte para combo falló (${cutErr instanceof Error ? cutErr.message : cutErr}) — ghost desde la foto original`);
+      }
       for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS; attempt++) {
         try {
-          // SOLO la foto FRENTE (back = undefined): pasar la espalda hacía que el
-          // ghost dibujara DOS maniquíes (frente + espalda) en vez de una sola foto
-          // limpia. La buena de ayer usaba solo el frente.
-          const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+          // back = undefined: una sola foto frontal (pasar la espalda hacía 2 maniquíes).
+          const ghost = await modelToGhost(ghostInput, garmentType ?? undefined, undefined, garmentDescription);
           const hasModel = await ghostStillHasPerson(ghost.url);
           if (hasModel === true) {
             console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: hay una persona — reintento`);
