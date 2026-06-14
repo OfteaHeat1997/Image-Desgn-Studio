@@ -413,9 +413,9 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Spec de construcción (Claude Vision) — se pasa al ghost para que no invente
     // el cierre (ej dibujar zipper donde hay ganchos).
     garmentDescription?: string;
-    // Método de recorte: 'grounded-sam' (recorte real fiel, DEFAULT) | 'ghost'
-    // (SeedDream 3D regenera) | 'auto' (real → ghost → rembg).
-    isolateMethod?: 'grounded-sam' | 'ghost' | 'auto';
+    // Método de recorte: 'combo' (real + ghost, DEFAULT) | 'grounded-sam' (recorte
+    // real fiel) | 'ghost' (ghost-mannequin redibujado) | 'auto' (real → ghost → rembg).
+    isolateMethod?: 'combo' | 'grounded-sam' | 'ghost' | 'auto';
     options?: Record<string, unknown>;
   };
 
@@ -472,13 +472,14 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // IA, revisá" antes de mandarlo al catálogo. false = recorte real fiel.
     let regenerated = false;
 
-    // Método de recorte (lo elige la usuaria en Paso 1). Default: 'auto' — FIDELIDAD
-    // PRIMERO. La usuaria exige el producto REAL (no inventado): probamos Uwear
-    // (extrae la prenda real, 100% fiel, NO regenera) → grounded_sam (pixeles reales)
-    // → ghost 3D (regenera, último recurso "lindo" con aviso) → rembg. NUNCA error.
-    //   'grounded-sam' / 'auto' → Uwear fiel → recorte real → ghost 3D → rembg.
-    //   'ghost'                 → ghost 3D primero → Uwear → recorte real → rembg.
-    const method = isolateMethod ?? 'auto';
+    // Método de recorte (lo elige la usuaria en Paso 1). Default: 'combo' — lo mejor
+    // de los dos: extrae el producto REAL (grounded_sam) y lo renderiza como
+    // ghost-mannequin profesional (ghost). Más fiel que el ghost solo y más
+    // profesional que el recorte solo.
+    //   'combo'                 → grounded_sam + ghost → ghost → recorte real → rembg.
+    //   'ghost'                 → ghost (redibuja desde la foto) → recorte real → rembg.
+    //   'grounded-sam' / 'auto' → recorte real fiel → ghost 3D → rembg.
+    const method = isolateMethod ?? 'combo';
     const MAX_GHOST_ATTEMPTS = 3;
 
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
@@ -530,23 +531,55 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       return false;
     };
 
+    // COMBO (lo mejor de los dos): 1) grounded_sam extrae el PRODUCTO REAL (sin
+    // modelo, pixeles fieles); 2) ese recorte limpio se le pasa al ghost para que lo
+    // renderice como ghost-mannequin profesional (maniquí invisible, frontal, fondo
+    // blanco, 3D). Como el ghost parte del producto YA aislado (no de la foto con
+    // modelo), inventa mucho menos → más fiel y más profesional.
+    const tryCombo = async (): Promise<boolean> => {
+      try {
+        const cutoutUrl = await isolateGarment(imageUrl, garmentType ?? null);
+        const ghost = await modelToGhost(
+          cutoutUrl,
+          garmentType ?? undefined,
+          backImageUrl ?? undefined,
+          garmentDescription,
+        );
+        // Validar que el ghost no haya metido una persona (no debería, parte del recorte)
+        const hasModel = await ghostStillHasPerson(ghost.url);
+        resultUrl = ghost.url;
+        usedProvider = `combo (grounded_sam + ${ghost.provider})${hasModel === true ? ' [revisar: posible persona]' : ''}`;
+        regenerated = true;
+        return true;
+      } catch (e) {
+        console.warn(`[bg-remove:removeSubject] combo falló (${e instanceof Error ? e.message : e})`);
+        return false;
+      }
+    };
+
     const rembgLastResort = async () => {
       console.warn('[bg-remove:removeSubject] cayendo a rembg-last-resort (deja la modelo → hard-fail en pipeline)');
       resultUrl = await removeBgReplicate(imageUrl);
       usedProvider = 'rembg-last-resort';
     };
 
-    // NUNCA se queda en error, y FIDELIDAD PRIMERO. grounded_sam recorta los PÍXELES
-    // REALES de tu producto y QUITA la modelo (lo único fiel que sí la elimina). El
-    // ghost queda como respaldo (quita la modelo pero REGENERA → con aviso).
-    if (method === 'ghost') {
-      // La usuaria pidió explícitamente el look 3D regenerado.
+    // NUNCA se queda en error. Default 'combo' = lo mejor de los dos (producto real
+    // extraído → ghost-mannequin profesional). Respaldos según el método.
+    if (method === 'combo') {
+      // Combo → si falla, ghost directo → recorte real → rembg.
+      if (!(await tryCombo())) {
+        if (!(await tryGhost())) {
+          if (!(await tryGroundedSam())) await rembgLastResort();
+        }
+      }
+    } else if (method === 'ghost') {
+      // Ghost-mannequin redibujado desde la foto. Respaldo: recorte real → rembg.
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
     } else {
-      // 'grounded-sam' / 'auto' (default): recorte real fiel (quita modelo) primero;
-      // si no logra máscara, ghost 3D (regenera, con aviso); último recurso, rembg.
+      // 'grounded-sam' / 'auto': recorte real fiel (quita modelo) primero; si no logra
+      // máscara, ghost 3D (regenera, con aviso); último recurso, rembg.
       if (!(await tryGroundedSam())) {
         if (!(await tryGhost())) await rembgLastResort();
       }
