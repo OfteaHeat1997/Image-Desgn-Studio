@@ -20,7 +20,6 @@ import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
-import { CLAUDE_HAIKU } from '@/lib/utils/constants';
 
 const PROVIDER_COSTS: Record<string, number> = {
   replicate: 0.01,
@@ -32,74 +31,19 @@ const PROVIDER_COSTS: Record<string, number> = {
 const ISOLATE_COST = 0.01;
 
 /**
- * Valida si un recorte TODAVÍA tiene una persona/modelo (SeedDream a veces no la
- * quita y devuelve la imagen casi igual). Usa Claude Vision (Haiku). Devuelve:
- *   true  = hay una persona visible (recorte malo → reintentar)
- *   false = producto solo (recorte bueno)
- *   null  = no se pudo validar (sin API key / error) → el caller acepta el result
- */
-async function ghostStillHasPerson(imageUrl: string): Promise<boolean | null> {
-  const key = process.env.ANTHROPIC_API_KEY?.trim();
-  if (!key) return null;
-  try {
-    let mediaType = 'image/png';
-    let base64: string;
-    if (imageUrl.startsWith('data:')) {
-      const m = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (!m) return null;
-      mediaType = m[1];
-      base64 = m[2];
-    } else {
-      const r = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
-      if (!r.ok) return null;
-      mediaType = r.headers.get('content-type') || 'image/png';
-      base64 = Buffer.from(await r.arrayBuffer()).toString('base64');
-    }
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: CLAUDE_HAIKU,
-        max_tokens: 10,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Is there a visible human PERSON or MODEL (face, skin, arms, torso, legs) in this image? This should be a product-only photo of a garment with NO person. Answer ONLY "yes" or "no".' },
-          ],
-        }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = String(data?.content?.[0]?.text ?? '').toLowerCase();
-    if (text.includes('yes')) return true;
-    if (text.includes('no')) return false;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Negative mask prompt for grounded_sam — regions to SUBTRACT from the garment
  * mask. We intentionally vary this by garment type.
  *
- * BUG ENCONTRADO (2026-06-14): la lista incluía `body,torso,waist` — pero el bra
- * está JUSTO sobre el torso/cuerpo. grounded_sam restaba esas regiones y borraba
- * el bra mismo → máscara vacía → "no se pudo recortar". Ahora restamos SOLO lo que
- * claramente NO es la prenda (piel expuesta, cara, pelo, brazos, hombros, cuello,
- * fondo). NO restamos torso/body/waist porque contienen la prenda.
+ * RESTAURADO al negative prompt de mayo (commit f1e4a59), que SÍ producía una
+ * máscara buena del bra de soporte. Hoy lo había cambiado (sacar torso/waist) con
+ * la hipótesis de que ayudaba a prendas de cobertura completa, pero en mayo —con
+ * torso/waist incluidos— grounded_sam funcionaba para ESTE bra. Restaurar lo conocido.
  */
 function garmentNegativePrompt(garmentType: string | null): string {
-  // MÍNIMO a propósito: antes restábamos skin/shoulder/neck/arm — pero en un bra
-  // deportivo los tirantes van sobre los hombros y el escote toca el cuello, así que
-  // esas restas EROSIONABAN la máscara hasta dejarla vacía → "no se pudo recortar".
-  // Ahora solo restamos el FONDO (nunca solapa la prenda). Grounding DINO ya acota la
-  // caja a la prenda, así que no necesitamos restar piel/hombros.
-  const base = 'background';
-  // Panties van bajo en cadera → muslo/pierna no solapan, ayudan a limpiar bordes.
-  return garmentType === 'panty' ? `${base},thigh,leg` : base;
+  // Prompt de mayo (probado): suprime piel/cuerpo/cara/pelo/brazo/hombro/cuello/torso/cintura/fondo.
+  const may = 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background';
+  // Panties van bajo en cadera → además suprimir muslo/pierna.
+  return garmentType === 'panty' ? `${may},thigh,leg,hip` : may;
 }
 
 /**
@@ -323,14 +267,12 @@ async function isolateGarment(
     }
   }
 
-  // No mask passed purity: try the candidate with the HIGHEST purity. Bajamos el
-  // umbral a 0.55 (antes 0.75): las fotos CON modelo (prenda oscura sobre cuerpo,
-  // JPEG) dan máscaras válidas pero menos "puras", y se rechazaban → "no se pudo
-  // recortar". Los overlays anotados (con bounding boxes) puntúan ~0.3-0.5, así
-  // que 0.55 sigue descartándolos pero acepta la máscara real borderline.
+  // No mask passed purity: try the candidate with the HIGHEST purity as long
+  // as it's still reasonably high (>=0.75) — sometimes JPEG compression
+  // drags purity down. Better than the annotated overlay.
   if (!bestMask && candidates.length) {
     const byPurity = [...candidates]
-      .filter((c) => c.purity >= 0.55 && c.coverage >= 0.001 && c.coverage <= 0.95)
+      .filter((c) => c.purity >= 0.75 && c.coverage >= 0.001 && c.coverage <= 0.9)
       .sort((a, b) => b.purity - a.purity)[0];
     if (byPurity) {
       console.warn(
@@ -354,30 +296,15 @@ async function isolateGarment(
   // componer la prenda aislada, devolvemos la máscara B/W cruda como PNG
   // grayscale — necesaria para inpaintear con flux-fill-pro la zona del bra
   // sobre el resultado del tryon.
-  //
-  // Recorte normal: (1) generamos el recorte transparente (lo que YA funcionaba:
-  // joinChannel de la máscara como alpha) y (2) lo componemos sobre un lienzo BLANCO
-  // con composite (operación robusta) → la usuaria lo quiere sobre blanco.
-  let isolated: Buffer;
-  if (returnMaskOnly) {
-    isolated = await sharp(bestMask, { raw: { width, height, channels: 1 } })
-      .png()
-      .toBuffer();
-  } else {
-    // 1) recorte transparente fiel (versión probada)
-    const cutout = await sharp(prepared)
-      .ensureAlpha()
-      .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
-      .png()
-      .toBuffer();
-    // 2) componer el recorte sobre fondo BLANCO
-    isolated = await sharp({
-      create: { width, height, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
-    })
-      .composite([{ input: cutout }])
-      .png()
-      .toBuffer();
-  }
+  const isolated = returnMaskOnly
+    ? await sharp(bestMask, { raw: { width, height, channels: 1 } })
+        .png()
+        .toBuffer()
+    : await sharp(prepared)
+        .ensureAlpha()
+        .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
+        .png()
+        .toBuffer();
 
   // Upload the result directly to fal storage — Kolors/Wan se alimentan de fal.
   // Retry 3× antes de fallar. NO caer a Replicate — las URLs api.replicate.com/v1/files/*
@@ -401,21 +328,15 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, backImageUrl, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
     garmentType?: string | null;
     returnMaskOnly?: boolean;
-    // Foto de espalda real del MISMO producto — referencia de construcción para
-    // Uwear y el ghost (reconstruir banda/tirantes fiel). Antes se IGNORABA acá.
-    backImageUrl?: string;
     // Spec de construcción (Claude Vision) — se pasa al ghost para que no invente
     // el cierre (ej dibujar zipper donde hay ganchos).
     garmentDescription?: string;
-    // Método de recorte: 'combo' (real + ghost, DEFAULT) | 'grounded-sam' (recorte
-    // real fiel) | 'ghost' (ghost-mannequin redibujado) | 'auto' (real → ghost → rembg).
-    isolateMethod?: 'combo' | 'grounded-sam' | 'ghost' | 'auto';
     options?: Record<string, unknown>;
   };
 
@@ -444,7 +365,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
   //      claro pidiendo reintentar con otra foto (o usar Uwear con la foto real).
   //      NUNCA inventa el producto → error honesto, no catálogo falso.
   if (removeSubject) {
-    let resultUrl = '';
+    let resultUrl: string;
     let usedProvider = 'grounded-sam-isolate';
 
     // returnMaskOnly: bypass del fallback SeedDream/rembg. La máscara solo se
@@ -467,121 +388,36 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       });
     }
 
-    // regenerated: true cuando el resultado lo produjo el ghost (SeedDream regenera
-    // el producto). Lo lee la pipeline para avisarle a la usuaria "se regeneró con
-    // IA, revisá" antes de mandarlo al catálogo. false = recorte real fiel.
-    let regenerated = false;
+    // regenerated queda SIEMPRE en false: ya no hay paso regenerativo (SeedDream
+    // ghost) en el cascade. Se conserva en la respuesta por compatibilidad con la
+    // pipeline (que lo lee), pero nunca dispara el aviso "se regeneró con IA"
+    // porque nunca regeneramos — o es el producto real, o es un error honesto.
+    const regenerated = false;
 
-    // Método de recorte (lo elige la usuaria en Paso 1). Default: 'combo' — lo mejor
-    // de los dos: extrae el producto REAL (grounded_sam) y lo renderiza como
-    // ghost-mannequin profesional (ghost). Más fiel que el ghost solo y más
-    // profesional que el recorte solo.
-    //   'combo'                 → grounded_sam + ghost → ghost → recorte real → rembg.
-    //   'ghost'                 → ghost (redibuja desde la foto) → recorte real → rembg.
-    //   'grounded-sam' / 'auto' → recorte real fiel → ghost 3D → rembg.
-    const method = isolateMethod ?? 'combo';
-    const MAX_GHOST_ATTEMPTS = 3;
-
-    // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
-    // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
-    // qué falla, no el mensaje genérico).
-    let groundedSamError = '';
-    const tryGroundedSam = async (): Promise<boolean> => {
+    // GHOST MANNEQUIN (SeedDream, look 3D) PRIMERO → grounded_sam → rembg.
+    //
+    // Antes corría grounded_sam primero, pero: (1) da un recorte PLANO, no el look
+    // 3D que la usuaria eligió; (2) con sus fotos siempre falla y reintenta, y esa
+    // espera ANTES del ghost hacía TIMEOUT de la función ("An error occurred", no
+    // JSON). Como ella quiere el ghost 3D, lo ponemos directo: rápido y el look
+    // correcto. grounded_sam queda solo de fallback si el ghost falla.
+    try {
+      // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
+      // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
+      const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+      resultUrl = ghost.url;
+      usedProvider = `ghost-mannequin (${ghost.provider})`;
+      console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
+    } catch (ghostErr) {
+      const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
+      console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
       try {
         resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-        usedProvider = 'grounded-sam-isolate';
-        return true;
       } catch (err) {
-        groundedSamError = err instanceof Error ? err.message : String(err);
-        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${groundedSamError})`);
-        return false;
-      }
-    };
-
-    // ghost (SeedDream 3D, regenera) con validación: tras cada intento, Claude
-    // Vision revisa si quedó una persona; si sí, reintenta (hasta 3). Si SeedDream
-    // nunca la quita, devuelve el último marcado "revisar".
-    const tryGhost = async (): Promise<boolean> => {
-      let lastUrl = '';
-      let lastProv = '';
-      for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS; attempt++) {
-        try {
-          const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, backImageUrl ?? undefined, garmentDescription);
-          lastUrl = ghost.url;
-          lastProv = ghost.provider;
-          const hasModel = await ghostStillHasPerson(ghost.url);
-          if (hasModel === true) {
-            console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: todavía hay una persona — reintento`);
-            continue;
-          }
-          resultUrl = ghost.url;
-          usedProvider = `ghost-mannequin (${ghost.provider})`;
-          regenerated = true;
-          return true;
-        } catch (e) {
-          console.warn(`[bg-remove:removeSubject] ghost intento ${attempt} falló (${e instanceof Error ? e.message : e})`);
-        }
-      }
-      if (lastUrl) {
-        resultUrl = lastUrl;
-        usedProvider = `ghost-mannequin (${lastProv}) [revisar: posible persona]`;
-        regenerated = true;
-        return true;
-      }
-      return false;
-    };
-
-    // COMBO (lo mejor de los dos): 1) grounded_sam extrae el PRODUCTO REAL (sin
-    // modelo, pixeles fieles); 2) ese recorte limpio se le pasa al ghost para que lo
-    // renderice como ghost-mannequin profesional (maniquí invisible, frontal, fondo
-    // blanco, 3D). Como el ghost parte del producto YA aislado (no de la foto con
-    // modelo), inventa mucho menos → más fiel y más profesional.
-    const tryCombo = async (): Promise<boolean> => {
-      try {
-        const cutoutUrl = await isolateGarment(imageUrl, garmentType ?? null);
-        const ghost = await modelToGhost(
-          cutoutUrl,
-          garmentType ?? undefined,
-          backImageUrl ?? undefined,
-          garmentDescription,
-        );
-        // Validar que el ghost no haya metido una persona (no debería, parte del recorte)
-        const hasModel = await ghostStillHasPerson(ghost.url);
-        resultUrl = ghost.url;
-        usedProvider = `combo (grounded_sam + ${ghost.provider})${hasModel === true ? ' [revisar: posible persona]' : ''}`;
-        regenerated = true;
-        return true;
-      } catch (e) {
-        console.warn(`[bg-remove:removeSubject] combo falló (${e instanceof Error ? e.message : e})`);
-        return false;
-      }
-    };
-
-    const rembgLastResort = async () => {
-      console.warn('[bg-remove:removeSubject] cayendo a rembg-last-resort (deja la modelo → hard-fail en pipeline)');
-      resultUrl = await removeBgReplicate(imageUrl);
-      usedProvider = 'rembg-last-resort';
-    };
-
-    // NUNCA se queda en error. Default 'combo' = lo mejor de los dos (producto real
-    // extraído → ghost-mannequin profesional). Respaldos según el método.
-    if (method === 'combo') {
-      // Combo → si falla, ghost directo → recorte real → rembg.
-      if (!(await tryCombo())) {
-        if (!(await tryGhost())) {
-          if (!(await tryGroundedSam())) await rembgLastResort();
-        }
-      }
-    } else if (method === 'ghost') {
-      // Ghost-mannequin redibujado desde la foto. Respaldo: recorte real → rembg.
-      if (!(await tryGhost())) {
-        if (!(await tryGroundedSam())) await rembgLastResort();
-      }
-    } else {
-      // 'grounded-sam' / 'auto': recorte real fiel (quita modelo) primero; si no logra
-      // máscara, ghost 3D (regenera, con aviso); último recurso, rembg.
-      if (!(await tryGroundedSam())) {
-        if (!(await tryGhost())) await rembgLastResort();
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
+        resultUrl = await removeBgReplicate(imageUrl);
+        usedProvider = 'rembg-last-resort';
       }
     }
 

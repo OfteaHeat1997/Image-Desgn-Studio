@@ -205,21 +205,19 @@ export async function modelToGhost(
     `no hair, no neck, no shoulders, no arms, no visible body — only the empty garment ` +
     `floating in its 3D form. Do NOT show a real mannequin or any solid body; the body ` +
     `itself is invisible, only the ${noun} is visible. ` +
-    // Bloquear el ÁNGULO al frente SIEMPRE (incluso con foto de espalda): SeedDream
-    // tiende a rotar la prenda y dibujar la espalda/racerback MEZCLADA con el frente.
-    // Reporte usuaria: "delante y atrás mezclados". El output es vista frontal pura.
-    `Show the product STRAIGHT FROM THE FRONT, camera directly facing it, perfectly ` +
-    `symmetrical front view — exactly like the FRONT reference photo. Do NOT use a 3/4 ` +
-    `angle, do NOT show it from the side or in profile, do NOT rotate or tilt the garment, ` +
-    `and do NOT show the back of the garment in the result. Only the front, with subtle 3D volume. ` +
-    // La foto de espalda es SOLO referencia de construcción — NUNCA se renderiza ni
-    // se mezcla. Así el bra queda fiel (banda/tirantes correctos) pero el resultado
-    // es una sola imagen frontal limpia, sin el artefacto frente+espalda.
+    // Bloquear el ÁNGULO al de la foto (genérico): SeedDream tiende a rotar la
+    // prenda y dibujar la espalda/racerback mezclada con el frente. Forzamos que
+    // muestre SOLO la misma vista de la referencia (la frontal) y que no invente
+    // la parte de atrás. Reporte usuaria: "delante y atrás mezclados".
     (hasBack
-      ? `The SECOND photo is the BACK view, provided ONLY as a construction reference so you ` +
-        `reproduce the straps, band and panels faithfully. Do NOT render the back, do NOT show ` +
-        `any back view, and do NOT blend or mix front and back into one image. The output must ` +
-        `be a single clean FRONT view only. `
+      ? ''
+      : `Show the product STRAIGHT FROM THE FRONT, camera directly facing it, perfectly ` +
+        `symmetrical front view — exactly like the reference photo. Do NOT use a 3/4 angle, ` +
+        `do NOT show it from the side or in profile, do NOT rotate or tilt the garment, and ` +
+        `do NOT show the back. Only the flat front the reference shows, just with subtle 3D volume. `) +
+    (hasBack
+      ? `Reproduce the back details (racerback straps, back mesh panels, band) correctly ` +
+        `from the BACK reference — do NOT erase or flatten the back. `
       : '') +
     `Preserve the exact same color, pattern, texture, fabric, and construction details ` +
     `of the ${noun}. Do not change the color. ` +
