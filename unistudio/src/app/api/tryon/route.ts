@@ -241,7 +241,10 @@ async function tryOnUwear(
   scenePrompt?: string,
   garmentBackUrl?: string,
 ): Promise<string> {
-  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.seedream;
+  // Qwen Intimate por default: es el modelo de Uwear orientado a lencería/intimates
+  // (la usuaria confirmó que da el mejor resultado — satén y cierre reales). Se puede
+  // sobreescribir con UWEAR_MODEL_SLUG en Vercel (ej volver a seedream-v4-5).
+  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.qwenIntimate;
   const isQwen = modelSlug.startsWith('qwen');
   const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
 
@@ -375,6 +378,21 @@ async function smartTryOn(
   // Flux Kontext returns E005, so neither is in this path. Fall back to Kolors
   // only when SeedDream fails.
   if (isIntimate) {
+    // Uwear (Qwen Intimate) PRIMERO: es el mejor para lencería — preserva el satén,
+    // los ganchos y la construcción reales (la usuaria lo confirmó). Casts su propia
+    // modelo a partir de la prenda. Si no hay UWEAR_API_KEY o falla auth, cae a
+    // SeedDream → Kolors sin romper el pipeline.
+    if (process.env.UWEAR_API_KEY?.trim()) {
+      try {
+        const url = await tryOnUwear(garmentImage, category, garmentType, garmentDescription, scenePrompt);
+        return { url, provider: 'uwear' };
+      } catch (err) {
+        console.warn(
+          '[tryon] Uwear failed for intimate garment, falling back to SeedDream:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     try {
       const url = await tryOnSeedDream(modelImage, garmentImage, garmentType, garmentDescription, scenePrompt);
       return { url, provider: 'seedream' };
