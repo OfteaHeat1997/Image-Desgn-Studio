@@ -20,7 +20,7 @@ import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
-import { CLAUDE_HAIKU } from '@/lib/utils/constants';
+import { CLAUDE_HAIKU, CLAUDE_SONNET } from '@/lib/utils/constants';
 
 const PROVIDER_COSTS: Record<string, number> = {
   replicate: 0.01,
@@ -66,6 +66,77 @@ async function ghostStillHasPerson(imageUrl: string): Promise<boolean | null> {
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
             { type: 'text', text: 'Is there a visible human PERSON or MODEL (face, skin, arms, torso, legs) in this image? This should be a product-only photo of a garment with NO person. Answer ONLY "yes" or "no".' },
+          ],
+        }],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = String(data?.content?.[0]?.text ?? '').toLowerCase();
+    if (text.includes('yes')) return true;
+    if (text.includes('no')) return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Descarga una imagen (http o data URL) a base64 para mandarla a Claude Vision. */
+async function fetchImageAsBase64(
+  imageUrl: string,
+): Promise<{ mediaType: string; data: string } | null> {
+  try {
+    if (imageUrl.startsWith('data:')) {
+      const m = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!m) return null;
+      return { mediaType: m[1], data: m[2] };
+    }
+    const r = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
+    if (!r.ok) return null;
+    const mediaType = r.headers.get('content-type') || 'image/png';
+    const data = Buffer.from(await r.arrayBuffer()).toString('base64');
+    return { mediaType, data };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GUARDIA DE FIDELIDAD (Claude Vision / Sonnet). Compara el resultado del ghost
+ * contra el producto REAL (foto original) y verifica que sea la MISMA prenda —
+ * mismo cierre (ganchos vs zipper), mismos tirantes, misma malla, mismo corte —
+ * SIN persona y SIN detalles inventados. Devuelve:
+ *   true  = fiel (mostrar)
+ *   false = alucinó / inventó / hay persona (descartar y reintentar)
+ *   null  = no se pudo validar (sin API key) → el caller acepta el resultado
+ */
+async function ghostMatchesProduct(
+  referenceUrl: string,
+  resultUrl: string,
+  garmentType: string | null,
+  hint?: string,
+): Promise<boolean | null> {
+  const key = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!key) return null;
+  try {
+    const ref = await fetchImageAsBase64(referenceUrl);
+    const out = await fetchImageAsBase64(resultUrl);
+    if (!ref || !out) return null;
+    const noun = garmentType ?? 'garment';
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: CLAUDE_SONNET,
+        max_tokens: 10,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: `IMAGE 1 is the REAL ${noun} (it may be worn by a model — look ONLY at the garment itself):` },
+            { type: 'image', source: { type: 'base64', media_type: ref.mediaType, data: ref.data } },
+            { type: 'text', text: `IMAGE 2 is an AI-generated product photo that must show the SAME ${noun} with NO person:` },
+            { type: 'image', source: { type: 'base64', media_type: out.mediaType, data: out.data } },
+            { type: 'text', text: `Is IMAGE 2 a FAITHFUL reproduction of the exact same ${noun} as IMAGE 1 — same closure type (hook-and-eye clasps vs zipper vs none), same strap width and style, same mesh/panel layout, same cut and silhouette — with NO visible person/face/skin and NO invented, removed or distorted details?${hint ? ' Real construction spec: ' + hint + '.' : ''} Answer ONLY "yes" (faithful AND no person) or "no" (anything invented/distorted/different, or a person is visible).` },
           ],
         }],
       }),
@@ -479,7 +550,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     //   'grounded-sam' / 'auto' → Uwear fiel → recorte real → ghost 3D → rembg.
     //   'ghost'                 → ghost 3D primero → Uwear → recorte real → rembg.
     const method = isolateMethod ?? 'auto';
-    const MAX_GHOST_ATTEMPTS = 3;
+    const MAX_GHOST_ATTEMPTS = 4;
 
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
     // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
@@ -497,36 +568,40 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       }
     };
 
-    // ghost (SeedDream 3D, regenera) con validación: tras cada intento, Claude
-    // Vision revisa si quedó una persona; si sí, reintenta (hasta 3). Si SeedDream
-    // nunca la quita, devuelve el último marcado "revisar".
+    // ghost (SeedDream 3D, regenera) CON GUARDIA CLAUDE VISION. Tras cada tirada:
+    //   1. ghostStillHasPerson → ¿quedó una persona? si sí, reintenta.
+    //   2. ghostMatchesProduct → ¿es FIEL al producto real (cierre/tirantes/malla,
+    //      sin inventar)? si NO, reintenta.
+    // Solo devuelve true si una tirada pasa AMBOS guardias. Si en MAX_GHOST_ATTEMPTS
+    // ninguna pasa, devuelve FALSE → el caller cae al recorte real fiel (NUNCA
+    // mostramos una alucinación). Si no hay ANTHROPIC_API_KEY, los guardias devuelven
+    // null y aceptamos la 1ª tirada (sin validación posible).
     const tryGhost = async (): Promise<boolean> => {
-      let lastUrl = '';
-      let lastProv = '';
       for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS; attempt++) {
         try {
           const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, backImageUrl ?? undefined, garmentDescription);
-          lastUrl = ghost.url;
-          lastProv = ghost.provider;
           const hasModel = await ghostStillHasPerson(ghost.url);
           if (hasModel === true) {
-            console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: todavía hay una persona — reintento`);
+            console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: hay una persona — reintento`);
             continue;
           }
+          const faithful = await ghostMatchesProduct(imageUrl, ghost.url, garmentType ?? null, garmentDescription);
+          if (faithful === false) {
+            console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: NO coincide con el producto (alucinó) — reintento`);
+            continue;
+          }
+          // faithful === true (pasó) o null (sin key → aceptamos)
           resultUrl = ghost.url;
-          usedProvider = `ghost-mannequin (${ghost.provider})`;
+          usedProvider = `ghost-validado (${ghost.provider})`;
           regenerated = true;
+          console.log(`[bg-remove:removeSubject] ghost intento ${attempt}: pasó el control de fidelidad ✓`);
           return true;
         } catch (e) {
           console.warn(`[bg-remove:removeSubject] ghost intento ${attempt} falló (${e instanceof Error ? e.message : e})`);
         }
       }
-      if (lastUrl) {
-        resultUrl = lastUrl;
-        usedProvider = `ghost-mannequin (${lastProv}) [revisar: posible persona]`;
-        regenerated = true;
-        return true;
-      }
+      // Ninguna tirada pasó el control → NO mostramos alucinación; caemos al recorte fiel.
+      console.warn('[bg-remove:removeSubject] el ghost no pasó el control de fidelidad en 4 intentos — recorte real fiel');
       return false;
     };
 
@@ -536,19 +611,18 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       usedProvider = 'rembg-last-resort';
     };
 
-    // NUNCA se queda en error, y FIDELIDAD PRIMERO. grounded_sam recorta los PÍXELES
-    // REALES de tu producto y QUITA la modelo (lo único fiel que sí la elimina). El
-    // ghost queda como respaldo (quita la modelo pero REGENERA → con aviso).
-    if (method === 'ghost') {
-      // La usuaria pidió explícitamente el look 3D regenerado.
+    // PLAN aprobado: ghost pulido con GUARDIA Claude Vision por default. El guardia
+    // rechaza alucinaciones y reintenta; si tras 4 intentos ninguna pasa, cae al
+    // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
+    // en error.
+    if (method === 'grounded-sam') {
+      // Modo "recorte real" explícito: SOLO píxeles reales (plano, 100% fiel).
+      if (!(await tryGroundedSam())) await rembgLastResort();
+    } else {
+      // DEFAULT: ghost pulido (apunta al look ghost-mannequin) con guardia de fidelidad
+      // → si ninguna tirada pasa, recorte real fiel → último recurso rembg.
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
-      }
-    } else {
-      // 'grounded-sam' / 'auto' (default): recorte real fiel (quita modelo) primero;
-      // si no logra máscara, ghost 3D (regenera, con aviso); último recurso, rembg.
-      if (!(await tryGroundedSam())) {
-        if (!(await tryGhost())) await rembgLastResort();
       }
     }
 
