@@ -17,7 +17,30 @@
 // gratis para probar (las imágenes de sandbox salen con marca de agua).
 // =============================================================================
 
+import sharp from 'sharp';
+
 const PHOTOROOM_EDIT_URL = 'https://image-api.photoroom.com/v2/edit';
+
+/**
+ * Realza el BRILLO del satén en el resultado de Photoroom. Photoroom re-ilumina la
+ * prenda y aplana los reflejos → el satén sale "soso". Subimos un poco el contraste
+ * (los reflejos brillantes resaltan sobre el negro = look glossy) y afilamos suave.
+ * Es un retoque global y reversible; los números se pueden ajustar si queda muy/poco.
+ *   linear(a,b): out = a*in + b. a=1.18 sube contraste; b=-16 mantiene los negros.
+ */
+async function enhanceSatinSheen(png: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(png)
+      .linear(1.18, -16)
+      .modulate({ brightness: 1.02 })
+      .sharpen({ sigma: 0.6 })
+      .png()
+      .toBuffer();
+  } catch {
+    // Si el realce falla por lo que sea, devolvemos el PNG original de Photoroom.
+    return png;
+  }
+}
 
 /** Read + trim the Photoroom API key. */
 function getPhotoroomKey(): string {
@@ -81,5 +104,7 @@ export async function ghostMannequinPhotoroom(imageUrl: string): Promise<Buffer>
     throw new Error(`Photoroom /v2/edit ${res.status}: ${txt.slice(0, 400)}`);
   }
 
-  return Buffer.from(await res.arrayBuffer());
+  const png = Buffer.from(await res.arrayBuffer());
+  // Realzar el brillo del satén (Photoroom lo aplana). Retoque suave y ajustable.
+  return await enhanceSatinSheen(png);
 }
