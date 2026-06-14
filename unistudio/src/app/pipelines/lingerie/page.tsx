@@ -2508,7 +2508,9 @@ async function runStep(
       signal: abortSignal,
       body: JSON.stringify({
         imageUrl: inputUrl,
-        falImageUrl: falUrl,
+        // NO mandar falImageUrl: falUrl — falUrl es la FOTO ORIGINAL (copyright).
+        // El 360 debe rotar el PRODUCTO aislado (inputUrl), no la modelo copyright.
+        // La ruta hace ensureFalAccessibleUrl(inputUrl) y usa el producto correcto.
         provider: "wan-2.2-fast",
         duration: 5,
         aspectRatio: "1:1",
@@ -2543,7 +2545,11 @@ async function runStep(
       signal: abortSignal,
       body: JSON.stringify({
         imageUrl: modelVideoUrl,
-        falImageUrl: falUrl,
+        // NO mandar falImageUrl: falUrl — falUrl es la FOTO ORIGINAL (copyright).
+        // La ruta de video, para fal, usa falImageUrl con prioridad sobre imageUrl,
+        // así que pasarlo hacía que el video saliera con la modelo de copyright en
+        // vez de la modelo IA + tu producto. Sin él, la ruta hace
+        // ensureFalAccessibleUrl(modelVideoUrl) y usa el try-on correcto.
         // Kling 2.6 Pro (fal-ai/kling-video/v2.6/pro/image-to-video) — calidad
         // cinematográfica para humanos. wan-2.2-fast es para productos y genera
         // personas con look de muñeco / piel waxy / micro-expresiones erráticas.
