@@ -355,24 +355,26 @@ async function isolateGarment(
   // grayscale — necesaria para inpaintear con flux-fill-pro la zona del bra
   // sobre el resultado del tryon.
   //
-  // Recorte normal: (1) suavizamos el borde de la máscara con un blur leve
-  // (anti-alias → corte más limpio, sin escalones) y (2) componemos sobre FONDO
-  // BLANCO (la usuaria lo quiere en blanco, no transparente). flatten usa el alpha
-  // de la máscara para fundir el borde contra el blanco → recorte prolijo.
+  // Recorte normal: (1) generamos el recorte transparente (lo que YA funcionaba:
+  // joinChannel de la máscara como alpha) y (2) lo componemos sobre un lienzo BLANCO
+  // con composite (operación robusta) → la usuaria lo quiere sobre blanco.
   let isolated: Buffer;
   if (returnMaskOnly) {
     isolated = await sharp(bestMask, { raw: { width, height, channels: 1 } })
       .png()
       .toBuffer();
   } else {
-    const smoothMask = await sharp(bestMask, { raw: { width, height, channels: 1 } })
-      .blur(1.2)
-      .raw()
-      .toBuffer();
-    isolated = await sharp(prepared)
+    // 1) recorte transparente fiel (versión probada)
+    const cutout = await sharp(prepared)
       .ensureAlpha()
-      .joinChannel(smoothMask, { raw: { width, height, channels: 1 } })
-      .flatten({ background: { r: 255, g: 255, b: 255 } })
+      .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
+      .png()
+      .toBuffer();
+    // 2) componer el recorte sobre fondo BLANCO
+    isolated = await sharp({
+      create: { width, height, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+    })
+      .composite([{ input: cutout }])
       .png()
       .toBuffer();
   }
