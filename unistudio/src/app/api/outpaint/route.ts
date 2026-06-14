@@ -176,18 +176,35 @@ export async function POST(request: NextRequest) {
       const output = await runModel('black-forest-labs/flux-fill-pro', fillProInput);
       const resultUrl: string = await extractOutputUrl(output);
 
+      // Persistir el resultado en fal storage. flux-fill-pro devuelve URLs de
+      // replicate.delivery que CADUCAN en ~1h → la tarjeta mostraba "La imagen
+      // expiró" al rato (sobre todo al día siguiente). Subir a fal da una URL
+      // estable. Si la subida falla, devolvemos la URL original (mejor que nada).
+      let stableUrl = resultUrl;
+      if (resultUrl.startsWith('http')) {
+        try {
+          const r = await fetch(resultUrl);
+          if (r.ok) {
+            const buf = Buffer.from(await r.arrayBuffer());
+            stableUrl = await uploadToFalStorage(buf, 'image/png', 'fullbody.png');
+          }
+        } catch (e) {
+          console.warn('[outpaint] no se pudo persistir en fal, uso URL original:', e instanceof Error ? e.message : e);
+        }
+      }
+
       await saveJob({
         operation: 'outpaint',
         provider: 'flux-fill-pro',
         inputParams: { imageUrl, direction, expandRatio: ratio, prompt: fillPrompt },
-        outputUrl: resultUrl,
+        outputUrl: stableUrl,
         cost: 0.05,
       });
 
       return NextResponse.json({
         success: true,
         data: {
-          url: proxyReplicateUrl(resultUrl),
+          url: proxyReplicateUrl(stableUrl),
           provider: 'flux-fill-pro',
           direction,
           expandRatio: ratio,
