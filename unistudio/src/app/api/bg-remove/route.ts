@@ -136,7 +136,7 @@ async function ghostMatchesProduct(
             { type: 'image', source: { type: 'base64', media_type: ref.mediaType, data: ref.data } },
             { type: 'text', text: `IMAGE 2 is an AI-generated product photo that must show the SAME ${noun} with NO person:` },
             { type: 'image', source: { type: 'base64', media_type: out.mediaType, data: out.data } },
-            { type: 'text', text: `Compare IMAGE 2 to the real ${noun} in IMAGE 1.${hint ? ' Real construction: ' + hint + '.' : ''} IMAGE 2 PASSES only if ALL are true: (a) FRONT CLOSURE matches EXACTLY — if IMAGE 1 has a vertical column of hook-and-eye clasps (or a zipper/buttons) down the center front, IMAGE 2 MUST clearly show that same closure; a smooth/plain front with no closure is a FAIL; (b) SIDE PANELS match — if IMAGE 1 has sheer MESH panels on the sides/underarm, IMAGE 2 MUST show those same mesh panels; plain solid sides with no mesh is a FAIL; (c) same strap width and style, same cut and silhouette; (d) fabric looks like REAL photographed cloth with natural satin sheen — NOT plastic, rubbery, cartoonish, CGI or doll-like; (e) ONE single front product — NOT two mannequins, NOT a front+back collage; (f) NO visible human person, face or skin. Answer ONLY "yes" if ALL of (a)(b)(c)(d)(e)(f) pass, or "no" if ANY one fails.` },
+            { type: 'text', text: `Compare IMAGE 2 to the real ${noun} in IMAGE 1.${hint ? ' Real construction: ' + hint + '.' : ''} IMAGE 2 PASSES only if ALL are true: (a) FRONT CLOSURE matches EXACTLY — if IMAGE 1 has a vertical column of hook-and-eye clasps (or a zipper/buttons) down the center front, IMAGE 2 MUST clearly show that same closure; a smooth/plain front with no closure is a FAIL; (b) SIDE PANELS match — if IMAGE 1 has sheer MESH panels on the sides/underarm, IMAGE 2 MUST show those same mesh panels; plain solid sides with no mesh is a FAIL; (c) OVERALL SHAPE matches — same cup style (soft/wireless/unstructured vs molded/push-up), same coverage and silhouette and proportions, same strap width; turning a soft full-coverage ${noun} into a molded push-up look is a FAIL; (d) fabric looks like REAL photographed cloth with natural satin sheen — NOT plastic, rubbery, cartoonish, CGI or doll-like; (e) ONE single front product — NOT two mannequins, NOT a front+back collage; (f) NO visible human person, face or skin. Answer ONLY "yes" if ALL of (a)(b)(c)(d)(e)(f) pass, or "no" if ANY one fails.` },
           ],
         }],
       }),
@@ -550,7 +550,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     //   'grounded-sam' / 'auto' → Uwear fiel → recorte real → ghost 3D → rembg.
     //   'ghost'                 → ghost 3D primero → Uwear → recorte real → rembg.
     const method = isolateMethod ?? 'auto';
-    const MAX_GHOST_ATTEMPTS = 4;
+    const MAX_GHOST_ATTEMPTS = 5;
 
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
     // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
@@ -577,21 +577,12 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // mostramos una alucinación). Si no hay ANTHROPIC_API_KEY, los guardias devuelven
     // null y aceptamos la 1ª tirada (sin validación posible).
     const tryGhost = async (): Promise<boolean> => {
-      // COMBO: el ghost parte del RECORTE LIMPIO de tu producto, NO de la foto con la
-      // modelo. En la foto con modelo los brazos tapan la malla lateral, así que el
-      // ghost la imagina/borra. Con el recorte limpio ve ganchos+malla y los COPIA.
-      // El recorte se calcula UNA sola vez y se reusa en todos los reintentos.
-      let ghostInput = imageUrl;
-      try {
-        ghostInput = await isolateGarment(imageUrl, garmentType ?? null);
-        console.log('[bg-remove:removeSubject] combo: ghost desde el recorte real (no la foto con modelo)');
-      } catch (cutErr) {
-        console.warn(`[bg-remove:removeSubject] recorte para combo falló (${cutErr instanceof Error ? cutErr.message : cutErr}) — ghost desde la foto original`);
-      }
       for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS; attempt++) {
         try {
-          // back = undefined: una sola foto frontal (pasar la espalda hacía 2 maniquíes).
-          const ghost = await modelToGhost(ghostInput, garmentType ?? undefined, undefined, garmentDescription);
+          // EXACTO como ayer: ghost desde TU FOTO original (imageUrl), solo el frente
+          // (back = undefined). Así salió la imagen buena. El combo (recorte como input)
+          // empeoraba la forma → revertido.
+          const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
           const hasModel = await ghostStillHasPerson(ghost.url);
           if (hasModel === true) {
             console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: hay una persona — reintento`);
@@ -613,7 +604,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         }
       }
       // Ninguna tirada pasó el control → NO mostramos alucinación; caemos al recorte fiel.
-      console.warn('[bg-remove:removeSubject] el ghost no pasó el control de fidelidad en 4 intentos — recorte real fiel');
+      console.warn('[bg-remove:removeSubject] el ghost no pasó el control de fidelidad en 5 intentos — recorte real fiel');
       return false;
     };
 
@@ -631,10 +622,9 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       // Modo recorte real explícito: solo píxeles reales (plano, textura exacta).
       if (!(await tryGroundedSam())) await rembgLastResort();
     } else {
-      // DEFAULT: ghost VALIDADO — apunta al look profesional FIEL (como funcionó ayer).
-      // El guardia Claude Vision rechaza tiradas con textura de muñeco, estructura
-      // distinta, collage front+atrás o persona, y reintenta. Si ninguna pasa en 4
-      // intentos → recorte real fiel → último recurso rembg.
+      // DEFAULT: ghost (como la imagen buena de ayer) con GUARDIA Claude Vision que
+      // reintenta hasta pescar una tirada fiel (cierre+malla+forma+textura). Si en los
+      // intentos ninguna pasa → recorte real fiel → rembg.
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
