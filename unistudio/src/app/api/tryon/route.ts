@@ -269,7 +269,10 @@ async function tryOnUwear(
   const prompt =
     `Photorealistic e-commerce catalog photo of a female model wearing the ${noun}, ` +
     `standing front view, clean white studio background, soft even studio lighting, sharp focus. ` +
-    `Keep the ${noun} exactly as provided — same closure, straps, band, cups and construction; do not redesign it.` +
+    `Keep the ${noun} exactly as provided — same closure, straps, band, cups and construction; do not redesign it. ` +
+    // Fidelidad de tela/brillo: preservar el acabado glossy del satén (no mate).
+    `Preserve the EXACT fabric finish and sheen: if the ${noun} is glossy/satin/shiny, keep its ` +
+    `bright highlights and reflective shine — do NOT make it matte, flat or dull.` +
     // Art direction (look del shoot) inyectado desde el pipeline.
     (scenePrompt?.trim() ? ` Art direction: ${scenePrompt.trim()}` : '');
 
@@ -330,6 +333,12 @@ async function tryOnSeedDream(
     `Replace only their ${noun} with the ${noun} from the second image, matching its exact ` +
     `color, pattern, lace, mesh, straps, trim, seams, cut and construction details precisely. ` +
     `Do not redesign, simplify, or recolor the garment. Keep it identical to the reference. ` +
+    // FIDELIDAD DE TELA/BRILLO: SeedDream tiende a renderizar el satén MATE. Anclar el
+    // acabado y el brillo reales del producto (lo lee de la imagen de la prenda).
+    `Preserve the EXACT fabric finish and sheen of the reference ${noun}: if the fabric is ` +
+    `glossy, satin or shiny, keep its bright specular highlights and reflective shine and the ` +
+    `same light reflections — do NOT render it matte, flat, dull or velvet-like; if it is matte, ` +
+    `keep it matte. Match the same material, texture and gloss level exactly. ` +
     spec +
     // Anti-hallucination: el modelo inventa un zipper central y costuras de copa
     // que no existen. Prohibirlo explícitamente y anclar al cierre real.
