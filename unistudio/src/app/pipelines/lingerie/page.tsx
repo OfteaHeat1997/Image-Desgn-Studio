@@ -3513,7 +3513,7 @@ export default function LingeriePipelinePage() {
 
         // Manual mode: pause and wait for user action (10 min timeout to prevent memory leak)
         if (!autoMode && (stepDef.id !== "model" || !newSharedModel)) {
-          await new Promise<void>((resolve) => {
+          const action = await new Promise<string>((resolve) => {
             const TIMEOUT_MS = 10 * 60 * 1000; // 10 min — si la usuaria cierra tab, no queda pendiente forever
             let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
             const cleanup = () => {
@@ -3525,19 +3525,28 @@ export default function LingeriePipelinePage() {
                 cleanup();
                 if (event.detail.action === "skip") {
                   updateStep(jobId, stepDef.id, { status: "skipped" });
+                  resolve("skip");
+                } else if (event.detail.action === "rerun") {
+                  resolve("rerun");
                 } else {
                   updateStep(jobId, stepDef.id, { status: "accepted" });
+                  resolve("accept");
                 }
-                resolve();
               }
             };
             window.addEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
             timeoutId = setTimeout(() => {
               cleanup();
               updateStep(jobId, stepDef.id, { status: "skipped" });
-              resolve();
+              resolve("skip");
             }, TIMEOUT_MS);
           });
+          // FIX Rehacer: re-EJECUTAR este paso de verdad. Antes solo hacía resolve()
+          // y saltaba al siguiente paso (por eso "Rehacer no funcionaba"). dispatchAction
+          // ya dejó el paso en idle; re-corremos processStep para el MISMO step.
+          if (action === "rerun") {
+            return await processStep(stepDef);
+          }
         } else {
           updateStep(jobId, stepDef.id, { status: "accepted" });
         }
@@ -3595,7 +3604,7 @@ export default function LingeriePipelinePage() {
 
         if (!autoMode) {
           // Wait for user to retry or skip (10 min timeout)
-          await new Promise<void>((resolve) => {
+          const action = await new Promise<string>((resolve) => {
             const TIMEOUT_MS = 10 * 60 * 1000;
             let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
             const cleanup = () => {
@@ -3607,9 +3616,9 @@ export default function LingeriePipelinePage() {
                 cleanup();
                 if (event.detail.action === "skip") {
                   updateStep(jobId, stepDef.id, { status: "skipped" });
-                  resolve();
+                  resolve("skip");
                 } else if (event.detail.action === "rerun") {
-                  resolve();
+                  resolve("rerun");
                 }
               }
             };
@@ -3617,9 +3626,13 @@ export default function LingeriePipelinePage() {
             timeoutId = setTimeout(() => {
               cleanup();
               updateStep(jobId, stepDef.id, { status: "skipped" });
-              resolve();
+              resolve("skip");
             }, TIMEOUT_MS);
           });
+          // FIX Rehacer: re-EJECUTAR el paso que falló (antes solo resolvía y saltaba).
+          if (action === "rerun") {
+            return await processStep(stepDef);
+          }
         } else {
           // Auto mode: skip errored step and continue
           toast.error(`Error en "${stepDef.label}": ${errorMsg}`);
