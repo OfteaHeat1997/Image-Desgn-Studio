@@ -19,7 +19,6 @@ import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
-import { generateUwearFlatLay } from '@/lib/api/uwear';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 
 const PROVIDER_COSTS: Record<string, number> = {
@@ -396,42 +395,30 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const regenerated = false;
 
     // Cascada del recorte (producto solo):
-    //   1. UWEAR FLAT-LAY — fidelidad real (la usuaria confirmó que Uwear respeta
-    //      su producto: ganchos, copas, satén). SeedDream REGENERA y pierde esos
-    //      detalles. Uwear es el mejor chance de un recorte fiel. Requiere key.
-    //   2. GHOST (SeedDream) — look 3D pero regenerado (puede diferir).
-    //   3. grounded_sam — recorte plano de pixeles reales (a veces falla).
-    //   4. rembg-last-resort — deja la modelo (hard-fail en la pipeline).
-    let done = false;
-    if (process.env.UWEAR_API_KEY?.trim()) {
+    //   1. GHOST (SeedDream) — look 3D flotante (regenera; puede diferir en detalle).
+    //   2. grounded_sam — recorte plano de pixeles reales (a veces falla).
+    //   3. rembg-last-resort — deja la modelo (hard-fail en la pipeline).
+    //
+    // Uwear flat-lay REMOVIDO: la usuaria confirmó que Uwear da "Flat lay failed"
+    // para TODOS sus bras — su flat-lay no soporta este tipo de prenda. (Uwear SÍ
+    // sirve para la foto CON modelo vía Qwen Intimate, que es otro camino — el try-on.)
+    try {
+      // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
+      // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
+      const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
+      resultUrl = ghost.url;
+      usedProvider = `ghost-mannequin (${ghost.provider})`;
+      console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
+    } catch (ghostErr) {
+      const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
+      console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
       try {
-        resultUrl = await generateUwearFlatLay({ name: `garment ${Date.now()}`, frontUrl: imageUrl });
-        usedProvider = 'uwear-flatlay';
-        done = true;
-        console.log('[bg-remove:removeSubject] Uwear flat-lay OK');
-      } catch (uwErr) {
-        console.warn(`[bg-remove:removeSubject] Uwear flat-lay falló (${uwErr instanceof Error ? uwErr.message : uwErr}) — ghost`);
-      }
-    }
-    if (!done) {
-      try {
-        // Solo la foto FRENTE: pasar también la espalda hacía que SeedDream MEZCLARA
-        // las dos vistas y dibujara un maniquí con un corte distinto ("no es mi producto").
-        const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
-        resultUrl = ghost.url;
-        usedProvider = `ghost-mannequin (${ghost.provider})`;
-        console.log(`[bg-remove:removeSubject] ghost OK (${ghost.provider})`);
-      } catch (ghostErr) {
-        const gm = ghostErr instanceof Error ? ghostErr.message : String(ghostErr);
-        console.warn(`[bg-remove:removeSubject] ghost falló (${gm}) — grounded_sam`);
-        try {
-          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
-          resultUrl = await removeBgReplicate(imageUrl);
-          usedProvider = 'rembg-last-resort';
-        }
+        resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${msg}) — rembg-last-resort`);
+        resultUrl = await removeBgReplicate(imageUrl);
+        usedProvider = 'rembg-last-resort';
       }
     }
 
