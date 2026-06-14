@@ -85,16 +85,17 @@ async function ghostStillHasPerson(imageUrl: string): Promise<boolean | null> {
  * Negative mask prompt for grounded_sam — regions to SUBTRACT from the garment
  * mask. We intentionally vary this by garment type.
  *
- * RESTAURADO al negative prompt de mayo (commit f1e4a59), que SÍ producía una
- * máscara buena del bra de soporte. Hoy lo había cambiado (sacar torso/waist) con
- * la hipótesis de que ayudaba a prendas de cobertura completa, pero en mayo —con
- * torso/waist incluidos— grounded_sam funcionaba para ESTE bra. Restaurar lo conocido.
+ * BUG ENCONTRADO (2026-06-14): la lista incluía `body,torso,waist` — pero el bra
+ * está JUSTO sobre el torso/cuerpo. grounded_sam restaba esas regiones y borraba
+ * el bra mismo → máscara vacía → "no se pudo recortar". Ahora restamos SOLO lo que
+ * claramente NO es la prenda (piel expuesta, cara, pelo, brazos, hombros, cuello,
+ * fondo). NO restamos torso/body/waist porque contienen la prenda.
  */
 function garmentNegativePrompt(garmentType: string | null): string {
-  // Prompt de mayo (probado): suprime piel/cuerpo/cara/pelo/brazo/hombro/cuello/torso/cintura/fondo.
-  const may = 'skin,body,face,hair,arm,shoulder,neck,torso,waist,background';
-  // Panties van bajo en cadera → además suprimir muslo/pierna.
-  return garmentType === 'panty' ? `${may},thigh,leg,hip` : may;
+  // Solo regiones que NO solapan la prenda (no torso/body/waist, que la contienen).
+  const base = 'skin,face,hair,arm,shoulder,neck,background';
+  // Panties van bajo en cadera → suprimir muslo/pierna (NO "hip", que solapa el panty).
+  return garmentType === 'panty' ? `${base},thigh,leg` : base;
 }
 
 /**
