@@ -19,7 +19,6 @@ import { uploadToFalStorage } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 import { modelToGhost } from '@/lib/processing/ghost-mannequin';
-import { isolateProductWithUwear } from '@/lib/api/uwear';
 import { proxyReplicateUrl, replicateHeaders } from '@/lib/utils/image';
 import { CLAUDE_HAIKU } from '@/lib/utils/constants';
 
@@ -93,9 +92,13 @@ async function ghostStillHasPerson(imageUrl: string): Promise<boolean | null> {
  * fondo). NO restamos torso/body/waist porque contienen la prenda.
  */
 function garmentNegativePrompt(garmentType: string | null): string {
-  // Solo regiones que NO solapan la prenda (no torso/body/waist, que la contienen).
-  const base = 'skin,face,hair,arm,shoulder,neck,background';
-  // Panties van bajo en cadera → suprimir muslo/pierna (NO "hip", que solapa el panty).
+  // MÍNIMO a propósito: antes restábamos skin/shoulder/neck/arm — pero en un bra
+  // deportivo los tirantes van sobre los hombros y el escote toca el cuello, así que
+  // esas restas EROSIONABAN la máscara hasta dejarla vacía → "no se pudo recortar".
+  // Ahora solo restamos el FONDO (nunca solapa la prenda). Grounding DINO ya acota la
+  // caja a la prenda, así que no necesitamos restar piel/hombros.
+  const base = 'background';
+  // Panties van bajo en cadera → muslo/pierna no solapan, ayudan a limpiar bordes.
   return garmentType === 'panty' ? `${base},thigh,leg` : base;
 }
 
@@ -463,36 +466,6 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const method = isolateMethod ?? 'auto';
     const MAX_GHOST_ATTEMPTS = 3;
 
-    // Uwear remove_background: EXTRAE el producto real (frente + espalda como
-    // referencia). 100% fiel — NO inventa la tela ni los detalles. Es el método que
-    // la usuaria pidió. Re-hospedamos en fal porque las URLs de Uwear expiran.
-    const tryUwear = async (): Promise<boolean> => {
-      try {
-        const uwearUrl = await isolateProductWithUwear({
-          name: `isolate-${garmentType ?? 'garment'}-${Date.now()}`,
-          frontUrl: imageUrl,
-          backUrl: backImageUrl ?? undefined,
-        });
-        let stableUrl = uwearUrl;
-        try {
-          const r = await fetch(uwearUrl);
-          if (r.ok) {
-            const buf = Buffer.from(await r.arrayBuffer());
-            const ct = r.headers.get('content-type') || 'image/png';
-            stableUrl = await uploadToFalStorage(buf, ct, 'uwear-isolate.png');
-          }
-        } catch (e) {
-          console.warn('[bg-remove:removeSubject] no se pudo re-hospedar Uwear en fal:', e instanceof Error ? e.message : e);
-        }
-        resultUrl = stableUrl;
-        usedProvider = 'uwear-remove-bg';
-        return true;
-      } catch (e) {
-        console.warn(`[bg-remove:removeSubject] Uwear isolate falló (${e instanceof Error ? e.message : e})`);
-        return false;
-      }
-    };
-
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
     // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
     // qué falla, no el mensaje genérico).
@@ -548,23 +521,19 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       usedProvider = 'rembg-last-resort';
     };
 
-    // NUNCA se queda en error, y FIDELIDAD PRIMERO. Uwear (producto real, no inventa)
-    // y grounded_sam (pixeles reales) van antes que el ghost (que regenera).
+    // NUNCA se queda en error, y FIDELIDAD PRIMERO. grounded_sam recorta los PÍXELES
+    // REALES de tu producto y QUITA la modelo (lo único fiel que sí la elimina). El
+    // ghost queda como respaldo (quita la modelo pero REGENERA → con aviso).
     if (method === 'ghost') {
-      // La usuaria pidió explícitamente el look 3D regenerado. Igual respaldamos con
-      // los fieles si el ghost falla.
+      // La usuaria pidió explícitamente el look 3D regenerado.
       if (!(await tryGhost())) {
-        if (!(await tryUwear())) {
-          if (!(await tryGroundedSam())) await rembgLastResort();
-        }
+        if (!(await tryGroundedSam())) await rembgLastResort();
       }
     } else {
-      // 'grounded-sam' / 'auto' (default): FIEL primero. Uwear extrae el producto
-      // real → grounded_sam (pixeles reales) → ghost 3D (regenera, con aviso) → rembg.
-      if (!(await tryUwear())) {
-        if (!(await tryGroundedSam())) {
-          if (!(await tryGhost())) await rembgLastResort();
-        }
+      // 'grounded-sam' / 'auto' (default): recorte real fiel (quita modelo) primero;
+      // si no logra máscara, ghost 3D (regenera, con aviso); último recurso, rembg.
+      if (!(await tryGroundedSam())) {
+        if (!(await tryGhost())) await rembgLastResort();
       }
     }
 
