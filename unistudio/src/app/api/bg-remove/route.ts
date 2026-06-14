@@ -472,7 +472,7 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, backImageUrl, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg';
     removeSubject?: boolean;
@@ -579,7 +579,10 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const tryGhost = async (): Promise<boolean> => {
       for (let attempt = 1; attempt <= MAX_GHOST_ATTEMPTS; attempt++) {
         try {
-          const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, backImageUrl ?? undefined, garmentDescription);
+          // SOLO la foto FRENTE (back = undefined): pasar la espalda hacía que el
+          // ghost dibujara DOS maniquíes (frente + espalda) en vez de una sola foto
+          // limpia. La buena de ayer usaba solo el frente.
+          const ghost = await modelToGhost(imageUrl, garmentType ?? undefined, undefined, garmentDescription);
           const hasModel = await ghostStillHasPerson(ghost.url);
           if (hasModel === true) {
             console.warn(`[bg-remove:removeSubject] ghost intento ${attempt}/${MAX_GHOST_ATTEMPTS}: hay una persona — reintento`);
