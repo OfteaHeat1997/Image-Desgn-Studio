@@ -550,7 +550,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     //   'grounded-sam' / 'auto' → Uwear fiel → recorte real → ghost 3D → rembg.
     //   'ghost'                 → ghost 3D primero → Uwear → recorte real → rembg.
     const method = isolateMethod ?? 'auto';
-    const MAX_GHOST_ATTEMPTS = 5;
+    const MAX_GHOST_ATTEMPTS = 3;
 
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
     // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
@@ -604,7 +604,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         }
       }
       // Ninguna tirada pasó el control → NO mostramos alucinación; caemos al recorte fiel.
-      console.warn('[bg-remove:removeSubject] el ghost no pasó el control de fidelidad en 5 intentos — recorte real fiel');
+      console.warn('[bg-remove:removeSubject] el ghost no pasó el control de fidelidad en 3 intentos — recorte real fiel');
       return false;
     };
 
