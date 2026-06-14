@@ -461,13 +461,17 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const MAX_GHOST_ATTEMPTS = 3;
 
     // grounded_sam: recorte de pixeles REALES (fiel). usedProvider claro.
+    // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
+    // qué falla, no el mensaje genérico).
+    let groundedSamError = '';
     const tryGroundedSam = async (): Promise<boolean> => {
       try {
         resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
         usedProvider = 'grounded-sam-isolate';
         return true;
       } catch (err) {
-        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${err instanceof Error ? err.message : err})`);
+        groundedSamError = err instanceof Error ? err.message : String(err);
+        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${groundedSamError})`);
         return false;
       }
     };
@@ -511,7 +515,13 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
 
     if (method === 'grounded-sam') {
       // SOLO recorte real (fiel). NUNCA ghost — la usuaria NO quiere regenerar.
-      if (!(await tryGroundedSam())) await rembgLastResort();
+      // Si falla, NO caemos a rembg (taparía el error): lanzamos el error REAL de
+      // grounded_sam para que se vea en "Ver detalle técnico" y poder diagnosticar.
+      if (!(await tryGroundedSam())) {
+        throw new Error(
+          `Recorte real (grounded_sam) no pudo aislar la prenda. Detalle: ${groundedSamError || 'no devolvió una máscara usable'}`,
+        );
+      }
     } else if (method === 'ghost') {
       if (!(await tryGhost())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
