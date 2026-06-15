@@ -244,12 +244,12 @@ async function tryOnUwear(
   // null/undefined, Uwear genera sin art direction = comportamiento actual.
   artDirectionId?: number | null,
 ): Promise<string> {
-  // Gemini Flash 2 ('nano-banana-2') por DEFAULT: es el modelo default de Uwear,
-  // realism 5 y NO requiere empresa verificada. Qwen Intimate (qwen-rapid-aio-v23)
-  // requiresVerifiedCompany:true → si la cuenta no está verificada, Uwear lo rechaza y
-  // el try-on caía a la modelo reusable (el bug que reportó la usuaria). Se puede
-  // sobreescribir con UWEAR_MODEL_SLUG en Vercel (ej qwen-rapid-aio-v23 si verificás).
-  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.geminiFlash;
+  // Qwen Intimate ('qwen-rapid-aio-v23') por DEFAULT: es el modelo de Uwear
+  // ESPECIALISTA en lencería/intimates (mejor fidelidad de satén y cierre). Requiere
+  // empresa verificada — la cuenta de Unistyles YA está verificada (jun-2025), así que
+  // funciona. Si en algún momento da error de verificación, seteá UWEAR_MODEL_SLUG=
+  // nano-banana-2 (Gemini Flash 2, realism 5, sin verificación) para volver al genérico.
+  const modelSlug = process.env.UWEAR_MODEL_SLUG?.trim() || UWEAR_MODEL_SLUGS.qwenIntimate;
   const isQwen = modelSlug.startsWith('qwen');
   const noun = GARMENT_NOUN[(garmentType ?? '').toLowerCase()] ?? 'garment';
 
