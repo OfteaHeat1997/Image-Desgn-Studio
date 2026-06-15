@@ -59,6 +59,15 @@ const IDM_VTON_PREFERRED_TYPES = new Set([
   'bikini',
   'bodysuit',
   'intimate',
+  // BUG (jun-2025): faltaban 'bra'/'panty'/'shapewear' acá → smartTryOn los trataba
+  // como NO-íntimos y los mandaba a FASHN (avatar genérico, poco natural) en vez de
+  // Uwear. El handler sí los reconocía (isIntimateRequest), pero esta lista no →
+  // inconsistencia. Ahora coinciden: bra/panty/shapewear van por el camino Uwear.
+  'bra',
+  'panty',
+  'shapewear',
+  'faja',
+  'fajas',
 ]);
 
 // ---------------------------------------------------------------------------
