@@ -1,5 +1,46 @@
 # UniStudio — Changelog
 
+## 2026-08-08 — Lencería: el pipeline deja de congelarse, y el health check deja de mentir
+
+Sesión de estabilización del pipeline de lencería antes de la demo. Tres bugs reales y una
+causa raíz que no era código.
+
+**CAUSA RAÍZ de "todos los pasos salen en rojo": la cuenta de fal.ai quedó SIN SALDO.**
+fal es el proveedor de SeedDream (modelo + try-on), Kolors, Kling y del storage donde se
+suben todas las imágenes intermedias — sin saldo, cada paso falla. No se arregla con código:
+recargar en fal.ai/dashboard/billing.
+
+**1. `productVideo` congelaba la app y borraba los resultados** (`lingerie/page.tsx`).
+Su guard hacía `throw` FUERA del try/catch de `processStep`, así que la excepción escapaba
+hasta `startPipeline` (que no la atrapaba): `setIsRunning(false)` nunca corría (UI trabada en
+"procesando"), el guardado en galería nunca corría (se perdían TODOS los resultados de la foto)
+y las fotos siguientes del batch no se procesaban. El disparador era el caso más común: que
+`isolate` cayera a `rembg-last-resort`. Ahora se salta con mensaje claro, como el resto de los
+guards. Además `startPipeline` envuelve `processJob` en try/catch como red de seguridad.
+
+**2. `photoBack` exigía la prenda aislada de más.** Cuando hay foto real de espalda, esa foto
+se usa como garment reference y el aislado ni se toca — pero el guard lo pedía igual, así que
+si "Aislar Producto" fallaba, Foto Espalda moría al pedo teniendo la foto real.
+
+**3. Paso 1 perdía tiempo con Photoroom sin plan pago** (`api/bg-remove/route.ts`).
+Ghost Mannequin es del plan Plus; sin suscripción la API responde 401/402/403 en TODAS las
+imágenes, pero se reintentaba en cada foto del batch. Ahora: sin `PHOTOROOM_API_KEY` ni se
+intenta, y ante un rechazo por plan se marca no disponible para el resto del proceso.
+
+**4. `/api/health` daba un FALSO POSITIVO de fal** (`api/health/route.ts`). Pegaba a
+`/fast-sdxl/status` y daba "connected" con cualquier status < 500 — pero el bloqueo por saldo
+es un 403, así que el health decía "healthy" mientras todo fallaba. Ahora pega al mismo
+endpoint que usa el pipeline (`storage/upload/initiate`), detecta explícitamente el saldo
+agotado, y el estado global mira los backends además de las env vars.
+
+**Verificado end-to-end en local** (antes de que se agotara el saldo), con foto real del
+inventario (`bras/011473`): Paso 1 → `grounded-sam-isolate`, producto real fiel sobre blanco
+($0.01, sin Photoroom); Paso 2 → modelo SeedDream ($0.055); Paso 3 → try-on `seedream` ($0.03).
+Pendiente de validar: el try-on inventó un cierre de cremallera donde el bra real tiene ganchos
+— la prueba se hizo SIN el `garmentDescription` que el pipeline sí inyecta, así que falta
+repetirla con ese anclaje cuando haya saldo.
+
+
 ## 2026-06-13 — Comparador antes/después en cada paso + panty del cuerpo completo con color del bra
 
 Dos pedidos de la usuaria cerrados:

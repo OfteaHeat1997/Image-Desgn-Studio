@@ -51,26 +51,54 @@ export async function GET() {
     }
   }
 
-  // Check fal.ai connectivity
+  // Check fal.ai connectivity.
+  //
+  // FALSO POSITIVO que este check tenía y costó horas de debug: pegaba a
+  // /fast-sdxl/status y daba "connected" con cualquier status < 500. Cuando la
+  // cuenta de fal se queda SIN SALDO, fal responde 403 "User is locked. Reason:
+  // Exhausted balance" — que es < 500 → el health decía "connected" mientras
+  // TODOS los pasos del pipeline fallaban en rojo (fal es el proveedor de
+  // SeedDream, Kolors, Kling y del storage donde se suben las imágenes).
+  //
+  // Ahora pegamos al MISMO endpoint que usa el pipeline (storage/upload/initiate)
+  // y distinguimos explícitamente el bloqueo por saldo, que es accionable:
+  // recargar en fal.ai/dashboard/billing.
   let falStatus = "not checked";
   const falKey = process.env.FAL_KEY?.trim();
   if (falKey) {
     try {
-      const res = await fetch("https://queue.fal.run/fal-ai/fast-sdxl/status", {
-        headers: { Authorization: `Key ${falKey}` },
-        signal: AbortSignal.timeout(5000),
+      const res = await fetch("https://rest.alpha.fal.ai/storage/upload/initiate", {
+        method: "POST",
+        headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ content_type: "image/png", file_name: "healthcheck.png" }),
+        signal: AbortSignal.timeout(8000),
       });
-      // 404/422 is fine — it means the API responded (no job ID given)
-      falStatus = res.status < 500 ? "connected" : `error: HTTP ${res.status}`;
+      if (res.ok) {
+        falStatus = "connected";
+      } else {
+        const detail = await res.text().catch(() => "");
+        if (/exhausted balance|user is locked/i.test(detail)) {
+          falStatus = "SIN SALDO — recargá en fal.ai/dashboard/billing (todos los pasos van a fallar)";
+        } else if (res.status === 401 || res.status === 403) {
+          falStatus = `error: credenciales rechazadas (HTTP ${res.status})`;
+        } else {
+          falStatus = `error: HTTP ${res.status}`;
+        }
+      }
     } catch (err) {
       falStatus = `error: ${err instanceof Error ? err.message : "unreachable"}`;
     }
   }
 
   const allRequired = requiredVars.every((v) => process.env[v]);
+  // El estado global también mira los backends: tener las env vars puestas no
+  // sirve de nada si fal está sin saldo o Replicate rechaza el token.
+  const backendsOk =
+    !falStatus.startsWith("error") && !falStatus.startsWith("SIN SALDO") &&
+    !replicateStatus.startsWith("error");
 
   return NextResponse.json({
-    status: allRequired ? "healthy" : "degraded",
+    status: allRequired && backendsOk ? "healthy" : "degraded",
     timestamp: new Date().toISOString(),
     database: dbStatus,
     backends: {
