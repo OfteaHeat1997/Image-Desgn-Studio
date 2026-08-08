@@ -254,8 +254,8 @@ const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: strin
 type IsolateMethod = "photoroom" | "combo" | "grounded-sam" | "ghost" | "auto";
 
 const ISOLATE_METHOD_OPTIONS: { value: IsolateMethod; label: string; hint: string }[] = [
-  { value: "grounded-sam", label: "Recorte real (recomendado)", hint: "Recorta los píxeles REALES de tu foto — NO inventa nada. Tu producto exacto, con su textura y su brillo. $0.01 y no necesita ninguna suscripción. (grounded_sam)" },
-  { value: "photoroom",    label: "Photoroom Ghost Mannequin (requiere plan pago)", hint: "Servicio dedicado de pago (plan Plus). Si no tenés PHOTOROOM_API_KEY con suscripción activa, este método NO corre: se salta solo y usa el recorte real." },
+  { value: "photoroom",    label: "Photoroom Ghost Mannequin (recomendado)", hint: "Servicio dedicado: deja tu producto flotando 3D sobre blanco preservando la tela. Es el que mejor resultado da. Requiere plan pago — si la key no está o no tiene plan, se salta solo y usa el recorte real." },
+  { value: "grounded-sam", label: "Recorte real (respaldo fiel)", hint: "Recorta los píxeles REALES de tu foto — NO inventa nada. $0.01 y sin suscripción. Sale más plano que Photoroom, y en fotos difíciles puede no encontrar la prenda." },
   { value: "ghost",        label: "Ghost 3D (regenera)", hint: "SeedDream redibuja el producto con volumen 3D — se ve lindo pero PUEDE cambiar textura/forma." },
   { value: "auto",         label: "Automático", hint: "Recorte real primero; si falla, ghost 3D; si falla, quita fondo." },
 ];
@@ -1557,7 +1557,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Método:</span>
             <select
-              value={step.isolateMethodOverride ?? "grounded-sam"}
+              value={step.isolateMethodOverride ?? "photoroom"}
               onChange={(e) => onChangeIsolateMethod(e.target.value as IsolateMethod)}
               disabled={step.status === "processing"}
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
@@ -1568,7 +1568,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             </select>
           </div>
           <p className="mt-1.5 text-[10px] text-gray-500">
-            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "grounded-sam"))?.hint}
+            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "photoroom"))?.hint}
           </p>
         </div>
       )}
@@ -2360,7 +2360,7 @@ async function runStep(
         garmentDescription,
         // Método de recorte elegido. Default 'combo' = producto real extraído +
         // ghost-mannequin profesional (lo mejor de los dos).
-        isolateMethod: isolateMethod ?? "grounded-sam",
+        isolateMethod: isolateMethod ?? "photoroom",
       }),
     });
     // El servidor a veces devuelve una página de error HTML (timeout/crash de la

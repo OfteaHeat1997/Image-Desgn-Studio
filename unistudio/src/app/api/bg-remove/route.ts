@@ -670,8 +670,18 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
     // en error.
     if (method === 'grounded-sam') {
-      // Modo recorte real explícito: solo píxeles reales (plano, textura exacta).
-      if (!(await tryGroundedSam())) await rembgLastResort();
+      // Modo recorte real explícito: primero píxeles reales (plano, textura exacta).
+      //
+      // Si grounded_sam no encuentra la prenda (pasa con fotos donde la modelo
+      // ocupa poco del encuadre), antes se caía DIRECTO a rembg-last-resort — que
+      // el pipeline de lencería hard-failea, así que elegir esta opción convertía
+      // una foto difícil en un error terminal. Ahora intenta Photoroom antes de
+      // rendirse: también preserva la tela real (no es un editor generativo), así
+      // que respeta la intención de "fiel" de esta opción. Si no hay plan de
+      // Photoroom, tryPhotoroom devuelve false al instante y no cuesta nada.
+      if (!(await tryGroundedSam())) {
+        if (!(await tryPhotoroom())) await rembgLastResort();
+      }
     } else if (method === 'ghost') {
       // Ghost generativo validado (selección explícita). Puede alucinar; el guardia
       // Claude Vision reintenta. Si ninguna pasa → recorte real → rembg.
