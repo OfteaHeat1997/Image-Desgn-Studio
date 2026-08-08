@@ -1,5 +1,39 @@
 # UniStudio — Changelog
 
+## 2026-08-08 — Photoroom: qué sirve y qué no (probado, no supuesto)
+
+**Virtual Model de Photoroom NO funciona con lencería.** Se probó a fondo antes de
+decidir si pagar el plan Plus (€100/mes):
+
+| Variable probada | Valores | Resultado |
+|---|---|---|
+| Color del producto | negro, beige | 500 en los dos |
+| Pose | standing, random | 500 en las dos |
+| Presets | `ava`+`studio` y `avery`+`street` (los del ejemplo oficial) | 500 en los dos |
+| Modo | sandbox y cuota real | 500 en los dos |
+
+Siempre el mismo `500 {"error":{"message":"An error occurred during Virtual Model
+processing"}}` — genérico, sin mencionar política de contenido. Test de control:
+el ghost-mannequin corrido en el MISMO modo sandbox devuelve imagen OK, así que
+el sandbox no es el problema — es Virtual Model.
+
+**Conclusión: Photoroom cubre el Paso 1 y nada más.** Los pasos 2-7 (modelo IA,
+try-on, espalda, cuerpo completo, videos) siguen en fal/Replicate. Photoroom
+tampoco genera video — confirmado en su documentación.
+
+**Modo sandbox SÍ sirve y es la vía para iterar gratis:** mismo key con prefijo
+`sandbox_`, 1.000 llamadas/mes (máx 100/día) contra /v2/edit, resultado con marca
+de agua. El plan de la usuaria es la prueba gratis de 10 imágenes/mes, así que sin
+sandbox cada tanteo del Paso 1 gastaba una de esas 10. Nuevo método de Paso 1
+`photoroom-sandbox` + opción en la UI, y ruta de diagnóstico
+`/api/photoroom-virtualmodel`.
+
+**Precios verificados en photoroom.com/api/pricing:** Basic €20/mes = *Remove
+Background API* solamente (NO incluye ghost-mannequin). Plus €100/mes = *Image
+Editing API*, que es donde vive ghostMannequin. Pagar el Basic no habilitaría el
+Paso 1.
+
+
 ## 2026-08-08 — Lencería: el pipeline deja de congelarse, y el health check deja de mentir
 
 Sesión de estabilización del pipeline de lencería antes de la demo. Tres bugs reales y una
