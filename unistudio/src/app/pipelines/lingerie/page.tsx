@@ -2593,6 +2593,41 @@ async function runStep(
     if (!sharedModelUrl) {
       throw new Error("Falta la modelo IA (paso 'model' no corrió o falló). Corré ese paso antes del try-on.");
     }
+
+    // LEFFA VA POR EL FLUJO ASÍNCRONO. Es el único proveedor verificado que
+    // RESPETA la silueta real del producto (warpea los píxeles reales en vez de
+    // redibujarlos como SeedDream), pero tarda ~236s y la ruta síncrona corre
+    // dentro de una función de Vercel limitada a 300s: se pasaba y devolvía
+    // FUNCTION_INVOCATION_TIMEOUT. Subir maxDuration no es opción — el plan de
+    // esta cuenta no admite más de 300s. Acá encolamos y consultamos desde el
+    // navegador, así ninguna llamada al servidor dura más de unos segundos.
+    if (providerOverride === "leffa") {
+      const submitRes = await fetch("/api/tryon/async", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortSignal,
+        body: JSON.stringify({ modelImage: sharedModelUrl, garmentImage: inputUrl, category }),
+      });
+      const submitJson = await submitRes.json();
+      if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
+      const { statusUrl, responseUrl } = submitJson.data as { statusUrl: string; responseUrl: string };
+
+      // Consulta cada 6s. Leffa ronda los 4 minutos; 60 intentos = 6 min de
+      // margen antes de rendirse con un mensaje claro.
+      for (let attempt = 0; attempt < 60; attempt++) {
+        if (abortSignal?.aborted) throw new DOMException("Aborted", "AbortError");
+        await new Promise((r) => setTimeout(r, 6000));
+        const q = `statusUrl=${encodeURIComponent(statusUrl)}&responseUrl=${encodeURIComponent(responseUrl)}`;
+        const pollRes = await fetch(`/api/tryon/async?${q}`, { signal: abortSignal });
+        const pollJson = await pollRes.json();
+        if (!pollJson.success) throw new Error(pollJson.error || "Leffa falló durante la generación.");
+        if (pollJson.data?.done) {
+          return { resultUrl: pollJson.data.url, cost: pollJson.data.cost ?? 0.04, usedProvider: "leffa" };
+        }
+      }
+      throw new Error("Leffa tardó más de 6 minutos. Dale 'Rehacer' o probá otro proveedor.");
+    }
+
     const res = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
