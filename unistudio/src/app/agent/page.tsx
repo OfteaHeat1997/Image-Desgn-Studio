@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { useI18n } from "@/hooks/useI18n";
 
 /**
  * AI Agent — pipeline router.
@@ -198,6 +199,7 @@ function FallbackLoader() {
 }
 
 function AgentRouterContent() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -293,9 +295,9 @@ function AgentRouterContent() {
 
       <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8">
         <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">¿Qué querés procesar?</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.agent.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Subí una foto (auto-detecto la categoría) o elegí abajo. Te mando al pipeline correcto con la configuración para ese tipo de producto.
+            {t.pages.agent.subtitle}
           </p>
         </div>
 

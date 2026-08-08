@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/hooks/useI18n";
 import {
   Scissors,
   ImageIcon,
@@ -889,6 +890,7 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
 // =============================================================================
 
 export default function WorkflowsPage() {
+  const { t } = useI18n();
   const [filterCat, setFilterCat] = useState<string>("all");
 
   const filtered = filterCat === "all" ? FEATURES : FEATURES.filter((f) => f.category === filterCat);
@@ -910,10 +912,10 @@ export default function WorkflowsPage() {
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-6 md:py-10">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-heading">
-            UniStudio — Mapa Completo
+            {t.pages.workflows.title}
           </h1>
           <p className="mt-1 text-sm text-body">
-            Cada feature, qué hace, qué archivos tocar, con fotos reales de tu inventario Unistyles
+            {t.pages.workflows.subtitle}
           </p>
         </div>
 

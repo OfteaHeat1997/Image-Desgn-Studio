@@ -23,6 +23,7 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { cn } from "@/lib/utils/cn";
+import { useI18n } from "@/hooks/useI18n";
 import { toast } from "@/hooks/use-toast";
 import { useGalleryStore } from "@/stores/gallery-store";
 import {
@@ -423,6 +424,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 /* ------------------------------------------------------------------ */
 
 export default function StaticProductPipelinePage() {
+  const { t } = useI18n();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [defaultType, setDefaultType] = useState<StaticProductType>("perfume");
@@ -1095,9 +1097,9 @@ export default function StaticProductPipelinePage() {
 
       <div className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
         <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Fotos profesionales para tu catálogo</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.staticProduct.title}</h1>
           <p className="mt-1 text-sm text-body leading-relaxed">
-            Sube tus perfumes y la IA genera los 3 outputs que necesitas: fondo blanco para Amazon, fondo de catálogo estilo Sephora, y formato vertical 9:16 para Reels y Stories — todos cohesivos entre sí.
+            {t.pages.staticProduct.subtitle}
           </p>
         </div>
 

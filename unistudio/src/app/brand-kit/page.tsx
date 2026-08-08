@@ -21,6 +21,7 @@ import { ColorPicker } from "@/components/ui/color-picker";
 import { Dropzone } from "@/components/ui/dropzone";
 import { cn } from "@/lib/utils/cn";
 import { useBrandStore } from "@/stores/brand-store";
+import { useI18n } from "@/hooks/useI18n";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -143,6 +144,7 @@ const INITIAL_STATE: BrandKitState = {
 /* ------------------------------------------------------------------ */
 
 export default function BrandKitPage() {
+  const { t } = useI18n();
   const [state, setState] = useState<BrandKitState>(INITIAL_STATE);
   const [isSaving, setIsSaving] = useState(false);
   const hasInitialized = useRef(false);
@@ -338,9 +340,9 @@ export default function BrandKitPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Tu Kit de Marca</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.brandKit.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Define la identidad de tu marca: logo, colores y marca de agua. Se aplica automáticamente en todas las fotos.
+            {t.pages.brandKit.subtitle}
           </p>
           {isApiLoading && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">

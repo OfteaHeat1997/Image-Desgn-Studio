@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils/cn";
 import { useGalleryStore } from "@/stores/gallery-store";
 import { toast } from "@/hooks/use-toast";
+import { useI18n } from "@/hooks/useI18n";
 
 /* ------------------------------------------------------------------ */
 /*  Safe JSON helper — handles "Request Entity Too Large" text errors   */
@@ -322,6 +323,7 @@ async function downloadAsZip(
 /* ------------------------------------------------------------------ */
 
 export default function BatchPage() {
+  const { t } = useI18n();
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -1107,9 +1109,9 @@ export default function BatchPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Procesa muchas fotos a la vez</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.batch.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Sube hasta 50 imágenes y aplica el mismo pipeline a todas — perfecto para catálogo de temporada.
+            {t.pages.batch.subtitle}
           </p>
         </div>
         <div className="flex items-center gap-2">

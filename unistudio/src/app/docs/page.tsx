@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/hooks/useI18n";
 import {
   ArrowLeft,
   Folder,
@@ -782,6 +783,7 @@ function FileTreeItem({ entry, depth = 0 }: { entry: FileEntry; depth?: number }
 // =============================================================================
 
 export default function DocsPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"tree" | "reference">("tree");
 
@@ -820,9 +822,9 @@ export default function DocsPage() {
       </header>
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-6 md:py-10">
         <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Mapa del Proyecto</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.docs.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Cada archivo, cada carpeta, qué hace y dónde ir para cambiarlo
+            {t.pages.docs.subtitle}
           </p>
         </div>
 

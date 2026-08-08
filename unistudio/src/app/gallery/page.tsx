@@ -29,6 +29,7 @@ import { useGalleryStore, type GalleryImage } from "@/stores/gallery-store";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
+import { useI18n } from "@/hooks/useI18n";
 
 /* ------------------------------------------------------------------ */
 /*  Filter constants                                                    */
@@ -61,6 +62,7 @@ const PROJECT_OPTIONS = [
 /* ------------------------------------------------------------------ */
 
 export default function GalleryPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const images = useGalleryStore((s) => s.images);
   const addImage = useGalleryStore((s) => s.addImage);
@@ -242,10 +244,10 @@ export default function GalleryPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Tu galería de imágenes</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.gallery.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Todas tus fotos procesadas, listas para reusar o descargar.{" "}
-            <span className="text-muted">{images.length} en total</span>
+            {t.pages.gallery.subtitle}{" "}
+            <span className="text-muted">{images.length} {t.pages.gallery.totalSuffix}</span>
           </p>
         </div>
 

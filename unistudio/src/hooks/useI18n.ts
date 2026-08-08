@@ -20,13 +20,13 @@ import {
   DEFAULT_LOCALE,
   LOCALE_BCP47,
   getCopy,
-  type HomeCopy,
+  type AppCopy,
   type Locale,
 } from '@/lib/i18n/translations';
 
 export interface UseI18n {
   /** Textos del idioma activo. */
-  t: HomeCopy;
+  t: AppCopy;
   /** Idioma activo (es | en). */
   locale: Locale;
   /** BCP-47 del idioma activo (para el Web Speech API / TTS). */

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/hooks/useI18n";
 import {
   ArrowLeft,
   ArrowRight,
@@ -405,6 +406,7 @@ const NAV_ITEMS = [
 /* ================================================================== */
 
 export default function ArchitecturePage() {
+  const { t } = useI18n();
   return (
     <div className="min-h-screen bg-surface text-heading">
       {/* Header coherente con dashboard + pipelines */}
@@ -434,10 +436,9 @@ export default function ArchitecturePage() {
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Hero */}
         <div className="rounded-xl border border-surface-lighter bg-surface p-6 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-2">Como Funciona UniStudio</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">{t.pages.architecture.title}</h2>
           <p className="text-sm text-gray-400 max-w-2xl">
-            Guia interactiva para entender la arquitectura, el flujo de datos, cada modulo, y como probar
-            que todo funcione. Diseñada para estudiantes que necesitan tomar decisiones sobre el proyecto.
+            {t.pages.architecture.subtitle}
           </p>
           <div className="flex flex-wrap gap-3 mt-4">
             <div className="flex items-center gap-1.5 text-xs text-gray-400">

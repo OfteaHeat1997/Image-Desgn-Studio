@@ -16,6 +16,8 @@
 //     que TypeScript garantice que ninguna clave quede sin traducir.
 // =============================================================================
 
+import { type PagesCopy, PAGES_ES, PAGES_EN } from './pages';
+
 export type Locale = 'es' | 'en';
 
 export const LOCALES: Locale[] = ['es', 'en'];
@@ -486,8 +488,21 @@ const en: HomeCopy = {
 // Registro
 // -----------------------------------------------------------------------------
 
-export const TRANSLATIONS: Record<Locale, HomeCopy> = { es, en };
+/**
+ * Diccionario completo de la app: la home (`HomeCopy`) + los encabezados de las
+ * páginas internas (`pages`). Se extiende de forma aditiva, así la home no se
+ * rompe: sus claves siguen en el nivel superior (`t.dashboard`, `t.pipelines`…)
+ * y lo nuevo cuelga de `t.pages.*`.
+ */
+export interface AppCopy extends HomeCopy {
+  pages: PagesCopy;
+}
 
-export function getCopy(locale: Locale): HomeCopy {
+const esFull: AppCopy = { ...es, pages: PAGES_ES };
+const enFull: AppCopy = { ...en, pages: PAGES_EN };
+
+export const TRANSLATIONS: Record<Locale, AppCopy> = { es: esFull, en: enFull };
+
+export function getCopy(locale: Locale): AppCopy {
   return TRANSLATIONS[locale] ?? TRANSLATIONS[DEFAULT_LOCALE];
 }

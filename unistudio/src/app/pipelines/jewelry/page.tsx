@@ -17,6 +17,7 @@ import {
   Film,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useI18n } from "@/hooks/useI18n";
 import { toast } from "@/hooks/use-toast";
 import { useGalleryStore } from "@/stores/gallery-store";
 import {
@@ -248,6 +249,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 /* ------------------------------------------------------------------ */
 
 export default function JewelryPipelinePage() {
+  const { t } = useI18n();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [defaultSubType, setDefaultSubType] = useState<JewelrySubType>("earrings");
@@ -658,9 +660,9 @@ export default function JewelryPipelinePage() {
 
       <div className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
         <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Joyería para catálogo de lujo</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.jewelry.title}</h1>
           <p className="mt-1 text-sm text-body leading-relaxed">
-            Cada pieza recibe el mismo tratamiento que las marcas premium: estante elegante con fondo de mármol, foto en modelo (oreja, cuello, mano o muñeca según el tipo) y video 360° opcional para Reels.
+            {t.pages.jewelry.subtitle}
           </p>
         </div>
 
