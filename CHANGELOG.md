@@ -33,12 +33,38 @@ es un 403, así que el health decía "healthy" mientras todo fallaba. Ahora pega
 endpoint que usa el pipeline (`storage/upload/initiate`), detecta explícitamente el saldo
 agotado, y el estado global mira los backends además de las env vars.
 
-**Verificado end-to-end en local** (antes de que se agotara el saldo), con foto real del
-inventario (`bras/011473`): Paso 1 → `grounded-sam-isolate`, producto real fiel sobre blanco
-($0.01, sin Photoroom); Paso 2 → modelo SeedDream ($0.055); Paso 3 → try-on `seedream` ($0.03).
-Pendiente de validar: el try-on inventó un cierre de cremallera donde el bra real tiene ganchos
-— la prueba se hizo SIN el `garmentDescription` que el pipeline sí inyecta, así que falta
-repetirla con ese anclaje cuando haya saldo.
+**5. `photoFullBody` fallaba SIEMPRE por filtro NSFW** (`api/outpaint/route.ts`). flux-fill-pro
+es más permisivo que Kontext pero su safety checker igual rechaza lencería ("NSFW content
+detected"). Ahora cae a SeedDream v4 edit (fal), el camino sin filtro que ya usan tryon y el
+ghost mannequin, pasándole el canvas ya extendido. Además se le fija `image_size` con las
+dimensiones exactas del canvas: sin eso SeedDream reencuadraba a cuadrado y cortaba la cabeza
+de la modelo.
+
+**Verificado end-to-end en local con foto real del inventario (`bras/011473`):**
+
+| Paso | Proveedor real | Costo | Resultado |
+|---|---|---|---|
+| Aislar Producto | `grounded-sam-isolate` | $0.01 | Producto real fiel sobre blanco, sin Photoroom |
+| Crear Modelo IA | SeedDream (fal) | $0.055 | OK |
+| Foto Frontal (try-on) | `seedream` | $0.03 | Ganchos frontales + panel de malla correctos |
+| Foto Cuerpo Completo | `seedream-edit-fallback` | $0.05 | Cabeza a pies, misma modelo, mismo bra |
+| Video 360° Producto | `wan-2.2-fast` | $0.05 | OK |
+| Video Modelo | `kling-2.6` | $0.35 | OK |
+
+Total ~$0.55 por producto con los dos videos; ~$0.15 solo fotos. Sin mensualidad de Photoroom.
+
+**Hallazgo clave sobre fidelidad:** el `garmentDescription` que genera Claude Vision
+automáticamente (`cierre frontal: múltiples ganchos centrales verticales`) da MEJOR resultado
+que una descripción escrita a mano. Sin ese anclaje el try-on inventa un cierre de cremallera;
+con él salen los ganchos reales y hasta el panel de malla lateral. No tocar ese camino.
+
+**Nota pendiente (no bloqueante):** `photoFullBody` con `expandRatio: 0.65` sobre un try-on de
+1152×2048 produce 1152×3384 (ratio 0.34) — muy alargado para ecommerce, y por debajo del mínimo
+de 0.4 que exige Kling si alguna vez se usara como input de video. El pipeline actual alimenta
+`modelVideo` con el try-on, no con el cuerpo completo, así que hoy no rompe nada.
+
+**Sin verificar:** `photoBack` (requiere subir una foto etiquetada "Espalda") y la corrida
+completa desde la UI — las pruebas de esta sesión fueron contra las rutas de API.
 
 
 ## 2026-06-13 — Comparador antes/después en cada paso + panty del cuerpo completo con color del bra
