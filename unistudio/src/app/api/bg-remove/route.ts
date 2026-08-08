@@ -196,10 +196,13 @@ function garmentTypeToPrompt(garmentType: string | null): string {
       // Grounding DINO responds better to a richer vocabulary — catches
       // soft bras, sports bras, wireless, bralettes, and nude/skin-tone
       // pieces that the single word "bra" sometimes misses.
-      return 'bra,bralette,sports bra,wireless bra,soft bra,lingerie top,chest garment';
+      // Se agregan los TIRANTES explicitamente: Grounding DINO segmentaba el
+      // cuerpo del bra pero recortaba los breteles (quedaba un mordisco en el
+      // hombro), porque ninguna palabra del prompt los nombraba.
+      return 'bra,bralette,sports bra,wireless bra,soft bra,lingerie top,chest garment,bra straps,shoulder straps,straps';
     case 'lingerie':
     case 'bodysuit':
-      return 'bra,bralette,lingerie top,bodysuit,one-piece lingerie';
+      return 'bra,bralette,lingerie top,bodysuit,one-piece lingerie,straps,shoulder straps';
     case 'panty':
       return 'panty,underwear bottom,briefs,thong,bikini bottom';
     case 'set':
