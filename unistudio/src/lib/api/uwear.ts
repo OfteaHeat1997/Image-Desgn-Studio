@@ -118,18 +118,18 @@ export async function createUwearClothingItem(params: {
   if (params.description) body.description = params.description;
   if (params.descriptionBack) body.description_back = params.descriptionBack;
 
-  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-items`, {
     method: 'POST',
     headers: { ...authHeader(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new Error(`Uwear /clothing-item ${res.status}: ${txt.slice(0, 400)}`);
+    throw new Error(`Uwear /clothing-items ${res.status}: ${txt.slice(0, 400)}`);
   }
   const json = (await res.json()) as { clothing_item_id?: number };
   if (typeof json?.clothing_item_id !== 'number') {
-    throw new Error('Uwear /clothing-item: respuesta sin clothing_item_id');
+    throw new Error('Uwear /clothing-items: respuesta sin clothing_item_id');
   }
   return json.clothing_item_id;
 }
@@ -155,14 +155,14 @@ export async function generateUwearFlatLay(params: {
   }
   form.append('clothing_processing_mode', 'generate_flat_lay');
 
-  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-items`, {
     method: 'POST',
     headers: authHeader(),
     body: form,
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new Error(`Uwear flat-lay /clothing-item ${res.status}: ${txt.slice(0, 400)}`);
+    throw new Error(`Uwear flat-lay /clothing-items ${res.status}: ${txt.slice(0, 400)}`);
   }
   const json = (await res.json()) as { clothing_item_url?: string };
   if (!json?.clothing_item_url) {
@@ -192,14 +192,14 @@ export async function isolateProductWithUwear(params: {
   // remove_background: extrae la prenda real (no flat_lay, que fallaba con bras).
   form.append('clothing_processing_mode', 'remove_background');
 
-  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-items`, {
     method: 'POST',
     headers: authHeader(),
     body: form,
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new Error(`Uwear remove-bg /clothing-item ${res.status}: ${txt.slice(0, 400)}`);
+    throw new Error(`Uwear remove-bg /clothing-items ${res.status}: ${txt.slice(0, 400)}`);
   }
   const json = (await res.json()) as { clothing_item_url?: string; clothing_item_id?: number };
   if (!json?.clothing_item_url) {
