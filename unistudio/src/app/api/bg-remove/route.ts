@@ -569,16 +569,28 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Capturamos el error REAL para poder mostrarlo (la usuaria necesita ver por
     // qué falla, no el mensaje genérico).
     let groundedSamError = '';
+    // grounded_sam es NO-DETERMINISTA: Grounding DINO + SAM devuelven 4 máscaras
+    // candidatas que cambian entre corridas, y isolateGarment las filtra por
+    // coverage/purity. La MISMA foto puede fallar en un intento y salir perfecta
+    // en el siguiente. Aun así corría UNA sola vez — mientras el ghost tenía 3
+    // reintentos y la subida a fal otros 3. Un único mal sorteo dejaba a la
+    // usuaria sin el camino gratuito y la empujaba a gastar cuota de Photoroom.
+    // 2 intentos cubren la mayoría de los fallos por azar sin alargar de más
+    // (cada uno ~15-20s) ni arriesgar el timeout de 300s de Vercel.
+    const MAX_SAM_ATTEMPTS = 2;
     const tryGroundedSam = async (): Promise<boolean> => {
-      try {
-        resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
-        usedProvider = 'grounded-sam-isolate';
-        return true;
-      } catch (err) {
-        groundedSamError = err instanceof Error ? err.message : String(err);
-        console.warn(`[bg-remove:removeSubject] grounded_sam falló (${groundedSamError})`);
-        return false;
+      for (let attempt = 1; attempt <= MAX_SAM_ATTEMPTS; attempt++) {
+        try {
+          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+          usedProvider = 'grounded-sam-isolate';
+          if (attempt > 1) console.log(`[bg-remove:removeSubject] grounded_sam OK en el intento ${attempt}`);
+          return true;
+        } catch (err) {
+          groundedSamError = err instanceof Error ? err.message : String(err);
+          console.warn(`[bg-remove:removeSubject] grounded_sam intento ${attempt}/${MAX_SAM_ATTEMPTS} falló (${groundedSamError})`);
+        }
       }
+      return false;
     };
 
     // ghost (SeedDream 3D, regenera) CON GUARDIA CLAUDE VISION. Tras cada tirada:
