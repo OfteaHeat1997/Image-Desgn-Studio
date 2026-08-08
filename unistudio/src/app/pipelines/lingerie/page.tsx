@@ -3718,9 +3718,21 @@ export default function LingeriePipelinePage() {
           });
         }));
 
+        // BUG CRITICO (encontrado 2026-08-09): `stepDef` viene de `enabledSteps`,
+        // capturado del job ANTES de arrancar el loop. Cuando la usuaria elegia un
+        // proveedor/metodo y daba "Rehacer", su seleccion se guardaba en el estado
+        // pero processStep seguia re-ejecutando con esa copia VIEJA — providerOverride
+        // undefined — asi que corria el default (SeedDream) en vez de lo elegido.
+        //
+        // Esto es lo que hacia que el selector pareciera decorativo: elegia Leffa y
+        // salia SeedDream redibujando el producto, elegia otro metodo del Paso 1 y
+        // salia lo mismo. `freshJob` SI trae el estado actualizado, asi que tomamos
+        // el paso de ahi.
+        const liveStep = freshJob.steps.find((s) => s.id === stepDef.id) ?? stepDef;
+
         const result = await executeStep(
           { ...freshJob, uploadedUrl, falUrl },
-          stepDef,
+          liveStep,
           inputForStep,
           newSharedModel,
           newSharedSeed,
