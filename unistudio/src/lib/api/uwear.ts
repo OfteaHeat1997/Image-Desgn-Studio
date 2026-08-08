@@ -17,7 +17,14 @@
 // same gotcha as the fal/replicate/fashn clients).
 // =============================================================================
 
-const UWEAR_BASE_URL = 'https://api.uwear.ai';
+// La API pública de Uwear vive bajo /api/v1. Antes pegábamos a la raíz
+// (https://api.uwear.ai/clothing-item), que es OTRO endpoint: el interno, que
+// exige `assets[]` con asset_kind/asset_view y devolvía 415/422 con nuestro body.
+// Ese 415 rompía TODO el camino Uwear del pipeline de lencería — smartTryOn lo
+// intenta primero para íntimos y, al fallar, caía en silencio a SeedDream, que
+// redibuja el producto. La usuaria elegía Uwear y le salía SeedDream.
+// Fuente: https://docs.dev.uwear.ai/operations/external_create_clothing_item
+const UWEAR_BASE_URL = 'https://api.uwear.ai/api/v1';
 
 /** Read + trim the Uwear API key. Trailing \n from `vercel env pull` causes 401s. */
 function getUwearKey(): string {
