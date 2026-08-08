@@ -35,10 +35,18 @@
 
 ---
 
+## ⚠️ AVISO IMPORTANTE PARA TODOS LOS TERMINALES
+
+**No usen `git add -A` ni `git add .` desde la raíz** (lo prohíbe `CLAUDE.md`). El 2026-08-09
+un terminal hizo `git add -A` justo cuando Desktop tenía cambios en stage, y **absorbió los
+borrados de docs de Desktop dentro de un commit de lencería**. Esta vez quedó benigno (nada se
+perdió), pero la próxima puede mezclar trabajo a medias. **Staging con rutas explícitas siempre.**
+
 ## 🗒️ Bitácora (cada terminal deja su nota, más reciente arriba)
 
 | Fecha | Terminal | Qué hizo |
 |-------|----------|----------|
+| 2026-08-09 | Desktop | ✅ Reestructuración docs COMPLETA: research/notas/interview-prep/datos-crudos/HTML movidos a `UniStudio-Workspace` externo. `docs/` quedó solo técnico. Creado `docs/README.md` (mapa). Pendiente: archivar código muerto + mover `UniStudioResearchGuide.docx` (abierto en Word). |
 | 2026-08-09 | Desktop | Inició reestructuración: workspace externo + limpieza docs + archivo de código muerto. |
 
 ---
