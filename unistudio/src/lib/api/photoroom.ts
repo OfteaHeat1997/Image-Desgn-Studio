@@ -89,7 +89,22 @@ async function toBuffer(imageUrl: string): Promise<Buffer> {
  * error con el cuerpo de respuesta para diagnosticar — el caller cae al método
  * siguiente.
  */
-export async function ghostMannequinPhotoroom(imageUrl: string, sandbox = false): Promise<Buffer> {
+export async function ghostMannequinPhotoroom(
+  imageUrl: string,
+  sandbox = false,
+  /**
+   * Descripción real del producto (la que saca Claude Vision: material, cierre,
+   * copas, banda, paneles de malla). Va al parámetro `ghostMannequin.prompt`,
+   * documentado como "text prompt to guide the generation style".
+   *
+   * Por qué importa: Photoroom recibe UNA sola foto (su API no acepta una segunda
+   * imagen del interior — confirmado en su documentación), así que el interior que
+   * se ve por el escote y el acabado de la tela los INVENTA. Con un bra de espalda
+   * de malla y satén brillante, eso salía como un interior liso y negro mate. El
+   * prompt es la única palanca que tenemos para anclarlo al producto real.
+   */
+  productPrompt?: string,
+): Promise<Buffer> {
   const imageBuffer = await toBuffer(imageUrl);
 
   const form = new FormData();
@@ -97,6 +112,13 @@ export async function ghostMannequinPhotoroom(imageUrl: string, sandbox = false)
   form.append('imageFile', new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' }), 'input.jpg');
   // Activar el efecto ghost mannequin (quita modelo/maniquí + reconstruye interior).
   form.append('ghostMannequin.mode', 'ai.auto');
+  if (productPrompt?.trim()) {
+    form.append('ghostMannequin.prompt', productPrompt.trim());
+  }
+  // Encuadre fijo. Sin esto el default es SQUARE_HD y el ángulo del ghost variaba
+  // entre corridas (a veces frontal, a veces 3/4), lo que rompe la consistencia
+  // del catálogo. Vertical 4:3 es el encuadre de producto de ecommerce.
+  form.append('ghostMannequin.size', 'PORTRAIT_HD_4_3');
   // Fondo blanco para ecommerce.
   form.append('background.color', 'FFFFFF');
   // Mantener el producto completo, sin recortar (padding 0, encuadre del objeto).

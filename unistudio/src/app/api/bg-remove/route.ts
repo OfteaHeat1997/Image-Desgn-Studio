@@ -689,7 +689,23 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         return false;
       }
       try {
-        const png = await ghostMannequinPhotoroom(imageUrl, sandbox);
+        // Anclar el ghost al producto REAL. Photoroom recibe una sola foto, así
+        // que el interior que se ve por el escote y el acabado de la tela los
+        // inventa: con este bra devolvía interior liso y satén mate, cuando el
+        // real tiene espalda de malla transparente y brillo satinado. El prompt
+        // es la única palanca disponible (su API no acepta una segunda imagen
+        // del interior — confirmado en su documentación).
+        const ghostPrompt = [
+          'ghost mannequin product photo, invisible mannequin, front view',
+          garmentDescription?.trim()
+            ? `The real garment: ${garmentDescription.trim()}`
+            : '',
+          'Preserve the exact fabric finish: if the fabric is satin or glossy keep its bright specular highlights and reflective sheen, do NOT render it matte or flat.',
+          'Show the real inner back panel through the neck opening, matching the garment construction.',
+        ]
+          .filter(Boolean)
+          .join('. ');
+        const png = await ghostMannequinPhotoroom(imageUrl, sandbox, ghostPrompt);
         // Persistir en fal para downstream estable (la pipeline espera una URL).
         const candidateUrl = await uploadToFalStorage(png, 'image/png', 'photoroom-ghost.png');
 
