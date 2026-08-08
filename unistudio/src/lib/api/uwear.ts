@@ -118,7 +118,7 @@ export async function createUwearClothingItem(params: {
   if (params.description) body.description = params.description;
   if (params.descriptionBack) body.description_back = params.descriptionBack;
 
-  const res = await fetch(`${UWEAR_BASE_URL}/clothing-items`, {
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
     method: 'POST',
     headers: { ...authHeader(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -155,7 +155,7 @@ export async function generateUwearFlatLay(params: {
   }
   form.append('clothing_processing_mode', 'generate_flat_lay');
 
-  const res = await fetch(`${UWEAR_BASE_URL}/clothing-items`, {
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
     method: 'POST',
     headers: authHeader(),
     body: form,
@@ -192,7 +192,7 @@ export async function isolateProductWithUwear(params: {
   // remove_background: extrae la prenda real (no flat_lay, que fallaba con bras).
   form.append('clothing_processing_mode', 'remove_background');
 
-  const res = await fetch(`${UWEAR_BASE_URL}/clothing-items`, {
+  const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
     method: 'POST',
     headers: authHeader(),
     body: form,

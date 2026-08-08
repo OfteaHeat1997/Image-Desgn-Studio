@@ -30,7 +30,7 @@ export async function GET() {
   const auth = { Authorization: `Bearer ${k}` };
 
   try {
-    const listRes = await fetch(`${UWEAR_BASE_URL}/clothing-item?page=1`, { headers: auth });
+    const listRes = await fetch(`${UWEAR_BASE_URL}/clothing-items?items_per_page=1`, { headers: auth });
     const listText = await listRes.text();
     let id: number | undefined;
     try {
@@ -49,7 +49,7 @@ export async function GET() {
       listStatus: listRes.status,
       firstId: id,
       // El primer item de la lista suele traer ya los assets embebidos.
-      listSample: listText.slice(0, 2500),
+      listSample: listText.slice(0, 6000),
       detail,
     });
   } catch (e) {
