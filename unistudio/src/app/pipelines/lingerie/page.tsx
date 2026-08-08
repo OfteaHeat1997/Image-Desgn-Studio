@@ -2461,11 +2461,16 @@ async function runStep(
   // Sin foto de espalda real, el step se salta antes de llegar acá (guard en
   // processStep) porque Kolors no sabe rotar 180° desde la frontal.
   if (stepId === "photoBack") {
-    if (!isolatedGarmentUrl) {
-      throw new Error("Foto Espalda necesita la prenda aislada. Activá el paso 'Aislar Producto'.");
-    }
     if (!isLingerieFlow) {
       throw new Error("Estas fotos extra solo aplican a lencería.");
+    }
+    // La prenda aislada SOLO hace falta cuando no hay foto real de espalda. Con
+    // backGarmentUrl usamos esa como garment reference (ver useRealBackPhoto más
+    // abajo) y el aislado ni se toca — antes exigíamos el aislado igual, así que
+    // si 'Aislar Producto' fallaba, Foto Espalda moría al pedo teniendo la foto
+    // real. processStep ya garantiza que llegamos acá solo con foto de espalda.
+    if (!isolatedGarmentUrl && !backGarmentUrl) {
+      throw new Error("Foto Espalda necesita la prenda aislada o una foto real de espalda. Activá el paso 'Aislar Producto' o subí una foto etiquetada 'Espalda'.");
     }
     // Default por stepId: photoBack=back-view, photoFullBody=standing.
     // Si la usuaria seleccionó pose manual desde la UI (poseOverride), usar esa.
@@ -2682,7 +2687,9 @@ async function runStep(
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "video failed");
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.10 };
+    // $0.05 = wan-2.2-fast 5s. Coincide con STEP_DEFS y estimateCost (antes acá
+    // decía 0.10 y el presupuesto mostrado a la usuaria no cerraba con el real).
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.05 };
   }
 
   if (stepId === "modelVideo") {
@@ -3605,12 +3612,22 @@ export default function LingeriePipelinePage() {
       } else if (stepDef.id === "productVideo") {
         // productVideo REQUIERE la prenda aislada (prenda sola, fondo limpio).
         // Caer a falUrl/uploadedUrl daría video de la foto original (modelo
-        // con prenda puesta) → lo opuesto del objetivo. Mejor fallar con
-        // mensaje claro pidiendo activar el paso 'Aislar Prenda'.
+        // con prenda puesta) → lo opuesto del objetivo.
+        //
+        // Se SALTA (no throw). Antes hacía `throw` acá afuera del try/catch de
+        // abajo, así que la excepción escapaba processStep → processJob →
+        // startPipeline (que no la atrapa): isRunning quedaba en true para
+        // siempre (UI trabada "procesando"), el guardado en galería nunca
+        // corría (se perdían TODOS los resultados de la foto) y las fotos
+        // siguientes del batch no se procesaban. Y el disparador era el caso
+        // MÁS común: isolate falla con rembg-last-resort. Ahora se comporta
+        // como el resto de los guards: skip con mensaje claro y seguir.
         if (!stepResults.isolate) {
-          throw new Error(
-            "Video 360° del Producto necesita la prenda aislada. Activá el paso 'Aislar Prenda' o desactivá este video."
-          );
+          updateStep(jobId, stepDef.id, {
+            status: "skipped",
+            error: "El Video 360° necesita la prenda aislada y el paso 'Aislar Producto' no dejó resultado. Reintentá ese paso, o desactivá este video.",
+          });
+          return false;
         }
         inputForStep = stepResults.isolate;
       }
@@ -4013,9 +4030,21 @@ export default function LingeriePipelinePage() {
 
       setActiveJobIndex(i);
       setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "active" } : j));
-      const { newSharedModel, newSharedSeed } = await processJob(job.id, jobsSnapshot, currentSharedModel, currentSharedSeed);
-      if (newSharedModel) currentSharedModel = newSharedModel;
-      if (newSharedSeed !== undefined) currentSharedSeed = newSharedSeed;
+      // Red de seguridad: processJob NO debe poder tumbar el batch entero. Si un
+      // guard o un provider tira una excepción inesperada, antes escapaba hasta
+      // acá y dejaba isRunning=true para siempre (UI trabada) + las fotos
+      // siguientes sin procesar. Ahora esa foto queda marcada con error y el
+      // batch continúa con la siguiente.
+      try {
+        const { newSharedModel, newSharedSeed } = await processJob(job.id, jobsSnapshot, currentSharedModel, currentSharedSeed);
+        if (newSharedModel) currentSharedModel = newSharedModel;
+        if (newSharedSeed !== undefined) currentSharedSeed = newSharedSeed;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[lingerie] processJob explotó en ${job.filename}:`, err);
+        setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "done" } : j));
+        toast.error(`${job.filename}: ${msg}`);
+      }
     }
 
     setIsRunning(false);
