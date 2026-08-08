@@ -1,61 +1,64 @@
 // =============================================================================
-// DIAGNÓSTICO — estructura real de una prenda de Uwear
+// DIAGNÓSTICO — encontrar el endpoint real de creación de prenda en Uwear
 //
-// POST /clothing-item con multipart devuelve 415 y con nuestro JSON devuelve 422
-// pidiendo `assets[]` con `asset_kind` y `asset_view`. Los valores válidos de esos
-// enums no están en la documentación pública y adivinarlos no funcionó (probé
-// photo/image/garment/clothing/product/main: todos rechazados). La ruta
-// documentada /api/v1/clothing-item devuelve 404 en producción — es del entorno
-// dev.
+// Uwear cambió su API y el camino que usa el pipeline dejó de funcionar. Estado:
+//   POST https://api.uwear.ai/clothing-item        → 415/422 (pide assets[] con
+//        asset_kind/asset_view, enums NO documentados; probé 6 valores, todos mal)
+//   POST https://api.uwear.ai/clothing-items       → 405 (no acepta POST)
+//   POST https://api.uwear.ai/api/v1/clothing-item → 404 en un intento previo
 //
-// Ese 415/422 rompe TODO el camino Uwear del pipeline de lencería: smartTryOn lo
-// intenta primero para íntimos y, al fallar, cae en silencio a SeedDream, que
-// redibuja el producto. La usuaria elige Uwear y le sale SeedDream.
+// PERO su especificación OpenAPI (docs.dev.uwear.ai/openapi.json) dice que el
+// endpoint externo ES `POST /api/v1/clothing-item` sobre `https://api.uwear.ai`,
+// con body `{clothing_item_name, external_clothing_item_url, ...}` — sin assets.
+// Esta ruta prueba esa combinación EXACTA y algunas variantes de path, para
+// distinguir si el 404 fue un error de construcción de URL o si el endpoint
+// realmente no existe en producción.
 //
-// La cuenta ya tiene 13 prendas cargadas desde la web de Uwear. Leer una y mirar
-// sus assets da los valores reales sin adivinar.
+// Importa porque Uwear falla dentro de un try/catch en smartTryOn: el error se
+// traga y corre SeedDream, que REDIBUJA el producto. Ese catch silencioso ocultó
+// el problema durante meses.
 //
 // GET /api/uwear-presign
 // =============================================================================
 
 import { NextResponse } from 'next/server';
 
-const UWEAR_BASE_URL = 'https://api.uwear.ai';
+const BODY = {
+  clothing_item_name: 'diag bra 011473',
+  external_clothing_item_url:
+    'https://v3b.fal.media/files/b/0aa58f7a/4Qi-7AjuSadtWdDmiAjl7_bh-negro-original.png',
+  use_image_enhancement: true,
+};
+
+const PATHS = [
+  'https://api.uwear.ai/api/v1/clothing-item',
+  'https://api.uwear.ai/api/v1/clothing-items',
+  'https://api.uwear.ai/v1/clothing-item',
+  'https://api.uwear.ai/external/clothing-item',
+  'https://api.uwear.ai/api/clothing-item',
+];
 
 export async function GET() {
   const k = process.env.UWEAR_API_KEY?.trim();
   if (!k) {
     return NextResponse.json({ success: false, error: 'UWEAR_API_KEY no configurada' }, { status: 500 });
   }
-  const auth = { Authorization: `Bearer ${k}` };
 
-  try {
-    const listRes = await fetch(`${UWEAR_BASE_URL}/clothing-items?items_per_page=1`, { headers: auth });
-    const listText = await listRes.text();
-    let id: number | undefined;
+  const results = [];
+  for (const url of PATHS) {
     try {
-      const parsed = JSON.parse(listText) as { data?: Array<{ clothing_item_id?: number }> };
-      id = parsed.data?.[0]?.clothing_item_id;
-    } catch { /* se reporta crudo abajo */ }
-
-    let detail: unknown = null;
-    if (id) {
-      const detRes = await fetch(`${UWEAR_BASE_URL}/clothing-item/${id}`, { headers: auth });
-      detail = { status: detRes.status, body: (await detRes.text()).slice(0, 4000) };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${k}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(BODY),
+      });
+      const text = await res.text().catch(() => '');
+      results.push({ url, status: res.status, body: text.slice(0, 400) });
+      if (res.ok) break; // encontrado
+    } catch (e) {
+      results.push({ url, status: 0, body: e instanceof Error ? e.message : String(e) });
     }
-
-    return NextResponse.json({
-      success: true,
-      listStatus: listRes.status,
-      firstId: id,
-      // El primer item de la lista suele traer ya los assets embebidos.
-      listSample: listText.slice(0, 6000),
-      detail,
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { success: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 500 },
-    );
   }
+
+  return NextResponse.json({ success: true, results });
 }
