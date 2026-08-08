@@ -1390,7 +1390,11 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
   // en lugar del texto crudo "Sin imagen".
   const inputUrl = step.inputUrl || previousResultUrl || undefined;
-  const canInteract = step.status === "done" && !autoMode;
+  // Incluye "accepted": tras aceptar un paso desaparecian los botones y ya no se
+  // podia Rehacer con otro metodo/proveedor — habia que reiniciar todo el
+  // pipeline. La usuaria quedo trabada justo asi al agotarse la cuota de
+  // Photoroom: no podia cambiar a "Recorte real" y reintentar.
+  const canInteract = (step.status === "done" || step.status === "accepted") && !autoMode;
   const isVideo = step.resultUrl && (step.resultUrl.includes(".mp4") || step.resultUrl.includes(".webm") || step.resultUrl.includes("video"));
   const [showDocs, setShowDocs] = useState(false);
   // Lightbox: cuando es null no está abierto. Cuando tiene número, esa es
@@ -1553,7 +1557,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
       {/* Paso 1: selector de MÉTODO de recorte. Recorte real (fiel) por default;
           ghost 3D (regenera) opcional. La usuaria elige cuál sirve por producto. */}
-      {step.id === "isolate" && onChangeIsolateMethod && step.status !== "done" && step.status !== "accepted" && (
+      {step.id === "isolate" && onChangeIsolateMethod && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Método:</span>
@@ -1579,7 +1583,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           generación para recién poder elegir con qué proveedor generarla — justo
           al revés de lo útil. Pose y Acción siempre se pudieron elegir antes;
           Proveedor era la excepción. Ahora los tres se comportan igual. */}
-      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangeProvider && step.status !== "done" && step.status !== "accepted" && (
+      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangeProvider && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Proveedor:</span>
@@ -1602,7 +1606,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
       {/* Manual overrides — siempre visibles para que la usuaria pueda elegir
           ángulo/acción ANTES de procesar (no solo cuando hay error). */}
-      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangePose && step.status !== "done" && step.status !== "accepted" && (
+      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangePose && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Pose:</span>
@@ -1621,7 +1625,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           </div>
         </div>
       )}
-      {step.id === "modelVideo" && onChangeAction && step.status !== "done" && step.status !== "accepted" && (
+      {step.id === "modelVideo" && onChangeAction && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Acción:</span>
