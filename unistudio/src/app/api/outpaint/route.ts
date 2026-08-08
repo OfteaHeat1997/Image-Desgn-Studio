@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
-import { uploadToFalStorage } from '@/lib/api/fal';
+import { uploadToFalStorage, runFal } from '@/lib/api/fal';
 import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl } from '@/lib/utils/image';
 
@@ -25,7 +25,7 @@ async function extendCanvasAndMask(
   imageBuffer: Buffer,
   direction: Direction,
   expandRatio: number,
-): Promise<{ extendedUrl: string; maskUrl: string }> {
+): Promise<{ extendedUrl: string; maskUrl: string; newWidth: number; newHeight: number }> {
   const meta = await sharp(imageBuffer).metadata();
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
@@ -82,7 +82,7 @@ async function extendCanvasAndMask(
     uploadToFalStorage(extendedBuffer, 'image/png', 'outpaint-extended.png'),
     uploadToFalStorage(maskBuffer, 'image/png', 'outpaint-mask.png'),
   ]);
-  return { extendedUrl, maskUrl };
+  return { extendedUrl, maskUrl, newWidth, newHeight };
 }
 
 // Platform aspect ratio specifications
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         inputBuffer = Buffer.from(await r.arrayBuffer());
       }
 
-      const { extendedUrl, maskUrl } = await extendCanvasAndMask(inputBuffer, direction, ratio);
+      const { extendedUrl, maskUrl, newWidth, newHeight } = await extendCanvasAndMask(inputBuffer, direction, ratio);
 
       const fillPrompt = prompt || 'Continue the photograph naturally, maintaining consistent lighting and style.';
       const negative = negativePrompt || 'different person, different body, different skin, harsh shadows, low quality, plastic skin';
@@ -173,8 +173,46 @@ export async function POST(request: NextRequest) {
         prompt: fillPrompt,
         negative_prompt: negative,
       };
-      const output = await runModel('black-forest-labs/flux-fill-pro', fillProInput);
-      const resultUrl: string = await extractOutputUrl(output);
+      // flux-fill-pro es permisivo con lencería comparado con Kontext, PERO el
+      // safety checker de BFL igual devuelve "NSFW content detected" con bras y
+      // panties — es decir, el paso photoFullBody del pipeline de lencería
+      // fallaba SIEMPRE para el catálogo real (verificado 2026-08-08 con el
+      // try-on de un bra nude: "Prediction failed: NSFW content detected").
+      //
+      // Fallback: SeedDream v4 edit en fal, que en este repo ya es el camino
+      // probado sin filtro de contenido para lencería (lo usan tryon y el ghost
+      // mannequin). No toma máscara, así que le pasamos el canvas YA extendido
+      // (con la franja vacía abajo) y le pedimos que la complete respetando la
+      // mitad de arriba. Menos preciso que un inpaint con máscara, pero produce
+      // resultado en vez de un rojo garantizado.
+      let resultUrl: string;
+      let usedProvider = 'flux-fill-pro';
+      try {
+        const output = await runModel('black-forest-labs/flux-fill-pro', fillProInput);
+        resultUrl = await extractOutputUrl(output);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/nsfw|safety|content detected/i.test(msg)) throw err;
+        console.warn('[outpaint] flux-fill-pro rechazó por NSFW — fallback a SeedDream edit (fal)');
+        const seed = await runFal('fal-ai/bytedance/seedream/v4/edit', {
+          prompt:
+            `${fillPrompt} Fill ONLY the empty blank area of the canvas, continuing the existing photograph seamlessly. ` +
+            `Do NOT alter, redraw or restyle the part of the image that already has content — keep it pixel-identical. ` +
+            `Avoid: ${negative}.`,
+          image_urls: [extendedUrl],
+          num_images: 1,
+          enable_safety_checker: false,
+          // SIN esto SeedDream reencuadra a su tamaño default (cuadrado) y
+          // recorta la cabeza de la modelo — el cuerpo completo salía sin cara.
+          // Le fijamos las dimensiones exactas del lienzo ya extendido para que
+          // respete el encuadre en vez de inventar uno.
+          image_size: { width: newWidth, height: newHeight },
+        });
+        const seedUrl = seed?.images?.[0]?.url;
+        if (!seedUrl) throw new Error('El fallback SeedDream no devolvió imagen para el cuerpo completo.');
+        resultUrl = seedUrl;
+        usedProvider = 'seedream-edit-fallback';
+      }
 
       // Persistir el resultado en fal storage. flux-fill-pro devuelve URLs de
       // replicate.delivery que CADUCAN en ~1h → la tarjeta mostraba "La imagen
@@ -195,7 +233,7 @@ export async function POST(request: NextRequest) {
 
       await saveJob({
         operation: 'outpaint',
-        provider: 'flux-fill-pro',
+        provider: usedProvider,
         inputParams: { imageUrl, direction, expandRatio: ratio, prompt: fillPrompt },
         outputUrl: stableUrl,
         cost: 0.05,
@@ -205,7 +243,7 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           url: proxyReplicateUrl(stableUrl),
-          provider: 'flux-fill-pro',
+          provider: usedProvider,
           direction,
           expandRatio: ratio,
           cost: 0.05,
