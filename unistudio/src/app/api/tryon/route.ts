@@ -387,7 +387,15 @@ async function tryOnSeedDream(
     `same position of any mesh or sheer panels. Do NOT make the neckline deeper, more pointed ` +
     `or more V-shaped than the reference, and do NOT slim, reshape or make the ${noun} more ` +
     `fashionable than it is. ` +
-    `Photorealistic fashion e-commerce photography, studio lighting, sharp focus.` +
+    // FONDO (reportado 2026-08-08): al pasar el encuadre a 4:3 se abrió espacio
+    // horizontal y SeedDream lo llenó inventando un trípode y una luz de estudio.
+    // "Keep the background unchanged" no alcanza cuando el canvas es más ancho que
+    // la imagen de entrada: hay que decirle QUÉ poner en el espacio nuevo.
+    `The background must be plain, seamless, pure white studio backdrop across the ENTIRE frame, ` +
+    `including any area not covered by the original image. Absolutely NO studio equipment, ` +
+    `NO lights, softboxes, lamps, tripods, light stands, cables, reflectors, props, furniture, ` +
+    `walls, floor lines or shadows of equipment anywhere in the frame. Empty white background only. ` +
+    `Photorealistic fashion e-commerce photography, soft even lighting, sharp focus.` +
     // Art direction (look del shoot) inyectado desde el pipeline. Describe escena/luz,
     // NO la prenda — la prenda ya está anclada arriba al producto real.
     (scenePrompt?.trim() ? ` Art direction: ${scenePrompt.trim()}` : '');
@@ -398,7 +406,15 @@ async function tryOnSeedDream(
   const result = await runFal('fal-ai/bytedance/seedream/v4/edit', {
     prompt,
     image_urls: [humanImageUrl, garmentImageUrl],
-    image_size: 'portrait_16_9',
+    // ENCUADRE (reportado 2026-08-08: "frontal, no todo el cuerpo"). model-create
+    // genera la modelo en 3:4 (busto/medio cuerpo), pero acá se pedía
+    // portrait_16_9 — MUCHO más alto. SeedDream rellenaba ese espacio de más
+    // inventando cadera y panty: en un producto que es SOLO un bra, la Foto
+    // Frontal terminaba mostrando una prenda inferior que no está en el catálogo.
+    // Igualar el aspecto al de la modelo de entrada mantiene el encuadre frontal
+    // y elimina el lower body inventado. El cuerpo completo se arma después en
+    // photoFullBody con outpaint, que sí extiende el canvas a propósito.
+    image_size: 'portrait_4_3',
     num_images: 1,
     enable_safety_checker: false,
   });
