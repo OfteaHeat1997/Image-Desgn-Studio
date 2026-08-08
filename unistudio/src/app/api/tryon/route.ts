@@ -355,6 +355,15 @@ async function tryOnSeedDream(
     `Keep the person's face, hair, body, skin tone, pose and the background completely unchanged. ` +
     `Replace only their ${noun} with the ${noun} from the second image, matching its exact ` +
     `color, pattern, lace, mesh, straps, trim, seams, cut and construction details precisely. ` +
+    // PRODUCTO INVENTADO (reportado 2026-08-08): el prompt pedía "reemplazá solo su
+    // bra" pero NUNCA decía qué hacer con la parte de abajo. La modelo base viene con
+    // briefs beige lisos, y SeedDream los "combinaba" con el bra — devolvía la modelo
+    // con un panty negro de malla que NO existe en el catálogo. Para un catálogo real
+    // eso es inaceptable: se estaría publicando un producto que no se vende.
+    `The lower-body garment (briefs/panty/bottoms) must stay EXACTLY as it is in the first ` +
+    `image — same plain color, same simple shape, same fabric. Do NOT recolor it, do NOT ` +
+    `add mesh, lace, panels, straps or any detail to it, and do NOT restyle it to match ` +
+    `the ${noun}. It is not part of the product being photographed. ` +
     `Do not redesign, simplify, or recolor the garment. Keep it identical to the reference. ` +
     // FIDELIDAD DE TELA/BRILLO: SeedDream tiende a renderizar el satén MATE. Anclar el
     // acabado y el brillo reales del producto (lo lee de la imagen de la prenda).
@@ -369,6 +378,15 @@ async function tryOnSeedDream(
     `not present in the reference ${noun}. Keep the exact closure type shown in the ` +
     `reference (if it has hook-and-eye clasps, keep hook-and-eye — never a zipper) and ` +
     `keep the cups exactly as in the reference with no invented center seam or line. ` +
+    // SILUETA (reportado 2026-08-08): mantenía ganchos y malla pero devolvía otra
+    // FORMA — escote en V puntiagudo donde el producto real tiene escote recto y
+    // cobertura completa. La silueta es lo que hace reconocible al producto en el
+    // catálogo, así que la anclamos explícitamente igual que el cierre.
+    `Keep the exact SILHOUETTE of the reference ${noun}: the same neckline shape and height, ` +
+    `the same coverage area, the same strap width and placement, the same band width, and the ` +
+    `same position of any mesh or sheer panels. Do NOT make the neckline deeper, more pointed ` +
+    `or more V-shaped than the reference, and do NOT slim, reshape or make the ${noun} more ` +
+    `fashionable than it is. ` +
     `Photorealistic fashion e-commerce photography, studio lighting, sharp focus.` +
     // Art direction (look del shoot) inyectado desde el pipeline. Describe escena/luz,
     // NO la prenda — la prenda ya está anclada arriba al producto real.
