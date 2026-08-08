@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Volume2, VolumeX } from "lucide-react";
+import { useI18n } from "@/hooks/useI18n";
 
 /**
  * AudioButton — botón 🔊 que lee texto en voz alta usando Web Speech API.
@@ -14,9 +15,10 @@ import { Volume2, VolumeX } from "lucide-react";
  *
  * Uso:
  *   <AudioButton text="Sube tu foto del perfume y la IA hace los 3 outputs..." />
- *   <AudioButton text={COPY.pipelines.lingerie.benefit} variant="inline" />
+ *   <AudioButton text={t.pipelines.lingerie.benefit} variant="inline" />
  *
- * - Voz: prefiere voces es-ES o es-MX disponibles en el dispositivo
+ * - Voz: sigue el idioma activo de la app (es-ES o en-US); si se pasa `lang`
+ *   explícito, ese tiene prioridad
  * - Velocidad: 1.0 (natural)
  * - Cancelar otra utterance al iniciar nueva (evita superposición)
  */
@@ -29,7 +31,7 @@ interface AudioButtonProps {
   size?: "sm" | "md" | "lg";
   /** Clase extra para el wrapper */
   className?: string;
-  /** Idioma BCP-47. Default es-ES con fallback es-MX/es-US */
+  /** Idioma BCP-47 explícito. Si se omite, sigue el idioma activo de la app. */
   lang?: string;
 }
 
@@ -45,17 +47,16 @@ function checkSupport(): boolean {
   return supportsSpeech;
 }
 
-function pickSpanishVoice(lang = "es-ES"): SpeechSynthesisVoice | null {
+function pickVoice(lang = "es-ES"): SpeechSynthesisVoice | null {
   if (!checkSupport()) return null;
   const voices = window.speechSynthesis.getVoices();
   if (voices.length === 0) return null;
-  // Preferencia: es-ES exacto > es-MX > es-US > cualquier es-*
+  const base = lang.split("-")[0]; // "es-ES" -> "es", "en-US" -> "en"
+  // Preferencia: match exacto de región > cualquier voz del mismo idioma.
   const exact = voices.find((v) => v.lang === lang);
   if (exact) return exact;
-  const mxOrUs = voices.find((v) => v.lang === "es-MX" || v.lang === "es-US");
-  if (mxOrUs) return mxOrUs;
-  const anySpanish = voices.find((v) => v.lang.startsWith("es"));
-  return anySpanish ?? null;
+  const sameLanguage = voices.find((v) => v.lang.startsWith(base));
+  return sameLanguage ?? null;
 }
 
 export function AudioButton({
@@ -63,8 +64,12 @@ export function AudioButton({
   variant = "icon",
   size = "md",
   className = "",
-  lang = "es-ES",
+  lang,
 }: AudioButtonProps) {
+  // El idioma activo de la app decide la voz y los labels, salvo que se pase
+  // un `lang` explícito.
+  const { bcp47, t } = useI18n();
+  const speechLang = lang ?? bcp47;
   const [isPlaying, setIsPlaying] = useState(false);
   // Mounted flag para evitar SSR mismatch — la API speechSynthesis solo existe
   // en el cliente. Renderizamos null en SSR y luego en el primer effect
@@ -76,7 +81,7 @@ export function AudioButton({
 
   useEffect(() => {
     if (checkSupport()) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount only, no cascading
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- runs once on mount only, no cascading
       setAvailable(true);
       // Warmup voices en Chrome mobile que devuelve [] hasta voiceschanged
       window.speechSynthesis.getVoices();
@@ -92,9 +97,9 @@ export function AudioButton({
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = pickSpanishVoice(lang);
+    const voice = pickVoice(speechLang);
     if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang ?? lang;
+    utterance.lang = voice?.lang ?? speechLang;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
@@ -104,7 +109,7 @@ export function AudioButton({
     utterance.onerror = () => setIsPlaying(false);
 
     window.speechSynthesis.speak(utterance);
-  }, [text, lang]);
+  }, [text, speechLang]);
 
   const stop = useCallback(() => {
     if (!checkSupport()) return;
@@ -144,11 +149,11 @@ export function AudioButton({
         type="button"
         onClick={toggle}
         className={`${baseClasses} gap-1.5 px-2.5 ${className}`}
-        title={isPlaying ? "Detener audio" : "Escuchar descripción"}
-        aria-label={isPlaying ? "Detener audio" : "Escuchar descripción"}
+        title={isPlaying ? t.audio.stopTitle : t.audio.listenTitle}
+        aria-label={isPlaying ? t.audio.stopTitle : t.audio.listenTitle}
       >
         <Icon className={ICON_SIZES[size]} />
-        <span className="text-xs font-medium">{isPlaying ? "Detener" : "Escuchar"}</span>
+        <span className="text-xs font-medium">{isPlaying ? t.audio.stop : t.audio.listen}</span>
       </button>
     );
   }
@@ -158,8 +163,8 @@ export function AudioButton({
       type="button"
       onClick={toggle}
       className={`${baseClasses} ${className}`}
-      title={isPlaying ? "Detener audio" : "Escuchar descripción"}
-      aria-label={isPlaying ? "Detener audio" : "Escuchar descripción"}
+      title={isPlaying ? t.audio.stopTitle : t.audio.listenTitle}
+      aria-label={isPlaying ? t.audio.stopTitle : t.audio.listenTitle}
     >
       <Icon className={ICON_SIZES[size]} />
     </button>

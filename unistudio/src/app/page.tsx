@@ -1,7 +1,10 @@
 "use client";
 
-import { COPY } from "@/lib/design/copy";
+import { useEffect } from "react";
 import { AudioButton } from "@/components/ui/AudioButton";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { useI18n } from "@/hooks/useI18n";
+import type { HomeCopy } from "@/lib/i18n/translations";
 
 /**
  * Dashboard / Home page.
@@ -10,160 +13,109 @@ import { AudioButton } from "@/components/ui/AudioButton";
  * de AI product photography para e-commerce). Patrones aplicados:
  *
  *  1. Mobile-first — los 3 pipelines son cards grandes en columna en mobile,
- *     row en desktop. Photoroom domina mobile y eso es donde la usuaria
- *     hace testing.
- *  2. Outcome > proceso — la descripción dice qué SALE, no qué pasa
- *     ("Estante de lujo + foto en modelo + video 360°" en vez de
- *     "Aretes, cadenas, anillos — estante + foto en modelo + video 360°").
- *  3. Design tokens — usa el oro premium del brand (--accent #D4B48A)
- *     en lugar de colores random tipo pink/amber/yellow. Inspirado en
- *     Claid (single-brand color) en vez de Photoroom (multi-color).
- *  4. Jerarquía visual — la sección principal son los pipelines, todo lo
- *     demás (utilities, módulos sueltos) es claramente secundario.
- *  5. Texto centralizado — todas las strings desde lib/design/copy.ts
- *     para que la usuaria pueda iterar UX text sin tocar JSX.
+ *     row en desktop.
+ *  2. Outcome > proceso — la descripción dice qué SALE, no qué pasa.
+ *  3. Design tokens — usa el oro premium del brand (--accent #D4B48A).
+ *  4. Jerarquía visual — los 3 pipelines son la sección principal.
+ *  5. Bilingüe — TODO el texto viene de `src/lib/i18n/translations.ts` y el
+ *     switch ES/EN (arriba a la derecha) cambia el idioma en vivo, incluido
+ *     el audio (Web Speech API). La tipografía usa la serif editorial
+ *     (Fraunces) en los títulos para un acabado de "estudio de moda".
  */
 export default function HomePage() {
+  const { t, locale } = useI18n();
+
+  // Mantén el atributo lang del documento en sync con el idioma elegido —
+  // mejora accesibilidad (lectores de pantalla) y SEO en el cliente.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   return (
     <div className="min-h-screen bg-surface text-heading">
-      <div className="max-w-5xl mx-auto px-4 py-10 md:py-14">
+      <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
+        {/* ── Top bar: wordmark + switch de idioma ─────────────────── */}
+        <div className="flex items-center justify-between mb-8 md:mb-10">
+          <span className="font-serif text-lg md:text-xl font-semibold tracking-tight text-gradient">
+            {t.app.name}
+          </span>
+          <LanguageSwitcher />
+        </div>
+
         {/* ── Hero ─────────────────────────────────────────────────── */}
-        <header className="text-center mb-10 md:mb-14">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-gradient">
-            {COPY.app.name}
-          </h1>
-          <p className="text-muted text-sm md:text-base">{COPY.app.tagline}</p>
-          <p className="mt-6 text-lg md:text-xl text-heading font-medium">
-            {COPY.dashboard.title}
+        <header className="text-center mb-12 md:mb-16">
+          <p className="text-muted text-sm md:text-base font-medium tracking-wide">
+            {t.app.tagline}
           </p>
-          <p className="mt-1 text-sm text-muted">{COPY.dashboard.subtitle}</p>
-          <div className="mt-3 flex justify-center">
-            <AudioButton
-              variant="inline"
-              text={`${COPY.app.name}. ${COPY.app.tagline}. ${COPY.dashboard.title}. ${COPY.dashboard.subtitle}. Tienes tres pipelines: lencería para bras y panties, perfumes y belleza para cremas y maquillaje, y joyería para anillos y aretes.`}
-            />
+          <h1 className="font-serif mt-5 text-3xl md:text-5xl font-semibold leading-tight tracking-tight text-heading text-balance">
+            {t.dashboard.title}
+          </h1>
+          <p className="mt-4 text-base md:text-lg text-muted max-w-2xl mx-auto text-balance">
+            {t.dashboard.subtitle}
+          </p>
+          <div className="mt-6 flex justify-center">
+            <AudioButton variant="inline" text={t.audio.intro} />
           </div>
         </header>
 
         {/* ── Sección principal: 3 pipelines ──────────────────────── */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-10">
-          <PipelineCard
-            href="/pipelines/lingerie"
-            data={COPY.pipelines.lingerie}
-          />
-          <PipelineCard
-            href="/pipelines/static-product"
-            data={COPY.pipelines.beauty}
-          />
-          <PipelineCard
-            href="/pipelines/jewelry"
-            data={COPY.pipelines.jewelry}
-          />
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-12">
+          <PipelineCard href="/pipelines/lingerie" data={t.pipelines.lingerie} />
+          <PipelineCard href="/pipelines/static-product" data={t.pipelines.beauty} />
+          <PipelineCard href="/pipelines/jewelry" data={t.pipelines.jewelry} />
         </section>
 
         {/* ── Utilities ──────────────────────────────────────────── */}
-        <section className="mb-10">
-          <h2 className="text-xs font-semibold mb-3 text-muted uppercase tracking-wider">
-            Más opciones
-          </h2>
+        <section className="mb-12">
+          <SectionLabel>{t.sections.moreOptions}</SectionLabel>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
-            <UtilityCard href="/batch" data={COPY.utilities.batch} />
-            <UtilityCard href="/editor" data={COPY.utilities.editor} />
-            <UtilityCard href="/brand-kit" data={COPY.utilities.brandKit} />
+            <UtilityCard href="/batch" data={t.utilities.batch} />
+            <UtilityCard href="/editor" data={t.utilities.editor} />
+            <UtilityCard href="/brand-kit" data={t.utilities.brandKit} />
           </div>
         </section>
 
         {/* ── Módulos sueltos (avanzado) ─────────────────────────── */}
-        <details className="mb-8 group">
+        <details className="mb-10 group">
           <summary className="cursor-pointer list-none">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-surface-light border border-[var(--border-default)] hover:border-[var(--accent-muted)] transition-default">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface-light border border-[var(--border-default)] hover:border-[var(--accent-muted)] transition-default">
               <span className="text-sm font-semibold text-body">
-                📸 Módulos sueltos (avanzado)
+                📸 {t.sections.advancedTitle}
               </span>
-              <span className="text-xs text-muted group-open:hidden">Ver →</span>
-              <span className="text-xs text-muted hidden group-open:inline">Ocultar ↓</span>
+              <span className="text-xs text-muted group-open:hidden">
+                {t.sections.show} →
+              </span>
+              <span className="text-xs text-muted hidden group-open:inline">
+                {t.sections.hide} ↓
+              </span>
             </div>
           </summary>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-            <ModuleLink
-              href="/editor?module=bg-remove" name="Quitar fondo" cost="$0.01"
-              description="Borra el fondo de tu foto y deja solo el producto sobre transparente. Ideal para listados."
-            />
-            <ModuleLink
-              href="/editor?module=bg-generate" name="Fondos con IA" cost="$0.003 - $0.05"
-              description="Genera un fondo nuevo con inteligencia artificial. Mármol, playa, gradient o lo que quieras."
-            />
-            <ModuleLink
-              href="/editor?module=enhance" name="Mejorar calidad" cost="Gratis"
-              description="Ajusta brillo, contraste y nitidez automáticamente para que la foto se vea profesional."
-            />
-            <ModuleLink
-              href="/editor?module=inpaint" name="Borrar y reemplazar" cost="$0.03 - $0.05"
-              description="Selecciona una zona de la foto y la IA la reemplaza por algo distinto. Perfecto para borrar manchas o cambiar detalles."
-            />
-            <ModuleLink
-              href="/editor?module=upscale" name="Aumentar resolución" cost="$0.02 - $0.05"
-              description="Duplica o cuadruplica la resolución sin perder detalle. Para imprimir o zoom de catálogo."
-            />
-            <ModuleLink
-              href="/editor?module=tryon" name="Prueba virtual" cost="$0.02 - $0.05"
-              description="Viste una modelo IA con tu prenda real. La modelo no existe pero la prenda es tuya."
-            />
-            <ModuleLink
-              href="/editor?module=model-create" name="Crear modelo IA" cost="$0.055"
-              description="Genera una persona con licencia libre que puedes reusar en todas las fotos del mismo producto."
-            />
-            <ModuleLink
-              href="/editor?module=ghost-mannequin" name="Maniquí invisible" cost="$0.05 - $0.08"
-              description="Quita la modelo o el maniquí y deja la prenda flotando estilo producto 3D."
-            />
-            <ModuleLink
-              href="/editor?module=jewelry" name="Joyería virtual" cost="$0.05"
-              description="Coloca un anillo, arete o cadena en una modelo IA. Ideal para mostrar la pieza puesta."
-            />
-            <ModuleLink
-              href="/editor?module=video" name="Estudio de video" cost="$0 - $0.35"
-              description="Crea videos cortos a partir de tus fotos. Para Reels, Stories, TikTok."
-            />
-            <ModuleLink
-              href="/editor?module=ad-create" name="Crear anuncios" cost="$0.04 - $0.35"
-              description="Diseña anuncios listos para Meta o Google con tus productos y tu marca."
-            />
-            <ModuleLink
-              href="/editor?module=shadows" name="Sombras y luces" cost="$0.04"
-              description="Agrega sombras profesionales debajo del producto para que se vea natural en cualquier fondo."
-            />
-            <ModuleLink
-              href="/editor?module=outpaint" name="Extender imagen" cost="$0.05"
-              description="Amplía la foto más allá de los bordes. La IA inventa el resto de la escena de forma coherente."
-            />
-            <ModuleLink
-              href="/editor?module=compliance" name="Verificar" cost="Gratis"
-              description="Revisa que tu foto cumpla las reglas de Amazon, MercadoLibre y otros marketplaces."
-            />
-            <ModuleLink
-              href="/editor?module=smart-editor" name="Editor avanzado" cost="Gratis"
-              description="Editor visual con todas las herramientas para retoques manuales detallados."
-            />
-            <ModuleLink
-              href="/editor?module=ai-prompt" name="Director creativo" cost="Gratis"
-              description="Conversa con la IA para que te ayude a escribir prompts y crear imágenes desde cero."
-            />
-            <ModuleLink
-              href="/editor?module=ai-agent"
-              name="Agente IA"
-              cost="Para producto fuera de las 3 categorías"
-              description="Para productos que no encajan en lencería, perfumes o joyería. La IA lee la foto y decide qué pasos correr automáticamente."
-              wide
-            />
+            {t.modules.map((m) => (
+              <ModuleLink
+                key={m.id}
+                href={`/editor?module=${m.id}`}
+                name={m.name}
+                cost={m.cost}
+                description={m.description}
+                costLabel={t.moduleCostLabel}
+                wide={m.wide}
+              />
+            ))}
           </div>
         </details>
 
         {/* ── Quick links ────────────────────────────────────────── */}
-        <nav className="flex justify-center gap-8 mt-10 mb-6 text-sm text-muted">
-          <a href="/gallery" className="hover:text-[var(--accent)] transition-default">📁 Galería</a>
-          <a href="/workflows" className="hover:text-[var(--accent)] transition-default">📋 Workflows</a>
-          <a href="/docs" className="hover:text-[var(--accent)] transition-default">📖 Docs</a>
+        <nav className="flex justify-center gap-6 md:gap-8 mt-12 mb-6 text-sm text-muted">
+          <a href="/gallery" className="hover:text-[var(--accent)] transition-default">
+            📁 {t.nav.gallery}
+          </a>
+          <a href="/workflows" className="hover:text-[var(--accent)] transition-default">
+            📋 {t.nav.workflows}
+          </a>
+          <a href="/docs" className="hover:text-[var(--accent)] transition-default">
+            📖 {t.nav.docs}
+          </a>
         </nav>
       </div>
     </div>
@@ -174,14 +126,15 @@ export default function HomePage() {
 /*  Sub-components                                                              */
 /* -------------------------------------------------------------------------- */
 
-interface PipelineCardData {
-  title: string;
-  icon: string;
-  tagline: string;
-  benefit: string;
-  cta: string;
-  video: string;
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-xs font-semibold mb-3 text-muted uppercase tracking-[0.14em]">
+      {children}
+    </h2>
+  );
 }
+
+type PipelineCardData = HomeCopy["pipelines"]["lingerie"];
 
 function PipelineCard({ href, data }: { href: string; data: PipelineCardData }) {
   return (
@@ -206,9 +159,11 @@ function PipelineCard({ href, data }: { href: string; data: PipelineCardData }) 
         <span className="absolute top-3 left-3 text-3xl drop-shadow-lg">{data.icon}</span>
       </div>
       <div className="p-4 md:p-5">
-        <h3 className="text-lg md:text-xl font-bold mb-1 text-heading">{data.title}</h3>
+        <h3 className="font-serif text-lg md:text-xl font-semibold mb-1 text-heading tracking-tight">
+          {data.title}
+        </h3>
         <p className="text-xs text-muted mb-2">{data.tagline}</p>
-        <p className="text-sm text-body leading-snug">{data.benefit}</p>
+        <p className="text-sm text-body leading-relaxed">{data.benefit}</p>
         <div className="mt-4 flex items-center gap-2">
           <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-dim)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--bg-primary)] transition-default">
             {data.cta}
@@ -223,12 +178,7 @@ function PipelineCard({ href, data }: { href: string; data: PipelineCardData }) 
   );
 }
 
-interface UtilityCardData {
-  title: string;
-  icon: string;
-  benefit: string;
-  video: string;
-}
+type UtilityCardData = HomeCopy["utilities"]["batch"];
 
 function UtilityCard({ href, data }: { href: string; data: UtilityCardData }) {
   return (
@@ -269,23 +219,23 @@ function ModuleLink({
   name,
   cost,
   description,
+  costLabel,
   wide,
 }: {
   href: string;
   name: string;
   cost: string;
   description?: string;
+  costLabel: string;
   wide?: boolean;
 }) {
   // Texto que se lee cuando la usuaria toca 🔊. Si hay description (más
   // explicativa) la usamos, sino combinamos el nombre + costo.
   const audioText = description
-    ? `${name}. ${description}. Costo: ${cost}.`
-    : `${name}. Costo: ${cost}.`;
+    ? `${name}. ${description}. ${costLabel}: ${cost}.`
+    : `${name}. ${costLabel}: ${cost}.`;
   return (
-    <div
-      className={`relative ${wide ? "col-span-2 md:col-span-4" : ""}`}
-    >
+    <div className={`relative ${wide ? "col-span-2 md:col-span-4" : ""}`}>
       <a
         href={href}
         className="block p-2.5 pr-9 rounded-lg bg-surface-light/40 border border-[var(--border-subtle)] hover:border-[var(--accent-muted)] text-sm transition-default"
