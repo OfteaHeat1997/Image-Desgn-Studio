@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { AudioButton } from "@/components/ui/AudioButton";
 import {
   ArrowLeft,
   Folder,
@@ -825,12 +824,6 @@ export default function DocsPage() {
           <p className="mt-1 text-sm text-body">
             Cada archivo, cada carpeta, qué hace y dónde ir para cambiarlo
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Documentación. Mapa del proyecto. Cada archivo y carpeta de UniStudio explicado, qué hace y dónde tocar para modificarlo."
-            />
-          </div>
         </div>
 
         {/* Stats */}

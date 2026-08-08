@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Modal, ModalFooter } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
-import { AudioButton } from "@/components/ui/AudioButton";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
@@ -172,13 +171,6 @@ export function Toolbar({
         </Link>
         <span className="hidden md:inline text-[var(--border-default)] mx-0.5">/</span>
         <span className="hidden md:inline text-xs font-semibold text-heading mr-1">Editor</span>
-        {/* Audio explicando qué es esta página */}
-        <div className="hidden md:block">
-          <AudioButton
-            size="sm"
-            text="Editor manual. Tienes todas las herramientas individuales para retoques. Selecciona un módulo del lado izquierdo para empezar."
-          />
-        </div>
         {/* Mobile module selector — only visible on small screens */}
         <div className="flex md:hidden flex-1 min-w-0 mr-1">
           <select

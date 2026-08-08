@@ -68,13 +68,10 @@ export interface HomeCopy {
   app: { name: string; tagline: string };
   language: { label: string; switchTo: string };
   dashboard: { title: string; subtitle: string };
-  audio: { listen: string; stop: string; listenTitle: string; stopTitle: string; intro: string };
   pipelines: { lingerie: PipelineCopy; beauty: PipelineCopy; jewelry: PipelineCopy };
   sections: { moreOptions: string; advancedTitle: string; show: string; hide: string };
   utilities: { batch: UtilityCopy; editor: UtilityCopy; brandKit: UtilityCopy };
   modules: ModuleCopy[];
-  /** Prefijo hablado del costo de un módulo (para el audio). */
-  moduleCostLabel: string;
   cost: { free: string };
   nav: { gallery: string; workflows: string; docs: string };
 }
@@ -97,15 +94,6 @@ const es: HomeCopy = {
   dashboard: {
     title: '¿Qué producto quieres fotografiar hoy?',
     subtitle: 'Elige tu categoría y la IA genera fotos y videos listos para vender.',
-  },
-
-  audio: {
-    listen: 'Escuchar',
-    stop: 'Detener',
-    listenTitle: 'Escuchar descripción',
-    stopTitle: 'Detener audio',
-    intro:
-      'UniStudio, tu estudio de fotografía de producto con IA. Elige tu categoría y la IA genera las fotos y videos listos para vender. Tienes tres flujos: lencería para bras y panties, perfumes y belleza para cremas y maquillaje, y joyería para anillos y aretes.',
   },
 
   pipelines: {
@@ -283,8 +271,6 @@ const es: HomeCopy = {
     },
   ],
 
-  moduleCostLabel: 'Costo',
-
   cost: { free: 'Gratis' },
 
   nav: {
@@ -312,15 +298,6 @@ const en: HomeCopy = {
   dashboard: {
     title: 'What product are you shooting today?',
     subtitle: 'Pick a category and AI generates sell-ready photos and video.',
-  },
-
-  audio: {
-    listen: 'Listen',
-    stop: 'Stop',
-    listenTitle: 'Listen to description',
-    stopTitle: 'Stop audio',
-    intro:
-      'UniStudio, your AI-powered product photography studio. Pick a category and AI generates sell-ready photos and video. There are three flows: lingerie for bras and panties, perfume and beauty for creams and makeup, and jewelry for rings and earrings.',
   },
 
   pipelines: {
@@ -495,8 +472,6 @@ const en: HomeCopy = {
       wide: true,
     },
   ],
-
-  moduleCostLabel: 'Cost',
 
   cost: { free: 'Free' },
 

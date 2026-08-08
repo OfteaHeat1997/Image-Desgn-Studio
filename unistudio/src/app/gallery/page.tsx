@@ -29,7 +29,6 @@ import { useGalleryStore, type GalleryImage } from "@/stores/gallery-store";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
-import { AudioButton } from "@/components/ui/AudioButton";
 
 /* ------------------------------------------------------------------ */
 /*  Filter constants                                                    */
@@ -248,12 +247,6 @@ export default function GalleryPage() {
             Todas tus fotos procesadas, listas para reusar o descargar.{" "}
             <span className="text-muted">{images.length} en total</span>
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text={`Galería. Tienes ${images.length} imágenes procesadas. Selecciónalas y descarga todo en un solo ZIP, o reusa imágenes individuales.`}
-            />
-          </div>
         </div>
 
         {selectedIds.size > 0 && (

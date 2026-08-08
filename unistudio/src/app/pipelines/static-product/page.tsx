@@ -45,7 +45,6 @@ import {
   getScenePresetsForType,
   type SceneCategory,
 } from "@/lib/pipelines/scene-presets";
-import { AudioButton } from "@/components/ui/AudioButton";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -1100,12 +1099,6 @@ export default function StaticProductPipelinePage() {
           <p className="mt-1 text-sm text-body leading-relaxed">
             Sube tus perfumes y la IA genera los 3 outputs que necesitas: fondo blanco para Amazon, fondo de catálogo estilo Sephora, y formato vertical 9:16 para Reels y Stories — todos cohesivos entre sí.
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Fotos profesionales para tu catálogo. Sube tus perfumes y la inteligencia artificial genera los tres outputs que necesitas: fondo blanco para Amazon, fondo de catálogo estilo Sephora, y formato vertical 9 a 16 para Reels y Stories. Todos cohesivos entre sí."
-            />
-          </div>
         </div>
 
         {/* Gap 1 — Batch desde inventario local */}

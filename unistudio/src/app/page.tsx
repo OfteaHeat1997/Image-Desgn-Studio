@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { AudioButton } from "@/components/ui/AudioButton";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { useI18n } from "@/hooks/useI18n";
 import type { HomeCopy } from "@/lib/i18n/translations";
@@ -18,9 +17,9 @@ import type { HomeCopy } from "@/lib/i18n/translations";
  *  3. Design tokens — usa el oro premium del brand (--accent #D4B48A).
  *  4. Jerarquía visual — los 3 pipelines son la sección principal.
  *  5. Bilingüe — TODO el texto viene de `src/lib/i18n/translations.ts` y el
- *     switch ES/EN (arriba a la derecha) cambia el idioma en vivo, incluido
- *     el audio (Web Speech API). La tipografía usa la serif editorial
- *     (Fraunces) en los títulos para un acabado de "estudio de moda".
+ *     switch ES/EN (arriba a la derecha) cambia el idioma en vivo. La
+ *     tipografía usa la serif editorial (Fraunces) en los títulos para un
+ *     acabado de "estudio de moda".
  */
 export default function HomePage() {
   const { t, locale } = useI18n();
@@ -53,9 +52,6 @@ export default function HomePage() {
           <p className="mt-4 text-base md:text-lg text-muted max-w-2xl mx-auto text-balance">
             {t.dashboard.subtitle}
           </p>
-          <div className="mt-6 flex justify-center">
-            <AudioButton variant="inline" text={t.audio.intro} />
-          </div>
         </header>
 
         {/* ── Sección principal: 3 pipelines ──────────────────────── */}
@@ -97,8 +93,6 @@ export default function HomePage() {
                 href={`/editor?module=${m.id}`}
                 name={m.name}
                 cost={m.cost}
-                description={m.description}
-                costLabel={t.moduleCostLabel}
                 wide={m.wide}
               />
             ))}
@@ -164,14 +158,11 @@ function PipelineCard({ href, data }: { href: string; data: PipelineCardData }) 
         </h3>
         <p className="text-xs text-muted mb-2">{data.tagline}</p>
         <p className="text-sm text-body leading-relaxed">{data.benefit}</p>
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-4">
           <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-dim)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--bg-primary)] transition-default">
             {data.cta}
             <span className="transition-transform group-hover:translate-x-0.5">→</span>
           </span>
-          <div onClick={(e) => e.preventDefault()}>
-            <AudioButton text={`${data.title}. ${data.tagline}. ${data.benefit}`} size="sm" />
-          </div>
         </div>
       </div>
     </a>
@@ -201,14 +192,9 @@ function UtilityCard({ href, data }: { href: string; data: UtilityCardData }) {
         <div className="absolute inset-0 bg-gradient-to-t from-[rgba(12,12,14,0.85)] to-transparent" />
         <span className="absolute top-2 left-2 text-xl drop-shadow">{data.icon}</span>
       </div>
-      <div className="flex items-center justify-between gap-2 p-3">
-        <div className="min-w-0">
-          <h3 className="font-medium text-sm text-heading truncate">{data.title}</h3>
-          <p className="text-xs text-muted truncate">{data.benefit}</p>
-        </div>
-        <div onClick={(e) => e.preventDefault()} className="shrink-0">
-          <AudioButton text={`${data.title}. ${data.benefit}`} size="sm" />
-        </div>
+      <div className="p-3">
+        <h3 className="font-medium text-sm text-heading truncate">{data.title}</h3>
+        <p className="text-xs text-muted truncate">{data.benefit}</p>
       </div>
     </a>
   );
@@ -218,34 +204,22 @@ function ModuleLink({
   href,
   name,
   cost,
-  description,
-  costLabel,
   wide,
 }: {
   href: string;
   name: string;
   cost: string;
-  description?: string;
-  costLabel: string;
   wide?: boolean;
 }) {
-  // Texto que se lee cuando la usuaria toca 🔊. Si hay description (más
-  // explicativa) la usamos, sino combinamos el nombre + costo.
-  const audioText = description
-    ? `${name}. ${description}. ${costLabel}: ${cost}.`
-    : `${name}. ${costLabel}: ${cost}.`;
   return (
-    <div className={`relative ${wide ? "col-span-2 md:col-span-4" : ""}`}>
-      <a
-        href={href}
-        className="block p-2.5 pr-9 rounded-lg bg-surface-light/40 border border-[var(--border-subtle)] hover:border-[var(--accent-muted)] text-sm transition-default"
-      >
-        <span className="block font-medium text-body">{name}</span>
-        <span className="block text-[10px] text-muted leading-tight">{cost}</span>
-      </a>
-      <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
-        <AudioButton text={audioText} size="sm" />
-      </div>
-    </div>
+    <a
+      href={href}
+      className={`block p-2.5 rounded-lg bg-surface-light/40 border border-[var(--border-subtle)] hover:border-[var(--accent-muted)] text-sm transition-default ${
+        wide ? "col-span-2 md:col-span-4" : ""
+      }`}
+    >
+      <span className="block font-medium text-body">{name}</span>
+      <span className="block text-[10px] text-muted leading-tight">{cost}</span>
+    </a>
   );
 }

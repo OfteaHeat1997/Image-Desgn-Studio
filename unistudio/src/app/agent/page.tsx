@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AudioButton } from "@/components/ui/AudioButton";
 import {
   ArrowLeft,
   Upload,
@@ -298,12 +297,6 @@ function AgentRouterContent() {
           <p className="mt-1 text-sm text-body">
             Subí una foto (auto-detecto la categoría) o elegí abajo. Te mando al pipeline correcto con la configuración para ese tipo de producto.
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Agente IA. Sube una foto y la inteligencia artificial detecta automáticamente si es lencería, perfume o joyería, y te lleva al pipeline correcto."
-            />
-          </div>
         </div>
 
         {/* Optional upload — auto-detects lingerie garments */}

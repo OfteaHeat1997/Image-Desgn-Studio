@@ -24,7 +24,6 @@ import {
   Layers,
   Image as ImageIcon,
 } from "lucide-react";
-import { AudioButton } from "@/components/ui/AudioButton";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -1112,12 +1111,6 @@ export default function BatchPage() {
           <p className="mt-1 text-sm text-body">
             Sube hasta 50 imágenes y aplica el mismo pipeline a todas — perfecto para catálogo de temporada.
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Procesamiento masivo. Sube hasta 50 fotos y aplica el mismo pipeline a todas. Ideal para catálogo de temporada cuando tienes muchos productos del mismo tipo."
-            />
-          </div>
         </div>
         <div className="flex items-center gap-2">
           {isRunning && (

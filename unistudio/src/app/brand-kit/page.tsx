@@ -4,7 +4,6 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ChevronLeft, Palette } from "lucide-react";
-import { AudioButton } from "@/components/ui/AudioButton";
 import {
   Save,
   RotateCcw,
@@ -343,12 +342,6 @@ export default function BrandKitPage() {
           <p className="mt-1 text-sm text-body">
             Define la identidad de tu marca: logo, colores y marca de agua. Se aplica automáticamente en todas las fotos.
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Kit de marca. Define tu logo, colores principales y marca de agua. Se aplican automáticamente en todas las fotos que proceses."
-            />
-          </div>
           {isApiLoading && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
               <Loader2 className="h-3 w-3 animate-spin" />

@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { AudioButton } from "@/components/ui/AudioButton";
 import {
   Scissors,
   ImageIcon,
@@ -916,12 +915,6 @@ export default function WorkflowsPage() {
           <p className="mt-1 text-sm text-body">
             Cada feature, qué hace, qué archivos tocar, con fotos reales de tu inventario Unistyles
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Workflows. Mapa completo de UniStudio. Cada feature, qué hace, y los archivos relacionados con tu inventario."
-            />
-          </div>
         </div>
 
         {/* ── SECTION 1: Inventory ── */}
