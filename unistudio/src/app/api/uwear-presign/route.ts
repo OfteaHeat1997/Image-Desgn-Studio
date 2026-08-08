@@ -33,6 +33,29 @@ export async function GET(request: NextRequest) {
   const steps: Record<string, unknown> = {};
 
   try {
+    // ---- 0. Leer una prenda YA cargada en la cuenta -----------------------
+    // Adivinar los valores del enum ClothingItemAssetKind es tirar dardos. La
+    // cuenta ya tiene prendas cargadas desde la web de Uwear, así que su propia
+    // respuesta nos da la estructura exacta de assets (kind y view reales).
+    const listRes = await fetch(`${UWEAR_BASE_URL}/clothing-item?page=1`, {
+      headers: { Authorization: `Bearer ${key()}` },
+    });
+    const listText = await listRes.text().catch(() => '');
+    let firstId: number | undefined;
+    try {
+      const parsed = JSON.parse(listText) as { data?: Array<{ clothing_item_id?: number }> };
+      firstId = parsed.data?.[0]?.clothing_item_id;
+    } catch { /* lo reportamos crudo abajo */ }
+    steps.list = { status: listRes.status, firstId, body: listText.slice(0, 1500) };
+
+    if (firstId) {
+      const detRes = await fetch(`${UWEAR_BASE_URL}/clothing-item/${firstId}`, {
+        headers: { Authorization: `Bearer ${key()}` },
+      });
+      const detText = await detRes.text().catch(() => '');
+      steps.detail = { status: detRes.status, body: detText.slice(0, 2500) };
+    }
+
     // ---- 1. presign -------------------------------------------------------
     const presignRes = await fetch(`${UWEAR_BASE_URL}/clothing-item/presigned-upload`, {
       method: 'POST',
