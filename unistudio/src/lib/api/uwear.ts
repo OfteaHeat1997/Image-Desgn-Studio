@@ -88,23 +88,33 @@ export async function createUwearClothingItem(params: {
   descriptionBack?: string;
   processingMode?: 'none' | 'remove_background' | 'generate_flat_lay';
 }): Promise<number> {
-  const form = new FormData();
-  form.append('clothing_item_name', params.name);
-  form.append('photo_file', await fetchImageBlob(params.frontUrl), 'front.jpg');
-  if (params.backUrl) {
-    form.append('back_photo_file', await fetchImageBlob(params.backUrl), 'back.jpg');
-  }
-  if (params.description) form.append('description', params.description);
-  if (params.descriptionBack) form.append('description_back', params.descriptionBack);
-  // Default to remove_background: it cleans the garment AND auto-generates the
-  // AI-vision description, which improves try-on fidelity.
-  form.append('clothing_processing_mode', params.processingMode ?? 'remove_background');
+  // API NUEVA (rota desde ~ago-2026). Antes se mandaba multipart con photo_file;
+  // ahora ese formato devuelve 415: "The clothing item endpoint expects a JSON
+  // body with assets. Upload local files through /clothing-item/presigned-upload
+  // first...". Ese mensaje manda al camino de ARCHIVOS LOCALES (presign → S3 →
+  // assets[]), pero nuestras imágenes YA son URLs públicas (fal.media), así que
+  // corresponde el camino documentado de URL externa: JSON con
+  // external_clothing_item_url. Más simple y sin subida intermedia.
+  //
+  // Esto es lo que rompía TODO el camino Uwear del pipeline de lencería:
+  // smartTryOn lo intenta primero para íntimos y, al fallar con 415, caía en
+  // silencio a SeedDream — que redibuja el producto. La usuaria elegía Uwear y
+  // le salía SeedDream, sin ninguna explicación visible.
+  const body: Record<string, unknown> = {
+    clothing_item_name: params.name,
+    external_clothing_item_url: params.frontUrl,
+    // Limpia el fondo del garment y dispara la descripción por visión de Uwear,
+    // que mejora la fidelidad del try-on. Equivale al viejo 'remove_background'.
+    use_image_enhancement: params.processingMode !== 'none',
+  };
+  if (params.backUrl) body.external_clothing_item_back_url = params.backUrl;
+  if (params.description) body.description = params.description;
+  if (params.descriptionBack) body.description_back = params.descriptionBack;
 
-  // NOTE: do not set Content-Type — fetch sets the multipart boundary itself.
   const res = await fetch(`${UWEAR_BASE_URL}/clothing-item`, {
     method: 'POST',
-    headers: authHeader(),
-    body: form,
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
