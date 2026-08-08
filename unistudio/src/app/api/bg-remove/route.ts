@@ -704,10 +704,19 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         // no es viable. Acá el guardia devuelve `false` y el caller cae al recorte
         // real, que preserva los píxeles (y con ellos el brillo). Si no hay
         // ANTHROPIC_API_KEY devuelve null → aceptamos, como en el otro camino.
+        // El guardia AVISA pero NO descarta. Cuando descartaba (primera versión de
+        // este cambio) el caller caía a grounded_sam, y el recorte real sale peor
+        // que el Photoroom rechazado: plano y a veces mordido en un tirante. O sea,
+        // el "control de calidad" empeoraba la imagen que veía la usuaria.
+        //
+        // Photoroom re-ilumina y aplana el satén, así que su resultado casi siempre
+        // falla el chequeo (d) del guardia (brillo satinado natural) aunque la forma,
+        // el cierre y la malla estén perfectos. Rechazar por eso es tirar la mejor
+        // imagen disponible. Se registra en el log y el provider queda marcado para
+        // que la usuaria pueda revisar, pero la imagen se entrega.
         const faithful = await ghostMatchesProduct(imageUrl, candidateUrl, garmentType ?? null, garmentDescription);
         if (faithful === false) {
-          console.warn('[bg-remove:removeSubject] Photoroom NO pasó el control de fidelidad (tela/forma) — caigo al recorte real');
-          return false;
+          console.warn('[bg-remove:removeSubject] AVISO: Photoroom no pasó el control de fidelidad (probablemente el satén quedó mate) — se entrega igual porque el recorte real sale peor');
         }
 
         resultUrl = candidateUrl;
