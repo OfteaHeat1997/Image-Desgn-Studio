@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { useI18n } from "@/hooks/useI18n";
 import type { HomeCopy } from "@/lib/i18n/translations";
 
@@ -38,7 +37,6 @@ export default function HomePage() {
           <span className="font-serif text-lg md:text-xl font-semibold tracking-tight text-gradient">
             {t.app.name}
           </span>
-          <LanguageSwitcher />
         </div>
 
         {/* ── Hero ─────────────────────────────────────────────────── */}
