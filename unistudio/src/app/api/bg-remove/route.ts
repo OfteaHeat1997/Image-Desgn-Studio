@@ -691,9 +691,28 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       try {
         const png = await ghostMannequinPhotoroom(imageUrl, sandbox);
         // Persistir en fal para downstream estable (la pipeline espera una URL).
-        resultUrl = await uploadToFalStorage(png, 'image/png', 'photoroom-ghost.png');
+        const candidateUrl = await uploadToFalStorage(png, 'image/png', 'photoroom-ghost.png');
+
+        // GUARDIA DE FIDELIDAD TAMBIÉN EN PHOTOROOM (hueco detectado 2026-08-08 por
+        // la usuaria). ghostMatchesProduct solo corría en el camino del ghost
+        // generativo; el resultado de Photoroom se aceptaba SIN validar. Por eso
+        // pasó sin aviso un bra de satén devuelto en negro MATE: Photoroom
+        // re-ilumina la prenda y le borra los reflejos, y el chequeo (d) del
+        // guardia —"tela real con brillo satinado natural"— nunca llegó a correr.
+        //
+        // Importa sobre todo en producción por lotes: revisar 490 resultados a ojo
+        // no es viable. Acá el guardia devuelve `false` y el caller cae al recorte
+        // real, que preserva los píxeles (y con ellos el brillo). Si no hay
+        // ANTHROPIC_API_KEY devuelve null → aceptamos, como en el otro camino.
+        const faithful = await ghostMatchesProduct(imageUrl, candidateUrl, garmentType ?? null, garmentDescription);
+        if (faithful === false) {
+          console.warn('[bg-remove:removeSubject] Photoroom NO pasó el control de fidelidad (tela/forma) — caigo al recorte real');
+          return false;
+        }
+
+        resultUrl = candidateUrl;
         usedProvider = 'photoroom-ghost-mannequin';
-        console.log('[bg-remove:removeSubject] Photoroom ghost-mannequin OK');
+        console.log('[bg-remove:removeSubject] Photoroom ghost-mannequin OK' + (faithful === null ? ' (sin validar: falta ANTHROPIC_API_KEY)' : ' ✓ validado'));
         return true;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
