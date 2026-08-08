@@ -2250,6 +2250,51 @@ function buildGarmentDescription(spec: ProductSpec | null | undefined): string |
   return out.length > 0 ? out : undefined;
 }
 
+/**
+ * Try-on con Leffa por el flujo ASINCRONO (encolar + consultar).
+ *
+ * Leffa es el unico proveedor verificado que RESPETA la silueta real: warpea los
+ * pixeles de la prenda en vez de redibujarla como SeedDream (que devuelve escote
+ * en V donde el real es recto, o encaje con ojales donde el real es malla lisa).
+ * Pero tarda ~236s medidos y la ruta sincrona corre en una funcion de Vercel
+ * limitada a 300s: se pasaba y devolvia FUNCTION_INVOCATION_TIMEOUT. Subir
+ * maxDuration no es opcion (el plan no admite mas de 300s; con 800 Vercel aplica
+ * el default de 60s y rompe TODO el paso).
+ *
+ * Extraido a helper para que lo usen tanto la Foto Frontal como la Foto Espalda —
+ * esta ultima seguia en SeedDream y por eso inventaba el broche y el encaje.
+ */
+async function tryOnLeffaAsync(
+  modelImage: string,
+  garmentImage: string,
+  category: string,
+  abortSignal?: AbortSignal,
+): Promise<{ resultUrl: string; cost: number; usedProvider: string }> {
+  const submitRes = await fetch("/api/tryon/async", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: abortSignal,
+    body: JSON.stringify({ modelImage, garmentImage, category }),
+  });
+  const submitJson = await submitRes.json();
+  if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
+  const { statusUrl, responseUrl } = submitJson.data as { statusUrl: string; responseUrl: string };
+
+  // Consulta cada 6s. Leffa ronda los 4 minutos; 60 intentos = 6 min de margen.
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (abortSignal?.aborted) throw new DOMException("Aborted", "AbortError");
+    await new Promise((r) => setTimeout(r, 6000));
+    const q = `statusUrl=${encodeURIComponent(statusUrl)}&responseUrl=${encodeURIComponent(responseUrl)}`;
+    const pollRes = await fetch(`/api/tryon/async?${q}`, { signal: abortSignal });
+    const pollJson = await pollRes.json();
+    if (!pollJson.success) throw new Error(pollJson.error || "Leffa fallo durante la generacion.");
+    if (pollJson.data?.done) {
+      return { resultUrl: pollJson.data.url, cost: pollJson.data.cost ?? 0.04, usedProvider: "leffa" };
+    }
+  }
+  throw new Error("Leffa tardo mas de 6 minutos. Dale 'Rehacer' o proba otro proveedor.");
+}
+
 async function runStep(
   stepId: StepId,
   inputUrl: string,
@@ -2556,6 +2601,18 @@ async function runStep(
       productType === "panty" ? "bottoms"
       : productType === "set" ? "one-pieces"
       : "tops";
+    // FOTO ESPALDA CON LEFFA. Seguia siempre en la ruta sincrona (SeedDream), que
+    // REDIBUJA: devolvia un broche y un encaje con ojales que no existen en el
+    // producto real. Con Leffa se warpea la foto REAL de espalda sobre la modelo.
+    if (providerOverride === "leffa") {
+      // garmentForTryon puede ser undefined si no hay aislado NI foto de espalda;
+      // el guard de arriba ya garantiza que hay una de las dos, pero TypeScript no
+      // lo deduce — fallamos con mensaje claro en vez de mandar undefined.
+      if (!garmentForTryon) throw new Error("Foto Espalda: falta la prenda (aislado o foto de espalda).");
+      const leffa = await tryOnLeffaAsync(newModelImage, garmentForTryon, category, abortSignal);
+      return { resultUrl: leffa.resultUrl, cost: modelCost + leffa.cost, usedProvider: leffa.usedProvider };
+    }
+
     const tryonRes = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2606,30 +2663,7 @@ async function runStep(
     // esta cuenta no admite más de 300s. Acá encolamos y consultamos desde el
     // navegador, así ninguna llamada al servidor dura más de unos segundos.
     if (providerOverride === "leffa") {
-      const submitRes = await fetch("/api/tryon/async", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: abortSignal,
-        body: JSON.stringify({ modelImage: sharedModelUrl, garmentImage: inputUrl, category }),
-      });
-      const submitJson = await submitRes.json();
-      if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
-      const { statusUrl, responseUrl } = submitJson.data as { statusUrl: string; responseUrl: string };
-
-      // Consulta cada 6s. Leffa ronda los 4 minutos; 60 intentos = 6 min de
-      // margen antes de rendirse con un mensaje claro.
-      for (let attempt = 0; attempt < 60; attempt++) {
-        if (abortSignal?.aborted) throw new DOMException("Aborted", "AbortError");
-        await new Promise((r) => setTimeout(r, 6000));
-        const q = `statusUrl=${encodeURIComponent(statusUrl)}&responseUrl=${encodeURIComponent(responseUrl)}`;
-        const pollRes = await fetch(`/api/tryon/async?${q}`, { signal: abortSignal });
-        const pollJson = await pollRes.json();
-        if (!pollJson.success) throw new Error(pollJson.error || "Leffa falló durante la generación.");
-        if (pollJson.data?.done) {
-          return { resultUrl: pollJson.data.url, cost: pollJson.data.cost ?? 0.04, usedProvider: "leffa" };
-        }
-      }
-      throw new Error("Leffa tardó más de 6 minutos. Dale 'Rehacer' o probá otro proveedor.");
+      return await tryOnLeffaAsync(sharedModelUrl, inputUrl, category, abortSignal);
     }
 
     const res = await fetch("/api/tryon", {
