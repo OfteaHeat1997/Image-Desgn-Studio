@@ -695,13 +695,22 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         // real tiene espalda de malla transparente y brillo satinado. El prompt
         // es la única palanca disponible (su API no acepta una segunda imagen
         // del interior — confirmado en su documentación).
+        // Orden = prioridad: el ghost es generativo y reinterpreta lo que no se le
+        // ancla, así que lo que va primero es lo que NO se puede perder.
+        //
+        // La primera versión de este prompt pedía "mostrá el panel interior de la
+        // espalda por el escote". Resultado: recuperó el brillo del satén pero
+        // abrió el escote en V y se comió los ganchos del frente — que son la
+        // firma del producto. Esa instrucción se elimina: Photoroom recibe UNA
+        // sola foto y el interior no está en ella, así que pedirlo solo lo empuja
+        // a agrandar la abertura para dibujar algo ahí.
         const ghostPrompt = [
-          'ghost mannequin product photo, invisible mannequin, front view',
-          garmentDescription?.trim()
-            ? `The real garment: ${garmentDescription.trim()}`
-            : '',
-          'Preserve the exact fabric finish: if the fabric is satin or glossy keep its bright specular highlights and reflective sheen, do NOT render it matte or flat.',
-          'Show the real inner back panel through the neck opening, matching the garment construction.',
+          'ghost mannequin product photo, invisible mannequin, straight front view',
+          'CRITICAL: keep the closure of the front exactly as in the photo — if there is a vertical row of metal hook-and-eye clasps down the center front, it MUST stay clearly visible and unchanged',
+          'Keep the exact original neckline shape, height and coverage — do NOT deepen it and do NOT make it V-shaped',
+          'Keep the satin sheen of the fabric: bright specular highlights and glossy reflections, never matte or flat',
+          'Keep sheer mesh panels exactly where they are in the photo',
+          garmentDescription?.trim() ? `The real garment: ${garmentDescription.trim()}` : '',
         ]
           .filter(Boolean)
           .join('. ');
