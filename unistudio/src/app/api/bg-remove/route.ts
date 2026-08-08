@@ -33,6 +33,18 @@ const PROVIDER_COSTS: Record<string, number> = {
 const ISOLATE_COST = 0.01;
 
 /**
+ * Circuit breaker de Photoroom. El efecto Ghost Mannequin vive en el plan Plus
+ * (de pago): sin suscripción activa la API responde 401/402/403 para TODAS las
+ * imágenes, siempre. Sin este breaker un batch de 6 fotos pagaba 6 round-trips
+ * inútiles (subir la imagen + esperar el rechazo) antes de caer al recorte real
+ * cada vez. Al primer rechazo por plan/credenciales lo damos por no disponible
+ * durante el resto de la vida del proceso y vamos directo al método que sí anda.
+ * Se resetea solo cuando Vercel recicla la lambda (o al reiniciar `npm run dev`),
+ * así que si contratás el plan no hay que tocar nada.
+ */
+let photoroomUnavailable = false;
+
+/**
  * Valida si un recorte TODAVÍA tiene una persona/modelo (SeedDream a veces no la
  * quita y devuelve la imagen casi igual). Usa Claude Vision (Haiku). Devuelve:
  *   true  = hay una persona visible (recorte malo → reintentar)
@@ -620,6 +632,17 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // generativo libre). Es el método recomendado tras la investigación. Si la key no
     // está, o Photoroom filtra la lencería, tira error → el caller cae al siguiente.
     const tryPhotoroom = async (): Promise<boolean> => {
+      // Sin key configurada no hay nada que intentar: evitamos el round-trip y
+      // arrancamos directo por el recorte real, que sí funciona con las keys de
+      // fal/Replicate que ya están puestas.
+      if (!process.env.PHOTOROOM_API_KEY?.trim()) {
+        console.log('[bg-remove:removeSubject] sin PHOTOROOM_API_KEY — directo al recorte real');
+        return false;
+      }
+      if (photoroomUnavailable) {
+        console.log('[bg-remove:removeSubject] Photoroom ya rechazó por plan en este proceso — salteando');
+        return false;
+      }
       try {
         const png = await ghostMannequinPhotoroom(imageUrl);
         // Persistir en fal para downstream estable (la pipeline espera una URL).
@@ -628,7 +651,16 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         console.log('[bg-remove:removeSubject] Photoroom ghost-mannequin OK');
         return true;
       } catch (e) {
-        console.warn(`[bg-remove:removeSubject] Photoroom falló (${e instanceof Error ? e.message : e})`);
+        const msg = e instanceof Error ? e.message : String(e);
+        // 401/402/403 = key inválida o plan sin Ghost Mannequin. Eso NO se
+        // arregla reintentando con otra foto → apagamos Photoroom para el resto
+        // del proceso. Otros errores (timeout, filtro de contenido puntual) sí
+        // pueden ser específicos de una imagen, así que esos no lo apagan.
+        if (/Photoroom \/v2\/edit (401|402|403)\b/.test(msg) || msg.includes('PHOTOROOM_API_KEY no está configurada')) {
+          photoroomUnavailable = true;
+          console.warn('[bg-remove:removeSubject] Photoroom rechazó por plan/credenciales — desactivado para el resto del proceso');
+        }
+        console.warn(`[bg-remove:removeSubject] Photoroom falló (${msg})`);
         return false;
       }
     };
