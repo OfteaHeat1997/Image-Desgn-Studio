@@ -73,36 +73,18 @@ export async function GET(request: NextRequest) {
     steps.assetUrl = assetUrl;
 
     // ---- 3. probar formas de body para POST /clothing-item ----------------
-    const candidates: Array<{ label: string; body: unknown }> = [
-      {
-        label: 'assets[asset_url] + name + mode',
-        body: {
-          clothing_item_name: 'diag bra',
-          clothing_processing_mode: 'remove_background',
-          assets: [{ asset_url: assetUrl }],
-        },
+    // La API pide asset_kind + asset_view pero no dice los valores válidos.
+    // Probamos los candidatos razonables; el 422 de un enum suele listar los
+    // permitidos, así que con una pasada alcanza para cerrar el contrato.
+    const KINDS = ['photo', 'image', 'garment', 'clothing', 'product', 'main'];
+    const candidates: Array<{ label: string; body: unknown }> = KINDS.map((kind) => ({
+      label: `asset_kind=${kind}, asset_view=front`,
+      body: {
+        clothing_item_name: 'diag bra',
+        clothing_processing_mode: 'remove_background',
+        assets: [{ asset_url: assetUrl, asset_kind: kind, asset_view: 'front' }],
       },
-      {
-        label: 'assets[asset_url+view=front]',
-        body: {
-          clothing_item_name: 'diag bra',
-          clothing_processing_mode: 'remove_background',
-          assets: [{ asset_url: assetUrl, view: 'front' }],
-        },
-      },
-      {
-        label: 'assets[asset_url+asset_type=front]',
-        body: {
-          clothing_item_name: 'diag bra',
-          clothing_processing_mode: 'remove_background',
-          assets: [{ asset_url: assetUrl, asset_type: 'front' }],
-        },
-      },
-      {
-        label: 'solo assets',
-        body: { assets: [{ asset_url: assetUrl }] },
-      },
-    ];
+    }));
 
     const tries = [];
     for (const c of candidates) {
