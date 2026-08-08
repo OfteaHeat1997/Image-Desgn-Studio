@@ -448,17 +448,50 @@ async function isolateGarment(
       .png()
       .toBuffer();
   } else {
-    // 1) recorte transparente fiel (versión probada)
-    const cutout = await sharp(prepared)
-      .ensureAlpha()
-      .joinChannel(bestMask, { raw: { width, height, channels: 1 } })
+    // COLOR APAGADO (reportado 2026-08-08: "el color no sale vivo"). El recorte se
+    // componía sobre `prepared`, que es la foto re-encodeada a JPEG q90 y limitada a
+    // 1024px — pensada para que grounded_sam infiera rápido, NO para ser el resultado
+    // final. En satén negro los degradados y reflejos son justo lo que el JPEG tira
+    // primero, así que la prenda salía chata. `prepared` sigue alimentando la
+    // segmentación; el recorte final ahora se compone sobre la foto ORIGINAL, y la
+    // máscara se escala a esa resolución.
+    // MISMO redimensionado que `prepared` (así la máscara calza exacto, sin
+    // reescalarla), pero PNG sin pérdida en vez de JPEG q90, y con el alfa quitado
+    // AL ESCRIBIR: si el buffer conserva su canal alfa, joinChannel agrega un 5º
+    // canal que sharp descarta al guardar el PNG — el recorte no se aplica y vuelve
+    // la foto entera con la modelo. Sin alfa, el canal que unimos queda como alfa real.
+    const originalHQ = await sharp(inputBuffer)
+      .rotate()
+      .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+      .removeAlpha()
       .png()
       .toBuffer();
-    // 2) componer el recorte sobre fondo BLANCO
+    const ow = width;
+    const oh = height;
+    const maskFull = bestMask;
+
+    // 1) recorte transparente fiel, a resolución original.
+    //    removeAlpha() y NO ensureAlpha(): `prepared` era JPEG (3 canales) así que
+    //    ensureAlpha+joinChannel daba RGBA correcto, pero la foto ORIGINAL suele ser
+    //    PNG que YA trae alfa → ensureAlpha no hacía nada y joinChannel agregaba un
+    //    5º canal que sharp descarta al escribir el PNG: el recorte no se aplicaba y
+    //    volvía la foto entera con la modelo. Quitando el alfa primero, el canal que
+    //    unimos siempre queda como alfa real.
+    const cutout = await sharp(originalHQ)
+      .joinChannel(maskFull, { raw: { width: ow, height: oh, channels: 1 } })
+      .png()
+      .toBuffer();
+    // 2) componer sobre fondo BLANCO + el MISMO realce sutil de satén que ya se le
+    //    aplicaba al resultado de Photoroom (enhanceSatinSheen en lib/api/photoroom.ts).
+    //    Estaba solo en ese camino, así que el recorte real se veía más apagado al
+    //    lado del ghost. linear(1.06,-5): apenas contraste, sin sharpen — el realce
+    //    fuerte hacía ver el satén de plástico (ver commit 1df5a57). Sobre el blanco
+    //    no tiene efecto visible (255 satura igual).
     isolated = await sharp({
-      create: { width, height, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
+      create: { width: ow, height: oh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
     })
       .composite([{ input: cutout }])
+      .linear(1.06, -5)
       .png()
       .toBuffer();
   }
