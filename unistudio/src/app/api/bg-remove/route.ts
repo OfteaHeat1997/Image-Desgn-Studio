@@ -704,12 +704,24 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         // firma del producto. Esa instrucción se elimina: Photoroom recibe UNA
         // sola foto y el interior no está en ella, así que pedirlo solo lo empuja
         // a agrandar la abertura para dibujar algo ahí.
+        // Orden = prioridad: el ghost es generativo y reinterpreta todo lo que no
+        // se le ancla, así que lo que NO se puede perder va primero.
+        //
+        // AGNÓSTICO AL PRODUCTO — regla del proyecto y requisito real: el catálogo
+        // tiene ~490 variantes con cierres distintos (ganchos al frente, broche
+        // atrás, zipper, sin cierre), escotes distintos y telas distintas. Una
+        // versión anterior de este prompt decía literalmente "hook-and-eye clasps":
+        // servía para un bra y le habría inventado ganchos a los otros 76. Acá se
+        // describen CATEGORÍAS ("el cierre que sea", "la tela que sea") y los
+        // detalles concretos llegan por garmentDescription, que Claude Vision saca
+        // de CADA foto.
         const ghostPrompt = [
           'ghost mannequin product photo, invisible mannequin, straight front view',
-          'CRITICAL: keep the closure of the front exactly as in the photo — if there is a vertical row of metal hook-and-eye clasps down the center front, it MUST stay clearly visible and unchanged',
-          'Keep the exact original neckline shape, height and coverage — do NOT deepen it and do NOT make it V-shaped',
-          'Keep the satin sheen of the fabric: bright specular highlights and glossy reflections, never matte or flat',
-          'Keep sheer mesh panels exactly where they are in the photo',
+          'CRITICAL: reproduce the garment EXACTLY as photographed. Keep whatever closure it has (hooks, clasps, zipper, buttons, or none) in the same place, same type and same size — never add, remove, move or substitute a closure',
+          'Keep the exact original neckline shape, height and coverage — do NOT deepen it and do NOT change its cut',
+          'Keep the exact fabric finish: if it is satin, silk or glossy keep its bright specular highlights and reflective sheen; if it is matte or cotton keep it matte. Never change the material look',
+          'Keep any sheer, mesh, lace or contrast panels exactly where they are, with the same size and transparency',
+          'Keep the strap width, band width and overall silhouette identical to the photo',
           garmentDescription?.trim() ? `The real garment: ${garmentDescription.trim()}` : '',
         ]
           .filter(Boolean)
