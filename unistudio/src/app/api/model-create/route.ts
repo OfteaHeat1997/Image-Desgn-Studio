@@ -357,8 +357,21 @@ export async function POST(request: NextRequest) {
     // For lingerie we want a base that looks like the eventual garment so
     // Kolors has a clean canvas — a simple beige swim two-piece is ideal
     // (same silhouette as a bra + briefs without the trigger word "bikini").
+    // PARA UN BRA, LA FOTO FRONTAL ES DE TORSO — NO DE CUERPO ENTERO.
+    // Reportado por la usuaria: "frontal quiere decir no todo el cuerpo, solo la
+    // parte de arriba". El prompt pedia "top beige Y briefs beige", o sea le
+    // pedia explicitamente que mostrara la parte de abajo, y por eso el encuadre
+    // bajaba hasta la cadera. Peor aun: en un producto que es SOLO un bra, esa
+    // prenda inferior no existe en el catalogo, y el try-on despues la recoloreaba
+    // (bra negro -> panty negro inventado).
+    //
+    // Para bras se pide solo el top y encuadre de torso. El resto de lenceria
+    // (panties, fajas, bodysuits) SI necesita la base de dos piezas.
+    const isBraOnly = garmentType === 'bra';
     const promptClothing = (garmentImage || isLingerie)
-      ? 'a simple beige swim top and matching beige swim briefs, plain solid-color two-piece swimwear, suitable base for virtual try-on'
+      ? (isBraOnly
+          ? 'a simple beige swim top, plain solid-color, suitable base for virtual try-on, cropped at the waist so no lower garment is visible'
+          : 'a simple beige swim top and matching beige swim briefs, plain solid-color two-piece swimwear, suitable base for virtual try-on')
       : clothing;
 
     // Build the prompt
