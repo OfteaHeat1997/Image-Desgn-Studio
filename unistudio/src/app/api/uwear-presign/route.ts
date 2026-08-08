@@ -1,14 +1,19 @@
 // =============================================================================
-// DIAGNÓSTICO — leer la especificación OpenAPI de Uwear
+// DIAGNÓSTICO — estructura real de una prenda de Uwear
 //
-// Uwear cambió POST /clothing-item: el multipart viejo devuelve 415 y el body
-// JSON ahora exige `assets: [{asset_url, asset_kind, asset_view}]`. Los valores
-// válidos de ClothingItemAssetKind no están en la documentación pública y
-// adivinarlos fue una pérdida de tiempo.
+// POST /clothing-item con multipart devuelve 415 y con nuestro JSON devuelve 422
+// pidiendo `assets[]` con `asset_kind` y `asset_view`. Los valores válidos de esos
+// enums no están en la documentación pública y adivinarlos no funcionó (probé
+// photo/image/garment/clothing/product/main: todos rechazados). La ruta
+// documentada /api/v1/clothing-item devuelve 404 en producción — es del entorno
+// dev.
 //
-// api.uwear.ai es FastAPI, así que publica /openapi.json — pero pide auth. Esta
-// ruta la trae con la key y devuelve SOLO los enums y el schema del endpoint,
-// que es lo que hace falta para escribir el cliente correcto de una vez.
+// Ese 415/422 rompe TODO el camino Uwear del pipeline de lencería: smartTryOn lo
+// intenta primero para íntimos y, al fallar, cae en silencio a SeedDream, que
+// redibuja el producto. La usuaria elige Uwear y le sale SeedDream.
+//
+// La cuenta ya tiene 13 prendas cargadas desde la web de Uwear. Leer una y mirar
+// sus assets da los valores reales sin adivinar.
 //
 // GET /api/uwear-presign
 // =============================================================================
@@ -22,53 +27,30 @@ export async function GET() {
   if (!k) {
     return NextResponse.json({ success: false, error: 'UWEAR_API_KEY no configurada' }, { status: 500 });
   }
+  const auth = { Authorization: `Bearer ${k}` };
 
   try {
-    const res = await fetch(`${UWEAR_BASE_URL}/openapi.json`, {
-      headers: { Authorization: `Bearer ${k}` },
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => '');
-      return NextResponse.json({ success: false, status: res.status, body: t.slice(0, 500) });
-    }
-    const spec = (await res.json()) as {
-      components?: { schemas?: Record<string, unknown> };
-      paths?: Record<string, unknown>;
-    };
-    const schemas = spec.components?.schemas ?? {};
-
-    // Todo schema cuyo nombre huela a asset/kind/view, más el body del endpoint.
-    const relevant: Record<string, unknown> = {};
-    for (const [name, def] of Object.entries(schemas)) {
-      if (/asset|kind|view|clothingitem/i.test(name)) relevant[name] = def;
-    }
-
-    // Respaldo: si el spec no trae los schemas, leemos una prenda YA cargada en
-    // la cuenta desde la web de Uwear — su propia respuesta muestra los valores
-    // reales de asset_kind/asset_view, que es lo único que falta.
-    let existing: unknown = null;
+    const listRes = await fetch(`${UWEAR_BASE_URL}/clothing-item?page=1`, { headers: auth });
+    const listText = await listRes.text();
+    let id: number | undefined;
     try {
-      const listRes = await fetch(`${UWEAR_BASE_URL}/clothing-item?page=1`, {
-        headers: { Authorization: `Bearer ${k}` },
-      });
-      const list = (await listRes.json()) as { data?: Array<{ clothing_item_id?: number }> };
-      const id = list.data?.[0]?.clothing_item_id;
-      if (id) {
-        const detRes = await fetch(`${UWEAR_BASE_URL}/clothing-item/${id}`, {
-          headers: { Authorization: `Bearer ${k}` },
-        });
-        existing = { id, status: detRes.status, body: (await detRes.text()).slice(0, 3000) };
-      }
-    } catch (e) {
-      existing = { error: e instanceof Error ? e.message : String(e) };
+      const parsed = JSON.parse(listText) as { data?: Array<{ clothing_item_id?: number }> };
+      id = parsed.data?.[0]?.clothing_item_id;
+    } catch { /* se reporta crudo abajo */ }
+
+    let detail: unknown = null;
+    if (id) {
+      const detRes = await fetch(`${UWEAR_BASE_URL}/clothing-item/${id}`, { headers: auth });
+      detail = { status: detRes.status, body: (await detRes.text()).slice(0, 4000) };
     }
 
     return NextResponse.json({
       success: true,
-      schemaNames: Object.keys(schemas),
-      relevant,
-      clothingItemPath: spec.paths?.['/clothing-item'],
-      existing,
+      listStatus: listRes.status,
+      firstId: id,
+      // El primer item de la lista suele traer ya los assets embebidos.
+      listSample: listText.slice(0, 2500),
+      detail,
     });
   } catch (e) {
     return NextResponse.json(

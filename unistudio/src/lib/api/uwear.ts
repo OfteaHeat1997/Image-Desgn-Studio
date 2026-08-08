@@ -24,7 +24,7 @@
 // intenta primero para íntimos y, al fallar, caía en silencio a SeedDream, que
 // redibuja el producto. La usuaria elegía Uwear y le salía SeedDream.
 // Fuente: https://docs.dev.uwear.ai/operations/external_create_clothing_item
-const UWEAR_BASE_URL = 'https://api.uwear.ai/api/v1';
+const UWEAR_BASE_URL = 'https://api.uwear.ai';
 
 /** Read + trim the Uwear API key. Trailing \n from `vercel env pull` causes 401s. */
 function getUwearKey(): string {
