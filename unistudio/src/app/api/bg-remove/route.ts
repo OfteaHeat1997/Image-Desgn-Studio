@@ -435,6 +435,31 @@ async function isolateGarment(
     throw new Error('grounded_sam no produjo una máscara usable de la prenda');
   }
 
+  // UNION DE MASCARAS DEL MISMO PRODUCTO. grounded_sam devuelve 4 candidatas y
+  // antes se usaba UNA sola: si a esa le faltaba un bretel, el recorte salia
+  // mordido (reportado por la usuaria: al bra le faltaba el tirante derecho).
+  // Las otras candidatas suelen cubrir justo lo que a la elegida le falta.
+  //
+  // Solo se unen las que son del MISMO objeto: cobertura entre 0.5x y 2x de la
+  // elegida. Sin ese rango entraria tambien la mascara de cuerpo entero
+  // (coverage ~0.9 en las fotos con modelo) y volveria la persona al recorte.
+  if (bestMask) {
+    const lo = bestCoverage * 0.5;
+    const hi = bestCoverage * 2;
+    let merged = 0;
+    for (const c of candidates) {
+      if (c.buffer === bestMask) continue;
+      if (c.purity < 0.9) continue;
+      if (c.coverage < lo || c.coverage > hi) continue;
+      if (c.buffer.length !== bestMask.length) continue;
+      for (let i = 0; i < bestMask.length; i++) {
+        if (c.buffer[i] > bestMask[i]) bestMask[i] = c.buffer[i];
+      }
+      merged++;
+    }
+    if (merged > 0) console.log(`[bg-remove:isolate] union de ${merged} mascara(s) extra para tapar huecos`);
+  }
+
   console.log(`[bg-remove:isolate] using mask coverage=${bestCoverage.toFixed(3)}`);
 
   // returnMaskOnly: usado por texturePreserve (lingerie pipeline). En vez de
@@ -782,39 +807,50 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // rechaza alucinaciones y reintenta; si tras 4 intentos ninguna pasa, cae al
     // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
     // en error.
-    if (method === 'photoroom-sandbox') {
-      // MODO PRUEBA: la MISMA key con prefijo sandbox_ → 1.000 llamadas gratis al mes
-      // (máx 100/día) contra /v2/edit, que NO gastan la cuota del plan. Sale CON MARCA
-      // DE AGUA, así que sirve para iterar el encuadre y el prompt, no para publicar.
-      // Importa porque el plan de la usuaria es la prueba de 10 imágenes/mes: sin esto,
-      // cada tanteo del Paso 1 le gastaba una de esas 10. Si falla, cae al recorte real.
-      if (!(await tryPhotoroom(true))) {
-        if (!(await tryGroundedSam())) await rembgLastResort();
+    // EL SELECTOR MANDA. Antes cada metodo caia en silencio a otro cuando fallaba,
+    // asi que los CUATRO caminos terminaban en grounded_sam: la usuaria elegia
+    // cosas distintas y veia siempre la misma imagen, sin enterarse de cual habia
+    // corrido. Ese mismo patron de sustitucion silenciosa oculto durante meses que
+    // Uwear estaba roto en el Paso 2 (elegia Uwear, corria SeedDream), y llevo a
+    // ajustar prompts en la capa equivocada.
+    //
+    // Ahora: si elegis un metodo, se usa ESE. Si falla, se devuelve el error REAL
+    // nombrando el metodo — nunca una imagen de otro proveedor haciendose pasar por
+    // el elegido. 'auto' sigue siendo el unico que encadena, porque eso es lo que
+    // significa.
+    if (method === 'photoroom' || method === 'photoroom-sandbox') {
+      const sandbox = method === 'photoroom-sandbox';
+      if (!(await tryPhotoroom(sandbox))) {
+        return NextResponse.json({
+          success: false,
+          error:
+            `Photoroom${sandbox ? ' (modo prueba)' : ''} no pudo procesar esta foto. ` +
+            `Causa tipica: se agoto la cuota del plan, o la key no tiene Ghost Mannequin (es del plan Plus). ` +
+            `Elegi "Recorte real" en el selector de Metodo — es gratis y no depende de Photoroom.`,
+        });
       }
     } else if (method === 'grounded-sam') {
-      // Modo recorte real explícito: primero píxeles reales (plano, textura exacta).
-      //
-      // Si grounded_sam no encuentra la prenda (pasa con fotos donde la modelo
-      // ocupa poco del encuadre), antes se caía DIRECTO a rembg-last-resort — que
-      // el pipeline de lencería hard-failea, así que elegir esta opción convertía
-      // una foto difícil en un error terminal. Ahora intenta Photoroom antes de
-      // rendirse: también preserva la tela real (no es un editor generativo), así
-      // que respeta la intención de "fiel" de esta opción. Si no hay plan de
-      // Photoroom, tryPhotoroom devuelve false al instante y no cuesta nada.
       if (!(await tryGroundedSam())) {
-        if (!(await tryPhotoroom())) await rembgLastResort();
+        return NextResponse.json({
+          success: false,
+          error:
+            `El recorte real no encontro la prenda en esta foto` +
+            `${groundedSamError ? ` (${groundedSamError})` : ''}. ` +
+            `Dale "Rehacer" — es no-determinista y suele salir al segundo intento. ` +
+            `Si vuelve a fallar, probá con una foto donde la prenda se vea completa.`,
+        });
       }
     } else if (method === 'ghost') {
-      // Ghost generativo validado (selección explícita). Puede alucinar; el guardia
-      // Claude Vision reintenta. Si ninguna pasa → recorte real → rembg.
       if (!(await tryGhost())) {
-        if (!(await tryGroundedSam())) await rembgLastResort();
+        return NextResponse.json({
+          success: false,
+          error:
+            'El ghost 3D no paso el control de fidelidad: lo que genero no coincide con tu producto real. ' +
+            'Elegi "Recorte real" (usa los pixeles de tu foto, nunca inventa) o dale "Rehacer".',
+        });
       }
     } else {
-      // DEFAULT (recomendado tras la investigación): PHOTOROOM Ghost Mannequin —
-      // servicio dedicado que quita la modelo y deja el producto 3D fiel a la tela.
-      // Si falla (sin key / filtro / error) → recorte real fiel → rembg. NO usa el
-      // ghost generativo por default (era el que alucinaba).
+      // 'auto' — el UNICO que encadena, y avisa cual corrio via data.provider.
       if (!(await tryPhotoroom())) {
         if (!(await tryGroundedSam())) await rembgLastResort();
       }
