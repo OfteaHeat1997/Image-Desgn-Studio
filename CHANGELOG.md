@@ -1,5 +1,29 @@
 # UniStudio — Changelog
 
+## 2026-08-09 — Reestructuración del repo: código muerto + docs fuera del repo
+
+Limpieza estructural de cara a la revisión externa (Desktop terminal). Objetivo: que el
+repositorio de GitHub contenga **solo código y documentación técnica**, y que todo lo demás
+viva fuera.
+
+**Código muerto archivado (12 archivos huérfanos, cero imports):** `card.tsx`, `tooltip.tsx`,
+`processing-overlay.tsx`, `processing/{model-create,outpaint,upscale}.ts`,
+`utils/{prompts,cost-tracker,humanize-error}.ts`, `batch/{pipeline,queue}.ts`, `brand/compliance.ts`.
+No se borraron: se movieron a `UniStudio-Workspace/archive-dead-code/` con `MANIFEST.md` para
+restaurar. Verificado con grep + auditoría de agente. No se tocó zona activa de lencería
+(`tryon.ts`, `scan-bras`, `useAgentPipeline`).
+
+**Documentación no-técnica sacada del repo** a `C:\Users\maria\Documents\UniStudio-Workspace\`
+(fuera de git): `interview-prep/` (36MB, incl. audios), `inventory-final/` (25MB de datos crudos),
+roadmap, pendientes, ux-research, learning-guide, guías HTML gigantes (`TESTING-GUIDE.html`,
+`UNISTUDIO-COMPLETE-GUIDE.html` — estaban trackeadas pese al `.gitignore`).
+
+**Nuevos documentos-mapa:** `docs/README.md` (índice del repo), `COORDINATION.md` (registro entre
+los terminales Desktop/Phone/Cloud) y el `README.md` del workspace externo.
+
+`docs/` quedó solo con: `architecture.md`, `design-system.md`, `UX_UI_GUIDE.md`, `guia-completa.md`,
+`inventory.md`, `pipelines/`, `modules/`, `research/`.
+
 ## 2026-08-08 — Photoroom: qué sirve y qué no (probado, no supuesto)
 
 **Virtual Model de Photoroom NO funciona con lencería.** Se probó a fondo antes de
