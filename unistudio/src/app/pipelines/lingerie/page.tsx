@@ -251,10 +251,11 @@ const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: strin
  * Método de recorte para el Paso 1 (Aislar Producto). La usuaria puede elegir
  * entre el recorte real (FIEL) y el ghost 3D (regenera). Default: recorte real.
  */
-type IsolateMethod = "photoroom" | "combo" | "grounded-sam" | "ghost" | "auto";
+type IsolateMethod = "photoroom" | "photoroom-sandbox" | "combo" | "grounded-sam" | "ghost" | "auto";
 
 const ISOLATE_METHOD_OPTIONS: { value: IsolateMethod; label: string; hint: string }[] = [
   { value: "photoroom",    label: "Photoroom Ghost Mannequin (recomendado)", hint: "Servicio dedicado: deja tu producto flotando 3D sobre blanco preservando la tela. Es el que mejor resultado da. Requiere plan pago — si la key no está o no tiene plan, se salta solo y usa el recorte real." },
+  { value: "photoroom-sandbox", label: "Photoroom — MODO PRUEBA (gratis, con marca de agua)", hint: "El MISMO ghost-mannequin de Photoroom pero en sandbox: 1.000 llamadas gratis al mes (máx 100/día) que NO gastan tu cuota del plan. El resultado sale CON MARCA DE AGUA — usalo para probar encuadre y calidad todas las veces que quieras, y recién cuando esté como querés cambiá a Photoroom normal para la foto final." },
   { value: "grounded-sam", label: "Recorte real (respaldo fiel)", hint: "Recorta los píxeles REALES de tu foto — NO inventa nada. $0.01 y sin suscripción. Sale más plano que Photoroom, y en fotos difíciles puede no encontrar la prenda." },
   { value: "ghost",        label: "Ghost 3D (regenera)", hint: "SeedDream redibuja el producto con volumen 3D — se ve lindo pero PUEDE cambiar textura/forma." },
   { value: "auto",         label: "Automático", hint: "Recorte real primero; si falla, ghost 3D; si falla, quita fondo." },

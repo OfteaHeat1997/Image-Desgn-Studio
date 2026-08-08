@@ -532,7 +532,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     garmentDescription?: string;
     // Método de recorte: 'grounded-sam' (recorte real fiel, DEFAULT) | 'ghost'
     // (SeedDream 3D regenera) | 'auto' (real → ghost → rembg).
-    isolateMethod?: 'grounded-sam' | 'ghost' | 'auto';
+    isolateMethod?: 'photoroom' | 'photoroom-sandbox' | 'grounded-sam' | 'ghost' | 'auto';
     options?: Record<string, unknown>;
   };
 
@@ -676,7 +676,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // producto flotando 3D sobre blanco, preservando la tela visible (no es un editor
     // generativo libre). Es el método recomendado tras la investigación. Si la key no
     // está, o Photoroom filtra la lencería, tira error → el caller cae al siguiente.
-    const tryPhotoroom = async (): Promise<boolean> => {
+    const tryPhotoroom = async (sandbox = false): Promise<boolean> => {
       // Sin key configurada no hay nada que intentar: evitamos el round-trip y
       // arrancamos directo por el recorte real, que sí funciona con las keys de
       // fal/Replicate que ya están puestas.
@@ -684,12 +684,12 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         console.log('[bg-remove:removeSubject] sin PHOTOROOM_API_KEY — directo al recorte real');
         return false;
       }
-      if (photoroomUnavailable) {
+      if (photoroomUnavailable && !sandbox) {
         console.log('[bg-remove:removeSubject] Photoroom ya rechazó por plan en este proceso — salteando');
         return false;
       }
       try {
-        const png = await ghostMannequinPhotoroom(imageUrl);
+        const png = await ghostMannequinPhotoroom(imageUrl, sandbox);
         // Persistir en fal para downstream estable (la pipeline espera una URL).
         resultUrl = await uploadToFalStorage(png, 'image/png', 'photoroom-ghost.png');
         usedProvider = 'photoroom-ghost-mannequin';
@@ -702,7 +702,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         // del proceso. Otros errores (timeout, filtro de contenido puntual) sí
         // pueden ser específicos de una imagen, así que esos no lo apagan.
         if (/Photoroom \/v2\/edit (401|402|403)\b/.test(msg) || msg.includes('PHOTOROOM_API_KEY no está configurada')) {
-          photoroomUnavailable = true;
+          if (!sandbox) photoroomUnavailable = true;
           console.warn('[bg-remove:removeSubject] Photoroom rechazó por plan/credenciales — desactivado para el resto del proceso');
         }
         console.warn(`[bg-remove:removeSubject] Photoroom falló (${msg})`);
@@ -714,7 +714,16 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // rechaza alucinaciones y reintenta; si tras 4 intentos ninguna pasa, cae al
     // recorte REAL fiel (plano, nunca inventa). NUNCA muestra una alucinación ni queda
     // en error.
-    if (method === 'grounded-sam') {
+    if (method === 'photoroom-sandbox') {
+      // MODO PRUEBA: la MISMA key con prefijo sandbox_ → 1.000 llamadas gratis al mes
+      // (máx 100/día) contra /v2/edit, que NO gastan la cuota del plan. Sale CON MARCA
+      // DE AGUA, así que sirve para iterar el encuadre y el prompt, no para publicar.
+      // Importa porque el plan de la usuaria es la prueba de 10 imágenes/mes: sin esto,
+      // cada tanteo del Paso 1 le gastaba una de esas 10. Si falla, cae al recorte real.
+      if (!(await tryPhotoroom(true))) {
+        if (!(await tryGroundedSam())) await rembgLastResort();
+      }
+    } else if (method === 'grounded-sam') {
       // Modo recorte real explícito: primero píxeles reales (plano, textura exacta).
       //
       // Si grounded_sam no encuentra la prenda (pasa con fotos donde la modelo

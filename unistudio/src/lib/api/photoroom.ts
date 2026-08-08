@@ -43,8 +43,17 @@ async function enhanceSatinSheen(png: Buffer): Promise<Buffer> {
   }
 }
 
-/** Read + trim the Photoroom API key. */
-function getPhotoroomKey(): string {
+/**
+ * Read + trim the Photoroom API key.
+ *
+ * MODO SANDBOX: Photoroom no usa una key aparte ni otro endpoint — se le pone el
+ * prefijo `sandbox_` a la MISMA key. Da 1.000 llamadas gratis por mes (máx 100 por
+ * día) contra el Image Editing API (/v2/edit), que es donde vive ghostMannequin.
+ * Los resultados salen CON MARCA DE AGUA, así que sirve para probar, no para
+ * publicar. Importa porque el plan de la usuaria es una prueba de 10 imágenes/mes:
+ * sin sandbox, cada tanteo del Paso 1 le gastaba una de esas 10.
+ */
+function getPhotoroomKey(sandbox = false): string {
   const key = process.env.PHOTOROOM_API_KEY?.trim();
   if (!key) {
     throw new Error(
@@ -52,7 +61,9 @@ function getPhotoroomKey(): string {
       'para usar el método Photoroom Ghost Mannequin. (Sandbox gratis en photoroom.com/api).',
     );
   }
-  return key;
+  // Idempotente: si la key ya viene con el prefijo puesto, no lo duplicamos.
+  if (sandbox) return key.startsWith('sandbox_') ? key : `sandbox_${key}`;
+  return key.startsWith('sandbox_') ? key.slice('sandbox_'.length) : key;
 }
 
 /** Descarga la imagen de entrada a un Buffer (http(s) o data URL). */
@@ -78,7 +89,7 @@ async function toBuffer(imageUrl: string): Promise<Buffer> {
  * error con el cuerpo de respuesta para diagnosticar — el caller cae al método
  * siguiente.
  */
-export async function ghostMannequinPhotoroom(imageUrl: string): Promise<Buffer> {
+export async function ghostMannequinPhotoroom(imageUrl: string, sandbox = false): Promise<Buffer> {
   const imageBuffer = await toBuffer(imageUrl);
 
   const form = new FormData();
@@ -94,7 +105,7 @@ export async function ghostMannequinPhotoroom(imageUrl: string): Promise<Buffer>
   const res = await fetch(PHOTOROOM_EDIT_URL, {
     method: 'POST',
     headers: {
-      'x-api-key': getPhotoroomKey(),
+      'x-api-key': getPhotoroomKey(sandbox),
       Accept: 'image/png, application/json',
     },
     body: form,
@@ -108,4 +119,62 @@ export async function ghostMannequinPhotoroom(imageUrl: string): Promise<Buffer>
   const png = Buffer.from(await res.arrayBuffer());
   // Realzar el brillo del satén (Photoroom lo aplana). Retoque suave y ajustable.
   return await enhanceSatinSheen(png);
+}
+
+/** Poses de Virtual Model que expone Photoroom (12 presets). */
+export type PhotoroomPose = 'standing' | 'seated' | 'crossedarms' | 'back' | 'random';
+
+export interface VirtualModelOptions {
+  /** Preset de modelo (avery, sam, taylor, jackson, ava…). MISMO preset = MISMA
+   *  modelo en todo el catálogo, sin depender de un seed que se rompe. */
+  modelPreset?: string;
+  /** Preset de escena. 'studio' es el fondo limpio de ecommerce. */
+  scenePreset?: string;
+  /** Pose. 'back' resuelve la Foto Espalda, que hoy es un hack de 2 llamadas. */
+  pose?: PhotoroomPose;
+  /** Modo prueba: prefijo sandbox_ → gratis y con marca de agua. */
+  sandbox?: boolean;
+}
+
+/**
+ * VIRTUAL MODEL de Photoroom: toma la foto de la PRENDA y devuelve una modelo
+ * generada usándola. Cubre en UNA llamada lo que hoy son dos pasos separados
+ * (model-create + tryon) y, fijando `modelPreset`, garantiza la misma modelo en
+ * todo el catálogo — algo que con SeedDream forzamos con un seed compartido que
+ * se rompe seguido.
+ *
+ * NO documentado: si acepta lencería/intimates. FASHN las bloquea, por eso el
+ * pipeline terminó en SeedDream. Por eso esta función existe primero para
+ * PROBARLA en sandbox (gratis) con varios colores antes de decidir pagar el plan.
+ *
+ * Salida 1K por defecto; 2K/4K requieren Enterprise.
+ */
+export async function virtualModelPhotoroom(
+  garmentImageUrl: string,
+  opts: VirtualModelOptions = {},
+): Promise<Buffer> {
+  const imageBuffer = await toBuffer(garmentImageUrl);
+
+  const form = new FormData();
+  form.append('imageFile', new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' }), 'garment.jpg');
+  form.append('virtualModel.mode', 'ai.auto');
+  form.append('virtualModel.model.preset.name', opts.modelPreset ?? 'ava');
+  form.append('virtualModel.scene.preset.name', opts.scenePreset ?? 'studio');
+  form.append('virtualModel.pose', opts.pose ?? 'standing');
+
+  const res = await fetch(PHOTOROOM_EDIT_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': getPhotoroomKey(opts.sandbox),
+      Accept: 'image/png, application/json',
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Photoroom virtualModel ${res.status}: ${txt.slice(0, 400)}`);
+  }
+
+  return Buffer.from(await res.arrayBuffer());
 }
