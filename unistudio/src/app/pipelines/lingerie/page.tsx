@@ -238,7 +238,7 @@ const VIDEO_ACTION_OPTIONS: { value: VideoActionOption; label: string; promptHin
 type TryonProvider = "seedream" | "uwear" | "leffa" | "kolors" | "fashn" | "idm-vton" | "auto";
 
 const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: string }[] = [
-  { value: "auto",     label: "Automático",   hint: "El sistema elige (SeedDream para lencería)" },
+  { value: "auto",     label: "Automático (Leffa)", hint: "Para lencería usa Leffa: warpea los píxeles REALES de tu prenda en vez de redibujarla. Tarda ~4 min pero respeta la silueta, el cierre y los paneles. Antes esta opción caía en SeedDream, que reinterpreta el producto." },
   { value: "seedream", label: "SeedDream edit", hint: "Default lencería · preserva el producto real (encaje, tirantes) · $0.03" },
   { value: "uwear",    label: "Uwear (dedicado)", hint: "Plataforma de moda · genera la modelo + viste tu prenda · permite lencería · SeedDream 4.5/Qwen Intimate · requiere UWEAR_API_KEY · ~$0.20" },
   { value: "leffa",    label: "Leffa (probar)", hint: "OTRO proveedor · warpea la prenda real en vez de re-dibujarla · probalo si SeedDream te cambia el producto · $0.04" },
@@ -2662,7 +2662,20 @@ async function runStep(
     // FUNCTION_INVOCATION_TIMEOUT. Subir maxDuration no es opción — el plan de
     // esta cuenta no admite más de 300s. Acá encolamos y consultamos desde el
     // navegador, así ninguna llamada al servidor dura más de unos segundos.
-    if (providerOverride === "leffa") {
+    // AUTOMATICO = LEFFA para lenceria. Antes "auto" mandaba a smartTryOn, que
+    // para intimos intenta Uwear PRIMERO — pero Uwear devuelve 415 desde que
+    // cambio su API, el catch lo tapa, y termina corriendo SeedDream. O sea:
+    // "Automatico" era SeedDream disfrazado, y SeedDream REDIBUJA el producto
+    // (escote en V donde el real es recto, encaje con ojales donde es malla lisa).
+    //
+    // Leffa warpea los pixeles reales de la prenda, asi que respeta la silueta.
+    // Es mas lento (~4 min vs ~25s), pero el default debe ser el que devuelve TU
+    // producto, no el que responde rapido con otro. Quien quiera velocidad puede
+    // elegir SeedDream a mano en el selector.
+    const useLeffa =
+      providerOverride === "leffa" ||
+      (isLingerieFlow && (!providerOverride || providerOverride === "auto"));
+    if (useLeffa) {
       return await tryOnLeffaAsync(sharedModelUrl, inputUrl, category, abortSignal);
     }
 
