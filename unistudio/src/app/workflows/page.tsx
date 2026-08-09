@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/hooks/useI18n";
+import { WORKFLOWS_BODY_ES, WORKFLOWS_BODY_EN } from "@/lib/i18n/pages-body/workflows";
 import {
   Scissors,
   ImageIcon,
@@ -674,6 +675,9 @@ const AGENT_WORKFLOWS = [
 
 function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number }) {
   const [isOpen, setIsOpen] = useState(false);
+  const { locale } = useI18n();
+  const b = locale === "en" ? WORKFLOWS_BODY_EN : WORKFLOWS_BODY_ES;
+  const fb = b.features[feature.id];
   const Icon = feature.icon;
 
   return (
@@ -709,10 +713,10 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
         {/* Title + description */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="text-[15px] font-semibold text-[#F5F5F5]">{feature.name}</h3>
+            <h3 className="text-[15px] font-semibold text-[#F5F5F5]">{fb.name}</h3>
             <span className="text-[10px] text-[#55555A] font-mono">{feature.nameEn}</span>
           </div>
-          <p className="text-[12px] text-[#8A8A90] line-clamp-1">{feature.whatItDoes}</p>
+          <p className="text-[12px] text-[#8A8A90] line-clamp-1">{fb.whatItDoes}</p>
         </div>
 
         {/* Cost + Providers */}
@@ -742,15 +746,15 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
             <div className="lg:col-span-2 space-y-5">
               {/* What it does */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2">Que Hace</h4>
-                <p className="text-[13px] text-[#D4D4D8] leading-relaxed">{feature.whatItDoes}</p>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2">{b.labels.whatItDoes}</h4>
+                <p className="text-[13px] text-[#D4D4D8] leading-relaxed">{fb.whatItDoes}</p>
               </div>
 
               {/* Flow */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-3">Flujo Paso a Paso</h4>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-3">{b.labels.flow}</h4>
                 <div className="space-y-2">
-                  {feature.flow.map((step, i) => (
+                  {fb.flow.map((step, i) => (
                     <div key={i} className="flex items-start gap-3">
                       <span
                         className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
@@ -766,11 +770,11 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
 
               {/* Providers */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2">Providers / APIs</h4>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2">{b.labels.providers}</h4>
                 <div className="space-y-1.5">
-                  {feature.providers.map((p) => (
+                  {feature.providers.map((p, pi) => (
                     <div key={p.name} className="flex items-center gap-3 text-[11px]">
-                      <span className="text-[#D4D4D8] flex-1">{p.name}</span>
+                      <span className="text-[#D4D4D8] flex-1">{fb.providers[pi].name}</span>
                       <span
                         className="font-bold px-2 py-0.5 rounded-full"
                         style={{
@@ -780,7 +784,7 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
                       >
                         {p.cost}
                       </span>
-                      <span className="text-[#55555A]">{p.quality}</span>
+                      <span className="text-[#55555A]">{fb.providers[pi].quality}</span>
                     </div>
                   ))}
                 </div>
@@ -788,15 +792,15 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
 
               {/* Used by */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2">Productos Unistyles que lo Usan</h4>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2">{b.labels.usedBy}</h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {feature.usedBy.map((u) => (
+                  {feature.usedBy.map((u, ui) => (
                     <span
                       key={u}
                       className="text-[10px] px-2 py-1 rounded-md"
                       style={{ background: "#1A1A1D", color: "#D4D4D8", border: "1px solid #262629" }}
                     >
-                      {u}
+                      {fb.usedBy[ui]}
                     </span>
                   ))}
                 </div>
@@ -811,12 +815,12 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={feature.outputImage}
-                    alt={`${feature.name} resultado`}
+                    alt={b.labels.resultAlt(fb.name)}
                     className="w-full h-auto object-cover"
                     loading="lazy"
                   />
                   <div className="px-3 py-2 text-[10px] text-[#55555A]" style={{ background: `${feature.color}08` }}>
-                    Resultado real de UniStudio
+                    {b.labels.realResult}
                   </div>
                 </div>
               )}
@@ -833,7 +837,7 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
                     className="w-full h-auto"
                   />
                   <div className="px-3 py-2 text-[10px] text-[#55555A]" style={{ background: "#1A1A1D" }}>
-                    Video demo
+                    {b.labels.videoDemo}
                   </div>
                 </div>
               )}
@@ -842,20 +846,20 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
               <div>
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#55555A] mb-2 flex items-center gap-1.5">
                   <FileCode className="h-3 w-3" />
-                  Archivos del Codigo
+                  {b.labels.codeFiles}
                 </h4>
                 <div className="space-y-1.5">
-                  {feature.files.map((f) => (
+                  {feature.files.map((f, fi) => (
                     <div
                       key={f.path}
                       className="rounded-lg px-2.5 py-2"
                       style={{ background: "#0D0D0F", border: "1px solid #1E1E21" }}
                     >
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-[10px] font-semibold" style={{ color: feature.color }}>{f.label}</span>
+                        <span className="text-[10px] font-semibold" style={{ color: feature.color }}>{fb.files[fi].label}</span>
                       </div>
                       <div className="text-[10px] font-mono text-[#55555A] mb-0.5">{f.path}</div>
-                      <div className="text-[10px] text-[#8A8A90]">{f.purpose}</div>
+                      <div className="text-[10px] text-[#8A8A90]">{fb.files[fi].purpose}</div>
                     </div>
                   ))}
                 </div>
@@ -875,7 +879,7 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
               }}
             >
               <Icon className="h-3.5 w-3.5" />
-              Usar {feature.name}
+              {b.labels.useCta(fb.name)}
               <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
@@ -890,7 +894,8 @@ function FeatureCard({ feature, index }: { feature: FeatureDetail; index: number
 // =============================================================================
 
 export default function WorkflowsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? WORKFLOWS_BODY_EN : WORKFLOWS_BODY_ES;
   const [filterCat, setFilterCat] = useState<string>("all");
 
   const filtered = filterCat === "all" ? FEATURES : FEATURES.filter((f) => f.category === filterCat);
@@ -923,22 +928,22 @@ export default function WorkflowsPage() {
         <section className="mb-12">
           <h2 className="text-[20px] font-bold text-[#F5F5F5] mb-4 flex items-center gap-2">
             <Package className="h-5 w-5" style={{ color: "#C5A47E" }} />
-            Tu Inventario Unistyles
+            {b.inventory.title}
           </h2>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-5">
             <div className="rounded-xl p-4 text-center" style={{ background: "#111113", border: "1px solid #262629" }}>
               <div className="text-[28px] font-bold" style={{ color: "#C5A47E" }}>{INVENTORY.total}</div>
-              <div className="text-[11px] text-[#55555A] uppercase tracking-wider">Productos Total</div>
+              <div className="text-[11px] text-[#55555A] uppercase tracking-wider">{b.inventory.total}</div>
             </div>
             <div className="rounded-xl p-4 text-center" style={{ background: "#111113", border: "1px solid #262629" }}>
               <div className="text-[28px] font-bold" style={{ color: "#50C878" }}>{INVENTORY.onWebsite}</div>
-              <div className="text-[11px] text-[#55555A] uppercase tracking-wider">En la Web</div>
+              <div className="text-[11px] text-[#55555A] uppercase tracking-wider">{b.inventory.onWebsite}</div>
             </div>
             <div className="rounded-xl p-4 text-center" style={{ background: "#111113", border: "1px solid #262629" }}>
               <div className="text-[28px] font-bold" style={{ color: "#FF6B6B" }}>{INVENTORY.missing}</div>
-              <div className="text-[11px] text-[#55555A] uppercase tracking-wider">Faltan</div>
+              <div className="text-[11px] text-[#55555A] uppercase tracking-wider">{b.inventory.missing}</div>
             </div>
           </div>
 
@@ -955,14 +960,14 @@ export default function WorkflowsPage() {
                   <div className="flex items-center gap-3 mb-3">
                     <span className="text-[24px]">{cat.emoji}</span>
                     <div>
-                      <div className="text-[14px] font-semibold text-[#F5F5F5]">{cat.name}</div>
-                      <div className="text-[10px] text-[#55555A]">{cat.brand}</div>
+                      <div className="text-[14px] font-semibold text-[#F5F5F5]">{b.inventory.categoryNames[cat.slug]}</div>
+                      <div className="text-[10px] text-[#55555A]">{b.inventory.categoryBrands[cat.slug]}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-[12px] mb-2">
-                    <span className="text-[#8A8A90]">Catalogo: <strong className="text-[#F5F5F5]">{cat.count}</strong></span>
-                    <span className="text-[#8A8A90]">Web: <strong className="text-[#50C878]">{cat.onSite}</strong></span>
-                    {gap > 0 && <span className="text-[#FF6B6B] font-bold">-{gap} faltan</span>}
+                    <span className="text-[#8A8A90]">{b.inventory.catalog} <strong className="text-[#F5F5F5]">{cat.count}</strong></span>
+                    <span className="text-[#8A8A90]">{b.inventory.web} <strong className="text-[#50C878]">{cat.onSite}</strong></span>
+                    {gap > 0 && <span className="text-[#FF6B6B] font-bold">{b.inventory.missingBadge(gap)}</span>}
                   </div>
                   {/* Progress bar */}
                   <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#1A1A1D" }}>
@@ -975,7 +980,7 @@ export default function WorkflowsPage() {
                     />
                   </div>
                   <div className="text-[10px] text-[#55555A] mt-1">
-                    Precio: ${typeof cat.price === "number" ? cat.price : cat.price} XCG
+                    {b.inventory.priceLabel}: ${typeof cat.price === "number" ? cat.price : cat.price} XCG
                   </div>
                 </div>
               );
@@ -987,10 +992,10 @@ export default function WorkflowsPage() {
         <section className="mb-12">
           <h2 className="text-[20px] font-bold text-[#F5F5F5] mb-4 flex items-center gap-2">
             <Bot className="h-5 w-5" style={{ color: "#C5A47E" }} />
-            3 Flujos del AI Agent
+            {b.agent.title}
           </h2>
           <p className="text-[13px] text-[#8A8A90] mb-5">
-            Asi es como el AI Agent encadena los modulos automaticamente segun el tipo de producto
+            {b.agent.subtitle}
           </p>
 
           <div className="space-y-4">
@@ -1010,12 +1015,12 @@ export default function WorkflowsPage() {
                       <WfIcon className="h-5 w-5" style={{ color: wf.color }} />
                     </div>
                     <div>
-                      <h3 className="text-[16px] font-bold text-[#F5F5F5]">Agente: {wf.name}</h3>
-                      <p className="text-[11px] text-[#8A8A90]">{wf.description}</p>
+                      <h3 className="text-[16px] font-bold text-[#F5F5F5]">{b.agent.agentPrefix}{b.agent.workflowNames[wf.name]}</h3>
+                      <p className="text-[11px] text-[#8A8A90]">{b.agent.workflowDescriptions[wf.name]}</p>
                     </div>
                     <div className="ml-auto text-right">
                       <div className="text-[14px] font-bold" style={{ color: wf.color }}>{wf.totalCost}</div>
-                      <div className="text-[10px] text-[#55555A]">{wf.products}</div>
+                      <div className="text-[10px] text-[#55555A]">{b.agent.workflowProducts[wf.name]}</div>
                     </div>
                   </div>
 
@@ -1041,7 +1046,7 @@ export default function WorkflowsPage() {
                             </span>
                             <StepIcon className="h-3.5 w-3.5" style={{ color: StepFeature?.color || wf.color }} />
                             <div>
-                              <div className="text-[11px] font-medium text-[#F5F5F5]">{step.label}</div>
+                              <div className="text-[11px] font-medium text-[#F5F5F5]">{b.agent.stepLabels[wf.name][i]}</div>
                               <div className="text-[10px]" style={{ color: step.cost === "Gratis" ? "#50C878" : "#8A8A90" }}>
                                 {step.cost}
                               </div>
@@ -1064,19 +1069,19 @@ export default function WorkflowsPage() {
         <section className="mb-12">
           <h2 className="text-[20px] font-bold text-[#F5F5F5] mb-4 flex items-center gap-2">
             <FolderOpen className="h-5 w-5" style={{ color: "#5B9CF6" }} />
-            Arquitectura del Proyecto
+            {b.architecture.title}
           </h2>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "Paginas", count: 8, desc: "/, /editor, /agent, /workflows, /docs, /batch, /gallery, /brand-kit", icon: Globe, color: "#5B9CF6" },
-              { label: "API Routes", count: 28, desc: "Un endpoint por modulo en src/app/api/", icon: Server, color: "#FF6B6B" },
-              { label: "Modulos UI", count: 17, desc: "Paneles en src/components/modules/", icon: Eye, color: "#C5A47E" },
-              { label: "Procesamiento", count: 16, desc: "Logica IA en src/lib/processing/", icon: Cpu, color: "#E879F9" },
-              { label: "API Clients", count: 4, desc: "Replicate, fal.ai, FASHN, withoutBG", icon: Globe, color: "#F5A623" },
-              { label: "Stores", count: 6, desc: "Zustand: editor, video, batch, brand, gallery, settings", icon: Database, color: "#50C878" },
-              { label: "Hooks", count: 6, desc: "useAgentPipeline, useEditor, useImageProcessing, etc", icon: Code, color: "#5B9CF6" },
-              { label: "Types", count: 6, desc: "agent.ts, api.ts, editor.ts, video.ts, batch.ts, brand.ts", icon: FileCode, color: "#8A8A90" },
+              { label: b.architecture.items.pages.label, count: 8, desc: b.architecture.items.pages.desc, icon: Globe, color: "#5B9CF6" },
+              { label: b.architecture.items.apiRoutes.label, count: 28, desc: b.architecture.items.apiRoutes.desc, icon: Server, color: "#FF6B6B" },
+              { label: b.architecture.items.uiModules.label, count: 17, desc: b.architecture.items.uiModules.desc, icon: Eye, color: "#C5A47E" },
+              { label: b.architecture.items.processing.label, count: 16, desc: b.architecture.items.processing.desc, icon: Cpu, color: "#E879F9" },
+              { label: b.architecture.items.apiClients.label, count: 4, desc: b.architecture.items.apiClients.desc, icon: Globe, color: "#F5A623" },
+              { label: b.architecture.items.stores.label, count: 6, desc: b.architecture.items.stores.desc, icon: Database, color: "#50C878" },
+              { label: b.architecture.items.hooks.label, count: 6, desc: b.architecture.items.hooks.desc, icon: Code, color: "#5B9CF6" },
+              { label: b.architecture.items.types.label, count: 6, desc: b.architecture.items.types.desc, icon: FileCode, color: "#8A8A90" },
             ].map((item) => {
               const ItemIcon = item.icon;
               return (
@@ -1102,19 +1107,19 @@ export default function WorkflowsPage() {
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-[20px] font-bold text-[#F5F5F5] flex items-center gap-2">
               <Zap className="h-5 w-5" style={{ color: "#F5A623" }} />
-              Todas las Features ({FEATURES.length})
+              {b.section4.allFeatures} ({FEATURES.length})
             </h2>
 
             {/* Category filter */}
             <div className="flex gap-1.5">
               {[
-                { id: "all", label: "Todas", color: "#8A8A90" },
-                { id: "fondos", label: "Fondos", color: "#5B9CF6" },
-                { id: "mejora", label: "Mejora", color: "#50C878" },
-                { id: "edicion", label: "Edicion", color: "#E879F9" },
-                { id: "modelos", label: "Modelos", color: "#C5A47E" },
-                { id: "contenido", label: "Contenido", color: "#FF6B6B" },
-                { id: "auto", label: "Auto", color: "#F5A623" },
+                { id: "all", label: b.section4.filters.all, color: "#8A8A90" },
+                { id: "fondos", label: b.section4.filters.fondos, color: "#5B9CF6" },
+                { id: "mejora", label: b.section4.filters.mejora, color: "#50C878" },
+                { id: "edicion", label: b.section4.filters.edicion, color: "#E879F9" },
+                { id: "modelos", label: b.section4.filters.modelos, color: "#C5A47E" },
+                { id: "contenido", label: b.section4.filters.contenido, color: "#FF6B6B" },
+                { id: "auto", label: b.section4.filters.auto, color: "#F5A623" },
               ].map((cat) => (
                 <button
                   key={cat.id}
@@ -1133,7 +1138,7 @@ export default function WorkflowsPage() {
           </div>
 
           <p className="text-[12px] text-[#55555A] mb-5">
-            Haz click en cada feature para ver el flujo completo, archivos del codigo, providers, fotos reales y video demo
+            {b.section4.hint}
           </p>
 
           <div className="space-y-3">
