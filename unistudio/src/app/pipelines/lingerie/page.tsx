@@ -3007,7 +3007,14 @@ async function runStep(
     // esa foto como entrada y el giro deja de negociarse con un modelo
     // generativo. Deterministico: misma mujer que en los demas pasos, perfil
     // real, sin generar personas.
-    const sideGarment = backGarmentUrl ?? inputUrl;
+    // LA PRENDA DE REFERENCIA ES LA DEL FRENTE, NO LA DE ESPALDA.
+    // Primero se mandaba `backGarmentUrl ?? inputUrl` copiando lo que hace la
+    // Foto Espalda, pero ahi la espalda es correcta porque la vista PEDIDA es la
+    // espalda. En un perfil no: Leffa deforma los pixeles de la foto que recibe,
+    // y con la espalda como referencia devolvia un top negro liso — perdia el
+    // racerback, la malla y los ganchos, que estan en la cara frontal. El
+    // aislado del frente es la unica referencia que los contiene.
+    const sideGarment = inputUrl;
     const leffaSide = await tryOnLeffaAsync(
       "", // la modelo la pone el servidor desde el avatar
       sideGarment,
