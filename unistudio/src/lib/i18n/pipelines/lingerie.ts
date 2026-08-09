@@ -121,6 +121,10 @@ export interface LingeriePipelineCopy {
     manual: string;
     manualSub: string;
   };
+  advanced: {
+    heading: string;
+    hint: string;
+  };
   generationMode: {
     heading: string;
     subtitle: string;
@@ -424,9 +428,15 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
   executionMode: {
     heading: 'Modo de Ejecución',
     auto: 'Automático',
-    autoSub: 'Todo sin pausas',
+    // Antes decia solo "Todo sin pausas" / "Revisar cada paso", que describe el
+    // mecanismo pero no ayuda a elegir. Ahora cada opcion dice CUANDO usarla.
+    autoSub: 'Corre todos los pasos seguidos, sin preguntarte nada. Para cuando ya sabés que la configuración funciona.',
     manual: 'Manual',
-    manualSub: 'Revisar cada paso',
+    manualSub: 'Frena en cada paso para que veas el resultado y decidas: aceptar, rehacer o saltar. Recomendado la primera vez con un producto nuevo.',
+  },
+  advanced: {
+    heading: 'Ajustes avanzados',
+    hint: 'Look del shoot, variantes y calidad. Ya vienen configurados — no hace falta tocarlos.',
   },
   generationMode: {
     heading: 'Modo de Generación',
@@ -1100,9 +1110,13 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
   executionMode: {
     heading: 'Run Mode',
     auto: 'Automatic',
-    autoSub: 'Everything, no pauses',
+    autoSub: 'Runs every step back to back without asking. Use it once you know the setup works.',
     manual: 'Manual',
-    manualSub: 'Review each step',
+    manualSub: 'Stops at each step so you can see the result and decide: accept, redo or skip. Recommended the first time with a new product.',
+  },
+  advanced: {
+    heading: 'Advanced settings',
+    hint: 'Shoot look, variants and quality. Already configured — you do not need to touch these.',
   },
   generationMode: {
     heading: 'Generation Mode',

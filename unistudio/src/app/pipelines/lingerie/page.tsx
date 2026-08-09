@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Check,
   SkipForward,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -3279,6 +3280,9 @@ export default function LingeriePipelinePage() {
   const lg = t.pipelines.lingerie;
   void locale;
   const [phase, setPhase] = useState<Phase>("setup");
+  // Ajustes avanzados plegados por default — ver el comentario de divulgacion
+  // progresiva donde se renderiza el desplegable.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   // Help dialog: keyboard shortcuts reference
   const [showHelp, setShowHelp] = useState(false);
   useEffect(() => {
@@ -5306,8 +5310,40 @@ export default function LingeriePipelinePage() {
                 </div>
               </section>
 
-              {/* Phase 2f: modo de generación — default / face-swap / multi-sample.
-                  Elegible por la usuaria; cada uno tiene tradeoffs distintos. */}
+              {/* DIVULGACION PROGRESIVA.
+                  La columna traia NUEVE secciones con exactamente el mismo peso
+                  visual — mismo borde, mismo fondo, mismo tamano de titulo — asi
+                  que nada indicaba por donde empezar. Pero la pagina tiene UNA
+                  sola accion obligatoria (subir fotos): todo lo demas es
+                  configuracion que ya viene con un default sano y que la mayoria
+                  de las veces no se toca.
+                  Las tres de abajo (modo de generacion, art direction, calidad de
+                  FASHN) se pliegan detras de un desplegable. Siguen disponibles a
+                  un click para quien las necesite, pero dejan de competir con lo
+                  que si hay que hacer. */}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                aria-expanded={showAdvanced}
+                className="flex w-full items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-5 py-4 text-left transition-colors hover:border-[var(--border-default)]"
+              >
+                <span className="flex flex-col">
+                  <span className="text-sm font-semibold uppercase tracking-[0.08em] text-white">
+                    {lg.advanced.heading}
+                  </span>
+                  <span className="mt-1 text-[13px] text-[var(--text-secondary)]">
+                    {lg.advanced.hint}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform",
+                    showAdvanced && "rotate-180",
+                  )}
+                />
+              </button>
+
+              <div className={cn("space-y-6", !showAdvanced && "hidden")}>
               <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
                 <h2 className="mb-1 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.generationMode.heading}
@@ -5441,6 +5477,7 @@ export default function LingeriePipelinePage() {
                   })}
                 </div>
               </section>
+              </div>
 
               {/* Cost summary + launch */}
               <section className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] p-5">
