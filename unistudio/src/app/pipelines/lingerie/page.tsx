@@ -1520,12 +1520,12 @@ interface StepCardProps {
 // Su selector de pose tampoco hacia nada: la pose la fija el asset del avatar.
 // photoSide sale por el mismo motivo que photoBack: ahora usa el asset
 // "full_body_side" del avatar, asi que el proveedor y la pose son fijos.
-const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoDetail", "photoFullBody"];
+const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoSide", "photoDetail", "photoFullBody"];
 
 // Pasos sin selector: parten del asset real del avatar (perfil / espalda) y le
 // deforman la prenda encima. No se elige proveedor porque no hay alternativa
 // que devuelva esa vista — pero la tarjeta igual dice cual corre y por que.
-const FIXED_PROVIDER_STEPS: StepId[] = ["photoSide", "photoBack"];
+const FIXED_PROVIDER_STEPS: StepId[] = ["photoBack"];
 
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const { t } = useI18n();
@@ -3015,15 +3015,57 @@ async function runStep(
     // racerback, la malla y los ganchos, que estan en la cara frontal. El
     // aislado del frente es la unica referencia que los contiene.
     const sideGarment = inputUrl;
-    const leffaSide = await tryOnLeffaAsync(
-      "", // la modelo la pone el servidor desde el avatar
-      sideGarment,
-      category,
-      abortSignal,
-      false, // backView
-      true,  // sideView
-    );
-    return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
+
+    // EL DEFAULT ES EL AVATAR, PERO LA ELECCION ES DE LA USUARIA.
+    // Con "Automatico" corre el camino del avatar, que es el unico verificado
+    // que devuelve un perfil de verdad. Si elige otro proveedor a mano, se
+    // respeta: es su producto y puede querer comparar. Bloquear el selector era
+    // decidir por ella; lo correcto es que el default sea el bueno y que el
+    // resto este disponible con su advertencia.
+    if (!providerOverride || providerOverride === "auto") {
+      const leffaSide = await tryOnLeffaAsync(
+        "", // la modelo la pone el servidor desde el avatar
+        sideGarment,
+        category,
+        abortSignal,
+        false, // backView
+        true,  // sideView
+      );
+      return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
+    }
+
+    // Proveedor elegido a mano. Estos generan su propia modelo y, medido dos
+    // veces, devuelven una foto DE FRENTE aunque el prompt pida el giro — un
+    // try-on no rota a nadie. Se corre igual porque la usuaria lo pidio, con el
+    // prompt de perfil por si algun proveedor futuro si lo respeta.
+    if (providerNeedsModelImage(providerOverride) && !sharedModelUrl) {
+      throw new Error("Este proveedor viste TU modelo IA, así que necesita ese paso. Corré 'Crear Modelo IA', o dejá 'Automático' para usar el perfil real del avatar.");
+    }
+    const sideScene =
+      "TRUE SIDE PROFILE, 90 degrees. The model's body and face point to the side of the frame, NOT at the camera: " +
+      "only ONE eye, ONE ear, ONE shoulder and ONE arm are visible, and the bust is seen edge-on as an outline against " +
+      "the background. The visible arm is raised with the hand behind the head so the armpit, the side panel and the " +
+      "side band are exposed. Show how far the cup projects, the real band width and how the strap sits on the shoulder. " +
+      "Waist-up framing, clean seamless studio background. A front-facing photo is a FAILED result for this image.";
+    const res = await fetch("/api/tryon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        modelImage: sharedModelUrl,
+        garmentImage: sideGarment,
+        garmentBackUrl: providerOverride === "uwear" ? backGarmentUrl : undefined,
+        category,
+        garmentType: garmentTypeForApi,
+        provider: providerOverride,
+        forceProvider: true,
+        garmentDescription,
+        scenePrompt: sideScene,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Foto Lateral falló");
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
   }
 
   if (stepId === "photoDetail") {
