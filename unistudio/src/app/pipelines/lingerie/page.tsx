@@ -4491,6 +4491,19 @@ export default function LingeriePipelinePage() {
           ...(stepDef.id === "tryon" && newSharedModel && result.usedProvider !== "uwear"
             ? { originalUrl: newSharedModel }
             : {}),
+          // FOTO ESPALDA: el "antes" tiene que ser TU foto de espalda.
+          // La tarjeta mostraba el resultado del paso anterior (la modelo de
+          // frente), asi que parecia que el paso ignoraba la foto trasera —
+          // cuando en realidad es la que usa como referencia de prenda. Lo que
+          // se ve tiene que ser lo que de verdad entra al paso; si no, no hay
+          // forma de auditar si el broche y la banda salieron bien.
+          ...(stepDef.id === "photoBack"
+            ? (() => {
+                const b = findMatchingPhoto({ ...job, uploadedUrl, falUrl } as ImageJob, jobsSnapshot, ["espalda"]);
+                const u = b?.falUrl ?? b?.uploadedUrl;
+                return u ? { originalUrl: u } : {};
+              })()
+            : {}),
         });
 
         // Populate local map para que el próximo step pueda leer este resultUrl
