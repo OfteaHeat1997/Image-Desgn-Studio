@@ -1908,24 +1908,9 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           {/* Error retry — Reintentar es primario (botón grande violeta), Saltar secundario (link gris) */}
           {step.status === "error" && (
             <div className="mt-4 space-y-3 border-t border-white/6 pt-4">
-              {/* P1-1: selector de proveedor para tryon steps. Permite reintentar
-                  con FASHN si Kolors reinterpretó mal el broche/textura. */}
-              {onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Proveedor:</span>
-                  <select
-                    value={step.providerOverride ?? "auto"}
-                    onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
-                    className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-[var(--accent)]/50"
-                  >
-                    {TRYON_PROVIDER_OPTIONS.map((p) => (
-                      <option key={p.value} value={p.value} title={p.hint}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* El selector de PROVEEDOR ya vive arriba y se muestra SIEMPRE,
+                  tambien con el paso en error. Antes se repetia aca dentro del
+                  bloque de error: tercer control para lo mismo. */}
               <div className="flex items-center justify-between gap-2">
                 <button
                   onClick={onSkip}
