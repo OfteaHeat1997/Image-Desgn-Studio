@@ -3007,11 +3007,21 @@ async function runStep(
       productType === "panty" ? "bottoms"
       : productType === "set" ? "one-pieces"
       : "tops";
+    // MISMO ERROR QUE TENIA LA LATERAL: instrucciones abstractas.
+    // "cropped to the chest" y "45 degrees" no son verificables, asi que el
+    // modelo devuelve un plano medio comun y corriente — que es lo que ya da el
+    // Paso 2. Se describe el encuadre por lo que ENTRA y lo que QUEDA AFUERA.
     const detailScene =
-      "Close-up three-quarter diagonal product shot: camera near the garment, angled about 45 degrees, " +
-      "cropped to the chest and upper torso so the fabric fills the frame. Sharp macro-level focus on the " +
-      "material: show the real weave, the sheen of the fabric, the mesh panels and the stitching. " +
-      "Clean seamless studio background, soft directional light that reveals texture without blowing out highlights.";
+      "EXTREME CLOSE-UP of the garment on the body. The fabric fills the whole frame, edge to edge. " +
+      "The crop runs from the collarbones down to just below the band around the ribs: no full body, no legs, " +
+      "no waist, and the face is cut off above the chin — at most the jawline enters at the very top edge. " +
+      "The torso is turned halfway between front and side, so the front of the garment AND the start of the side " +
+      "panel are both visible in the same picture, meeting at a diagonal across the frame. " +
+      "Macro sharpness on the material: the real weave of the fabric, the sheen where light grazes it, the mesh " +
+      "panels with their see-through grid, the stitching and the edge binding must all be legible. " +
+      "Clean seamless studio background, soft directional light raking across the surface to reveal texture without " +
+      "blowing out highlights. A waist-up or full-body shot is a FAILED result for this image — it must read as a " +
+      "fabric detail photograph, not as a portrait.";
     const res = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3019,6 +3029,10 @@ async function runStep(
       body: JSON.stringify({
         modelImage: sharedModelUrl,
         garmentImage: inputUrl,
+        // La diagonal muestra el frente Y el arranque del costado, asi que
+        // necesita la foto real de espalda por el mismo motivo que la lateral:
+        // sin ella Uwear inventa como sigue la prenda al doblar el cuerpo.
+        garmentBackUrl: (providerOverride ?? "uwear") === "uwear" ? backGarmentUrl : undefined,
         category,
         garmentType: garmentTypeForApi,
         provider: providerOverride && providerOverride !== "auto" ? providerOverride : "uwear",
