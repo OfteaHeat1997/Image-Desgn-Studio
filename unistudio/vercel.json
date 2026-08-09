@@ -55,7 +55,7 @@
       "maxDuration": 120
     },
     "src/app/api/jewelry-scene/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 300
     },
     "src/app/api/jewelry-prompts/route.ts": {
       "maxDuration": 120
