@@ -3084,6 +3084,39 @@ async function runStep(
     return { resultUrl: json.data.url, cost: json.cost ?? 0.05 };
   }
 
+  // VIDEO HERO (giro para el carrusel de la tienda). Mismo motor que el video de
+  // catalogo, distinta intencion: el de catalogo muestra el producto con
+  // movimiento sutil; este tiene que enganchar mientras alguien scrollea la home,
+  // asi que gira 360 de forma continua y cierra donde empezo para que el loop no
+  // tenga corte visible.
+  if (stepId === "heroVideo") {
+    const heroBase = inputUrl;
+    const heroPrompt =
+      "Fashion campaign hero shot: the model rotates a smooth, continuous full 360 degrees in place, " +
+      "at even speed, ending exactly where she started so the clip loops seamlessly. " +
+      "She keeps her posture and expression steady while turning. Photorealistic skin and hair with " +
+      "natural motion, studio lighting consistent across every frame, clean seamless background.";
+    const heroNegative =
+      "jump cut, speed change, stopping mid-turn, camera shake, morphing features, identity change, " +
+      "doll-like, plastic skin, waxy face, distorted limbs, extra fingers, duplicate, split screen";
+    const res = await fetch("/api/video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        imageUrl: heroBase,
+        provider: "kling-2.6",
+        duration: 5,
+        aspectRatio: "9:16",
+        prompt: heroPrompt,
+        negativePrompt: heroNegative,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Video Hero falló");
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.35 };
+  }
+
   if (stepId === "modelVideo") {
     // Usa el URL de la modelo (sharedModelUrl) PRIORITARIAMENTE. Si tryon funcionó
     // (inputUrl viene del tryon exitoso, o texturePreserve si corrió), usa ese.
@@ -3971,7 +4004,7 @@ export default function LingeriePipelinePage() {
         // Replicate privado → el navegador muestra "La imagen expiró"). Así la foto
         // original se ve a la izquierda y grounded_sam/ghost reciben una imagen legible.
         inputForStep = falUrl || uploadedUrl || lastResultUrl;
-      } else if (stepDef.id === "modelVideo") {
+      } else if (stepDef.id === "modelVideo" || stepDef.id === "heroVideo") {
         // PRIORIDAD: CUERPO COMPLETO. La usuaria: "no usa la del cuerpo completo,
         // usa el paso dos, la de medio cuerpo; necesito que use la del cuerpo
         // completo". Y tiene razon para video: partir de un encuadre de torso
