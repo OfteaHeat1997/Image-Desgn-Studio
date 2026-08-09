@@ -35,9 +35,15 @@ const BODY = {
 // rechaza clothing_item_id con "extra_forbidden": tambien le cambiaron el body.
 // Misma tecnica que funciono antes: leer una generacion YA hecha desde la web de
 // Uwear y copiar la forma real de su request.
+// AVATARES. Uwear castea su PROPIA modelo salvo que se le pase un avatar fijo,
+// asi que cada foto salia con una mujer distinta y se rompia la consistencia del
+// catalogo. La API expone avatar_id en /generation; hay que descubrir como se
+// listan/crean los avatares. Misma tecnica que resolvio assets[] y
+// clothing_item_ids: leer lo que la cuenta YA tiene.
 const READ_PATHS = [
-  'https://api.uwear.ai/generations?items_per_page=2',
-  'https://api.uwear.ai/generation?items_per_page=2',
+  'https://api.uwear.ai/avatars?items_per_page=5',
+  'https://api.uwear.ai/avatar?items_per_page=5',
+  'https://api.uwear.ai/models?items_per_page=5',
 ];
 
 export async function GET() {
