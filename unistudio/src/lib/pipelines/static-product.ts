@@ -104,7 +104,7 @@ export function getAdaptiveBgConfig(
     if (PREMIUM_BRANDS.includes(brand)) {
       return {
         prompt:
-          'minimalist luxury photo studio backdrop, polished cream marble pedestal in foreground, soft warm golden gradient bokeh in background (out-of-focus light, NO objects), editorial fragrance catalog aesthetic, magazine-quality empty scene, NO store interior, NO shelves, NO products visible anywhere, NO retail environment, just a clean empty luxury pedestal' + HD + NO_DUP,
+          'editorial luxury fragrance photography, perfume bottle centered on a warm cream travertine pedestal, flowing beige silk fabric backdrop with soft elegant folds, dried pampas grass and delicate dried botanicals arranged to one side, dramatic soft directional sunlight from the side casting long elegant shadows, warm golden-cream color palette, shallow depth of field, high-end magazine editorial aesthetic like Sephora and Aesop campaigns, refined minimal and sophisticated, NO store interior, NO shelves, NO retail environment, NO extra products' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',
