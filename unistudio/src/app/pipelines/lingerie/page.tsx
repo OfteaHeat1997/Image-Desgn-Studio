@@ -3950,10 +3950,20 @@ export default function LingeriePipelinePage() {
         // original se ve a la izquierda y grounded_sam/ghost reciben una imagen legible.
         inputForStep = falUrl || uploadedUrl || lastResultUrl;
       } else if (stepDef.id === "modelVideo") {
-        // modelVideo usa SOLO el try-on (modelo IA + tu prenda) o la modelo IA.
-        // NUNCA cae a la foto original (es copyright de Leonisa). Si no hay try-on
-        // ni modelo, se salta con mensaje claro.
-        const base = stepResults.texturePreserve || stepResults.tryon || newSharedModel;
+        // PRIORIDAD: CUERPO COMPLETO. La usuaria: "no usa la del cuerpo completo,
+        // usa el paso dos, la de medio cuerpo; necesito que use la del cuerpo
+        // completo". Y tiene razon para video: partir de un encuadre de torso
+        // obliga al modelo a INVENTAR las piernas al animar, y ahi es donde
+        // aparecen las deformaciones. Con el cuerpo completo ya generado, el video
+        // solo tiene que mover lo que ya existe.
+        //
+        // El orden de respaldo se mantiene por si ese paso se salto o fallo, y
+        // NUNCA cae a la foto original (copyright de Leonisa).
+        const base =
+          stepResults.photoFullBody ||
+          stepResults.texturePreserve ||
+          stepResults.tryon ||
+          newSharedModel;
         if (!base) {
           updateStep(jobId, stepDef.id, {
             status: "skipped",

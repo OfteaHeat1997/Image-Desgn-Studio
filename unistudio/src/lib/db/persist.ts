@@ -5,19 +5,12 @@
 // Gracefully no-ops when DATABASE_URL is not configured.
 // =============================================================================
 
+// El tipo Prisma vuelve a importarse: el script de build ahora corre
+// `prisma generate` SIEMPRE (antes solo estaba en postinstall, que Vercel puede
+// saltarse al cachear node_modules — de ahi el fallo de deploy). Con el cliente
+// garantizado, corresponde usar el tipo real y no un equivalente estructural.
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
-
-/**
- * Equivalente estructural a Prisma.InputJsonValue.
- *
- * No se importa el namespace `Prisma` de '@prisma/client' porque ese tipo solo
- * existe cuando el cliente esta GENERADO. En este repo la base de datos es
- * OPCIONAL —cada llamada a prisma.* esta null-guardeada— asi que el build no
- * puede depender de haber corrido `prisma generate`: sin cliente generado,
- * `next build` fallaba con "Module '@prisma/client' has no exported member
- * 'Prisma'".
- */
-type JsonInput = string | number | boolean | null | JsonInput[] | { [k: string]: JsonInput };
 
 // -----------------------------------------------------------------------------
 // Default project (cached in-memory)
@@ -128,7 +121,7 @@ export async function saveJob(data: {
         provider: data.provider,
         model: data.model ?? null,
         status: 'completed',
-        inputParams: data.inputParams as JsonInput,
+        inputParams: data.inputParams as Prisma.InputJsonValue,
         outputUrl: data.outputUrl,
         cost: data.cost,
         processingTime: data.processingTimeMs ? data.processingTimeMs / 1000 : null,
