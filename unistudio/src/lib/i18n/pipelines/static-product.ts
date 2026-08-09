@@ -29,6 +29,7 @@ type JobStatusKey =
 
 /** Claves de paso — deben coincidir con `StepKey` en page.tsx. */
 type StepKeyName =
+  | 'restore'
   | 'isolate'
   | 'normalize'
   | 'white'
@@ -339,6 +340,18 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
     repeatTitle: 'Re-ejecutar este output',
     repeat: 'Repetir',
     items: {
+      restore: {
+        label: 'Restaurar a HD',
+        costHint: '$0.10',
+        description: 'Reconstruye la foto original a alta resolución y nitidez.',
+        what: 'PASO 1 — arregla la resolución de tu foto original ANTES de todo lo demás. SUPIR reconstruye detalle, nitidez y etiqueta legible en fotos pixeladas o borrosas. Si el paso 1 sale bien, TODAS las demás imágenes salen bien.',
+        provider: 'SUPIR-v0Q (Replicate). Fallback: Real-ESRGAN.',
+        duration: '20–60 s',
+        tips: [
+          'Es el paso más importante: si la foto entra mala, todo sale mal.',
+          'SUPIR reconstruye detalle real, no solo agranda. Ideal para fotos de vendedora.',
+        ],
+      },
       isolate: {
         label: 'Quitar fondo',
         costHint: '$0.01',
@@ -627,6 +640,18 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
     repeatTitle: 'Rerun this output',
     repeat: 'Repeat',
     items: {
+      restore: {
+        label: 'Restore to HD',
+        costHint: '$0.10',
+        description: 'Rebuilds the original photo to high resolution and sharpness.',
+        what: 'STEP 1 — fixes your original photo resolution BEFORE anything else. SUPIR reconstructs detail, sharpness and readable label on pixelated or blurry photos. If step 1 comes out right, EVERY other image comes out right.',
+        provider: 'SUPIR-v0Q (Replicate). Fallback: Real-ESRGAN.',
+        duration: '20–60 s',
+        tips: [
+          'The most important step: garbage in, garbage out.',
+          'SUPIR reconstructs real detail, not just upscaling. Ideal for reseller photos.',
+        ],
+      },
       isolate: {
         label: 'Remove background',
         costHint: '$0.01',

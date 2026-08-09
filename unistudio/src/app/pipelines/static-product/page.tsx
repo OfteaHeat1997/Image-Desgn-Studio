@@ -62,6 +62,7 @@ type JobStatus = "idle" | "uploading" | "isolating" | "normalizing" | "generatin
  *    across all 3 outputs.
  */
 type StepKey =
+  | "restore"
   | "isolate"
   | "normalize"
   | "white"
@@ -137,6 +138,9 @@ interface Job {
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
+  // PASO 1 — restaurar la foto MALA a HD ANTES de todo. Si esto sale bien, el
+  // resto (recorte, fondos, hero, video) parte de una imagen buena.
+  restore: { cost: 0, status: "idle" },
   isolate: { cost: 0, status: "idle" },
   normalize: { cost: 0, status: "idle" },
   white: { cost: 0, status: "idle" },
@@ -189,6 +193,17 @@ interface StepMeta {
 }
 
 const STEP_META: Record<StepKey, StepMeta> = {
+  restore: {
+    label: "Restaurar a HD",
+    icon: "✨",
+    costHint: "$0.10",
+    description: "Reconstruye la foto original a alta resolución y nitidez.",
+    what: "PASO 1 — arregla la resolución de tu foto original ANTES de todo. SUPIR reconstruye detalle, nitidez y etiqueta legible en fotos pixeladas. Si el paso 1 sale bien, TODO lo demás sale bien.",
+    provider: "SUPIR-v0Q (Replicate). Fallback: Real-ESRGAN.",
+    duration: "20–60 s",
+    canFail: ["Si SUPIR se cae, la ruta usa Real-ESRGAN; si todo falla, sigue con la foto original."],
+    tips: ["Es el paso más importante: si la foto entra mala, todo sale mal.", "SUPIR reconstruye detalle real, no solo agranda."],
+  },
   isolate: {
     label: "Quitar fondo",
     icon: "✂️",
@@ -1000,6 +1015,35 @@ export default function StaticProductPipelinePage() {
         .then((d) => (d?.success ? (d.data as StaticProductFeatures) : null))
         .catch(() => null);
 
+      // PASO 1 — RESTAURAR A HD (lo PRIMERO de todo). Arreglamos la resolución de
+      // la foto CRUDA antes de quitar fondo o generar nada. Si la foto entra mala,
+      // TODO sale mal — por eso va de primero. SUPIR trabaja sobre la foto normal
+      // (con fondo), que es su input natural, y reconstruye detalle real
+      // (etiqueta legible, frasco nítido). Recién DESPUÉS quitamos el fondo, así
+      // el recorte sale de una imagen ya en alta calidad. Si SUPIR se cae, la
+      // ruta usa Real-ESRGAN; y softFail devuelve la foto original — nunca rompe.
+      updateJob(job.id, { status: "isolating" });
+      updateStep(job.id, "restore", { status: "running" });
+      try {
+        const hdRes = await fetch("/api/upscale", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: currentUrl, provider: "supir", scale: 2, softFail: true }),
+        });
+        const hdData = await safeJson(hdRes);
+        if (hdData.success && hdData.data?.url) {
+          currentUrl = hdData.data.url;
+          const restoreCost = hdData.cost ?? 0.1;
+          totalCost += restoreCost;
+          updateStep(job.id, "restore", { status: "done", resultUrl: currentUrl, cost: restoreCost });
+        } else {
+          updateStep(job.id, "restore", { status: "skipped", error: hdData.error });
+        }
+      } catch (hdErr) {
+        console.warn("[static-product] PASO 1 HD/SUPIR falló, sigo con la foto original:", hdErr);
+        updateStep(job.id, "restore", { status: "skipped", error: hdErr instanceof Error ? hdErr.message : String(hdErr) });
+      }
+
       // 2. Remove background → step "isolate"
       updateJob(job.id, { status: "isolating" });
       updateStep(job.id, "isolate", { status: "running" });
@@ -1089,33 +1133,8 @@ export default function StaticProductPipelinePage() {
         ". Keep the scene completely EMPTY — absolutely no bottles, jars or products anywhere in the background; only the empty pedestal and backdrop. Soft background lighting that harmonizes elegantly with the product placed on top.";
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
-      // PASO HD (primero): RESTAURAR el PRODUCTO a alta resolución/nitidez ANTES
-      // de generar los fondos, así TODOS los outputs (blanco, adaptativo, hero,
-      // vertical) salen en alta calidad y no partiendo de la foto mediocre de la
-      // vendedora. SUPIR (v0Q en Replicate) reconstruye detalle real en fotos
-      // degradadas/pixeladas/ilegibles — lo que real-esrgan (super-resolución
-      // fiel pero que NO recupera detalle perdido) y clarity (que deforma) no
-      // logran. Si SUPIR falla, la ruta cae sola a real-esrgan; y softFail
-      // devuelve el producto normalizado — nunca rompe el flujo.
-      try {
-        const hdRes = await fetch("/api/upscale", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // SUPIR = restauración real de fotos malas. Reconstruye la etiqueta y
-          // la nitidez del frasco que la foto original perdió. Fallback interno a
-          // real-esrgan en la propia ruta si SUPIR se cae.
-          body: JSON.stringify({ imageUrl: currentUrl, provider: "supir", scale: 2, softFail: true }),
-        });
-        const hdData = await safeJson(hdRes);
-        if (hdData.success && hdData.data?.url) {
-          currentUrl = hdData.data.url;
-          totalCost += hdData.cost ?? 0.05;
-          updateStep(job.id, "normalize", { resultUrl: currentUrl });
-        }
-      } catch (hdErr) {
-        console.warn("[static-product] HD upscale del producto falló, sigo con normalizado:", hdErr);
-      }
-
+      // El HD ya se hizo en el PASO 1 (restore/SUPIR, antes de quitar fondo), así
+      // que aquí currentUrl ya viene en alta calidad. No se re-escala.
       const sharedInput = currentUrl;
       const [whiteRes, adaptiveRes, heroRes, verticalRes] = await Promise.all([
         runOutputStep(job.id, "white", sharedInput, enrichedConfig, undefined, job.usePhotoroom),
@@ -1953,9 +1972,9 @@ export default function StaticProductPipelinePage() {
                     {/* Step timeline — split into 2 prep steps (compact) + 3 outputs (big) */}
                     {job.status !== "idle" && (
                       <div className="mt-3 space-y-3">
-                        {/* Prep — compact thumbnails */}
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {(["isolate", "normalize"] as StepKey[]).map((key) => {
+                        {/* Prep — compact thumbnails. restore = PASO 1 (HD). */}
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {(["restore", "isolate", "normalize"] as StepKey[]).map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
                             const spMeta = sp.steps.items[key];
