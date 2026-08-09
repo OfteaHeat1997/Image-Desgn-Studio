@@ -676,10 +676,21 @@ export async function compositeOnSolidColor(
   // existing fallback so all 3 outputs of the static-product pipeline keep the
   // product at a consistent size relative to the frame).
   const canvas = aspectRatioToCanvas(aspectRatio, baseSize);
-  const productMaxW = Math.round(canvas.width * 0.80);
-  const productMaxH = Math.round(canvas.height * 0.85);
+  // Producto MÁS grande (0.90) para que llene el encuadre — antes salía chico.
+  const productMaxW = Math.round(canvas.width * 0.90);
+  const productMaxH = Math.round(canvas.height * 0.90);
 
-  const resizedProduct = await sharp(transparentBuffer)
+  // .trim() quita el padding transparente que deja el bg-remove alrededor del
+  // producto. Sin esto, el producto real quedaba pequeño dentro de mucho vacío
+  // → se veía chico y con la etiqueta ilegible. Con trim, el producto ocupa el
+  // encuadre. Defensivo: si trim falla (imagen rara), usamos el buffer original.
+  let trimmedBuffer: Buffer = transparentBuffer;
+  try {
+    trimmedBuffer = await sharp(transparentBuffer).trim({ threshold: 5 }).png().toBuffer();
+  } catch {
+    trimmedBuffer = transparentBuffer;
+  }
+  const resizedProduct = await sharp(trimmedBuffer)
     .resize(productMaxW, productMaxH, { fit: 'inside', withoutEnlargement: false })
     .png()
     .toBuffer();
