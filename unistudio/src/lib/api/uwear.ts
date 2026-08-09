@@ -428,3 +428,40 @@ export async function generateUwearGhostProduct(params: {
   return await pollUwearGeneration(generationId);
 }
 
+
+/**
+ * Devuelve la URL de un asset del avatar (vista trasera, frontal, etc).
+ *
+ * Por que existe: la Foto Espalda estaba mal disenada de raiz. Pedia a
+ * model-create una modelo "de espaldas" y le pegaba la prenda con un try-on —
+ * pero SeedDream ignora el "back-view" y devuelve otra persona DE FRENTE, y un
+ * try-on no puede rotar a nadie: si recibe una modelo de frente, devuelve una
+ * foto de frente. Por eso fallaba con Leffa Y con Uwear: el proveedor no era el
+ * problema, la entrada lo era.
+ *
+ * Los avatares de Uwear ya traen la vista trasera lista (asset_role
+ * "full_body_back"), del MISMO avatar. Usarla como imagen de la modelo convierte
+ * el paso en algo determinista: misma mujer, espalda real, sin generar nada.
+ *
+ * Roles disponibles: upper_body_front | full_body_front | full_body_back | full_body_side
+ */
+export async function getUwearAvatarAsset(
+  avatarId: number,
+  role: 'upper_body_front' | 'full_body_front' | 'full_body_back' | 'full_body_side',
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${UWEAR_BASE_URL}/avatars?items_per_page=50`, { headers: authHeader() });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      data?: Array<{
+        avatar_id?: number;
+        assets?: Array<{ asset_role?: string; asset_url?: string }>;
+      }>;
+    };
+    const avatar = json.data?.find((a) => a.avatar_id === avatarId);
+    const asset = avatar?.assets?.find((x) => x.asset_role === role);
+    return asset?.asset_url ?? null;
+  } catch {
+    return null;
+  }
+}

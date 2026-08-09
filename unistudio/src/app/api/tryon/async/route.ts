@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { submitFal, getFalStatus, ensureFalAccessibleUrl } from '@/lib/api/fal';
+import { getUwearAvatarAsset } from '@/lib/api/uwear';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 
 /** Mapea nuestras categorías a las de Leffa. */
@@ -32,11 +33,37 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     modelImage?: string;
     garmentImage?: string;
     category?: string;
+    /** true = Foto Espalda: usar la vista trasera real del avatar como modelo. */
+    backView?: boolean;
   };
   const missing = requireFields(body as Record<string, unknown>, ['modelImage', 'garmentImage']);
   if (missing) return missing;
 
-  const humanImageUrl = await ensureFalAccessibleUrl(body.modelImage!);
+  // FOTO ESPALDA. El paso estaba mal disenado de raiz: pedia a model-create una
+  // modelo "de espaldas" y le pegaba la prenda con un try-on. Pero SeedDream
+  // ignora el back-view y devuelve OTRA persona DE FRENTE, y un try-on no puede
+  // rotar a nadie — si recibe una modelo de frente, devuelve una foto de frente.
+  // Por eso fallaba igual con Leffa y con Uwear: el proveedor nunca fue el
+  // problema, la imagen de entrada lo era.
+  //
+  // Los avatares de Uwear ya traen la vista trasera lista (asset_role
+  // "full_body_back") del MISMO avatar. Usarla como imagen de la modelo vuelve el
+  // paso determinista: misma mujer, espalda real, sin generar nada. Combinada con
+  // la foto REAL de la espalda del producto que sube la usuaria, el try-on por fin
+  // tiene las dos entradas correctas.
+  let modelImage = body.modelImage!;
+  if (body.backView) {
+    const avatarId = Number(process.env.UWEAR_AVATAR_ID?.trim() || 21663);
+    const backUrl = await getUwearAvatarAsset(avatarId, 'full_body_back');
+    if (backUrl) {
+      modelImage = backUrl;
+      console.log(`[tryon-async] Foto Espalda: usando full_body_back del avatar ${avatarId}`);
+    } else {
+      console.warn('[tryon-async] no se pudo leer full_body_back del avatar — sigo con la modelo recibida');
+    }
+  }
+
+  const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
   const garmentImageUrl = await ensureFalAccessibleUrl(body.garmentImage!);
 
   const queued = await submitFal('fal-ai/leffa/virtual-tryon', {

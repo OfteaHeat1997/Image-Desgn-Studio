@@ -2269,12 +2269,14 @@ async function tryOnLeffaAsync(
   garmentImage: string,
   category: string,
   abortSignal?: AbortSignal,
+  /** Foto Espalda: el servidor usa la vista trasera real del avatar de Uwear. */
+  backView = false,
 ): Promise<{ resultUrl: string; cost: number; usedProvider: string }> {
   const submitRes = await fetch("/api/tryon/async", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: abortSignal,
-    body: JSON.stringify({ modelImage, garmentImage, category }),
+    body: JSON.stringify({ modelImage, garmentImage, category, backView }),
   });
   const submitJson = await submitRes.json();
   if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
@@ -2609,7 +2611,17 @@ async function runStep(
       // el guard de arriba ya garantiza que hay una de las dos, pero TypeScript no
       // lo deduce — fallamos con mensaje claro en vez de mandar undefined.
       if (!garmentForTryon) throw new Error("Foto Espalda: falta la prenda (aislado o foto de espalda).");
-      const leffa = await tryOnLeffaAsync(newModelImage, garmentForTryon, category, abortSignal);
+      // backView:true → el servidor reemplaza la modelo por la vista trasera real
+      // del avatar. Como garment se prioriza la foto REAL de espalda del producto
+      // (backGarmentUrl); asi las DOS entradas son de espalda y el resultado deja
+      // de ser una foto frontal disfrazada.
+      const leffa = await tryOnLeffaAsync(
+        newModelImage,
+        backGarmentUrl ?? garmentForTryon,
+        category,
+        abortSignal,
+        true,
+      );
       return { resultUrl: leffa.resultUrl, cost: modelCost + leffa.cost, usedProvider: leffa.usedProvider };
     }
 
