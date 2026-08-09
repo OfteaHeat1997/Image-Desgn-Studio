@@ -2787,6 +2787,24 @@ async function runStep(
       // del avatar. Como garment se prioriza la foto REAL de espalda del producto
       // (backGarmentUrl); asi las DOS entradas son de espalda y el resultado deja
       // de ser una foto frontal disfrazada.
+      // AVISAR CUANDO NO HAY FOTO REAL DE ESPALDA.
+      //
+      // Leffa preserva pixeles reales, asi que con la foto de espalda de la
+      // usuaria la malla y el broche salen bien. Pero si esa foto no esta, caia en
+      // SILENCIO al recorte FRONTAL — y deformar un frente sobre una espalda
+      // devuelve una banda lisa sin detalle. La usuaria lo vio y creyo que fallaba
+      // Leffa; en realidad faltaba el dato de entrada.
+      //
+      // Sustituir sin avisar es el patron que ya nos costo semanas en el Paso 2.
+      if (!backGarmentUrl) {
+        console.warn("[lingerie] photoBack sin foto real de espalda — usando el recorte frontal");
+        toast.warning(
+          "Foto Espalda: no encontre una foto tuya etiquetada \"Espalda\" para este producto, " +
+          "asi que estoy usando el recorte frontal. El resultado NO va a mostrar la espalda real " +
+          "(malla, broche, cruce de tirantes). Subi la foto de atras y etiquetala \"Espalda\" en el setup.",
+          12000,
+        );
+      }
       const leffa = await tryOnLeffaAsync(
         newModelImage,
         backGarmentUrl ?? garmentForTryon,
