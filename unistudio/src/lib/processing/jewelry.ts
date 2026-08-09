@@ -316,7 +316,21 @@ export async function applyJewelry(
   modelImageUrl: string,
   jewelryImageUrl: string,
   accessoryType: string,
-  options?: { metalType?: string; finish?: string; bgStyle?: string; featureDescriptor?: string },
+  options?: {
+    metalType?: string;
+    finish?: string;
+    bgStyle?: string;
+    featureDescriptor?: string;
+    /**
+     * Direccion de colocacion escrita por Claude Vision para ESTA pieza: donde
+     * va sobre el cuerpo, como cae por gravedad y que encuadre la muestra mejor.
+     * Se AGREGA a la plantilla por tipo, no la reemplaza: la plantilla trae los
+     * guards de "no rediseñar", que no se pueden perder.
+     */
+    placementDirection?: string;
+    /** Lista de la marca de lo que NO debe aparecer ni cambiar. */
+    negative?: string;
+  },
 ): Promise<string> {
   const placementPrompt = PLACEMENT_PROMPTS[accessoryType];
   if (!placementPrompt) {
@@ -365,8 +379,15 @@ export async function applyJewelry(
     'a split screen, a before/after comparison or two panels side by side. ' +
     'The two halves of the input are a REFERENCE for you, not a layout to reproduce.';
 
+  // La direccion de Vision va DESPUES de la plantilla: lo ultimo pesa mas, y la
+  // plantilla ya dejo sentados los guards de preservacion.
+  const direction = options?.placementDirection ? ` ${options.placementDirection}` : '';
+  const negative = options?.negative
+    ? ` Do NOT include or change any of the following: ${options.negative}.`
+    : '';
+
   const fullPrompt =
-    placementPrompt + modifierStr + bgInstruction + featureAnchor + singleImage +
+    placementPrompt + modifierStr + bgInstruction + featureAnchor + direction + negative + singleImage +
     ' Professional jewelry photography quality, photorealistic, high detail.';
 
   // SALIDA VERTICAL, no cuadrada. La entrada es un compuesto lado a lado y con

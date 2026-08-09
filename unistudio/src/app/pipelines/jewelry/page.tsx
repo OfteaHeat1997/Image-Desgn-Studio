@@ -1381,7 +1381,7 @@ export default function JewelryPipelinePage() {
             const modelPrompt =
               key === "scale"
                 ? "elegant woman hand holding the piece between thumb and fingers, hand at natural scale, plain neutral background, soft studio light, commercial jewelry scale reference photography, sharp focus"
-                : (job.prompts?.model ?? config.modelPrompt);
+                : config.modelPrompt;
 
             const modelRes = await fetch("/api/model-create", {
               method: "POST",
@@ -1416,6 +1416,12 @@ export default function JewelryPipelinePage() {
                 type: key === "scale" ? "ring" : job.subType,
                 mode: "modelo",
                 featureDescriptor: descriptor ?? undefined,
+                // El prompt de colocacion de Vision va al TRY-ON, que es quien
+                // pone la joya sobre el cuerpo. Se estaba mandando a
+                // model-create, o sea describiendo a la modelo en vez de dirigir
+                // la colocacion: la direccion se perdia.
+                placementDirection: key === "model" ? job.prompts?.model : undefined,
+                negative: job.prompts?.negative,
               }),
               signal,
             });

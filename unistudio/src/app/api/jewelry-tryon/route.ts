@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
     let finish: string | undefined;
     let bgStyle: string | undefined;
     let featureDescriptor: string | undefined;
+    let placementDirection: string | undefined;
+    let negative: string | undefined;
 
     const contentType = request.headers.get('content-type') || '';
 
@@ -61,6 +63,8 @@ export async function POST(request: NextRequest) {
       finish = (formData.get('finish') as string) || undefined;
       bgStyle = (formData.get('bgStyle') as string) || undefined;
       featureDescriptor = (formData.get('featureDescriptor') as string) || undefined;
+      placementDirection = (formData.get('placementDirection') as string) || undefined;
+      negative = (formData.get('negative') as string) || undefined;
 
       if (!jewelryFile) {
         return NextResponse.json(
@@ -93,6 +97,8 @@ export async function POST(request: NextRequest) {
       finish = body.finish;
       bgStyle = body.bgStyle;
       featureDescriptor = body.featureDescriptor;
+      placementDirection = body.placementDirection;
+      negative = body.negative;
 
       // B-5: Validate that provided image strings are valid URLs or data URIs
       if (jewelryImage && !isValidImageUrl(jewelryImage)) {
@@ -146,7 +152,16 @@ export async function POST(request: NextRequest) {
       // featureDescriptor: per-photo feature anchor (eg "anillo redondo · oro
       //   brillante · 3 piedras transparentes · grabados") so Kontext respects
       //   the actual piece instead of inventing one.
-      resultUrl = await applyJewelry(modelImage, jewelryImage, type, { metalType, finish, bgStyle, featureDescriptor });
+      resultUrl = await applyJewelry(modelImage, jewelryImage, type, {
+        metalType,
+        finish,
+        bgStyle,
+        featureDescriptor,
+        // Direccion de colocacion escrita por Vision para ESTA pieza + el
+        // negativo de la marca. Antes se generaban y no llegaban hasta aca.
+        placementDirection,
+        negative,
+      });
     }
 
     await saveJob({
