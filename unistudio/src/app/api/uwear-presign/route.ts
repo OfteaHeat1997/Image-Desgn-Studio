@@ -27,11 +27,14 @@ const BODY = {
   use_image_enhancement: true,
 };
 
-const HOSTS = [
-  'https://api.uwear.ai/api/v1/clothing-item',
-  'https://platform.uwear.ai/api/v1/clothing-item',
-  'https://platform.uwear.ai/api/clothing-item',
-  'https://api.uwear.ai/clothing-item',
+// Confirmado: el UNICO endpoint que existe es POST https://api.uwear.ai/clothing-item
+// con Bearer, y exige assets[]. Los enums no estan documentados, pero la cuenta ya
+// tiene prendas creadas desde la web de Uwear: leer una devuelve sus assets con los
+// valores REALES de asset_kind/asset_view.
+const READ_PATHS = [
+  'https://api.uwear.ai/clothing-items?items_per_page=1',
+  'https://api.uwear.ai/clothing-item/325429',
+  'https://api.uwear.ai/clothing-items/325429',
 ];
 
 export async function GET() {
@@ -46,23 +49,15 @@ export async function GET() {
   ];
 
   const results = [];
-  for (const url of HOSTS) {
-    for (const [authName, headers] of authVariants) {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify(BODY),
-          redirect: 'manual',
-        });
-        const text = await res.text().catch(() => '');
-        results.push({ url, auth: authName, status: res.status, body: text.slice(0, 300) });
-        if (res.ok) return NextResponse.json({ success: true, found: { url, auth: authName }, results });
-      } catch (e) {
-        results.push({ url, auth: authName, status: 0, body: e instanceof Error ? e.message : String(e) });
-      }
+  for (const url of READ_PATHS) {
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${k}` } });
+      const text = await res.text().catch(() => '');
+      results.push({ url, auth: 'Bearer', status: res.status, body: text.slice(0, 3000) });
+    } catch (e) {
+      results.push({ url, auth: 'Bearer', status: 0, body: e instanceof Error ? e.message : String(e) });
     }
   }
-
+  void BODY; void authVariants;
   return NextResponse.json({ success: true, found: null, results });
 }
