@@ -178,7 +178,10 @@ async function ghostMatchesProduct(
  * claramente NO es la prenda (piel expuesta, cara, pelo, brazos, hombros, cuello,
  * fondo). NO restamos torso/body/waist porque contienen la prenda.
  */
-function garmentNegativePrompt(garmentType: string | null): string {
+function garmentNegativePrompt(garmentType: string | null, override?: string): string {
+  // Utileria nombrada por Vision (cilindro, pedestal, bandeja...). Se suma a la
+  // base para que la mascara la reste.
+  if (override && override.trim()) return `background,${override.trim()}`;
   // MÍNIMO a propósito: antes restábamos skin/shoulder/neck/arm — pero en un bra
   // deportivo los tirantes van sobre los hombros y el escote toca el cuello, así que
   // esas restas EROSIONABAN la máscara hasta dejarla vacía → "no se pudo recortar".
@@ -206,7 +209,10 @@ function garmentNegativePrompt(garmentType: string | null): string {
  * Map our internal garmentType values to the exact text prompt that
  * grounded_sam (Grounding DINO under the hood) responds to best.
  */
-function garmentTypeToPrompt(garmentType: string | null): string {
+function garmentTypeToPrompt(garmentType: string | null, override?: string): string {
+  // Vocabulario dirigido por Vision. Gana sobre la tabla fija: la tabla solo
+  // sabe de tipos, Vision mira ESTA foto y nombra las partes reales.
+  if (override && override.trim()) return override.trim();
   switch (garmentType) {
     case 'bra':
       // Grounding DINO responds better to a richer vocabulary — catches
@@ -586,7 +592,7 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, subjectPrompt, propPrompt, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg' | 'birefnet';
     removeSubject?: boolean;
@@ -601,6 +607,10 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Método de recorte: 'grounded-sam' (recorte real fiel, DEFAULT) | 'ghost'
     // (SeedDream 3D regenera) | 'auto' (real → ghost → rembg).
     isolateMethod?: 'photoroom' | 'photoroom-sandbox' | 'grounded-sam' | 'ghost' | 'auto';
+    /** Palabras que nombran el producto (Vision). Sobrescriben la tabla por tipo. */
+    subjectPrompt?: string;
+    /** Palabras que nombran la utileria a restar (Vision). */
+    propPrompt?: string;
     options?: Record<string, unknown>;
   };
 

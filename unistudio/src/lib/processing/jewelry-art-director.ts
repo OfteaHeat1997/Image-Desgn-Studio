@@ -47,6 +47,18 @@ export interface JewelryPromptSet {
   negative: string;
   /** Descripción literal de la pieza, para auditar qué entendió Vision. */
   pieceDescription: string;
+  /**
+   * Palabras que nombran EL PRODUCTO, en inglés, para segmentación dirigida.
+   * BiRefNet es un segmentador de objeto saliente: no sabe qué es el producto,
+   * así que con una pulsera apoyada en un cilindro blanco se queda con los dos.
+   * Estas palabras le dicen al recorte qué buscar.
+   */
+  productWords: string;
+  /**
+   * Palabras que nombran la UTILERÍA del taller (exhibidores, pedestales,
+   * bandejas). Se restan de la máscara.
+   */
+  propWords: string;
 }
 
 /** Coste aproximado de la llamada (Sonnet con una imagen). */
@@ -132,7 +144,9 @@ Mirá la foto y respondé SOLO con JSON válido, sin markdown:
   "luxuryBackdrop": "el MISMO decorado pero SIN la joya, terminando en 'no jewelry, no product, empty center'",
   "macroFocus": "prompt en inglés que nombre qué parte de ESTA pieza hay que acercar",
   "model": "prompt en inglés para la colocación sobre la modelo",
-  "negative": "lista en inglés, separada por comas, de lo que NO debe aparecer ni cambiar"
+  "negative": "lista en inglés, separada por comas, de lo que NO debe aparecer ni cambiar",
+  "productWords": "palabras en inglés separadas por comas que nombran SOLO la pieza de joyería y sus partes (ej 'beaded bracelet, gold beads, turtle charm, elastic band'). NO incluyas soportes ni fondos.",
+  "propWords": "palabras en inglés separadas por comas que nombran la UTILERIA visible que NO es el producto: exhibidor, cilindro, pedestal, bandeja, tarjeta, base, soporte. Cadena vacia si no hay."
 }`;
 }
 
@@ -220,6 +234,8 @@ export async function directJewelryPrompts(
       macroFocus: parsed.macroFocus ?? '',
       model: parsed.model,
       negative: parsed.negative ?? '',
+      productWords: parsed.productWords ?? '',
+      propWords: parsed.propWords ?? '',
     };
   } catch (err) {
     console.warn('[art-director] falló:', err);
