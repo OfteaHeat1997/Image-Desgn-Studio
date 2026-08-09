@@ -37,7 +37,12 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     /** true = Foto Espalda: usar la vista trasera real del avatar como modelo. */
     backView?: boolean;
   };
-  const missing = requireFields(body as Record<string, unknown>, ['modelImage', 'garmentImage']);
+  // Con backView la modelo la pone el servidor (asset full_body_back del avatar
+  // de Uwear), asi que modelImage no solo es opcional: es que la que mande el
+  // cliente se DESCARTA. Exigirla obligaba a la pagina a generar una modelo de
+  // $0.055 y ~40s para tirarla a la basura en la linea siguiente.
+  const required = body.backView ? ['garmentImage'] : ['modelImage', 'garmentImage'];
+  const missing = requireFields(body as Record<string, unknown>, required);
   if (missing) return missing;
 
   // FOTO ESPALDA. El paso estaba mal disenado de raiz: pedia a model-create una
@@ -52,7 +57,7 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
   // paso determinista: misma mujer, espalda real, sin generar nada. Combinada con
   // la foto REAL de la espalda del producto que sube la usuaria, el try-on por fin
   // tiene las dos entradas correctas.
-  let modelImage = body.modelImage!;
+  let modelImage = body.modelImage ?? '';
   if (body.backView) {
     const avatarId = Number(process.env.UWEAR_AVATAR_ID?.trim() || 21663);
     const backUrl = await getUwearAvatarAsset(avatarId, 'full_body_back');
@@ -92,6 +97,19 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     } else {
       console.warn('[tryon-async] no se pudo leer full_body_back del avatar — sigo con la modelo recibida');
     }
+  }
+
+  // Sin backView el cliente ya no manda modelImage, asi que si el asset del
+  // avatar no se pudo leer nos quedamos sin nada. Fallar con un mensaje que diga
+  // que hacer es mejor que mandar una cadena vacia a fal y recibir un 422 opaco.
+  if (!modelImage) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'No se pudo obtener la vista trasera del avatar de Uwear. Revisá UWEAR_API_KEY y UWEAR_AVATAR_ID.',
+      },
+      { status: 502 },
+    );
   }
 
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);

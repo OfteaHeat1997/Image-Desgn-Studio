@@ -1509,7 +1509,16 @@ interface StepCardProps {
  * y no se podia elegir nada. Centralizarla evita que el proximo paso nuevo nazca
  * mudo.
  */
-const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoSide", "photoBack", "photoDetail", "photoFullBody"];
+// Pasos que muestran selector de proveedor y de pose.
+//
+// photoBack NO esta en la lista a proposito. La Foto Espalda va SIEMPRE por el
+// camino de Leffa + la vista trasera del avatar, sin importar lo que diga el
+// dropdown: es el unico que produce una espalda de verdad (SeedDream y Uwear
+// generan su propia modelo y siempre sale de frente). Tener ahi un selector que
+// no cambia nada es peor que no tenerlo — la usuaria eligio "Uwear" y el badge
+// del resultado dijo "LEFFA", que se lee como un bug aunque sea lo correcto.
+// Su selector de pose tampoco hacia nada: la pose la fija el asset del avatar.
+const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoSide", "photoDetail", "photoFullBody"];
 
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const { t } = useI18n();
@@ -2822,28 +2831,18 @@ async function runStep(
     // que el prompt base de model-create (beige swim briefs para lencería) se
     // encargue del lower body; Kolors reemplaza el top con la prenda real.
     const newBackground = "plain white studio background, clean minimalist";
-    // Fase 1: generar modelo en la nueva pose con el MISMO seed
-    const modelRes = await fetch("/api/model-create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: abortSignal,
-      body: JSON.stringify({
-        gender: modelConfig.gender,
-        ageRange: modelConfig.ageRange,
-        skinTone: modelConfig.skinTone,
-        bodyType: modelConfig.bodyType,
-        pose: newPose,
-        expression: "confident natural",
-        background: newBackground,
-        garmentType: garmentTypeForApi,
-        seed: sharedSeed,
-        referenceNumber: referenceNumber || undefined,
-      }),
-    });
-    const modelJson = await modelRes.json();
-    if (!modelJson.success) throw new Error(modelJson.error || `${stepId}: model-create failed`);
-    const newModelImage = modelJson.data.url;
-    const modelCost = modelJson.cost ?? 0.055;
+    void newPose;
+    void newBackground;
+    // AQUI SE PAGABA UNA MODELO PARA TIRARLA.
+    // Este paso generaba una modelo con /api/model-create ($0.055 y ~40s) y se la
+    // pasaba a tryOnLeffaAsync con backView:true. Pero backView hace que el
+    // servidor REEMPLACE esa modelo por el asset "full_body_back" del avatar de
+    // Uwear — o sea, la modelo recien pagada se descartaba en la linea siguiente.
+    // Costaba plata y tiempo en cada Foto Espalda, de cada producto.
+    // La ruta async ya no exige modelImage cuando backView es true, asi que
+    // simplemente no la generamos.
+    const newModelImage = "";
+    const modelCost = 0;
 
     // Fase 2: vestir la nueva modelo con la prenda correcta.
     // P0-2: si el step es photoBack Y la usuaria subió una foto tagged
