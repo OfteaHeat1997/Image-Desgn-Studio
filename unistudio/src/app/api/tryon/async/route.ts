@@ -74,19 +74,31 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
         const w = meta.width ?? 0;
         const h = meta.height ?? 0;
         if (w && h) {
-          // Cabeza hasta la CINTURA: 42% superior. Con 55% el encuadre llegaba a
-          // la cadera y el resultado salia con la modelo DESNUDA de la cintura
-          // para abajo — el avatar de espalda no siempre trae prenda inferior, y
-          // el warp de Leffa terminaba de borrarla. Una imagen asi no puede
-          // llegar a un catalogo, asi que el recorte se cierra por encima de la
-          // zona de riesgo. 42% igual deja ver el bra completo con su banda, que
-          // es lo que esta foto tiene que mostrar.
+          // ENCUADRE VERTICAL, NO SOLO RECORTE SUPERIOR.
+          //
+          // Antes se tomaba el 42% superior a ANCHO COMPLETO. El limite vertical
+          // es correcto y hay que conservarlo: con 55% el encuadre llegaba a la
+          // cadera y salia la modelo desnuda de la cintura para abajo, porque el
+          // avatar de espalda no siempre trae prenda inferior y el warp de Leffa
+          // termina de borrarla. Eso no puede llegar a un catalogo.
+          //
+          // El problema era el ANCHO. Un recorte ancho y bajo deja a la modelo
+          // chiquita en el centro, y Leffa lo devuelve con bandas blancas arriba
+          // y abajo al encajarlo en su aspecto de salida. El broche y la banda
+          // —el motivo entero de esta foto— quedaban ilegibles.
+          //
+          // Ahora se recorta una ventana VERTICAL 3:4 centrada en el torso: mismo
+          // techo de seguridad, pero la espalda ocupa el cuadro.
+          const top = Math.round(h * 0.06); // apenas por encima de la cabeza
+          const cropH = Math.min(Math.round(h * 0.40), h - top);
+          const cropW = Math.min(w, Math.round(cropH * 0.75)); // retrato 3:4
+          const left = Math.max(0, Math.round((w - cropW) / 2));
           const cropped = await sharp(buf)
-            .extract({ left: 0, top: 0, width: w, height: Math.round(h * 0.42) })
+            .extract({ left, top, width: cropW, height: cropH })
             .png()
             .toBuffer();
           modelImage = await uploadToFalStorage(cropped, 'image/png', 'avatar-back-torso.png');
-          console.log(`[tryon-async] Foto Espalda: full_body_back del avatar ${avatarId} recortado al torso`);
+          console.log(`[tryon-async] Foto Espalda: full_body_back del avatar ${avatarId} recortado a ventana 3:4 del torso`);
         } else {
           modelImage = backUrl;
         }
