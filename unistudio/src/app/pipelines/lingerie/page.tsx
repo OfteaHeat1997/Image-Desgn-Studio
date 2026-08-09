@@ -4727,9 +4727,11 @@ export default function LingeriePipelinePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-            {/* Left column */}
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+            {/* Left column — min-w-0 es obligatorio: sin el, un hijo mas ancho que
+                la columna la estira y empuja la columna derecha fuera de pantalla,
+                en vez de hacer scroll dentro de su propia caja. */}
+            <div className="min-w-0 space-y-6">
               {/* Upload */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -4985,7 +4987,7 @@ export default function LingeriePipelinePage() {
                       fila, se hojea con el dedo o la rueda, y al pasar el mouse
                       cada modelo se levanta. Una fila dice "elegi una si querés";
                       tres filas dicen "tenés que revisar esto". */}
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  <div className="flex w-full min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
                     {savedModels.slice(0, 18).map((m) => {
                       const isSelected = sharedModelUrl === m.previewUrl;
                       return (
@@ -5008,7 +5010,7 @@ export default function LingeriePipelinePage() {
                             // pagina — la columna derecha quedaba fuera de pantalla y
                             // no se podia clickear nada. Se conserva solo el
                             // micro-movimiento al hover, que no afecta el ancho.
-                            "group relative flex flex-col overflow-hidden rounded-lg border transition-all duration-200 hover:-translate-y-0.5",
+                            "group relative flex w-28 shrink-0 snap-start flex-col overflow-hidden rounded-lg border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/40",
                             isSelected
                               ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40"
                               : "border-white/10 hover:border-[var(--accent)]/50",

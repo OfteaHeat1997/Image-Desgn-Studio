@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import {
   removeBgReplicate,
   removeBgWithoutBg,
+  removeBgBirefnet,
 } from '@/lib/processing/bg-remove';
 import { isWithoutBgHealthy } from '@/lib/api/withoutbg';
 import {
@@ -27,6 +28,8 @@ const PROVIDER_COSTS: Record<string, number> = {
   replicate: 0.01,
   browser: 0,
   withoutbg: 0,
+  // BiRefNet (fal). El mejor medido para joyeria — ver removeBgBirefnet().
+  birefnet: 0.01,
 };
 
 // Cost of the garment isolation path (grounded_sam + local compositing)
@@ -183,7 +186,20 @@ function garmentNegativePrompt(garmentType: string | null): string {
   // caja a la prenda, así que no necesitamos restar piel/hombros.
   const base = 'background';
   // Panties van bajo en cadera → muslo/pierna no solapan, ayudan a limpiar bordes.
-  return garmentType === 'panty' ? `${base},thigh,leg` : base;
+  if (garmentType === 'panty') return `${base},thigh,leg`;
+
+  // Joyería: lo que contamina la máscara no es piel sino el ATREZO. Las fotos de
+  // taller llegan con la pieza sobre pedestales, bandejas y tarjetas, y con
+  // precio/marca de agua encima. Nada de eso solapa la pieza, así que restarlo
+  // limpia los bordes sin erosionar la cadena.
+  const JEWELRY_TYPES = new Set([
+    'necklace', 'rosary', 'earrings', 'studs', 'hoops', 'ring', 'bracelet',
+  ]);
+  if (garmentType && JEWELRY_TYPES.has(garmentType)) {
+    return `${base},display stand,pedestal,riser,podium,tray,display card,box,text,watermark,price tag,label`;
+  }
+
+  return base;
 }
 
 /**
@@ -211,6 +227,30 @@ function garmentTypeToPrompt(garmentType: string | null): string {
       return 'swimsuit,bikini,swim top,swim bottom';
     case 'shapewear':
       return 'shapewear,bodysuit,compression garment';
+
+    // ---- Joyería -----------------------------------------------------------
+    // Grounding DINO necesita nombrar CADA parte de la pieza, no solo la
+    // categoría. Con joyería el error clásico es que agarra el colgante (objeto
+    // compacto y contrastado) y suelta la cadena, porque ninguna palabra del
+    // prompt nombra los eslabones. Verificado con el rosario: rembg devolvía la
+    // foto casi intacta y el macro terminaba mostrando solo la cruz.
+    case 'necklace':
+      return 'necklace,chain,chain links,pendant,charm,clasp,jewelry';
+    case 'rosary':
+      // El rosario es una cadena de cuentas: sin 'beads' / 'bead chain' el
+      // modelo trata cada bolita como ruido y se queda con el crucifijo.
+      return 'rosary,rosary beads,bead chain,beaded necklace,beads,chain,chain links,crucifix,cross pendant,religious medal,medallion,jewelry';
+    case 'earrings':
+    case 'studs':
+    case 'hoops':
+      return 'earrings,pair of earrings,earring,stud earring,hoop earring,ear hook,jewelry';
+    case 'ring':
+      return 'ring,finger ring,band,gemstone setting,jewelry';
+    case 'bracelet':
+      return 'bracelet,chain bracelet,bangle,chain links,clasp,charm,jewelry';
+    case 'set':
+      return 'jewelry set,necklace,chain,chain links,pendant,earrings,bracelet,jewelry';
+
     default:
       return 'garment,clothing,product';
   }
@@ -548,7 +588,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
   const body = await request.json();
   const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, options } = body as {
     imageUrl: string;
-    provider: 'browser' | 'replicate' | 'withoutbg';
+    provider: 'browser' | 'replicate' | 'withoutbg' | 'birefnet';
     removeSubject?: boolean;
     garmentType?: string | null;
     returnMaskOnly?: boolean;
@@ -744,7 +784,15 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
         // detalles concretos llegan por garmentDescription, que Claude Vision saca
         // de CADA foto.
         const ghostPrompt = [
-          'ghost mannequin product photo, invisible mannequin, straight front view',
+          'ghost mannequin product photo, invisible mannequin, STRAIGHT FRONT VIEW ONLY',
+          // La ficha del producto ahora se arma con TODAS las vistas (frontal +
+          // espalda), asi que puede describir la construccion de atras: malla,
+          // cruce de tirantes, broche. Sin esta aclaracion Photoroom tomaba esos
+          // datos como lo que debia renderizar y devolvia la prenda DE ESPALDAS
+          // aunque la foto de entrada fuera frontal. La ficha es CONTEXTO de como
+          // esta construida la prenda, no la vista a dibujar.
+          'The description below may mention how the BACK is built (mesh, strap crossing, closure). ' +
+            'That is context only — do NOT render the back. Show the garment from the FRONT, as in the input photo',
           'CRITICAL: reproduce the garment EXACTLY as photographed. Keep whatever closure it has (hooks, clasps, zipper, buttons, or none) in the same place, same type and same size — never add, remove, move or substitute a closure',
           'Keep the exact original neckline shape, height and coverage — do NOT deepen it and do NOT change its cut',
           'Keep the exact fabric finish: if it is satin, silk or glossy keep its bright specular highlights and reflective sheen; if it is matte or cotton keep it matte. Never change the material look',
@@ -893,6 +941,19 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
   switch (provider) {
     case 'replicate': {
       resultUrl = await removeBgReplicate(imageUrl);
+      break;
+    }
+
+    case 'birefnet': {
+      // Recorte fino: conserva cadenas, aros y grabados. Si fal falla, caemos a
+      // rembg para no dejar al pipeline sin recorte — pero el resultado sera
+      // peor, asi que se registra el proveedor real que corrio.
+      try {
+        resultUrl = await removeBgBirefnet(imageUrl);
+      } catch (err) {
+        console.warn('[API /bg-remove] birefnet failed, falling back to rembg:', err);
+        resultUrl = await removeBgReplicate(imageUrl);
+      }
       break;
     }
 
