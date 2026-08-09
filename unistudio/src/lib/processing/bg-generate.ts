@@ -616,7 +616,12 @@ export async function generateBgFast(
       bgRes.arrayBuffer().then(Buffer.from),
     ]);
 
-    const canvas = aspectRatioToCanvas(aspectRatio, 1024);
+    // Lienzo a 2000px (antes 1024) para que el PRODUCTO salga en HD en el output
+    // final — el recorte viene del producto ya restaurado por SUPIR/normalizado a
+    // 2000px, así que a 2000 se mantiene nítido en vez de bajar a 1024. El fondo
+    // de Flux (~1024 nativo) se estira a 2000 (cover); un fondo un pelín suave no
+    // importa, lo que importa es que el PRODUCTO quede nítido.
+    const canvas = aspectRatioToCanvas(aspectRatio, 2000);
     const productMaxW = Math.round(canvas.width * 0.80);
     const productMaxH = Math.round(canvas.height * 0.85);
 
@@ -638,12 +643,15 @@ export async function generateBgFast(
 
     const resizedBg = await sharp(bgBuffer).resize(canvas.width, canvas.height, { fit: 'cover' }).png().toBuffer();
 
+    // JPEG q92: a 2000px un PNG pesaría ~8MB (revienta localStorage/red). JPEG
+    // mantiene la nitidez del producto con ~10x menos peso. El fondo es opaco así
+    // que no perdemos transparencia.
     const resultBuffer = await sharp(resizedBg)
       .composite([{ input: resizedProduct, left, top }])
-      .png()
+      .jpeg({ quality: 92 })
       .toBuffer();
 
-    return `data:image/png;base64,${resultBuffer.toString('base64')}`;
+    return `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
   } catch (err) {
     // If composite fails, return background-only rather than crashing
     console.warn('[bg-generate] Fast mode composite failed, returning background only:', err);

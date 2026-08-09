@@ -347,9 +347,7 @@ function outputStepsFor(job: Job): StepKey[] {
 function outputProvider(job: Job, key: StepKey): { label: string; faithful: boolean } | null {
   switch (key) {
     case "white":
-      return job.usePhotoroom
-        ? { label: "Photoroom", faithful: true }
-        : { label: "Sharp", faithful: true };
+      return { label: "Sharp", faithful: true };
     case "adaptive":
     case "hero":
     case "vertical":
@@ -926,12 +924,11 @@ export default function StaticProductPipelinePage() {
     const timeoutSignal = AbortSignal.timeout(90_000);
 
     if (key === "white") {
-      // Opt-in Photoroom: recorte + blanco real + sombra suave en UN paso.
-      // Default OFF → sigue el camino Sharp puro. Sandbox por defecto (gratis,
-      // con marca de agua) — el backend usa sandbox:true salvo sandbox:false.
-      const whiteBody = usePhotoroom
-        ? { imageUrl: inputUrl, provider: "photoroom", style: "pure-white", shadow: "soft", mode: "fast" }
-        : { imageUrl: inputUrl, mode: "fast", style: "pure-white", aspectRatio: "1:1" };
+      // Blanco e-commerce SIEMPRE con Sharp puro (#FFFFFF exacto, gratis, sin
+      // marca de agua). Photoroom se quitó: quedamos en que NO sirve para HD y su
+      // sandbox mete marca de agua. El HD lo da el paso 1 (SUPIR), no Photoroom.
+      void usePhotoroom;
+      const whiteBody = { imageUrl: inputUrl, mode: "fast", style: "pure-white", aspectRatio: "1:1" };
       const r = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1902,19 +1899,6 @@ export default function StaticProductPipelinePage() {
                           <div className="flex-1 min-w-0">
                             <span className="text-[11px] font-semibold text-gray-100">{sp.job.shadowToggle}</span>
                             <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.shadowDesc}</p>
-                          </div>
-                        </label>
-                        <label className="flex items-start gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={job.usePhotoroom ?? false}
-                            onChange={(e) => updateJob(job.id, { usePhotoroom: e.target.checked })}
-                            disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
-                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[11px] font-semibold text-gray-100">{sp.job.photoroomToggle}</span>
-                            <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.photoroomDesc}</p>
                           </div>
                         </label>
                       </div>
