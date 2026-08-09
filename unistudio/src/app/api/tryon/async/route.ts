@@ -69,9 +69,15 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
         const w = meta.width ?? 0;
         const h = meta.height ?? 0;
         if (w && h) {
-          // Desde la cabeza hasta ~la cadera: el 55% superior del encuadre.
+          // Cabeza hasta la CINTURA: 42% superior. Con 55% el encuadre llegaba a
+          // la cadera y el resultado salia con la modelo DESNUDA de la cintura
+          // para abajo — el avatar de espalda no siempre trae prenda inferior, y
+          // el warp de Leffa terminaba de borrarla. Una imagen asi no puede
+          // llegar a un catalogo, asi que el recorte se cierra por encima de la
+          // zona de riesgo. 42% igual deja ver el bra completo con su banda, que
+          // es lo que esta foto tiene que mostrar.
           const cropped = await sharp(buf)
-            .extract({ left: 0, top: 0, width: w, height: Math.round(h * 0.55) })
+            .extract({ left: 0, top: 0, width: w, height: Math.round(h * 0.42) })
             .png()
             .toBuffer();
           modelImage = await uploadToFalStorage(cropped, 'image/png', 'avatar-back-torso.png');
