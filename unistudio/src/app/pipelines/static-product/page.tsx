@@ -674,7 +674,7 @@ export default function StaticProductPipelinePage() {
   // Lightbox state — click on any thumbnail to view full-size in a modal.
   // Fixes the "no preview en grande" complaint: every step thumb is clickable
   // and opens the original-resolution image.
-  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; label: string; before?: string } | null>(null);
 
   // Read URL params from auto-mode redirect (e.g., ?productType=perfume)
   useEffect(() => {
@@ -2110,7 +2110,7 @@ export default function StaticProductPipelinePage() {
                                   <div className="grid grid-cols-2 gap-2">
                                     <button
                                       type="button"
-                                      onClick={() => setLightbox({ url: job.previewUrl, label: `${job.file.name} — Original` })}
+                                      onClick={() => setLightbox({ url: step.resultUrl!, before: job.previewUrl, label: `${job.file.name} — ${spMeta.label}` })}
                                       className="group/img relative h-72 w-full overflow-hidden rounded bg-black/40 ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
                                       title={sp.steps.zoomBig}
                                     >
@@ -2120,7 +2120,7 @@ export default function StaticProductPipelinePage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
+                                      onClick={() => setLightbox({ url: step.resultUrl!, before: job.previewUrl, label: `${job.file.name} — ${spMeta.label}` })}
                                       className="group/img relative h-72 w-full overflow-hidden rounded bg-black ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
                                       title={sp.steps.zoomBig}
                                     >
@@ -2421,12 +2421,27 @@ export default function StaticProductPipelinePage() {
           </button>
           <div className="flex max-h-full max-w-full flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <p className="max-w-[80vw] truncate text-xs text-gray-300">{lightbox.label}</p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lightbox.url}
-              alt={lightbox.label}
-              className="max-h-[85vh] max-w-[90vw] rounded object-contain"
-            />
+            {lightbox.before ? (
+              <div className="flex max-w-[94vw] items-center justify-center gap-3">
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="rounded bg-black/70 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">Antes</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={lightbox.before} alt="antes" className="max-h-[80vh] max-w-[45vw] rounded object-contain" />
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="rounded bg-[var(--accent)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-black">Después</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={lightbox.url} alt={lightbox.label} className="max-h-[80vh] max-w-[45vw] rounded object-contain" />
+                </div>
+              </div>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={lightbox.url}
+                alt={lightbox.label}
+                className="max-h-[85vh] max-w-[90vw] rounded object-contain"
+              />
+            )}
             <a
               href={lightbox.url}
               download
