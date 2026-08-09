@@ -161,6 +161,21 @@ interface Job {
   status: "idle" | "active" | "done" | "error";
   features?: JewelryFeatures | null;
   analysisStatus: "pending" | "analyzing" | "done" | "error";
+  /**
+   * Prompts escritos por Claude Vision mirando ESTA foto. Reemplazan a las
+   * plantillas por sub-tipo, que producían escenas genéricas — la "escena de
+   * lujo" salía como un primer plano oscuro porque la plantilla no nombraba
+   * superficie, props ni espacio negativo. Si Vision falla, queda null y el
+   * pipeline usa las plantillas.
+   */
+  prompts?: {
+    pieceDescription: string;
+    packshot: string;
+    luxury: string;
+    macroFocus: string;
+    model: string;
+    negative: string;
+  } | null;
 }
 
 function makeSteps(includeModel: boolean, includeScale: boolean): Record<StepKey, StepState> {
@@ -1269,7 +1284,10 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
-            const base = key === "packshot" ? config.packshotPrompt : config.estantePrompt;
+            // El prompt de Vision gana sobre la plantilla: nombra la cadena, el
+            // tamaño de las cuentas y el colgante reales de ESTA pieza.
+            const directed = key === "packshot" ? job.prompts?.packshot : job.prompts?.luxury;
+            const base = directed ?? (key === "packshot" ? config.packshotPrompt : config.estantePrompt);
             // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
             // plantilla genérica del sub-tipo.
             const suffix = descriptor ? `. Featuring this exact piece: ${descriptor}.` : "";
@@ -1281,9 +1299,12 @@ export default function JewelryPipelinePage() {
                 mode: "precise",
                 style: "custom",
                 customPrompt:
-                  withJewelryPreserve(base + suffix) +
-                  " Do NOT include any text, price tag, label or watermark in the output.",
-                aspectRatio: "1:1",
+                  withJewelryPreserve(directed ? base : base + suffix) +
+                  " Do NOT include any text, price tag, label or watermark in the output." +
+                  (job.prompts?.negative ? ` Do NOT include: ${job.prompts.negative}.` : ""),
+                // 4:5 en vez de 1:1 — es el formato de Instagram y deja más
+                // espacio negativo vertical, que es lo que hace editorial la toma.
+                aspectRatio: key === "luxury" ? "4:5" : "1:1",
               }),
               signal,
             });
@@ -1331,7 +1352,7 @@ export default function JewelryPipelinePage() {
             const modelPrompt =
               key === "scale"
                 ? "elegant woman hand holding the piece between thumb and fingers, hand at natural scale, plain neutral background, soft studio light, commercial jewelry scale reference photography, sharp focus"
-                : config.modelPrompt;
+                : (job.prompts?.model ?? config.modelPrompt);
 
             const modelRes = await fetch("/api/model-create", {
               method: "POST",
@@ -1503,6 +1524,21 @@ export default function JewelryPipelinePage() {
         }
       } catch {
         patchJob(jobId, { analysisStatus: "error" });
+      }
+
+      // Dirección de arte por foto. No bloquea: si falla, se usan las
+      // plantillas por sub-tipo.
+      try {
+        const current = jobsRef.current.find((j) => j.id === jobId);
+        const res = await fetch("/api/jewelry-prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: uploadedUrl, features: current?.features ?? null }),
+        });
+        const data = await res.json();
+        patchJob(jobId, { prompts: data?.success ? data.data : null });
+      } catch {
+        patchJob(jobId, { prompts: null });
       }
       return true;
     },

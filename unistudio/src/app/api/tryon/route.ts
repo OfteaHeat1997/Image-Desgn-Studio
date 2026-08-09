@@ -540,7 +540,17 @@ export async function POST(request: NextRequest) {
       artDirectionId?: number | null;
     };
 
-    if (!modelImage) {
+    // Uwear NO recibe modelImage: castea su propia modelo a partir de la prenda
+    // (mira tryOnUwear — la firma ni siquiera acepta el parametro). Cuando el
+    // paso "Crear Modelo IA" se salta porque va a correr Uwear, el cliente no
+    // manda modelImage y esta validacion tumbaba el paso con
+    // 'Missing required field "modelImage"' ANTES de llamar a nadie: por eso
+    // fallaba con cualquier proveedor elegido a mano, sin importar el proveedor.
+    // Solo se exime a Uwear explicito: con 'auto' el fallback (SeedDream,
+    // Kolors) si necesita la foto de la modelo, asi que ahi sigue siendo
+    // obligatoria.
+    const uwearCastsOwnModel = provider === 'uwear';
+    if (!modelImage && !uwearCastsOwnModel) {
       return NextResponse.json(
         { success: false, error: 'Missing required field "modelImage".' },
         { status: 400 },
@@ -564,8 +574,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure both images are HTTP URLs (IDM-VTON/Kolors can't process data URIs)
-    const httpModelImage = await ensureHttpUrl(modelImage);
+    // Ensure both images are HTTP URLs (IDM-VTON/Kolors can't process data URIs).
+    // Con Uwear modelImage puede venir vacio a proposito — no lo subimos.
+    const httpModelImage = modelImage ? await ensureHttpUrl(modelImage) : '';
     const httpGarmentImage = await ensureHttpUrl(garmentImage);
 
     // For intimates with provider="auto", smartTryOn handles FASHN-first +

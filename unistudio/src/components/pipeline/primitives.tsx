@@ -98,8 +98,13 @@ export function StatusBadge({
 /*  Descarga con detección de URLs caducadas                            */
 /* ------------------------------------------------------------------ */
 
-const CHECKER_DARK = "repeating-conic-gradient(#1a1a1a 0% 25%, #141414 0% 50%) 0 0 / 16px 16px";
-const CHECKER_MID = "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px";
+// Fondo detrás de un PNG transparente. Era un damero gris oscuro, y sobre él un
+// recorte de joyería dorada se veía sucio y "roto" — el reporte fue textual:
+// "¿por qué el recorte es así? ¿por qué no lo pone en fondo blanco?".
+// El damero es una convención de editor de imágenes, no de catálogo: acá lo que
+// hay que juzgar es si la pieza quedó bien recortada, y eso se ve sobre blanco.
+const CHECKER_DARK = "#f4f4f5";
+const CHECKER_MID = "#fafafa";
 
 function buildProxyHref(url: string, filename: string): string {
   if (url.startsWith("data:") || url.startsWith("blob:")) return url;

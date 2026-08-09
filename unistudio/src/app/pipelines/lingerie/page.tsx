@@ -2531,7 +2531,14 @@ async function tryOnLeffaAsync(
  */
 function providerNeedsModelImage(provider?: TryonProvider): boolean {
   const p = provider ?? "auto";
-  return p !== "uwear" && p !== "auto";
+  // "auto" SI necesita la modelo. Antes se la eximia junto con Uwear, y eso era
+  // un error de razonamiento: "auto" no es un proveedor, es una cadena — intenta
+  // Uwear primero y cae a SeedDream o Kolors, que visten la modelo recibida. Si
+  // el paso "Crear Modelo IA" se salteo, el primer fallback se queda sin foto de
+  // modelo y el paso muere. Ahorrar $0.055 no compensa perder el camino de
+  // recuperacion. Solo Uwear ELEGIDO A MANO puede saltarse la modelo, porque ahi
+  // no hay fallback: corre Uwear o falla Uwear.
+  return p !== "uwear";
 }
 
 async function runStep(
@@ -4096,10 +4103,29 @@ export default function LingeriePipelinePage() {
       // por proveedor, no global. La modelo guardada sigue disponible para otros
       // pipelines (joyeria la consume por /api/ai-models).
       if (stepDef.id === "model") {
-        const tryonStep = job.steps.find((st) => st.id === "tryon");
-        const tryonProvider = tryonStep?.providerOverride ?? "auto";
-        const uwearWillRun = tryonProvider === "uwear" || tryonProvider === "auto";
-        if (uwearWillRun && !currentSharedModel) {
+        // ESTE SALTO ERA LA CAUSA DE "ningun proveedor funciona".
+        //
+        // Antes decia `provider === "uwear" || provider === "auto"`, y "auto" es
+        // el default. O sea: la modelo NUNCA se creaba. Con Uwear la ruta moria
+        // con 'Missing required field "modelImage"'; con Leffa o SeedDream el
+        // guard del cliente cortaba con "necesita la modelo IA". Y "auto" no es
+        // un proveedor sino una cadena que cae a SeedDream/Kolors, que si visten
+        // la modelo recibida — asi que tampoco podia saltarse.
+        //
+        // Ademas mirar SOLO el proveedor del try-on era insuficiente: cada foto
+        // de modelo (lateral, espalda, detalle, cuerpo entero) tiene su propio
+        // selector. Con el try-on en Uwear y la lateral en Leffa, la modelo se
+        // salteaba y la lateral moria despues.
+        //
+        // Regla correcta: la modelo se saltea solo si NINGUN paso activo que
+        // vista una modelo la necesita.
+        const someStepNeedsModel = job.steps.some(
+          (st) =>
+            st.enabled &&
+            MODEL_PHOTO_STEPS.includes(st.id) &&
+            providerNeedsModelImage(st.providerOverride),
+        );
+        if (!someStepNeedsModel && !currentSharedModel) {
           updateStep(jobId, "model", {
             status: "skipped",
             error: "Uwear usa su propia modelo (avatar fijo), así que este paso no hace falta y te ahorrás $0.055. Si querés tu modelo IA en todas las fotos, elegí Leffa en la Foto Frontal.",

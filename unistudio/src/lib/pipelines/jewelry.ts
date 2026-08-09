@@ -111,7 +111,17 @@ const HD = ', ultra high resolution, 8K, sharp focus, crystal clear metal and ge
 // PRESERVE suffix para anclar Kontext al producto del input image y NUNCA
 // re-imaginarlo. Sin esto, prompts que describen el ambiente pueden disparar
 // que Kontext reinterprete la joya — un anillo dorado puede salir plateado.
-const PRESERVE = '. CRITICAL: preserve the EXACT jewelry piece from the input image — same shape, same metal color, same gems, same engravings, same proportions. Only modify the background/scene around it.';
+const PRESERVE =
+  '. CRITICAL: preserve the EXACT jewelry piece from the input image — same shape, same metal color, ' +
+  'same gems, same engravings, same proportions, same chain link type, same bead size and spacing. ' +
+  'Only modify the background/scene around it.' +
+  // ANTI-DUPLICACIÓN. Verificado con el rosario (2026-08-09): al pedir una
+  // composición simétrica o en espiral, Kontext ESPEJA los elementos — devolvió
+  // dos crucifijos y dos medallas donde el producto tiene uno de cada uno. Es
+  // el defecto que más arruina un packshot, porque parece otro producto.
+  ' Reproduce each element of the piece EXACTLY ONCE: one pendant, one crucifix, one centerpiece medal, one clasp. ' +
+  'Do NOT duplicate, mirror, repeat or add extra copies of any part of the jewelry. ' +
+  'Do NOT drop any element that is present in the input.';
 
 // Base común de todo packshot de marketplace. Las guías de catálogo (Mercado
 // Libre, Shopify, Amazon) piden lo mismo: fondo blanco liso, la pieza centrada,
