@@ -3984,6 +3984,30 @@ export default function LingeriePipelinePage() {
       // (broche/banda/tirantes random). Si la usuaria no subió foto de espalda
       // etiquetada, saltamos el step con mensaje claro en vez de generar un
       // resultado falso para el catálogo.
+      // NO PAGAR UNA MODELO QUE EL PROVEEDOR VA A DESCARTAR.
+      //
+      // Uwear no viste la modelo que le pasamos: genera la suya desde su avatar
+      // fijo. Con Uwear seleccionado, "Crear Modelo IA" gastaba $0.055 y ~40s en
+      // una modelo que nunca se usa, y encima dejaba la tarjeta del Paso 2
+      // comparando dos mujeres distintas.
+      //
+      // No se borra el paso porque con Leffa SI es obligatorio: Leffa viste
+      // exactamente esa modelo, y sin ella el paso falla. Por eso la decision es
+      // por proveedor, no global. La modelo guardada sigue disponible para otros
+      // pipelines (joyeria la consume por /api/ai-models).
+      if (stepDef.id === "model") {
+        const tryonStep = job.steps.find((st) => st.id === "tryon");
+        const tryonProvider = tryonStep?.providerOverride ?? "auto";
+        const uwearWillRun = tryonProvider === "uwear" || tryonProvider === "auto";
+        if (uwearWillRun && !currentSharedModel) {
+          updateStep(jobId, "model", {
+            status: "skipped",
+            error: "Uwear usa su propia modelo (avatar fijo), así que este paso no hace falta y te ahorrás $0.055. Si querés tu modelo IA en todas las fotos, elegí Leffa en la Foto Frontal.",
+          });
+          return false;
+        }
+      }
+
       if (stepDef.id === "photoBack") {
         const jobForMatching = { ...job, uploadedUrl, falUrl } as ImageJob;
         const hasBackPhoto = !!findMatchingPhoto(jobForMatching, jobsSnapshot, ["espalda"])?.uploadedUrl;
