@@ -170,9 +170,41 @@ export const GET = withApiErrorHandler('tryon-async', async (request: NextReques
     if (!url) {
       return NextResponse.json({ success: false, error: 'El proveedor terminó pero no devolvió imagen.' });
     }
+
+    // QUITAR EL ACOLCHADO BLANCO DE LEFFA.
+    //
+    // Leffa encaja su salida en un aspecto fijo y rellena el sobrante con BLANCO
+    // SOLIDO. Esas bandas quedan DENTRO del archivo, asi que la Foto Espalda se
+    // veia distinta a todas las demas: franja blanca arriba, la foto real (fondo
+    // gris de estudio) en una banda del medio, franja blanca abajo. Al lado de
+    // las fotos de Uwear —gris parejo de borde a borde— cantaba.
+    //
+    // Recortar el borde uniforme es determinista: sharp mide el color de los
+    // bordes y corta solo lo que es macizo. Si no hay acolchado no hace nada, y
+    // si el recorte falla devolvemos la imagen tal cual — nunca perdemos el
+    // resultado por intentar emprolijarlo.
+    let finalUrl = url;
+    try {
+      const imgRes = await fetch(url);
+      if (imgRes.ok) {
+        const raw = Buffer.from(await imgRes.arrayBuffer());
+        const trimmed = await sharp(raw).trim({ threshold: 12 }).png().toBuffer();
+        const before = await sharp(raw).metadata();
+        const after = await sharp(trimmed).metadata();
+        // Solo subimos si realmente se recorto algo; asi evitamos una subida
+        // inutil en el caso normal.
+        if (after.height && before.height && after.height < before.height - 8) {
+          finalUrl = await uploadToFalStorage(trimmed, 'image/png', 'back-trimmed.png');
+          console.log(`[tryon-async] acolchado blanco recortado: ${before.width}x${before.height} → ${after.width}x${after.height}`);
+        }
+      }
+    } catch (e) {
+      console.warn('[tryon-async] no se pudo recortar el acolchado, devuelvo la imagen original:', e instanceof Error ? e.message : e);
+    }
+
     return NextResponse.json({
       success: true,
-      data: { done: true, url, provider: 'leffa', cost: 0.04 },
+      data: { done: true, url: finalUrl, provider: 'leffa', cost: 0.04 },
     });
   }
 
