@@ -47,6 +47,18 @@
     },
     "src/app/api/macro-crop/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/social-kit/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/photo-clean/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/jewelry-scene/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/jewelry-prompts/route.ts": {
+      "maxDuration": 120
     }
   }
 }
