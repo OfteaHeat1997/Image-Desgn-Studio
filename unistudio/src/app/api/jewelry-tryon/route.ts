@@ -9,7 +9,21 @@ import { applyJewelry, applyJewelryDisplay, JEWELRY_COSTS } from '@/lib/processi
 import { proxyReplicateUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 
-const VALID_TYPES = ['earrings', 'necklace', 'ring', 'bracelet', 'sunglasses', 'watch'];
+// Must stay in sync with JewelrySubType in src/lib/pipelines/jewelry.ts plus the
+// two non-jewelry accessories. `studs`, `hoops` and `set` were missing here, so
+// every on-model run for topos / candongas / sets died with a 400 before ever
+// reaching the model.
+const VALID_TYPES = [
+  'earrings',
+  'studs',
+  'hoops',
+  'necklace',
+  'ring',
+  'bracelet',
+  'set',
+  'sunglasses',
+  'watch',
+];
 const VALID_MODES = ['exhibidor', 'flotante', 'modelo'];
 
 // B-5: Validate that a string is a usable image URL or data URI

@@ -44,6 +44,9 @@
     },
     "src/app/api/analyze-image/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/macro-crop/route.ts": {
+      "maxDuration": 60
     }
   }
 }

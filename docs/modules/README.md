@@ -16,12 +16,13 @@
 | 4 | Shadows | `/api/shadows` | Sharp (contact/drop/reflection), Replicate Flux (AI relight) | Estáticos, Joyería |
 | 5 | Inpaint | `/api/inpaint` | Flux Fill Dev, Flux Fill Pro, Kontext Pro | **Lencería** (step `texturePreserve` — flux-fill-pro restaura tela del bra post-tryon), uso manual vía editor |
 | 6 | Outpaint | `/api/outpaint` | Flux Kontext Pro, **Flux Fill Pro** (direction mode con canvas+mask server-side) | **Lencería** (step `photoFullBody` extiende tryon hacia abajo, sin regenerar modelo), uso manual vía editor |
-| 7 | Upscale | `/api/upscale` | Real-ESRGAN, Aura SR, Clarity | Lencería (opcional), Joyería (obligatorio) |
+| 7 | Upscale | `/api/upscale` | Real-ESRGAN (con reintento y caída automática a Clarity), Aura SR, Clarity | Lencería (opcional), Joyería (con `softFail`: nunca frena el pipeline) |
 | 8 | Try-On | `/api/tryon` | **SeedDream v4 edit (fal, primario lencería)**, Kolors v1.5 (fal, backup), FASHN v1.6 (solo no-íntimos), IDM-VTON | Lencería (`auto` → SeedDream, cae a Kolors) |
 | 9 | Model Create | `/api/model-create` | SeedDream 4.5 (fal), Flux Kontext Pro | Lencería, Joyería |
 | 10 | Ghost Mannequin | `/api/ghost-mannequin` | SeedDream edit, Flux Kontext Pro | Ninguno (reemplazado por Lencería para lencería real) |
-| 11 | Jewelry Try-On | `/api/jewelry-tryon` | Flux Kontext Pro | Joyería |
-| 12 | Video | `/api/video` | Ken Burns, wan-2.1, wan-2.2-fast, Kling, Minimax, LTX, fal/replicate | Lencería (modelo/flat-lay), Joyería (Ken Burns) |
+| 11 | Jewelry Try-On | `/api/jewelry-tryon` | Flux Kontext Pro | Joyería (los 7 sub-tipos: aretes, topos, candongas, cadenas, anillos, pulseras, sets) |
+| 12 | Video | `/api/video` | Ken Burns, wan-2.1, wan-2.2-fast, Kling, Minimax, LTX, fal/replicate | Lencería (modelo/flat-lay), Joyería (wan-2.2-fast sobre la escena de lujo) |
+| 19 | Macro Crop | `/api/macro-crop` | Sharp local (sin IA) | Joyería (paso "Detalle macro") |
 | 13 | Ad Creator | `/api/ad-create` | fal.ai + Replicate varios | Ninguno (uso manual) |
 | 14 | Analyze Image | `/api/analyze-image` | Claude Vision (Sonnet) + Sharp | Los 3 pipelines |
 | 15 | AI Prompt | `/api/prompt` | Claude Haiku | Ninguno (uso manual) |

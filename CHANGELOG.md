@@ -1,5 +1,53 @@
 # UniStudio — Changelog
 
+## 2026-08-09 — Joyería: arreglo funcional + rediseño UX
+
+El pipeline de joyería no producía **nada**. Subías un collar y terminaba con "Estante lujoso"
+y "En modelo" en `—` y el error crudo `Failed to run model "nightmareai/real-esrgan…" CUDA out
+of memory`. Se arreglaron dos bugs de fondo y se rehizo la UX.
+
+**Bug 1 — el upscale calculaba el presupuesto de píxeles al revés.** `/api/upscale` limitaba la
+imagen de *entrada* a 2M píxeles, pero Real-ESRGAN revienta por el tensor de *salida*: 2M ×
+escala 2 = 8M píxeles → ~5.7 GiB de una sola reserva en GPU compartidas de 14.6 GiB. Y como el
+paso hacía hard fail, una sola caída de GPU dejaba a la usuaria sin packshot, sin estante, sin
+detalle, sin modelo y sin video. Ahora el presupuesto es sobre la salida (4M px), hay 3
+reintentos con presupuesto a la mitad, caída automática a Clarity, y con `softFail: true` la
+ruta devuelve 200 con la imagen original en vez de tumbar el pipeline.
+
+**Bug 2 — 3 de los 7 sub-tipos siempre fallaban.** `VALID_TYPES` en `/api/jewelry-tryon` no
+incluía `studs`, `hoops` ni `set`, así que **topos, candongas y sets** daban HTTP 400 en el paso
+"En modelo". Estaba oculto porque collar y anillo sí pasaban. Se agregaron los 3 a `VALID_TYPES`,
+`PLACEMENT_PROMPTS`, `EXHIBIDOR_BG_PROMPTS` y `JEWELRY_COSTS`.
+
+**Módulo nuevo `/api/macro-crop`** (módulo 19, `src/lib/processing/macro-crop.ts`). Genera la
+foto de detalle recortando **píxeles reales** del PNG aislado con sharp — sin IA. Una foto de
+detalle existe para probarle al comprador que el broche y los eslabones son de verdad así; un
+macro generado por IA inventa justo eso. Usa una imagen integral sobre el canal alpha para
+encontrar la parte con más masa (el dije de un collar, no un tramo fino de cadena), con
+desempate hacia el centro de masa para que la pieza no quede tirada en una esquina. Costo $0.
+
+**Salidas nuevas.** Antes había una sola foto de estante. Ahora son 5 entregables: packshot
+fondo blanco para marketplaces, escena de lujo para redes, detalle macro, en modelo (opcional)
+y video (opcional). Los collares usan **ghost neckline** — colgados de un cuello invisible con
+caída por gravedad — en vez del busto de cuero genérico: así se lee el largo real y cómo cae el
+dije, que es lo que la compradora quiere saber.
+
+**UX pareja con lencería.** La página pasó de una grilla de miniaturas de 56 px a tarjetas
+verticales por paso: badge de estado, costo, botón "i" con documentación desplegable,
+comparador antes/después deslizable, vista grande al pasar el mouse y **Aceptar / Rehacer /
+Saltar** por paso. Las primitivas quedaron en `src/components/pipeline/primitives.tsx`,
+parametrizadas por props. Lencería todavía usa sus copias inline — migrarla queda pendiente
+porque ese archivo es zona activa de otra terminal.
+
+**i18n** ES/EN reescrito para los 7 pasos, incluyendo errores técnicos traducidos a lenguaje
+humano (`CUDA out of memory` → "La foto es muy pesada para la GPU").
+
+**Verificado:** `tsc --noEmit` limpio; 5 pruebas del algoritmo de recorte macro en verde (una
+encontró y forzó a arreglar el desempate que descentraba la pieza). ESLint y sharp **no se
+pudieron correr localmente**: a `node_modules` le faltan `@eslint-community/*` y `@img/colour`.
+
+**Docs:** `docs/pipelines/jewelry.md` reescrito, `docs/modules/README.md` con el módulo 19.
+
 ## 2026-08-09 — Reestructuración del repo: código muerto + docs fuera del repo
 
 Limpieza estructural de cara a la revisión externa (Desktop terminal). Objetivo: que el

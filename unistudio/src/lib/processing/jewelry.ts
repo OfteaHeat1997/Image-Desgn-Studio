@@ -21,9 +21,12 @@ import { removeBgReplicate } from '@/lib/processing/bg-remove';
 
 export const JEWELRY_COSTS: Record<string, number> = {
   earrings: 0.05,
+  studs: 0.05,
+  hoops: 0.05,
   necklace: 0.05,
   ring: 0.05,
   bracelet: 0.05,
+  set: 0.05,
   sunglasses: 0.05,
   watch: 0.05,
 };
@@ -66,6 +69,33 @@ const PLACEMENT_PROMPTS: Record<string, string> = {
     'Match lighting and reflections. Keep everything else unchanged. ' +
     'Output framing: close-up of wrist area, bracelet filling center of frame.',
 
+  studs:
+    'This image has two halves. The RIGHT side shows the EXACT stud earrings product that must be used — do NOT replace or redesign it. ' +
+    'The person on the LEFT is now wearing THIS EXACT pair of studs from the RIGHT side, centred on both earlobes. ' +
+    'Preserve every detail: same stone cut, same setting, same metal, same diameter. ' +
+    'Studs sit flush against the lobe — they do NOT dangle. ' +
+    'Do NOT substitute with drop earrings or hoops. Do NOT invent new jewelry. ' +
+    'Match lighting and reflections to the skin. Keep face, hair and clothing unchanged. ' +
+    'Output framing: macro close-up of one ear and cheek, the stud sharp and filling a large part of the frame.',
+
+  hoops:
+    'This image has two halves. The RIGHT side shows the EXACT hoop earrings product that must be used — do NOT replace or redesign it. ' +
+    'The person on the LEFT is now wearing THIS EXACT pair of hoops from the RIGHT side on both ears. ' +
+    'Preserve every detail: same diameter, same tube thickness, same metal colour, same texture or engraving. ' +
+    'The hoops hang below the earlobe and follow gravity, with the correct circular perspective for the head angle. ' +
+    'Do NOT substitute with studs or drop earrings. Do NOT invent new jewelry. ' +
+    'Match lighting and reflections. Keep face, hair and clothing unchanged. ' +
+    'Output framing: head and shoulders from a slight angle, ear and jawline visible, hoop clearly readable.',
+
+  set:
+    'This image has two halves. The RIGHT side shows the EXACT matching jewelry set that must be used — do NOT replace or redesign any piece. ' +
+    'The person on the LEFT is now wearing THIS EXACT set from the RIGHT side: the necklace resting naturally on the collarbone AND the matching earrings on both ears. ' +
+    'Preserve every detail of every piece: same chain, same pendant, same earring shape, same stones, same metal colour. ' +
+    'Every piece from the RIGHT side must appear on the person — do not drop one. ' +
+    'Do NOT substitute pieces. Do NOT invent new jewelry. ' +
+    'Match lighting and reflections. Keep face, hair and clothing unchanged. ' +
+    'Output framing: upper body portrait showing both ears and the full neckline, all pieces of the set visible at once.',
+
   sunglasses:
     'This image has two halves. The RIGHT side shows the EXACT eyewear product that must be used — do NOT replace or redesign it. ' +
     'The person on the LEFT is now wearing THESE EXACT sunglasses from the RIGHT side on their face. ' +
@@ -104,6 +134,18 @@ const EXHIBIDOR_BG_PROMPTS: Record<string, string> = {
     'minimalist product display, high-end jewelry photography background, no jewelry in scene',
   bracelet:
     'Professional commercial photography studio, curved bracelet display cushion stand, ' +
+    'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
+    'minimalist product display, high-end jewelry photography background, no jewelry in scene',
+  studs:
+    'Professional commercial photography studio, small flat velvet earring pad on a pedestal, ' +
+    'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
+    'minimalist product display, high-end jewelry photography background, no jewelry in scene',
+  hoops:
+    'Professional commercial photography studio, tall slim T-bar earring display stand, ' +
+    'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
+    'minimalist product display, high-end jewelry photography background, no jewelry in scene',
+  set:
+    'Professional commercial photography studio, coordinated jewelry set display tray with velvet lining, ' +
     'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
     'minimalist product display, high-end jewelry photography background, no jewelry in scene',
   sunglasses:
@@ -266,7 +308,7 @@ export async function applyJewelry(
   if (!placementPrompt) {
     throw new Error(
       `Unsupported accessory type "${accessoryType}". ` +
-      'Use one of: earrings, necklace, ring, bracelet, sunglasses, watch.',
+      'Use one of: earrings, studs, hoops, necklace, ring, bracelet, set, sunglasses, watch.',
     );
   }
 
@@ -340,7 +382,7 @@ export async function applyJewelryDisplay(
   if (!EXHIBIDOR_BG_PROMPTS[accessoryType]) {
     throw new Error(
       `Unsupported accessory type "${accessoryType}" for ${mode} mode. ` +
-      'Use one of: earrings, necklace, ring, bracelet, sunglasses, watch.',
+      'Use one of: earrings, studs, hoops, necklace, ring, bracelet, set, sunglasses, watch.',
     );
   }
 
