@@ -110,7 +110,17 @@ export function replicateHeaders(url: string): Record<string, string> {
 }
 
 export async function urlToBuffer(url: string): Promise<Buffer> {
-  const response = await fetch(url, { headers: replicateHeaders(url) });
+  // `proxyReplicateUrl()` devuelve una ruta RELATIVA (`/api/proxy-image?url=…`)
+  // porque está pensada para el navegador. Cuando ese valor vuelve a entrar a un
+  // módulo del servidor, `fetch()` no puede resolverla y explota con "Failed to
+  // parse URL" — así fallaba entero el paso "Listo para Instagram", que recibe
+  // los resultados ya proxiados del packshot y la escena de lujo.
+  // Se desenvuelve al upstream original, que sí es absoluto.
+  const resolved = url.startsWith('/api/proxy-image')
+    ? (new URLSearchParams(url.split('?')[1] ?? '').get('url') ?? url)
+    : url;
+
+  const response = await fetch(resolved, { headers: replicateHeaders(resolved) });
   if (!response.ok) {
     throw new Error(`Failed to fetch URL "${url}": ${response.status} ${response.statusText}`);
   }

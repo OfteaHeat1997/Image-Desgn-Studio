@@ -31,6 +31,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   ChevronLeft,
   Download,
   Eraser,
@@ -45,6 +46,7 @@ import {
   SkipForward,
   Square,
   StopCircle,
+  ThumbsDown,
   Upload,
   User,
   X,
@@ -66,7 +68,6 @@ import {
   type JewelryFeatures,
 } from "@/lib/processing/product-features";
 import {
-  BeforeAfterSlider,
   ImageLightbox,
   ImageThumb,
   StatusBadge,
@@ -119,6 +120,22 @@ const STEP_COST: Record<StepKey, number> = {
   social: 0,
 };
 
+/**
+ * Motor que corre cada paso, para mostrarlo en la tarjeta. La usuaria pidio
+ * explicitamente saber "cual proveedor" genero cada foto: hasta ahora solo
+ * estaba escrito dentro del panel de documentacion, cerrado por defecto.
+ */
+const STEP_ENGINE: Record<StepKey, string> = {
+  clean: "Kontext Pro",
+  isolate: "BiRefNet",
+  packshot: "Kontext Pro",
+  luxury: "Kontext Pro",
+  macro: "sharp · sin IA",
+  model: "SeedDream + Kontext",
+  scale: "SeedDream + Kontext",
+  social: "sharp + ffmpeg",
+};
+
 /** Pasos que se pueden apagar antes de correr. El resto van siempre. */
 const OPTIONAL_STEPS: StepKey[] = ["model", "scale"];
 
@@ -128,6 +145,13 @@ interface StepState {
   /** Imagen que entró a este paso — el "antes" del comparador. */
   inputUrl?: string;
   resultUrl?: string;
+  /**
+   * TODOS los resultados que produjo este paso, en orden. "Rehacer" no pisa el
+   * anterior: lo guarda acá. Así se puede comparar y volver al que gustaba, que
+   * es lo que faltaba — antes rehacer destruía el resultado bueno sin vuelta
+   * atrás, y no había forma de decir "este pedazo no lo quiero".
+   */
+  candidates?: string[];
   /** Slides del carrusel (solo el paso `social`). */
   carousel?: string[];
   /** Reel vertical (solo el paso `social`). */
@@ -152,6 +176,22 @@ interface Job {
   status: "idle" | "active" | "done" | "error";
   features?: JewelryFeatures | null;
   analysisStatus: "pending" | "analyzing" | "done" | "error";
+  /**
+   * Prompts escritos por Claude Vision mirando ESTA foto. Reemplazan a las
+   * plantillas por sub-tipo, que producían escenas genéricas — la "escena de
+   * lujo" salía como un primer plano oscuro porque la plantilla no nombraba
+   * superficie, props ni espacio negativo. Si Vision falla, queda null y el
+   * pipeline usa las plantillas.
+   */
+  prompts?: {
+    pieceDescription: string;
+    packshot: string;
+    luxury: string;
+    luxuryBackdrop: string;
+    macroFocus: string;
+    model: string;
+    negative: string;
+  } | null;
 }
 
 function makeSteps(includeModel: boolean, includeScale: boolean): Record<StepKey, StepState> {
@@ -363,6 +403,150 @@ function VisionPanel({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Vista previa del recorrido (pantalla inicial)                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Los 8 pasos, visibles ANTES de subir nada.
+ *
+ * Hasta ahora la pantalla inicial solo nombraba dos pasos — las dos casillas
+ * opcionales — porque el resto se creaba recién al subir una foto. Se entraba,
+ * se veían dos nombres sueltos y no había forma de saber que el pipeline tenía
+ * ocho pasos ni qué iba a producir. Verificado en el HTML del deploy: de los 8
+ * nombres, solo "En modelo" y "Foto de escala" aparecían.
+ */
+function FlowPreview({
+  includeModel,
+  includeScale,
+}: {
+  includeModel: boolean;
+  includeScale: boolean;
+}) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
+
+  return (
+    <div className="mb-4 rounded-xl border border-white/8 bg-white/[0.02] p-4">
+      <div className="space-y-3">
+        {STAGES.map((stage) => (
+          <div key={stage.key}>
+            <div className="mb-1.5 flex items-baseline gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                {jt.stages[stage.key].label}
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {jt.stages[stage.key].hint}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {stage.steps.map((k) => {
+                const off =
+                  (k === "model" && !includeModel) || (k === "scale" && !includeScale);
+                const Icon = STEP_ICONS[k];
+                return (
+                  <span
+                    key={k}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]",
+                      off
+                        ? "border-white/8 bg-transparent text-[var(--text-muted)] line-through"
+                        : "border-white/10 bg-white/[0.03] text-gray-200",
+                    )}
+                    title={jt.steps[k].description}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {jt.steps[k].label}
+                    <span className="text-[10px] text-[var(--text-secondary)]">
+                      {jt.steps[k].costHint}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Barra de pasos                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Mapa fijo de todo el recorrido, siempre visible bajo el encabezado.
+ *
+ * El reclamo fue "no puedo ver los otros pasos": ocho tarjetas altas apiladas
+ * dejan el resto fuera de pantalla y no hay forma de saber qué viene ni cuánto
+ * falta. Esta barra muestra los ocho de un vistazo con su estado, y al tocar
+ * uno salta a su tarjeta.
+ */
+function StepRail({
+  steps,
+  onJump,
+}: {
+  steps: Record<StepKey, StepState>;
+  onJump: (k: StepKey) => void;
+}) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
+
+  return (
+    <div className="sticky top-[57px] z-20 -mx-4 mb-5 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.92)] px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {STAGES.map((stage) => {
+          const visible = stage.steps.filter((k) => steps[k].enabled);
+          if (visible.length === 0) return null;
+          return (
+            <div key={stage.key} className="flex shrink-0 items-center gap-1.5">
+              <span className="px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                {jt.stages[stage.key].label}
+              </span>
+              {visible.map((k) => {
+                const st = steps[k];
+                const Icon = STEP_ICONS[k];
+                const dot =
+                  st.status === "done" || st.status === "accepted"
+                    ? "bg-[var(--success)]"
+                    : st.status === "processing"
+                      ? "bg-[var(--accent)] lz-dot"
+                      : st.status === "error"
+                        ? "bg-red-400"
+                        : st.status === "skipped"
+                          ? "bg-white/25"
+                          : "bg-white/15";
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => onJump(k)}
+                    title={jt.steps[k].label}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors",
+                      st.status === "processing"
+                        ? "border-[var(--accent)]/50 bg-[var(--accent-dim)] text-[var(--accent)]"
+                        : st.status === "error"
+                          ? "border-red-500/40 bg-red-500/10 text-red-300"
+                          : "border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:border-white/25 hover:text-gray-200",
+                    )}
+                  >
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="hidden whitespace-nowrap sm:inline">{jt.steps[k].label}</span>
+                  </button>
+                );
+              })}
+              <span className="px-0.5 text-[var(--text-muted)]">›</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Tarjeta de paso                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -376,6 +560,13 @@ interface StepCardProps {
   onSkip: () => void;
   onRerun: () => void;
   onStop: () => void;
+  /** Elegir cuál de las versiones generadas se queda. */
+  onSelectVariant: (url: string) => void;
+  /** "No me gusta": descarta la versión actual y vuelve a la anterior. */
+  onDiscard: () => void;
+  /** Plegada = fila compacta. Permite ver varios pasos a la vez. */
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 function StepCard({
@@ -388,6 +579,10 @@ function StepCard({
   onSkip,
   onRerun,
   onStop,
+  onSelectVariant,
+  onDiscard,
+  collapsed,
+  onToggleCollapse,
 }: StepCardProps) {
   const { t } = useI18n();
   const jt = t.pipelines.jewelry;
@@ -400,22 +595,6 @@ function StepCard({
   // VISTA GRANDE AL PASAR EL MOUSE, sin clic. Escalar la tarjeta un 3% no
   // alcanza para juzgar el acabado de una joya. El retardo de 180 ms es
   // hover-intent: sin él, el preview se dispara al pasar de largo scrolleando.
-  const [peek, setPeek] = useState(false);
-  const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openPeek = () => {
-    if (peekTimer.current) clearTimeout(peekTimer.current);
-    peekTimer.current = setTimeout(() => setPeek(true), 180);
-  };
-  const closePeek = () => {
-    if (peekTimer.current) clearTimeout(peekTimer.current);
-    setPeek(false);
-  };
-  useEffect(
-    () => () => {
-      if (peekTimer.current) clearTimeout(peekTimer.current);
-    },
-    [],
-  );
 
   const elapsed = useElapsedSeconds(step.status === "processing");
   const isSocial = stepKey === "social";
@@ -444,10 +623,13 @@ function StepCard({
                 : "border-white/8 bg-white/[0.02]",
       )}
     >
-      {/* Encabezado */}
-      <div
-        className="flex items-center justify-between gap-3 px-5 py-4"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      {/* Encabezado. Al plegar, toda la tarjeta se reduce a esta fila: asi
+          entran varios pasos en pantalla en vez de uno solo. */}
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        style={{ borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="flex min-w-0 items-center gap-3.5">
           <div className="relative shrink-0">
@@ -478,7 +660,7 @@ function StepCard({
               </span>
               <button
                 type="button"
-                onClick={() => setShowDocs((s) => !s)}
+                onClick={(e) => { e.stopPropagation(); setShowDocs((s) => !s); }}
                 className={cn(
                   "flex h-4 w-4 items-center justify-center rounded-full transition-colors",
                   showDocs
@@ -498,6 +680,12 @@ function StepCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          {/* Que motor corre este paso, siempre a la vista. Estaba solo en el
+              panel de docs, detras del icono "i", asi que no habia forma de
+              saber quien genero cada foto sin abrirlo. */}
+          <span className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)] lg:inline">
+            {STEP_ENGINE[stepKey]}
+          </span>
           <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
             {(step.status === "done" || step.status === "accepted") && step.cost > 0
               ? `$${step.cost.toFixed(3)}`
@@ -505,21 +693,28 @@ function StepCard({
           </span>
           <StatusBadge status={step.status} labels={jt.statusBadge} />
           {step.status === "processing" && (
-            <button
-              type="button"
-              onClick={onStop}
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onStop(); }}
               className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/20"
               title={jt.stepCard.stopTitle}
             >
               <StopCircle className="h-3 w-3" />
               {jt.buttons.stop}
-            </button>
+            </span>
           )}
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform",
+              collapsed ? "" : "rotate-180",
+            )}
+          />
         </div>
-      </div>
+      </button>
 
       {/* Documentación del paso */}
-      {showDocs && (
+      {!collapsed && showDocs && (
         <div className="border-b border-white/6 bg-[var(--accent)]/[0.03] px-5 py-4 text-xs">
           <div className="space-y-3">
             <div>
@@ -569,6 +764,7 @@ function StepCard({
       )}
 
       {/* Cuerpo */}
+      {!collapsed && (
       <div className="px-5 py-4">
         {step.status === "processing" ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
@@ -581,22 +777,60 @@ function StepCard({
         ) : isSocial ? (
           <SocialResult step={step} filenamePrefix={filenamePrefix} onOpen={setLightboxIdx} />
         ) : (
-          <div onMouseEnter={step.resultUrl ? openPeek : undefined} onMouseLeave={closePeek}>
-            <button
-              type="button"
-              onClick={() => step.resultUrl && setLightboxIdx(0)}
-              disabled={!step.resultUrl}
-              className="w-full cursor-zoom-in disabled:cursor-default"
-              title={step.resultUrl ? jt.stepCard.zoomHint : undefined}
-            >
-              <BeforeAfterSlider
-                before={step.inputUrl}
-                after={step.resultUrl}
-                label={copy.label}
-                className="h-56 w-full"
-                labels={{ ...jt.beforeAfter, ...jt.thumb }}
-              />
-            </button>
+          <div>
+            {/* Antes de correr se explica QUE hace, sin obligar a abrir el panel.
+                El reclamo fue "faltan explicaciones": la doc estaba escondida
+                detrás del icono "i" y nadie la abría antes de gastar. */}
+            {step.status === "idle" && (
+              <p className="mb-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                {copy.what}
+              </p>
+            )}
+
+            {/* DOS PANELES SEPARADOS, como lencería. Antes había un comparador
+                con divisor que SUPERPONE las dos imágenes: para ver el original
+                había que arrastrar, y nunca se veían las dos a la vez. El
+                reclamo fue textual — "card separado para ver original y
+                resultado". Cada panel abre el visor al tocarlo. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  {jt.lightbox.original}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => step.inputUrl && setLightboxIdx(0)}
+                  disabled={!step.inputUrl}
+                  className="w-full cursor-zoom-in disabled:cursor-default"
+                >
+                  <ImageThumb
+                    url={step.inputUrl}
+                    label={jt.lightbox.original}
+                    className="h-[22rem] w-full"
+                    labels={jt.thumb}
+                  />
+                </button>
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  {jt.lightbox.result}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => step.resultUrl && setLightboxIdx(0)}
+                  disabled={!step.resultUrl}
+                  className="w-full cursor-zoom-in disabled:cursor-default"
+                  title={step.resultUrl ? jt.stepCard.zoomHint : undefined}
+                >
+                  <ImageThumb
+                    url={step.resultUrl}
+                    label={copy.label}
+                    className="h-[22rem] w-full"
+                    labels={jt.thumb}
+                  />
+                </button>
+              </div>
+            </div>
             {step.resultUrl && (
               <p className="mt-2 text-center text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
                 {jt.stepCard.zoomHint}
@@ -616,6 +850,41 @@ function StepCard({
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
             <p className="text-xs leading-relaxed text-amber-200">{step.warning}</p>
+          </div>
+        )}
+
+        {/* Versiones generadas. Rehacer ya no pisa la anterior, así que se
+            puede comparar y volver a la que gustaba. */}
+        {!isSocial && (step.candidates?.length ?? 0) > 1 && (
+          <div className="mt-3">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              {jt.buttons.variants(step.candidates!.length)}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {step.candidates!.map((url, i) => {
+                const active = url === step.resultUrl;
+                return (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => onSelectVariant(url)}
+                    title={jt.buttons.useVariant(i + 1)}
+                    className={cn(
+                      "relative h-14 w-14 overflow-hidden rounded-lg border-2 transition-all",
+                      active
+                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
+                        : "border-white/10 opacity-70 hover:opacity-100",
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={jt.buttons.useVariant(i + 1)} className="h-full w-full object-cover" />
+                    <span className="absolute bottom-0 right-0 bg-black/70 px-1 text-[9px] font-semibold text-white">
+                      {i + 1}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -639,6 +908,17 @@ function StepCard({
               <RotateCcw className="h-3.5 w-3.5" />
               {jt.buttons.rerun}
             </button>
+            {(step.resultUrl || step.carousel) && (
+              <button
+                type="button"
+                onClick={onDiscard}
+                title={jt.buttons.discardTitle}
+                className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/5 px-3.5 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15"
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+                {jt.buttons.discard}
+              </button>
+            )}
             {step.status !== "skipped" && (
               <button
                 type="button"
@@ -668,47 +948,12 @@ function StepCard({
         )}
       </div>
 
-      {/* Vista grande al pasar el mouse */}
-      {peek && step.resultUrl && !isSocial && (
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm">
-          <div className="flex max-h-full w-full max-w-5xl items-center gap-3">
-            {step.inputUrl && !isVideoUrl(step.resultUrl) && (
-              <div className="relative flex-1">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={step.inputUrl}
-                  alt={jt.lightbox.original}
-                  className="max-h-[70vh] w-full rounded-xl object-contain"
-                />
-                <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                  {jt.beforeAfter.before}
-                </span>
-              </div>
-            )}
-            <div className="relative flex-1">
-              {isVideoUrl(step.resultUrl) ? (
-                <video
-                  src={step.resultUrl}
-                  autoPlay
-                  loop
-                  muted
-                  className="max-h-[70vh] w-full rounded-xl"
-                />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={step.resultUrl}
-                  alt={copy.label}
-                  className="max-h-[70vh] w-full rounded-xl object-contain"
-                />
-              )}
-              <span className="absolute right-2 top-2 rounded bg-[var(--accent)]/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                {jt.beforeAfter.after}
-              </span>
-            </div>
-          </div>
-        </div>
       )}
+
+      {/* El peek a pantalla completa se ELIMINO. Era un overlay `fixed inset-0`
+          que al pasar el mouse tapaba las tarjetas de alrededor y el resto de la
+          pagina — en las capturas se veia el panel flotando encima del paso
+          siguiente. Para ver grande esta el clic, que abre el visor. */}
 
       {lightboxIdx !== null && lightboxImages.length > 0 && (
         <ImageLightbox
@@ -826,6 +1071,31 @@ export default function JewelryPipelinePage() {
   const [busy, setBusy] = useState(false);
   const [includeModel, setIncludeModel] = useState(true);
   const [includeScale, setIncludeScale] = useState(false);
+  /**
+   * Pasos desplegados. Por defecto solo se abre el que corre y el ultimo que
+   * fallo: con los ocho abiertos la pagina medía varias pantallas y no se veia
+   * el recorrido. El resto queda plegado en una fila y se abre al tocarlo.
+   */
+  const [expanded, setExpanded] = useState<Set<StepKey>>(new Set());
+
+  const toggleExpanded = useCallback((k: StepKey) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }, []);
+
+  /** Salta a la tarjeta desde la barra y la abre. */
+  const jumpToStep = useCallback((k: StepKey) => {
+    setExpanded((prev) => new Set(prev).add(k));
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-step-id="${k}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
 
   const previewUrlsRef = useRef<string[]>([]);
   // Espejo del estado: los pasos encadenan y setState es asíncrono, así que
@@ -944,6 +1214,27 @@ export default function JewelryPipelinePage() {
         return false;
       };
 
+      /**
+       * Marca el paso como hecho y ACUMULA el resultado en `candidates`, sin
+       * pisar los anteriores. Rehacer deja de ser destructivo.
+       */
+      const done = (url: string, cost: number, extra: Partial<StepState> = {}) => {
+        const prev = jobsRef.current.find((j) => j.id === jobId)?.steps[key].candidates ?? [];
+        const candidates = prev.includes(url) ? prev : [...prev, url];
+        patchStep(jobId, key, { status: "done", resultUrl: url, candidates, cost, ...extra });
+      };
+
+      // Auto-scroll a la tarjeta que arranca. Sin esto las tarjetas quedan
+      // below-the-fold y no se ve que un paso empezo — el "no puedo ir abajo ni
+      // arriba". Lo mismo que hace lenceria.
+      const focusCard = () => {
+        requestAnimationFrame(() => {
+          document
+            .querySelector(`[data-step-id="${key}"]`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      };
+
       const descriptor = job.features ? jewelryDescriptor(job.features) : null;
 
       try {
@@ -952,6 +1243,7 @@ export default function JewelryPipelinePage() {
             const input = job.uploadedUrl;
             if (!input) return fail("Falta la subida");
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const res = await fetch("/api/photo-clean", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -961,11 +1253,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST.clean,
-            });
+            done(url, data.cost ?? STEP_COST.clean);
             return true;
           }
 
@@ -973,6 +1261,7 @@ export default function JewelryPipelinePage() {
             const input = job.steps.clean.resultUrl ?? job.uploadedUrl;
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const res = await fetch("/api/bg-remove", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -984,20 +1273,50 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST.isolate,
-            });
+            done(url, data.cost ?? STEP_COST.isolate);
             return true;
           }
 
-          case "packshot":
+          // ESCENA DE LUJO POR COMPOSICIÓN. La IA genera SOLO el decorado y
+          // encima se pegan los píxeles REALES del recorte. Los pasos 1-3
+          // respetaban la pieza porque casi no la tocan; del 4 en adelante
+          // Kontext la redibujaba dentro de la escena y la reinterpretaba
+          // (duplicaba el crucifijo, perdía la medalla, cambiaba las cuentas).
+          // Componiendo, la joya no puede cambiar: nunca entra al modelo.
           case "luxury": {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
+            const backdrop = job.prompts?.luxuryBackdrop;
+            if (!backdrop) {
+              // Sin decorado dirigido no hay compuesto posible: se marca saltado
+              // en vez de caer al camino que reinterpreta la pieza.
+              patchStep(jobId, key, { status: "skipped" });
+              return false;
+            }
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
-            const base = key === "packshot" ? config.packshotPrompt : config.estantePrompt;
+            focusCard();
+            const res = await fetch("/api/jewelry-scene", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ productUrl: input, backdropPrompt: backdrop, aspectRatio: "4:5" }),
+              signal,
+            });
+            const data = await safeJson(res);
+            const url = pickUrl(data.data);
+            if (!data.success || !url) return fail(data.error);
+            done(url, data.cost ?? 0.04);
+            return true;
+          }
+
+          case "packshot": {
+            const input = productUrl(job);
+            if (!input) return fail(jt.messages.needsIsolate);
+            patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
+            // El prompt de Vision gana sobre la plantilla: nombra la cadena, el
+            // tamaño de las cuentas y el colgante reales de ESTA pieza.
+            const directed = job.prompts?.packshot;
+            const base = directed ?? config.packshotPrompt;
             // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
             // plantilla genérica del sub-tipo.
             const suffix = descriptor ? `. Featuring this exact piece: ${descriptor}.` : "";
@@ -1009,8 +1328,11 @@ export default function JewelryPipelinePage() {
                 mode: "precise",
                 style: "custom",
                 customPrompt:
-                  withJewelryPreserve(base + suffix) +
-                  " Do NOT include any text, price tag, label or watermark in the output.",
+                  withJewelryPreserve(directed ? base : base + suffix) +
+                  " Do NOT include any text, price tag, label or watermark in the output." +
+                  (job.prompts?.negative ? ` Do NOT include: ${job.prompts.negative}.` : ""),
+                // 4:5 en vez de 1:1 — es el formato de Instagram y deja más
+                // espacio negativo vertical, que es lo que hace editorial la toma.
                 aspectRatio: "1:1",
               }),
               signal,
@@ -1018,11 +1340,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST[key],
-            });
+            done(url, data.cost ?? STEP_COST[key]);
             runIdentityCheck(jobId, key, input, url, false);
             return true;
           }
@@ -1031,6 +1349,7 @@ export default function JewelryPipelinePage() {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const res = await fetch("/api/macro-crop", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1045,7 +1364,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, { status: "done", resultUrl: url, cost: 0 });
+            done(url, 0);
             return true;
           }
 
@@ -1054,6 +1373,7 @@ export default function JewelryPipelinePage() {
             const jewelryUrl = productUrl(job);
             if (!jewelryUrl) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: jewelryUrl, error: undefined });
+            focusCard();
 
             // La foto de escala siempre va sobre una mano: es la referencia que
             // la compradora entiende sin pensar, y los anillos son lo que más
@@ -1061,7 +1381,7 @@ export default function JewelryPipelinePage() {
             const modelPrompt =
               key === "scale"
                 ? "elegant woman hand holding the piece between thumb and fingers, hand at natural scale, plain neutral background, soft studio light, commercial jewelry scale reference photography, sharp focus"
-                : config.modelPrompt;
+                : (job.prompts?.model ?? config.modelPrompt);
 
             const modelRes = await fetch("/api/model-create", {
               method: "POST",
@@ -1071,6 +1391,12 @@ export default function JewelryPipelinePage() {
                 ageRange: "26-35",
                 skinTone: "medium",
                 bodyType: "average",
+                // `pose` y `expression` son OBLIGATORIOS en /api/model-create.
+                // Faltaban, así que el paso moría con
+                // 'Missing required field "pose"' antes de generar nada — esa
+                // era la causa real de "en la modelo no funciona".
+                pose: "standing",
+                expression: "natural",
                 customDetails: modelPrompt,
               }),
               signal,
@@ -1103,11 +1429,7 @@ export default function JewelryPipelinePage() {
               });
               return false;
             }
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: modelCost + (tryonData.cost ?? 0.05),
-            });
+            done(url, modelCost + (tryonData.cost ?? 0.05));
             runIdentityCheck(jobId, key, jewelryUrl, url, true);
             return true;
           }
@@ -1125,6 +1447,7 @@ export default function JewelryPipelinePage() {
             if (urls.length === 0) return fail(jt.messages.needsEstante);
 
             patchStep(jobId, key, { status: "processing", inputUrl: urls[0], error: undefined });
+            focusCard();
             const res = await fetch("/api/social-kit", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1231,6 +1554,21 @@ export default function JewelryPipelinePage() {
       } catch {
         patchJob(jobId, { analysisStatus: "error" });
       }
+
+      // Dirección de arte por foto. No bloquea: si falla, se usan las
+      // plantillas por sub-tipo.
+      try {
+        const current = jobsRef.current.find((j) => j.id === jobId);
+        const res = await fetch("/api/jewelry-prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: uploadedUrl, features: current?.features ?? null }),
+        });
+        const data = await res.json();
+        patchJob(jobId, { prompts: data?.success ? data.data : null });
+      } catch {
+        patchJob(jobId, { prompts: null });
+      }
       return true;
     },
     [humanizeError, jt.messages, patchJob],
@@ -1277,6 +1615,26 @@ export default function JewelryPipelinePage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * "No me gusta": saca la versión actual de la lista y vuelve a la anterior.
+   * Si era la única, el paso queda vacío y listo para rehacer — antes no había
+   * forma de rechazar un resultado sin gastar en otro.
+   */
+  const handleDiscard = (jobId: string, key: StepKey) => {
+    const step = jobsRef.current.find((j) => j.id === jobId)?.steps[key];
+    if (!step) return;
+    const remaining = (step.candidates ?? []).filter((u) => u !== step.resultUrl);
+    patchStep(jobId, key, {
+      candidates: remaining,
+      resultUrl: remaining[remaining.length - 1],
+      carousel: undefined,
+      reelUrl: undefined,
+      status: remaining.length > 0 ? "done" : "idle",
+      warning: undefined,
+      error: undefined,
+    });
   };
 
   const handleRerun = async (jobId: string, key: StepKey) => {
@@ -1388,6 +1746,8 @@ export default function JewelryPipelinePage() {
                 <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">{jt.config.outputsHint}</p>
               </div>
 
+              <FlowPreview includeModel={includeModel} includeScale={includeScale} />
+
               <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 py-2">
                 <span className="text-xs font-medium text-[var(--accent)]">{jt.config.estimated}</span>
                 <span className="font-mono text-sm font-semibold text-[var(--accent)]">
@@ -1491,6 +1851,8 @@ export default function JewelryPipelinePage() {
               </div>
             )}
 
+            <StepRail steps={activeJob.steps} onJump={jumpToStep} />
+
             <VisionPanel
               job={activeJob}
               disabled={busy}
@@ -1531,6 +1893,16 @@ export default function JewelryPipelinePage() {
                         onSkip={() => patchStep(activeJob.id, key, { status: "skipped" })}
                         onRerun={() => void handleRerun(activeJob.id, key)}
                         onStop={() => abortRef.current?.abort()}
+                        onSelectVariant={(url) =>
+                          patchStep(activeJob.id, key, { resultUrl: url, status: "done" })
+                        }
+                        onDiscard={() => handleDiscard(activeJob.id, key)}
+                        collapsed={
+                          !expanded.has(key) &&
+                          activeJob.steps[key].status !== "processing" &&
+                          activeJob.steps[key].status !== "error"
+                        }
+                        onToggleCollapse={() => toggleExpanded(key)}
                       />
                     ))}
                   </div>

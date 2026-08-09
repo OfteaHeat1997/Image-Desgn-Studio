@@ -24,6 +24,7 @@ export const JEWELRY_COSTS: Record<string, number> = {
   studs: 0.05,
   hoops: 0.05,
   necklace: 0.05,
+  rosary: 0.05,
   ring: 0.05,
   bracelet: 0.05,
   set: 0.05,
@@ -68,6 +69,15 @@ const PLACEMENT_PROMPTS: Record<string, string> = {
     'Do NOT substitute with different jewelry. Do NOT invent new jewelry. ' +
     'Match lighting and reflections. Keep everything else unchanged. ' +
     'Output framing: close-up of wrist area, bracelet filling center of frame.',
+
+  rosary:
+    'This image has two halves. The RIGHT side shows the EXACT rosary that must be used — do NOT replace or redesign it. ' +
+    'The person on the LEFT is now wearing THIS EXACT rosary from the RIGHT side around their neck. ' +
+    'Preserve every detail: same bead size and spacing, same bead count, same centerpiece medal, same crucifix design and proportions, same metal colour. ' +
+    'The bead chain rests on the collarbone and the crucifix hangs straight down at the center of the chest, following gravity. ' +
+    'Do NOT substitute with a plain chain. Do NOT add gemstones, engravings or decorations that are not in the RIGHT side image. ' +
+    'Match lighting and reflections to the skin. Keep face, hair and clothing unchanged. ' +
+    'Output framing: upper body, neckline and chest visible so the full drop of the rosary and the crucifix are in frame.',
 
   studs:
     'This image has two halves. The RIGHT side shows the EXACT stud earrings product that must be used — do NOT replace or redesign it. ' +
@@ -136,6 +146,10 @@ const EXHIBIDOR_BG_PROMPTS: Record<string, string> = {
     'Professional commercial photography studio, curved bracelet display cushion stand, ' +
     'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
     'minimalist product display, high-end jewelry photography background, no jewelry in scene',
+  rosary:
+    'Professional commercial photography studio, tall velvet bust form for a rosary, ' +
+    'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
+    'minimalist product display, high-end devotional jewelry photography background, no jewelry in scene',
   studs:
     'Professional commercial photography studio, small flat velvet earring pad on a pedestal, ' +
     'clean white marble surface, soft diffused studio lighting, luxury brand advertising style, ' +
@@ -308,7 +322,7 @@ export async function applyJewelry(
   if (!placementPrompt) {
     throw new Error(
       `Unsupported accessory type "${accessoryType}". ` +
-      'Use one of: earrings, studs, hoops, necklace, ring, bracelet, set, sunglasses, watch.',
+      'Use one of: earrings, studs, hoops, necklace, rosary, ring, bracelet, set, sunglasses, watch.',
     );
   }
 
@@ -342,15 +356,27 @@ export async function applyJewelry(
   const compositeHttpUrl = await ensureHttpUrl(compositeDataUrl);
 
   // Build the full prompt
+  // ANTI-DÍPTICO. La entrada es un compuesto lado a lado [modelo | joya], y
+  // Kontext a veces "responde" con otro lado a lado: devolvía una foto partida
+  // en dos paneles (plano general + close-up) en vez de una sola. Verificado con
+  // el rosario el 2026-08-09. Sin esta frase el resultado no sirve para catálogo.
+  const singleImage =
+    ' Output ONE single photograph as the final image. Do NOT return a collage, a diptych, ' +
+    'a split screen, a before/after comparison or two panels side by side. ' +
+    'The two halves of the input are a REFERENCE for you, not a layout to reproduce.';
+
   const fullPrompt =
-    placementPrompt + modifierStr + bgInstruction + featureAnchor +
+    placementPrompt + modifierStr + bgInstruction + featureAnchor + singleImage +
     ' Professional jewelry photography quality, photorealistic, high detail.';
 
-  // B-3: Added aspect_ratio: '1:1'
+  // SALIDA VERTICAL, no cuadrada. La entrada es un compuesto lado a lado y con
+  // `1:1` Kontext copiaba esa estructura: devolvía la foto partida en dos
+  // paneles. Un lienzo 3:4 no da lugar a dos paneles horizontales, así que
+  // fuerza una sola toma — y de paso encaja con el 4:5 de Instagram.
   const output = await runModel('black-forest-labs/flux-kontext-pro', {
     input_image: compositeHttpUrl,
     prompt: fullPrompt,
-    aspect_ratio: '1:1',
+    aspect_ratio: '3:4',
   });
 
   return await extractOutputUrl(output);
@@ -382,7 +408,7 @@ export async function applyJewelryDisplay(
   if (!EXHIBIDOR_BG_PROMPTS[accessoryType]) {
     throw new Error(
       `Unsupported accessory type "${accessoryType}" for ${mode} mode. ` +
-      'Use one of: earrings, studs, hoops, necklace, ring, bracelet, set, sunglasses, watch.',
+      'Use one of: earrings, studs, hoops, necklace, rosary, ring, bracelet, set, sunglasses, watch.',
     );
   }
 

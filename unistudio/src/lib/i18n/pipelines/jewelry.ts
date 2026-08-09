@@ -73,6 +73,11 @@ export interface JewelryPipelineCopy {
     stop: string;
     downloadAll: string;
     back: string;
+    discard: string;
+    discardTitle: string;
+    variants: (n: number) => string;
+    useVariant: (n: number) => string;
+    whatIsThis: string;
   };
   statusBadge: {
     idle: string;
@@ -218,6 +223,11 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     stop: 'Detener',
     downloadAll: 'Descargar todo',
     back: 'Inicio',
+    discard: 'No me gusta',
+    discardTitle: 'Descartar este resultado y volver al anterior',
+    variants: (n) => `${n} versiones generadas`,
+    useVariant: (n) => `Usar la versión ${n}`,
+    whatIsThis: '¿Qué hace este paso?',
   },
   statusBadge: {
     idle: 'En espera',
@@ -516,6 +526,11 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     stop: 'Stop',
     downloadAll: 'Download all',
     back: 'Home',
+    discard: 'Not this one',
+    discardTitle: 'Discard this result and go back to the previous one',
+    variants: (n) => `${n} versions generated`,
+    useVariant: (n) => `Use version ${n}`,
+    whatIsThis: 'What does this step do?',
   },
   statusBadge: {
     idle: 'Waiting',

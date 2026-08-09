@@ -18,6 +18,10 @@ const VALID_TYPES = [
   'studs',
   'hoops',
   'necklace',
+  // El rosario se agregó como sub-tipo propio (cuelga distinto y el macro
+  // acerca menos), pero faltaba acá: el paso "En modelo" devolvía HTTP 400 para
+  // todo rosario. Esta lista tiene que seguir a JewelrySubType.
+  'rosary',
   'ring',
   'bracelet',
   'set',

@@ -37,7 +37,12 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     /** true = Foto Espalda: usar la vista trasera real del avatar como modelo. */
     backView?: boolean;
   };
-  const missing = requireFields(body as Record<string, unknown>, ['modelImage', 'garmentImage']);
+  // Con backView la modelo la pone el servidor (asset full_body_back del avatar
+  // de Uwear), asi que modelImage no solo es opcional: es que la que mande el
+  // cliente se DESCARTA. Exigirla obligaba a la pagina a generar una modelo de
+  // $0.055 y ~40s para tirarla a la basura en la linea siguiente.
+  const required = body.backView ? ['garmentImage'] : ['modelImage', 'garmentImage'];
+  const missing = requireFields(body as Record<string, unknown>, required);
   if (missing) return missing;
 
   // FOTO ESPALDA. El paso estaba mal disenado de raiz: pedia a model-create una
@@ -52,7 +57,7 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
   // paso determinista: misma mujer, espalda real, sin generar nada. Combinada con
   // la foto REAL de la espalda del producto que sube la usuaria, el try-on por fin
   // tiene las dos entradas correctas.
-  let modelImage = body.modelImage!;
+  let modelImage = body.modelImage ?? '';
   if (body.backView) {
     const avatarId = Number(process.env.UWEAR_AVATAR_ID?.trim() || 21663);
     const backUrl = await getUwearAvatarAsset(avatarId, 'full_body_back');
@@ -69,19 +74,31 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
         const w = meta.width ?? 0;
         const h = meta.height ?? 0;
         if (w && h) {
-          // Cabeza hasta la CINTURA: 42% superior. Con 55% el encuadre llegaba a
-          // la cadera y el resultado salia con la modelo DESNUDA de la cintura
-          // para abajo — el avatar de espalda no siempre trae prenda inferior, y
-          // el warp de Leffa terminaba de borrarla. Una imagen asi no puede
-          // llegar a un catalogo, asi que el recorte se cierra por encima de la
-          // zona de riesgo. 42% igual deja ver el bra completo con su banda, que
-          // es lo que esta foto tiene que mostrar.
+          // ENCUADRE VERTICAL, NO SOLO RECORTE SUPERIOR.
+          //
+          // Antes se tomaba el 42% superior a ANCHO COMPLETO. El limite vertical
+          // es correcto y hay que conservarlo: con 55% el encuadre llegaba a la
+          // cadera y salia la modelo desnuda de la cintura para abajo, porque el
+          // avatar de espalda no siempre trae prenda inferior y el warp de Leffa
+          // termina de borrarla. Eso no puede llegar a un catalogo.
+          //
+          // El problema era el ANCHO. Un recorte ancho y bajo deja a la modelo
+          // chiquita en el centro, y Leffa lo devuelve con bandas blancas arriba
+          // y abajo al encajarlo en su aspecto de salida. El broche y la banda
+          // —el motivo entero de esta foto— quedaban ilegibles.
+          //
+          // Ahora se recorta una ventana VERTICAL 3:4 centrada en el torso: mismo
+          // techo de seguridad, pero la espalda ocupa el cuadro.
+          const top = Math.round(h * 0.06); // apenas por encima de la cabeza
+          const cropH = Math.min(Math.round(h * 0.40), h - top);
+          const cropW = Math.min(w, Math.round(cropH * 0.75)); // retrato 3:4
+          const left = Math.max(0, Math.round((w - cropW) / 2));
           const cropped = await sharp(buf)
-            .extract({ left: 0, top: 0, width: w, height: Math.round(h * 0.42) })
+            .extract({ left, top, width: cropW, height: cropH })
             .png()
             .toBuffer();
           modelImage = await uploadToFalStorage(cropped, 'image/png', 'avatar-back-torso.png');
-          console.log(`[tryon-async] Foto Espalda: full_body_back del avatar ${avatarId} recortado al torso`);
+          console.log(`[tryon-async] Foto Espalda: full_body_back del avatar ${avatarId} recortado a ventana 3:4 del torso`);
         } else {
           modelImage = backUrl;
         }
@@ -92,6 +109,19 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     } else {
       console.warn('[tryon-async] no se pudo leer full_body_back del avatar — sigo con la modelo recibida');
     }
+  }
+
+  // Sin backView el cliente ya no manda modelImage, asi que si el asset del
+  // avatar no se pudo leer nos quedamos sin nada. Fallar con un mensaje que diga
+  // que hacer es mejor que mandar una cadena vacia a fal y recibir un 422 opaco.
+  if (!modelImage) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'No se pudo obtener la vista trasera del avatar de Uwear. Revisá UWEAR_API_KEY y UWEAR_AVATAR_ID.',
+      },
+      { status: 502 },
+    );
   }
 
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
@@ -140,9 +170,41 @@ export const GET = withApiErrorHandler('tryon-async', async (request: NextReques
     if (!url) {
       return NextResponse.json({ success: false, error: 'El proveedor terminó pero no devolvió imagen.' });
     }
+
+    // QUITAR EL ACOLCHADO BLANCO DE LEFFA.
+    //
+    // Leffa encaja su salida en un aspecto fijo y rellena el sobrante con BLANCO
+    // SOLIDO. Esas bandas quedan DENTRO del archivo, asi que la Foto Espalda se
+    // veia distinta a todas las demas: franja blanca arriba, la foto real (fondo
+    // gris de estudio) en una banda del medio, franja blanca abajo. Al lado de
+    // las fotos de Uwear —gris parejo de borde a borde— cantaba.
+    //
+    // Recortar el borde uniforme es determinista: sharp mide el color de los
+    // bordes y corta solo lo que es macizo. Si no hay acolchado no hace nada, y
+    // si el recorte falla devolvemos la imagen tal cual — nunca perdemos el
+    // resultado por intentar emprolijarlo.
+    let finalUrl = url;
+    try {
+      const imgRes = await fetch(url);
+      if (imgRes.ok) {
+        const raw = Buffer.from(await imgRes.arrayBuffer());
+        const trimmed = await sharp(raw).trim({ threshold: 12 }).png().toBuffer();
+        const before = await sharp(raw).metadata();
+        const after = await sharp(trimmed).metadata();
+        // Solo subimos si realmente se recorto algo; asi evitamos una subida
+        // inutil en el caso normal.
+        if (after.height && before.height && after.height < before.height - 8) {
+          finalUrl = await uploadToFalStorage(trimmed, 'image/png', 'back-trimmed.png');
+          console.log(`[tryon-async] acolchado blanco recortado: ${before.width}x${before.height} → ${after.width}x${after.height}`);
+        }
+      }
+    } catch (e) {
+      console.warn('[tryon-async] no se pudo recortar el acolchado, devuelvo la imagen original:', e instanceof Error ? e.message : e);
+    }
+
     return NextResponse.json({
       success: true,
-      data: { done: true, url, provider: 'leffa', cost: 0.04 },
+      data: { done: true, url: finalUrl, provider: 'leffa', cost: 0.04 },
     });
   }
 
