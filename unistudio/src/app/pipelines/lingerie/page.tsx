@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -3335,6 +3335,14 @@ export default function LingeriePipelinePage() {
     }
   });
   const [activeJobIndex, setActiveJobIndex] = useState(0);
+  // Uwear trae su propia modelo, asi que toda la configuracion de modelo deja de
+  // aplicar. Se calcula una sola vez y se usa para atenuar y explicar ese bloque.
+  const uwearWillHandleModel = useMemo(() => {
+    const tryonStep = steps.find((st) => st.id === "tryon");
+    const prov = tryonStep?.providerOverride ?? "auto";
+    return prov === "uwear" || prov === "auto";
+  }, [steps]);
+
   const [autoMode, setAutoMode] = useState(persistedSettings?.autoMode ?? true);
   // Phase 2f: modo de generación elegible (default / face-swap / multi-sample).
   // default = el flow legacy (model-create + tryon Kolors).
@@ -5080,11 +5088,34 @@ export default function LingeriePipelinePage() {
 
             {/* Right column — model config + summary */}
             <div className="space-y-5">
-              {/* Model config */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
+              {/* Model config.
+                  La usuaria: "si yo uso Uwear no puedo usar AI model setup, eso no
+                  funciona, entonces tiene que quitarse de aqui". Tiene razon —
+                  Uwear genera su modelo desde un avatar fijo, asi que tono de piel,
+                  edad y cuerpo no hacen NADA. Dejar controles que no controlan nada
+                  es lo que hace que la pantalla se sienta acumulada y que su mama
+                  no entienda la app.
+                  No se ocultan del todo: se explican. Si desaparecieran sin decir
+                  por que, la siguiente pregunta seria "donde esta la configuracion
+                  de la modelo". */}
+              <section className={cn(
+                "rounded-xl border p-5 transition-opacity",
+                uwearWillHandleModel
+                  ? "border-white/6 bg-white/[0.01] opacity-50"
+                  : "border-white/8 bg-white/[0.02]",
+              )}>
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
                   {lg.modelConfig.heading}
                 </h2>
+                {uwearWillHandleModel && (
+                  <p className="mb-4 rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 py-2 text-xs text-[var(--accent)]">
+                    <strong>No aplica con Uwear.</strong> Uwear genera su propia modelo
+                    (siempre la misma), así que estos ajustes no cambian nada y el paso
+                    &quot;Crear Modelo IA&quot; se salta — te ahorrás $0.055 por producto.
+                    Si querés controlar tono de piel, edad y cuerpo, elegí <strong>Leffa</strong> en
+                    la Foto Frontal.
+                  </p>
+                )}
                 <p className="mb-4 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
                   {lg.modelConfig.reuseNotePre}<strong>{lg.modelConfig.reuseNoteBold}</strong>{lg.modelConfig.reuseNotePost}
                 </p>
