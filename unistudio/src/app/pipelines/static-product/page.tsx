@@ -229,8 +229,18 @@ const STEP_META: Record<StepKey, StepMeta> = {
   },
 };
 
-/** Las 3 etapas que producen un output descargable (orden de display). */
+/** Las 3 etapas de IMAGEN que producen un output descargable (orden de display). */
 const OUTPUT_STEPS: StepKey[] = ["white", "adaptive", "vertical"];
+
+/**
+ * Outputs a renderizar para un job. Incluye el video lifestyle como tarjeta
+ * cuando la usuaria lo activó o cuando ya se intentó/generó — antes el video
+ * se generaba pero NUNCA se mostraba porque OUTPUT_STEPS solo tenía imágenes.
+ */
+function outputStepsFor(job: Job): StepKey[] {
+  const includeVideo = job.generateVideo === true || job.steps.lifestyleVideo.status !== "idle";
+  return includeVideo ? [...OUTPUT_STEPS, "lifestyleVideo"] : OUTPUT_STEPS;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -1541,17 +1551,18 @@ export default function StaticProductPipelinePage() {
 
                         {/* Outputs — big thumbnails with download + zoom + re-run */}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          {OUTPUT_STEPS.map((key) => {
+                          {outputStepsFor(job).map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
                             const spMeta = sp.steps.items[key];
+                            const isVideo = key === "lifestyleVideo";
                             const activeClass =
                               step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
                               step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
                               step.status === "error" ? "bg-red-500/10 border-red-500/40" :
                               step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
                               "bg-white/[0.02] border-white/10";
-                            const downloadName = `${job.file.name.replace(/\.[^.]+$/, "")}-${key}.jpg`;
+                            const downloadName = `${job.file.name.replace(/\.[^.]+$/, "")}-${key}.${isVideo ? "mp4" : "jpg"}`;
                             const canRerun =
                               (job.status === "done" || job.status === "error") &&
                               !isRunning &&
@@ -1615,6 +1626,16 @@ export default function StaticProductPipelinePage() {
                                 </div>
 
                                 {step.resultUrl ? (
+                                  isVideo ? (
+                                    <video
+                                      src={step.resultUrl}
+                                      className="h-40 w-full rounded bg-black object-contain"
+                                      controls
+                                      loop
+                                      muted
+                                      playsInline
+                                    />
+                                  ) : (
                                   <button
                                     type="button"
                                     onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
@@ -1639,6 +1660,7 @@ export default function StaticProductPipelinePage() {
                                       </span>
                                     )}
                                   </button>
+                                  )
                                 ) : (
                                   <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded bg-black/40 px-2 text-gray-600">
                                     {step.status === "running" ? (
