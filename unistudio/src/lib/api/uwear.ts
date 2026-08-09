@@ -87,6 +87,67 @@ async function fetchImageBlob(url: string): Promise<Blob> {
  *   - 'remove_background' Uwear strips the bg + auto-writes an AI-vision description
  *   - 'generate_flat_lay' Uwear builds a clean flat-lay
  */
+/**
+ * Sube una imagen a Uwear y devuelve la URL del asset ya hospedado por ellos.
+ *
+ * Uwear no acepta URLs externas en `assets[].asset_url`: hay que subir el archivo
+ * por su flujo firmado. Tres pasos, verificados contra su API:
+ *   1. POST /clothing-item/presigned-upload {file_name, content_type}
+ *      → {upload_url, method:'POST', fields:{...}, file_url}
+ *   2. POST multipart al `upload_url` de S3 con TODOS los `fields` + el archivo
+ *      → 204
+ *   3. usar el `file_url` devuelto (CloudFront) como asset_url
+ */
+async function uploadUwearAsset(imageUrl: string, fileName: string): Promise<string> {
+  const presignRes = await fetch(`${UWEAR_BASE_URL}/clothing-item/presigned-upload`, {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_name: fileName, content_type: 'image/jpeg' }),
+  });
+  if (!presignRes.ok) {
+    const txt = await presignRes.text().catch(() => '');
+    throw new Error(`Uwear presigned-upload ${presignRes.status}: ${txt.slice(0, 300)}`);
+  }
+  const presign = (await presignRes.json()) as {
+    upload_url: string;
+    fields?: Record<string, string>;
+    file_url?: string;
+  };
+
+  const blob = await fetchImageBlob(imageUrl);
+  const form = new FormData();
+  for (const [k, v] of Object.entries(presign.fields ?? {})) form.append(k, v);
+  form.append('file', blob, fileName);
+
+  const upRes = await fetch(presign.upload_url, { method: 'POST', body: form });
+  if (!upRes.ok && upRes.status !== 204) {
+    const txt = await upRes.text().catch(() => '');
+    throw new Error(`Uwear S3 upload ${upRes.status}: ${txt.slice(0, 300)}`);
+  }
+
+  const assetUrl =
+    presign.file_url ??
+    `${presign.upload_url.replace(/\/$/, '')}/${presign.fields?.key ?? ''}`;
+  if (!assetUrl) throw new Error('Uwear presigned-upload no devolvio file_url');
+  return assetUrl;
+}
+
+/**
+ * Registra una prenda en Uwear a partir de URL(s) de imagen. Devuelve clothing_item_id.
+ *
+ * API NUEVA (rompio el pipeline ~ago-2026). El formato viejo era multipart con
+ * photo_file y ahora devuelve 415. El nuevo pide JSON con `assets[]`, y los valores
+ * de `asset_kind`/`asset_view` NO estan documentados: se descubrieron leyendo una
+ * prenda ya creada desde la web de Uwear (GET /clothing-item/{id}), que devuelve
+ *   {asset_kind:"full", asset_view:"front", asset_role:"front", asset_url:"https://..."}
+ * `asset_kind` es "full" — no "photo"/"image"/"garment", que fue lo que se probo
+ * primero y Uwear rechazo.
+ *
+ * Esto es lo que rompia TODO el camino Uwear del pipeline de lenceria: smartTryOn
+ * lo intenta primero para intimos y, al fallar con 415, caia en SILENCIO a
+ * SeedDream — que redibuja el producto. La usuaria elegia Uwear y le salia
+ * SeedDream, sin ninguna senal de que Uwear ni siquiera habia corrido.
+ */
 export async function createUwearClothingItem(params: {
   name: string;
   frontUrl: string;
@@ -95,26 +156,27 @@ export async function createUwearClothingItem(params: {
   descriptionBack?: string;
   processingMode?: 'none' | 'remove_background' | 'generate_flat_lay';
 }): Promise<number> {
-  // API NUEVA (rota desde ~ago-2026). Antes se mandaba multipart con photo_file;
-  // ahora ese formato devuelve 415: "The clothing item endpoint expects a JSON
-  // body with assets. Upload local files through /clothing-item/presigned-upload
-  // first...". Ese mensaje manda al camino de ARCHIVOS LOCALES (presign → S3 →
-  // assets[]), pero nuestras imágenes YA son URLs públicas (fal.media), así que
-  // corresponde el camino documentado de URL externa: JSON con
-  // external_clothing_item_url. Más simple y sin subida intermedia.
-  //
-  // Esto es lo que rompía TODO el camino Uwear del pipeline de lencería:
-  // smartTryOn lo intenta primero para íntimos y, al fallar con 415, caía en
-  // silencio a SeedDream — que redibuja el producto. La usuaria elegía Uwear y
-  // le salía SeedDream, sin ninguna explicación visible.
+  const assets: Array<Record<string, string>> = [
+    {
+      asset_url: await uploadUwearAsset(params.frontUrl, 'front.jpg'),
+      asset_kind: 'full',
+      asset_view: 'front',
+      asset_role: 'front',
+    },
+  ];
+  if (params.backUrl) {
+    assets.push({
+      asset_url: await uploadUwearAsset(params.backUrl, 'back.jpg'),
+      asset_kind: 'full',
+      asset_view: 'back',
+      asset_role: 'back',
+    });
+  }
+
   const body: Record<string, unknown> = {
     clothing_item_name: params.name,
-    external_clothing_item_url: params.frontUrl,
-    // Limpia el fondo del garment y dispara la descripción por visión de Uwear,
-    // que mejora la fidelidad del try-on. Equivale al viejo 'remove_background'.
-    use_image_enhancement: params.processingMode !== 'none',
+    assets,
   };
-  if (params.backUrl) body.external_clothing_item_back_url = params.backUrl;
   if (params.description) body.description = params.description;
   if (params.descriptionBack) body.description_back = params.descriptionBack;
 
@@ -125,11 +187,11 @@ export async function createUwearClothingItem(params: {
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new Error(`Uwear /clothing-items ${res.status}: ${txt.slice(0, 400)}`);
+    throw new Error(`Uwear /clothing-item ${res.status}: ${txt.slice(0, 400)}`);
   }
   const json = (await res.json()) as { clothing_item_id?: number };
   if (typeof json?.clothing_item_id !== 'number') {
-    throw new Error('Uwear /clothing-items: respuesta sin clothing_item_id');
+    throw new Error('Uwear /clothing-item: respuesta sin clothing_item_id');
   }
   return json.clothing_item_id;
 }
