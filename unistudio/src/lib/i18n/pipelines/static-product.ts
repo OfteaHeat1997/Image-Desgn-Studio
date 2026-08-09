@@ -28,7 +28,16 @@ type JobStatusKey =
   | 'error';
 
 /** Claves de paso — deben coincidir con `StepKey` en page.tsx. */
-type StepKeyName = 'isolate' | 'normalize' | 'white' | 'adaptive' | 'vertical' | 'lifestyleVideo';
+type StepKeyName =
+  | 'isolate'
+  | 'normalize'
+  | 'white'
+  | 'adaptive'
+  | 'hero'
+  | 'vertical'
+  | 'upscale'
+  | 'shadow'
+  | 'lifestyleVideo';
 
 /** Copy de texto visible de un paso (el `icon` sigue viviendo en STEP_META). */
 interface StepItemCopy {
@@ -84,12 +93,16 @@ export interface StaticProductPipelineCopy {
     videoAction: string;
     /** Etiquetas del dropdown de acción del video — key = `LifestyleVideoAction`. */
     videoActions: Record<'auto' | 'spray' | 'mist' | 'rotacion' | 'luz' | 'dolly-in', string>;
+    upscaleToggle: string;
+    upscaleDesc: string;
+    shadowToggle: string;
+    shadowDesc: string;
     featuresTitle: string;
     cap: (value: string) => string;
     zoomSmall: string;
-    downloadAll3: string;
-    downloadNOf3: (count: number) => string;
-    downloadNOf3Title: (count: number) => string;
+    downloadAllN: (total: number) => string;
+    downloadNOfN: (count: number, total: number) => string;
+    downloadNOfNTitle: (count: number, total: number) => string;
   };
   statusLabels: Record<JobStatusKey, string>;
   steps: {
@@ -212,12 +225,18 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
       luz: 'Luz cinemática pulsante',
       'dolly-in': 'Acercamiento dolly-in',
     },
+    upscaleToggle: '🔍 Alta resolución + QC (+$0.05)',
+    upscaleDesc:
+      'Escala el adaptativo a mayor resolución y nitidez. Listo para el zoom de la ficha del producto.',
+    shadowToggle: '🌑 Sombra de contacto en el blanco',
+    shadowDesc:
+      'Aterriza el producto sobre el blanco e-commerce para que no parezca pegado. Gratis.',
     featuresTitle: '✨ Lo que la IA ve en tu foto',
     cap: (value) => `tapa ${value}`,
     zoomSmall: 'Ver en grande',
-    downloadAll3: 'Descargar las 3',
-    downloadNOf3: (count) => `Descargar ${count}/3`,
-    downloadNOf3Title: (count) => `Descargar ${count} de 3 versiones como ZIP`,
+    downloadAllN: (total) => `Descargar las ${total}`,
+    downloadNOfN: (count, total) => `Descargar ${count}/${total}`,
+    downloadNOfNTitle: (count, total) => `Descargar ${count} de ${total} versiones como ZIP`,
   },
   statusLabels: {
     idle: 'Listo',
@@ -293,6 +312,19 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
           'Adaptive y vertical comparten seed → look cohesivo entre 1:1 y 9:16.',
         ],
       },
+      hero: {
+        label: 'Hero editorial 4:5',
+        costHint: '$0.003',
+        description:
+          'Mismo fondo adaptativo en 4:5 (1080×1350). Ideal para el feed de Instagram y Facebook.',
+        what: 'Genera el mismo fondo adaptativo pero en 4:5 vertical (1080×1350) — el formato que más ocupa el feed de Instagram y Facebook. Mismo seed que el adaptativo y el vertical → catálogo cohesivo. Compone TU producto encima en pixel-perfect.',
+        provider: 'Flux Schnell + Sharp composite. Mismo seed que adaptive.',
+        duration: '8–15 s',
+        tips: [
+          'Usá este output para el feed de Instagram y Facebook — el 4:5 ocupa más pantalla que el 1:1.',
+          'Comparte seed con adaptativo y vertical → los 3 formatos se ven cohesivos.',
+        ],
+      },
       vertical: {
         label: 'Vertical 9:16',
         costHint: '$0.003',
@@ -302,6 +334,32 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
         provider: 'Flux Schnell + Sharp composite. Mismo seed que adaptive.',
         duration: '8–15 s',
         tips: ['Usá este output para Reels y Stories.'],
+      },
+      upscale: {
+        label: 'Alta resolución + QC',
+        costHint: '$0.05',
+        description:
+          'Escala el adaptativo a mayor resolución y nitidez — listo para el zoom de la ficha del producto.',
+        what: 'Escala el fondo adaptativo a una versión de mayor resolución y más nítida, ideal para el zoom de la ficha del producto y para impresión. Fiel al original — no reinventa el frasco.',
+        provider: 'Clarity Upscaler (Replicate). resemblance 0.85, creativity 0.25.',
+        duration: '15–40 s',
+        tips: [
+          'Actívalo cuando necesites zoom en la ficha o material impreso.',
+          'Toma el adaptativo como base (o el blanco si el adaptativo falló).',
+        ],
+      },
+      shadow: {
+        label: 'Sombra de contacto',
+        costHint: 'Gratis',
+        description:
+          'Sombra de contacto realista sobre el blanco e-commerce para que el producto no parezca pegado.',
+        what: 'Agrega una sombra de contacto realista al output blanco e-commerce para aterrizar el producto sobre la superficie y que no parezca recortado y pegado.',
+        provider: 'Sharp (contact shadow) — sin IA, gratis.',
+        duration: '<1 s',
+        tips: [
+          'Actívalo si el blanco e-commerce se ve flotando o recortado.',
+          'Se aplica sobre el output blanco (#FFFFFF).',
+        ],
       },
       lifestyleVideo: {
         label: 'Video Reels lifestyle',
@@ -420,12 +478,18 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
       luz: 'Pulsing cinematic light',
       'dolly-in': 'Dolly-in push',
     },
+    upscaleToggle: '🔍 High-res + QC (+$0.05)',
+    upscaleDesc:
+      'Upscales the adaptive output to higher resolution and sharpness. Ready for product-page zoom.',
+    shadowToggle: '🌑 Contact shadow on the white',
+    shadowDesc:
+      'Grounds the product on the e-commerce white so it does not look pasted. Free.',
     featuresTitle: '✨ What AI sees in your photo',
     cap: (value) => `cap ${value}`,
     zoomSmall: 'View larger',
-    downloadAll3: 'Download all 3',
-    downloadNOf3: (count) => `Download ${count}/3`,
-    downloadNOf3Title: (count) => `Download ${count} of 3 versions as ZIP`,
+    downloadAllN: (total) => `Download all ${total}`,
+    downloadNOfN: (count, total) => `Download ${count}/${total}`,
+    downloadNOfNTitle: (count, total) => `Download ${count} of ${total} versions as ZIP`,
   },
   statusLabels: {
     idle: 'Ready',
@@ -501,6 +565,19 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
           'Adaptive and vertical share a seed → cohesive look across 1:1 and 9:16.',
         ],
       },
+      hero: {
+        label: 'Editorial hero 4:5',
+        costHint: '$0.003',
+        description:
+          'The same adaptive background in 4:5 (1080×1350). Ideal for the Instagram and Facebook feed.',
+        what: 'Generates the same adaptive background but in 4:5 portrait (1080×1350) — the format that fills the most of the Instagram and Facebook feed. Same seed as adaptive and vertical → cohesive catalog. Composites YOUR product on top pixel-perfect.',
+        provider: 'Flux Schnell + Sharp composite. Same seed as adaptive.',
+        duration: '8–15 s',
+        tips: [
+          'Use this output for the Instagram and Facebook feed — 4:5 takes more screen than 1:1.',
+          'Shares a seed with adaptive and vertical → all 3 formats look cohesive.',
+        ],
+      },
       vertical: {
         label: 'Vertical 9:16',
         costHint: '$0.003',
@@ -510,6 +587,32 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
         provider: 'Flux Schnell + Sharp composite. Same seed as adaptive.',
         duration: '8–15 s',
         tips: ['Use this output for Reels and Stories.'],
+      },
+      upscale: {
+        label: 'High-res + QC',
+        costHint: '$0.05',
+        description:
+          'Upscales the adaptive output to higher resolution and sharpness — ready for product-page zoom.',
+        what: 'Upscales the adaptive background to a higher-resolution, sharper version, ideal for product-page zoom and print. Faithful to the original — never reinvents the bottle.',
+        provider: 'Clarity Upscaler (Replicate). resemblance 0.85, creativity 0.25.',
+        duration: '15–40 s',
+        tips: [
+          'Turn it on when you need product-page zoom or print material.',
+          'Takes the adaptive as its base (or the white output if adaptive failed).',
+        ],
+      },
+      shadow: {
+        label: 'Contact shadow',
+        costHint: 'Free',
+        description:
+          'Realistic contact shadow on the e-commerce white output so the product does not look pasted.',
+        what: 'Adds a realistic contact shadow to the e-commerce white output to ground the product on the surface so it does not look cut out and pasted.',
+        provider: 'Sharp (contact shadow) — no AI, free.',
+        duration: '<1 s',
+        tips: [
+          'Turn it on if the e-commerce white looks floating or cut out.',
+          'Applied on top of the white output (#FFFFFF).',
+        ],
       },
       lifestyleVideo: {
         label: 'Lifestyle Reels video',

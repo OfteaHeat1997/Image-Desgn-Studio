@@ -61,7 +61,16 @@ type JobStatus = "idle" | "uploading" | "isolating" | "normalizing" | "generatin
  *    different background — guaranteeing the bottle/jar shape is identical
  *    across all 3 outputs.
  */
-type StepKey = "isolate" | "normalize" | "white" | "adaptive" | "vertical" | "lifestyleVideo";
+type StepKey =
+  | "isolate"
+  | "normalize"
+  | "white"
+  | "adaptive"
+  | "hero"
+  | "vertical"
+  | "upscale"
+  | "shadow"
+  | "lifestyleVideo";
 
 interface StepSnapshot {
   /** URL después de completar este paso */
@@ -108,6 +117,16 @@ interface Job {
   videoAction?: LifestyleVideoAction;
   /** Toggle: ¿generar el video lifestyle? Opt-in porque cuesta $0.05 + 60-120s. */
   generateVideo?: boolean;
+  /**
+   * Toggle: ¿escalar el adaptativo a alta resolución + QC de color? Opt-in
+   * porque cuesta $0.05 y suma 15-40s. Usa Clarity Upscaler (resemblance 0.85).
+   */
+  upscaleOutput?: boolean;
+  /**
+   * Toggle: ¿agregar sombra de contacto realista al blanco e-commerce? Opt-in.
+   * Sharp puro (gratis) — aterriza el producto para que no parezca pegado.
+   */
+  addShadow?: boolean;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -115,7 +134,15 @@ const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
   normalize: { cost: 0, status: "idle" },
   white: { cost: 0, status: "idle" },
   adaptive: { cost: 0, status: "idle" },
+  // Hero editorial 4:5 (1080×1350) — STANDARD, siempre corre. Mismo fondo y
+  // MISMO seed que adaptive → los 3 formatos (1:1, 4:5, 9:16) quedan cohesivos.
+  hero: { cost: 0, status: "idle" },
   vertical: { cost: 0, status: "idle" },
+  // Upscale alta-res + QC — opt-in. Escala el adaptive (o el white si falló)
+  // con Clarity (resemblance 0.85, creativity 0.25).
+  upscale: { cost: 0, status: "idle" },
+  // Sombra de contacto — opt-in. Aterriza el producto sobre el white e-commerce.
+  shadow: { cost: 0, status: "idle" },
   // Video lifestyle 5s 9:16 — opt-in. Se genera DESPUÉS del adaptive, usando
   // ese frame como starting image. wan-2.2-fast anima sobre ese frame con un
   // prompt según la acción elegida (spray, mist, rotación, luz cinemática).
@@ -202,6 +229,20 @@ const STEP_META: Record<StepKey, StepMeta> = {
     ],
     tips: ["Si sale raro, click 'Cambiar' para editar el prompt y regenerar.", "Adaptive y vertical comparten seed → look cohesivo entre 1:1 y 9:16."],
   },
+  hero: {
+    label: "Hero editorial 4:5",
+    icon: "🖼️",
+    costHint: "$0.003",
+    description: "Mismo fondo adaptativo en 4:5 (1080×1350). Ideal para el feed de Instagram y Facebook.",
+    what: "Genera el mismo fondo adaptativo pero en 4:5 vertical (1080×1350) — el formato que más ocupa el feed de Instagram y Facebook. Mismo seed que el adaptativo y el vertical → catálogo cohesivo. Compone TU producto encima en pixel-perfect.",
+    provider: "Flux Schnell + Sharp composite. Mismo seed que adaptive.",
+    duration: "8–15 s",
+    canFail: ["Mismo riesgo que adaptive (filtro NSFW)."],
+    tips: [
+      "Usá este output para el feed de Instagram y Facebook — el 4:5 ocupa más pantalla que el 1:1.",
+      "Comparte seed con adaptativo y vertical → los 3 formatos se ven cohesivos.",
+    ],
+  },
   vertical: {
     label: "Vertical 9:16",
     icon: "📱",
@@ -212,6 +253,34 @@ const STEP_META: Record<StepKey, StepMeta> = {
     duration: "8–15 s",
     canFail: ["Mismo riesgo que adaptive (filtro NSFW)."],
     tips: ["Usá este output para Reels y Stories."],
+  },
+  upscale: {
+    label: "Alta resolución + QC",
+    icon: "🔍",
+    costHint: "$0.05",
+    description: "Escala el adaptativo a mayor resolución y nitidez — listo para zoom en la ficha del producto.",
+    what: "Escala el fondo adaptativo a una versión de mayor resolución y más nítida, ideal para el zoom de la ficha del producto y para impresión. Fiel al original — no reinventa el frasco.",
+    provider: "Clarity Upscaler (Replicate). resemblance 0.85, creativity 0.25.",
+    duration: "15–40 s",
+    canFail: ["Si la GPU se queda sin memoria, se degrada suave y devuelve la imagen original."],
+    tips: [
+      "Actívalo cuando necesites zoom en la ficha o material impreso.",
+      "Toma el adaptativo como base (o el blanco si el adaptativo falló).",
+    ],
+  },
+  shadow: {
+    label: "Sombra de contacto",
+    icon: "🌑",
+    costHint: "Gratis",
+    description: "Sombra de contacto realista sobre el blanco e-commerce para que el producto no parezca pegado.",
+    what: "Agrega una sombra de contacto realista al output blanco e-commerce para aterrizar el producto sobre la superficie y que no parezca recortado y pegado.",
+    provider: "Sharp (contact shadow) — sin IA, gratis.",
+    duration: "<1 s",
+    canFail: ["Si el blanco e-commerce falló, no hay base sobre la cual aplicar la sombra."],
+    tips: [
+      "Actívalo si el blanco e-commerce se ve flotando o recortado.",
+      "Se aplica sobre el output blanco (#FFFFFF).",
+    ],
   },
   lifestyleVideo: {
     label: "Video Reels lifestyle",
@@ -229,17 +298,21 @@ const STEP_META: Record<StepKey, StepMeta> = {
   },
 };
 
-/** Las 3 etapas de IMAGEN que producen un output descargable (orden de display). */
-const OUTPUT_STEPS: StepKey[] = ["white", "adaptive", "vertical"];
+/** Las etapas de IMAGEN estándar que producen un output descargable (orden de display). */
+const OUTPUT_STEPS: StepKey[] = ["white", "adaptive", "hero", "vertical"];
 
 /**
- * Outputs a renderizar para un job. Incluye el video lifestyle como tarjeta
- * cuando la usuaria lo activó o cuando ya se intentó/generó — antes el video
- * se generaba pero NUNCA se mostraba porque OUTPUT_STEPS solo tenía imágenes.
+ * Outputs a renderizar para un job. A los 4 outputs estándar les sumamos los
+ * opt-in (upscale, shadow, video lifestyle) SOLO cuando la usuaria los activó o
+ * cuando ya se intentó/generó — así aparecen como tarjeta con su estado en vez
+ * de generarse silenciosamente sin mostrarse.
  */
 function outputStepsFor(job: Job): StepKey[] {
-  const includeVideo = job.generateVideo === true || job.steps.lifestyleVideo.status !== "idle";
-  return includeVideo ? [...OUTPUT_STEPS, "lifestyleVideo"] : OUTPUT_STEPS;
+  const steps: StepKey[] = [...OUTPUT_STEPS];
+  if (job.upscaleOutput === true || job.steps.upscale.status !== "idle") steps.push("upscale");
+  if (job.addShadow === true || job.steps.shadow.status !== "idle") steps.push("shadow");
+  if (job.generateVideo === true || job.steps.lifestyleVideo.status !== "idle") steps.push("lifestyleVideo");
+  return steps;
 }
 
 /* ------------------------------------------------------------------ */
@@ -711,10 +784,11 @@ export default function StaticProductPipelinePage() {
       return { url: d.data.url || d.data.imageUrl, cost: d.cost ?? 0 };
     }
 
-    // adaptive (1:1) and vertical (9:16) share the same prompt + seed → cohesive
-    // catalog look across both formats. Always use mode:'fast' so the product
-    // is composited (pixel-perfect), never re-imagined by Kontext Pro.
-    const aspectRatio = key === "vertical" ? "9:16" : "1:1";
+    // adaptive (1:1), hero (4:5) and vertical (9:16) share the same prompt +
+    // seed → cohesive catalog look across all three formats. Always use
+    // mode:'fast' so the product is composited (pixel-perfect), never
+    // re-imagined by Kontext Pro.
+    const aspectRatio = key === "vertical" ? "9:16" : key === "hero" ? "4:5" : "1:1";
     const r = await fetch("/api/bg-generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -865,12 +939,82 @@ export default function StaticProductPipelinePage() {
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
       const sharedInput = currentUrl;
-      const [whiteRes, adaptiveRes, verticalRes] = await Promise.all([
+      const [whiteRes, adaptiveRes, heroRes, verticalRes] = await Promise.all([
         runOutputStep(job.id, "white", sharedInput, enrichedConfig),
         runOutputStep(job.id, "adaptive", sharedInput, enrichedConfig),
+        runOutputStep(job.id, "hero", sharedInput, enrichedConfig),
         runOutputStep(job.id, "vertical", sharedInput, enrichedConfig),
       ]);
-      totalCost += whiteRes.cost + adaptiveRes.cost + verticalRes.cost;
+      totalCost += whiteRes.cost + adaptiveRes.cost + heroRes.cost + verticalRes.cost;
+
+      // Optional: upscale the adaptive output (or white if adaptive failed) to a
+      // higher-res, sharper version — opt-in ($0.05, ~15-40s). Clarity Upscaler
+      // (resemblance 0.85, creativity 0.25) keeps the bottle faithful. softFail
+      // so a GPU hiccup degrades sharpness of ONE output instead of erroring.
+      if (job.upscaleOutput) {
+        const upscaleSrc = adaptiveRes.url || whiteRes.url;
+        if (upscaleSrc) {
+          updateStep(job.id, "upscale", { status: "running" });
+          try {
+            const uRes = await fetch("/api/upscale", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageUrl: upscaleSrc,
+                provider: "clarity",
+                scale: 2,
+                softFail: true,
+              }),
+            });
+            const uData = await safeJson(uRes);
+            if (uData.success && uData.data?.url) {
+              const upscaleCost = uData.cost ?? 0.05;
+              totalCost += upscaleCost;
+              updateStep(job.id, "upscale", { status: "done", resultUrl: uData.data.url, cost: upscaleCost });
+            } else {
+              updateStep(job.id, "upscale", { status: "error", error: uData.error || "Falló alta resolución" });
+            }
+          } catch (uErr) {
+            updateStep(job.id, "upscale", {
+              status: "error",
+              error: uErr instanceof Error ? uErr.message : String(uErr),
+            });
+          }
+        } else {
+          updateStep(job.id, "upscale", { status: "skipped", error: "Sin base para escalar (adaptive/white fallaron)." });
+        }
+      }
+
+      // Optional: contact shadow on the white e-commerce output — opt-in (free,
+      // Sharp-only). Grounds the product so it doesn't look cut out and pasted.
+      if (job.addShadow) {
+        const shadowSrc = whiteRes.url;
+        if (shadowSrc) {
+          updateStep(job.id, "shadow", { status: "running" });
+          try {
+            const sRes = await fetch("/api/shadows", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageUrl: shadowSrc, type: "contact" }),
+            });
+            const sData = await safeJson(sRes);
+            if (sData.success && sData.data?.url) {
+              const shadowCost = sData.cost ?? 0;
+              totalCost += shadowCost;
+              updateStep(job.id, "shadow", { status: "done", resultUrl: sData.data.url, cost: shadowCost });
+            } else {
+              updateStep(job.id, "shadow", { status: "error", error: sData.error || "Falló sombra de contacto" });
+            }
+          } catch (sErr) {
+            updateStep(job.id, "shadow", {
+              status: "error",
+              error: sErr instanceof Error ? sErr.message : String(sErr),
+            });
+          }
+        } else {
+          updateStep(job.id, "shadow", { status: "skipped", error: "Sin blanco e-commerce sobre el cual aplicar sombra." });
+        }
+      }
 
       // Optional: video lifestyle 5s 9:16 (opt-in, costs $0.05). Solo se
       // ejecuta si la usuaria activó el toggle generateVideo en el job.
@@ -971,8 +1115,8 @@ export default function StaticProductPipelinePage() {
       // The "main" thumbnail uses the adaptive 1:1 output (most visually rich).
       // If adaptive failed, fall back to white, then vertical, then the
       // normalize result, so the user always sees something useful.
-      const main = adaptiveRes.url || whiteRes.url || verticalRes.url || currentUrl;
-      const anyOutputSucceeded = !!(whiteRes.url || adaptiveRes.url || verticalRes.url);
+      const main = adaptiveRes.url || whiteRes.url || heroRes.url || verticalRes.url || currentUrl;
+      const anyOutputSucceeded = !!(whiteRes.url || adaptiveRes.url || heroRes.url || verticalRes.url);
       updateJob(job.id, {
         status: anyOutputSucceeded ? "done" : "error",
         resultUrl: main,
@@ -988,6 +1132,7 @@ export default function StaticProductPipelinePage() {
         const outs: Array<[StepKey, string | undefined]> = [
           ["white", whiteRes.url],
           ["adaptive", adaptiveRes.url],
+          ["hero", heroRes.url],
           ["vertical", verticalRes.url],
         ];
         for (const [key, url] of outs) {
@@ -1306,7 +1451,7 @@ export default function StaticProductPipelinePage() {
                                       return;
                                     }
                                     const zipBlob = await zip.generateAsync({ type: "blob" });
-                                    saveAs(zipBlob, `${baseName}-3versiones.zip`);
+                                    saveAs(zipBlob, `${baseName}-versiones.zip`);
                                     toast.success(sp.messages.zipReady(added));
                                   } catch (err) {
                                     toast.error(err instanceof Error ? err.message : sp.messages.zipError);
@@ -1315,16 +1460,16 @@ export default function StaticProductPipelinePage() {
                                   }
                                 }}
                                 className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
-                                title={sp.job.downloadNOf3Title(doneOutputs.length)}
+                                title={sp.job.downloadNOfNTitle(doneOutputs.length, OUTPUT_STEPS.length)}
                               >
                                 {zippingJobId === job.id ? (
                                   <Loader2 className="h-3 w-3 animate-spin" />
                                 ) : (
                                   <Download className="h-3 w-3" />
                                 )}
-                                {doneOutputs.length === 3
-                                  ? sp.job.downloadAll3
-                                  : sp.job.downloadNOf3(doneOutputs.length)}
+                                {doneOutputs.length === OUTPUT_STEPS.length
+                                  ? sp.job.downloadAllN(OUTPUT_STEPS.length)
+                                  : sp.job.downloadNOfN(doneOutputs.length, OUTPUT_STEPS.length)}
                               </button>
                             );
                           })()}
@@ -1443,6 +1588,38 @@ export default function StaticProductPipelinePage() {
                             </select>
                           </div>
                         )}
+                      </div>
+
+                      {/* Mejoras opt-in: alta resolución (upscale) + sombra de
+                          contacto. Ambas suman una tarjeta de output cuando se
+                          activan. Upscale cuesta $0.05; la sombra es gratis. */}
+                      <div className="space-y-1.5 rounded border border-white/10 bg-white/[0.02] px-2 py-2">
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={job.upscaleOutput ?? false}
+                            onChange={(e) => updateJob(job.id, { upscaleOutput: e.target.checked })}
+                            disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
+                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[11px] font-semibold text-gray-100">{sp.job.upscaleToggle}</span>
+                            <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.upscaleDesc}</p>
+                          </div>
+                        </label>
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={job.addShadow ?? false}
+                            onChange={(e) => updateJob(job.id, { addShadow: e.target.checked })}
+                            disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
+                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[11px] font-semibold text-gray-100">{sp.job.shadowToggle}</span>
+                            <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.shadowDesc}</p>
+                          </div>
+                        </label>
                       </div>
 
                       {/* Per-photo features detected by Vision — shows that the
@@ -1712,7 +1889,7 @@ export default function StaticProductPipelinePage() {
                                       {sp.steps.change}
                                     </button>
                                   )}
-                                  {canRerun && (
+                                  {canRerun && OUTPUT_STEPS.includes(key) && (
                                     <button
                                       type="button"
                                       onClick={() => reRunOutputs(job.id, [key])}
