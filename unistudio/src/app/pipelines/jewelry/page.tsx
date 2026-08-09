@@ -68,7 +68,6 @@ import {
   type JewelryFeatures,
 } from "@/lib/processing/product-features";
 import {
-  BeforeAfterSlider,
   ImageLightbox,
   ImageThumb,
   StatusBadge,
@@ -787,21 +786,51 @@ function StepCard({
                 {copy.what}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => step.resultUrl && setLightboxIdx(0)}
-              disabled={!step.resultUrl}
-              className="w-full cursor-zoom-in disabled:cursor-default"
-              title={step.resultUrl ? jt.stepCard.zoomHint : undefined}
-            >
-              <BeforeAfterSlider
-                before={step.inputUrl}
-                after={step.resultUrl}
-                label={copy.label}
-                className="h-[26rem] w-full"
-                labels={{ ...jt.beforeAfter, ...jt.thumb }}
-              />
-            </button>
+
+            {/* DOS PANELES SEPARADOS, como lencería. Antes había un comparador
+                con divisor que SUPERPONE las dos imágenes: para ver el original
+                había que arrastrar, y nunca se veían las dos a la vez. El
+                reclamo fue textual — "card separado para ver original y
+                resultado". Cada panel abre el visor al tocarlo. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  {jt.lightbox.original}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => step.inputUrl && setLightboxIdx(0)}
+                  disabled={!step.inputUrl}
+                  className="w-full cursor-zoom-in disabled:cursor-default"
+                >
+                  <ImageThumb
+                    url={step.inputUrl}
+                    label={jt.lightbox.original}
+                    className="h-[22rem] w-full"
+                    labels={jt.thumb}
+                  />
+                </button>
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  {jt.lightbox.result}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => step.resultUrl && setLightboxIdx(0)}
+                  disabled={!step.resultUrl}
+                  className="w-full cursor-zoom-in disabled:cursor-default"
+                  title={step.resultUrl ? jt.stepCard.zoomHint : undefined}
+                >
+                  <ImageThumb
+                    url={step.resultUrl}
+                    label={copy.label}
+                    className="h-[22rem] w-full"
+                    labels={jt.thumb}
+                  />
+                </button>
+              </div>
+            </div>
             {step.resultUrl && (
               <p className="mt-2 text-center text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
                 {jt.stepCard.zoomHint}
