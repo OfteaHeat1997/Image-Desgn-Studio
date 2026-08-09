@@ -3108,41 +3108,23 @@ async function runStep(
   }
 
   if (stepId === "photoDetail") {
-    // UNA FOTO DE DETALLE ES UN RECORTE, NO UNA GENERACION.
+    // GENERAR EN DIAGONAL CON LAS DOS FOTOS, Y DESPUES ACERCAR.
     //
-    // Se le pedia a Uwear un "extreme close-up" por prompt y devolvia un plano
-    // medio — el mismo del Paso 2. Y aunque saliera bien, estaria GENERANDO otra
-    // vez la tela: cada generacion es una interpretacion nueva, asi que el
-    // detalle podia no coincidir con la foto que la usuaria ya acepto.
+    // Dos intentos fallidos antes de este:
+    //   1. Pedirle a Uwear un "extreme close-up" por prompt -> devolvia un plano
+    //      medio, indistinguible del Paso 2. Se pagaba $0.20 por un duplicado.
+    //   2. Recortar la frontal ya aprobada -> el acercamiento era real, pero la
+    //      toma seguia siendo FRONTAL y usaba UNA sola foto. La usuaria pidio una
+    //      diagonal que use el frente Y la espalda, como las de Leonisa.
     //
-    // El detalle correcto es un recorte macro de la frontal ya aprobada:
-    // conserva exactamente esos pixeles, no inventa nada, sale en segundos y
-    // cuesta $0. Es lo que hace un fotografo de catalogo — no repite la toma,
-    // amplia la que tiene.
-    //
-    // Si el recorte falla se sigue con el camino generativo de abajo.
-    if (!providerOverride || providerOverride === "auto") {
-      try {
-        const cropRes = await fetch("/api/macro-crop", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: abortSignal,
-          body: JSON.stringify({
-            imageUrl: inputUrl,
-            zoom: 2.2,
-            aspectRatio: "4:5",
-            outputSize: 1400,
-          }),
-        });
-        const cropJson = await cropRes.json();
-        if (cropJson.success && cropJson.data?.url) {
-          return { resultUrl: cropJson.data.url, cost: 0, usedProvider: "macro-crop" };
-        }
-        console.warn("[lingerie] photoDetail: el recorte macro fallo, sigo con el generativo:", cropJson.error);
-      } catch (e) {
-        console.warn("[lingerie] photoDetail: fallo el recorte macro:", e instanceof Error ? e.message : e);
-      }
-    }
+    // Los dos fallaban por querer resolverlo con una sola herramienta. El detalle
+    // necesita las dos cosas y ninguna las hace sola:
+    //   - Uwear GENERA con frente + espalda + la ficha de Claude Vision, asi que
+    //     la diagonal muestra la construccion real (malla, ganchos, costuras).
+    //     Pero encuadra siempre en plano medio.
+    //   - macro-crop ACERCA de verdad sobre pixeles reales, pero no rota nada.
+    // Encadenados si sale: Uwear pone el angulo y la fidelidad, el recorte pone
+    // el acercamiento. Si el recorte falla se entrega igual la diagonal generada.
 
     if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
       throw new Error("La Foto Detalle necesita la modelo IA con este proveedor. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
@@ -3187,6 +3169,31 @@ async function runStep(
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "Foto Detalle falló");
+
+    // SEGUNDA MITAD: acercar de verdad. Uwear ya puso el angulo y la fidelidad
+    // (genero con frente + espalda + ficha), pero encuadra en plano medio. El
+    // recorte macro sobre ESE resultado es lo que lo convierte en un detalle:
+    // no reinterpreta nada, amplia los pixeles que Uwear acaba de producir.
+    try {
+      const cropRes = await fetch("/api/macro-crop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortSignal,
+        body: JSON.stringify({
+          imageUrl: json.data.url,
+          zoom: 2.4,
+          aspectRatio: "4:5",
+          outputSize: 1400,
+        }),
+      });
+      const cropJson = await cropRes.json();
+      if (cropJson.success && cropJson.data?.url) {
+        return { resultUrl: cropJson.data.url, cost: json.cost ?? 0.2, usedProvider: `${json.data.provider}+macro` };
+      }
+      console.warn("[lingerie] photoDetail: el acercamiento fallo, entrego la diagonal sin recortar:", cropJson.error);
+    } catch (e) {
+      console.warn("[lingerie] photoDetail: fallo el acercamiento:", e instanceof Error ? e.message : e);
+    }
     return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
   }
 
