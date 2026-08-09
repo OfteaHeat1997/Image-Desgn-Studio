@@ -96,6 +96,14 @@ export interface LingeriePipelineCopy {
   productType: Record<string, string>;
   modelConfig: {
     heading: string;
+    /** Aviso cuando el proveedor del try-on trae su propia modelo (Uwear) y
+     *  estos ajustes no aplican. Va traducido como todo lo demas: estaba escrito
+     *  a mano en espanol dentro del JSX y quedaba en castellano con la app en
+     *  ingles. */
+    uwearNoticeBold: string;
+    uwearNoticeBody: string;
+    uwearNoticeProvider: string;
+    uwearNoticeTail: string;
     reuseNotePre: string;
     reuseNoteBold: string;
     reuseNotePost: string;
@@ -384,6 +392,10 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
   },
   modelConfig: {
     heading: 'Configuración del Modelo IA',
+    uwearNoticeBold: 'No aplica con Uwear.',
+    uwearNoticeBody: ' Uwear genera su propia modelo (siempre la misma), así que estos ajustes no cambian nada y el paso "Crear Modelo IA" se salta — te ahorrás $0.055 por producto. Si querés controlar tono de piel, edad y cuerpo, elegí ',
+    uwearNoticeProvider: 'Leffa',
+    uwearNoticeTail: ' en la Foto Frontal.',
     reuseNotePre: 'El modelo se genera ',
     reuseNoteBold: 'una sola vez',
     reuseNotePost: ' y se reutiliza para todas las fotos del producto — optimizando costos.',
@@ -1056,6 +1068,10 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
   },
   modelConfig: {
     heading: 'AI Model Setup',
+    uwearNoticeBold: "Doesn't apply with Uwear.",
+    uwearNoticeBody: ' Uwear generates its own model (always the same one), so these settings change nothing and the "Create AI Model" step is skipped — saving you $0.055 per product. To control skin tone, age and body type, pick ',
+    uwearNoticeProvider: 'Leffa',
+    uwearNoticeTail: ' in the Front Photo step.',
     reuseNotePre: 'The model is generated ',
     reuseNoteBold: 'just once',
     reuseNotePost: ' and reused for every photo of the product — keeping costs down.',
