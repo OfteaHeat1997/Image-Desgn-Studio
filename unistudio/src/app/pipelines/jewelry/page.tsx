@@ -129,7 +129,7 @@ const STEP_ENGINE: Record<StepKey, string> = {
   clean: "Kontext Pro",
   isolate: "BiRefNet",
   packshot: "Kontext Pro",
-  luxury: "Kontext Pro",
+  luxury: "Flux Schnell + sharp",
   macro: "sharp · sin IA",
   model: "SeedDream + Kontext",
   scale: "SeedDream + Kontext",
@@ -682,7 +682,7 @@ function StepCard({
           {/* Que motor corre este paso, siempre a la vista. Estaba solo en el
               panel de docs, detras del icono "i", asi que no habia forma de
               saber quien genero cada foto sin abrirlo. */}
-          <span className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)] lg:inline">
+          <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]">
             {STEP_ENGINE[stepKey]}
           </span>
           <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
@@ -887,6 +887,32 @@ function StepCard({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* PASO QUE TODAVIA NO CORRIO. Antes no tenia NINGUN boton: los de
+            Aceptar/Rehacer/Saltar solo salen despues de correr, asi que si la
+            tanda se detenia la usuaria quedaba sin nada que oprimir. Reportado
+            textual: "no puedo oprimir ningun boton". */}
+        {!busy && (step.status === "idle" || step.status === "pending") && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onRerun}
+              title={jt.buttons.runStepTitle}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-[var(--bg-primary)] transition-colors hover:brightness-110"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {jt.buttons.runStep}
+            </button>
+            <button
+              type="button"
+              onClick={onSkip}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-gray-200"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              {jt.buttons.skip}
+            </button>
           </div>
         )}
 

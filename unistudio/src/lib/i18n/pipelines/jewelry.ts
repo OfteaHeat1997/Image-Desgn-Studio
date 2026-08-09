@@ -78,6 +78,8 @@ export interface JewelryPipelineCopy {
     variants: (n: number) => string;
     useVariant: (n: number) => string;
     whatIsThis: string;
+    runStep: string;
+    runStepTitle: string;
   };
   statusBadge: {
     idle: string;
@@ -228,6 +230,8 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     variants: (n) => `${n} versiones generadas`,
     useVariant: (n) => `Usar la versión ${n}`,
     whatIsThis: '¿Qué hace este paso?',
+    runStep: 'Generar este paso',
+    runStepTitle: 'Correr solo este paso, sin esperar a los demás',
   },
   statusBadge: {
     idle: 'En espera',
@@ -531,6 +535,8 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     variants: (n) => `${n} versions generated`,
     useVariant: (n) => `Use version ${n}`,
     whatIsThis: 'What does this step do?',
+    runStep: 'Run this step',
+    runStepTitle: 'Run just this step, without waiting for the others',
   },
   statusBadge: {
     idle: 'Waiting',
