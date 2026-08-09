@@ -1,5 +1,39 @@
 # UniStudio — Changelog
 
+## 2026-08-09 — Lencería: la modelo IA nunca se creaba, y legibilidad del setup
+
+**"Ningún proveedor funciona" tenía una sola causa.** El auto-salto del paso *Crear
+Modelo IA* preguntaba `provider === "uwear" || provider === "auto"`, y `"auto"` es el
+default: la modelo no se creaba nunca. De ahí salían tres errores que parecían
+distintos — Uwear moría en la ruta con `Missing required field "modelImage"`, Leffa y
+SeedDream morían en el guard del cliente con *"necesita la modelo IA"*. El error de
+razonamiento fue tratar `"auto"` como un proveedor: no lo es, es una cadena que cae a
+SeedDream/Kolors, y esos **sí** visten la modelo recibida.
+
+Tres arreglos: `providerNeedsModelImage("auto")` vuelve a `true` (solo Uwear elegido a
+mano se exime, porque ahí no hay fallback); el salto ya no mira solo el proveedor del
+try-on sino **todos** los pasos que visten una modelo, cada uno con su propio selector;
+y `/api/tryon` deja de exigir `modelImage` cuando el proveedor es Uwear, que castea su
+propia modelo — `tryOnUwear` ni siquiera acepta el parámetro.
+
+**Legibilidad medida, no a ojo.** Había 65 textos por debajo de 12 px (39 de 10 px, 26 de
+11 px) y 16 tarjetas en `bg-white/[0.02]` sobre `#0C0C0E`, diferencia casi nula: eso era
+el *"todo se ve oscuro y opaco"*. Piso tipográfico a 12/13 px, tarjetas al token
+`--bg-surface` que ya existía para eso, bordes crudos a `--border-subtle`/`--border-default`.
+Contra 120 usos de `--text-secondary` había 8 de `--text-muted`: sin jerarquía. Los
+encabezados de sección pasan a blanco y el título a la serif de marca a 30/36 px.
+
+**Divulgación progresiva en el setup.** La columna traía nueve secciones con el mismo peso
+visual. La página tiene una sola acción obligatoria (subir fotos); modo de generación, art
+direction y calidad de FASHN se pliegan detrás de *Ajustes avanzados*, cerrado por default.
+*Modo de Ejecución* ahora explica **cuándo** usar cada opción en vez de solo qué hace.
+
+**Dos bugs de interacción.** El lightbox bloqueaba explícitamente la comparación en video,
+así que al abrirlo grande desaparecía la foto de origen — justo la que hace falta para
+juzgar si el video conservó la prenda. Y en modo Automático `canInteract` era `false` y la
+barra de acciones no se renderizaba: al terminar el video de cuerpo completo la tarjeta
+quedaba sin un solo botón. Descargar y Rehacer ahora existen siempre que haya resultado.
+
 ## 2026-08-09 — Joyería: pipeline guiado por Vision, 3 etapas y kit de Instagram
 
 Segunda pasada sobre joyería, esta vez **midiendo contra el inventario real** en vez de
