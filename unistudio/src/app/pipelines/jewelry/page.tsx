@@ -191,6 +191,8 @@ interface Job {
     macroFocus: string;
     model: string;
     negative: string;
+    productWords: string;
+    propWords: string;
   } | null;
 }
 
@@ -1409,17 +1411,57 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
-            const res = await fetch("/api/bg-remove", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              // BiRefNet: ganó la comparativa contra rembg, WithoutBG,
-              // Bria RMBG 2.0, Grounded SAM y remove.bg sobre joyería real.
-              body: JSON.stringify({ imageUrl: input, provider: "birefnet" }),
-              signal,
-            });
-            const data = await safeJson(res);
-            const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error);
+            // RECORTE DIRIGIDO. BiRefNet es un segmentador de objeto SALIENTE:
+            // no sabe qué es el producto, así que con una pieza apoyada en un
+            // exhibidor se queda con los dos — y los pasos 3 a 6 heredan ese
+            // recorte. Por eso el packshot redibuja la joya: tiene que inventar
+            // cómo se ve sin el cilindro.
+            // Ahora Vision nombra producto y utilería, y grounded_sam segmenta
+            // con esas palabras. Si la máscara sale pobre, /api/bg-remove lanza
+            // (compuerta de cobertura) y caemos a BiRefNet, que es el
+            // comportamiento anterior: esto no puede quedar peor que antes.
+            let data: Awaited<ReturnType<typeof safeJson>> | null = null;
+            let url: string | undefined;
+
+            if (job.prompts?.productWords) {
+              try {
+                const guided = await fetch("/api/bg-remove", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    imageUrl: input,
+                    provider: "replicate",
+                    removeSubject: true,
+                    isolateMethod: "grounded-sam",
+                    garmentType: job.subType,
+                    subjectPrompt: job.prompts.productWords,
+                    propPrompt: job.prompts.propWords,
+                  }),
+                  signal,
+                });
+                const gd = await safeJson(guided);
+                const gu = pickUrl(gd.data);
+                if (gd.success && gu) {
+                  data = gd;
+                  url = gu;
+                }
+              } catch {
+                /* el respaldo se encarga */
+              }
+            }
+
+            if (!url) {
+              const res = await fetch("/api/bg-remove", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ imageUrl: input, provider: "birefnet" }),
+                signal,
+              });
+              data = await safeJson(res);
+              url = pickUrl(data.data);
+            }
+
+            if (!data?.success || !url) return fail(data?.error);
             done(url, data.cost ?? STEP_COST.isolate);
             return true;
           }

@@ -156,8 +156,8 @@ Mirá la foto y respondé SOLO con JSON válido, sin markdown:
   "macroFocus": "prompt en inglés que nombre qué parte de ESTA pieza hay que acercar",
   "model": "prompt en inglés para la colocación sobre la modelo",
   "negative": "lista en inglés, separada por comas, de lo que NO debe aparecer ni cambiar",
-  "productWords": "palabras en inglés separadas por comas que nombran SOLO la pieza de joyería y sus partes (ej 'beaded bracelet, gold beads, turtle charm, elastic band'). NO incluyas soportes ni fondos.",
-  "propWords": "palabras en inglés separadas por comas que nombran la UTILERIA visible que NO es el producto: exhibidor, cilindro, pedestal, bandeja, tarjeta, base, soporte. Cadena vacia si no hay."
+  "productWords": "MAXIMO 3 palabras o frases cortas en inglés, separadas por comas, que nombren la pieza. Ej: 'beaded bracelet, turtle charm'. Van a un segmentador que rinde PEOR con enumeraciones largas: elegí lo más genérico y reconocible, NO la lista de todas las partes. NO incluyas soportes ni fondos.",
+  "propWords": "MAXIMO 3 frases cortas en inglés que nombren la UTILERIA visible que NO es el producto (exhibidor, cilindro, pedestal, bandeja, base). Ej: 'white cylinder display, hexagonal riser'. Cadena vacia si no hay."
 }`;
 }
 
