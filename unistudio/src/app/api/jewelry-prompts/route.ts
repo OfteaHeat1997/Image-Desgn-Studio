@@ -7,19 +7,39 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { directJewelryPrompts, ART_DIRECTOR_COST } from '@/lib/processing/jewelry-art-director';
+import {
+  directJewelryPrompts,
+  findMacroRegion,
+  ART_DIRECTOR_COST,
+} from '@/lib/processing/jewelry-art-director';
 import { saveJob } from '@/lib/db/persist';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageUrl, features } = body as { imageUrl?: string; features?: unknown };
+    const { imageUrl, features, mode } = body as {
+      imageUrl?: string;
+      features?: unknown;
+      /** 'macro-region' pide solo el rectangulo a acercar, sobre la pieza aislada. */
+      mode?: 'prompts' | 'macro-region';
+    };
 
     if (!imageUrl || typeof imageUrl !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Missing required field "imageUrl".' },
         { status: 400 },
       );
+    }
+
+    if (mode === 'macro-region') {
+      const found = await findMacroRegion(imageUrl);
+      if (!found) {
+        return NextResponse.json(
+          { success: false, error: 'No se pudo elegir la region del macro.' },
+          { status: 502 },
+        );
+      }
+      return NextResponse.json({ success: true, data: found, cost: ART_DIRECTOR_COST });
     }
 
     const prompts = await directJewelryPrompts(imageUrl, features);

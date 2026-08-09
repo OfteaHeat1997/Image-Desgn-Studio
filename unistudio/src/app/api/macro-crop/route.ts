@@ -21,12 +21,13 @@ const VALID_ASPECTS = ['1:1', '4:5', '3:2'] as const;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageUrl, zoom, aspectRatio, background, outputSize } = body as {
+    const { imageUrl, zoom, aspectRatio, background, outputSize, region } = body as {
       imageUrl?: string;
       zoom?: number;
       aspectRatio?: (typeof VALID_ASPECTS)[number];
       background?: MacroBackground;
       outputSize?: number;
+      region?: { x: number; y: number; w: number; h: number };
     };
 
     if (!imageUrl || typeof imageUrl !== 'string') {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await macroCrop(imageUrl, { zoom, aspectRatio, background, outputSize });
+    const result = await macroCrop(imageUrl, { zoom, aspectRatio, background, outputSize, region });
 
     await saveJob({
       operation: 'macro-crop',

@@ -625,10 +625,9 @@ function StepCard({
     >
       {/* Encabezado. Al plegar, toda la tarjeta se reduce a esta fila: asi
           entran varios pasos en pantalla en vez de uno solo. */}
-      <button
-        type="button"
+      <div
         onClick={onToggleCollapse}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-5 py-4 text-left"
         style={{ borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="flex min-w-0 items-center gap-3.5">
@@ -693,25 +692,28 @@ function StepCard({
           </span>
           <StatusBadge status={step.status} labels={jt.statusBadge} />
           {step.status === "processing" && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onStop(); }}
               className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/20"
               title={jt.stepCard.stopTitle}
             >
               <StopCircle className="h-3 w-3" />
               {jt.buttons.stop}
-            </span>
+            </button>
           )}
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform",
-              collapsed ? "" : "rotate-180",
-            )}
-          />
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleCollapse(); }}
+            aria-label={collapsed ? copy.label : copy.label}
+            className="rounded p-0.5 text-[var(--text-secondary)] transition-colors hover:text-white"
+          >
+            <ChevronDown
+              className={cn("h-4 w-4 shrink-0 transition-transform", collapsed ? "" : "rotate-180")}
+            />
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Documentación del paso */}
       {!collapsed && showDocs && (
@@ -1350,11 +1352,29 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
+            // Vision mira la pieza aislada y elige QUE acercar. Sin esto el
+            // recorte es mecanico (la zona con mas masa de pixeles) y el zoom
+            // sale raro: a veces un tramo vacio de cadena, a veces media pieza.
+            let region: { x: number; y: number; w: number; h: number } | undefined;
+            try {
+              const rr = await fetch("/api/jewelry-prompts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ imageUrl: input, mode: "macro-region" }),
+                signal,
+              });
+              const rd = await rr.json();
+              if (rd?.success && rd.data?.region) region = rd.data.region;
+            } catch {
+              /* sin region, el recortador vuelve a su heuristica */
+            }
+
             const res = await fetch("/api/macro-crop", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 imageUrl: input,
+                region,
                 zoom: config.macro.zoom,
                 background: config.macro.background,
                 aspectRatio: "1:1",
@@ -1381,7 +1401,7 @@ export default function JewelryPipelinePage() {
             const modelPrompt =
               key === "scale"
                 ? "elegant woman hand holding the piece between thumb and fingers, hand at natural scale, plain neutral background, soft studio light, commercial jewelry scale reference photography, sharp focus"
-                : (job.prompts?.model ?? config.modelPrompt);
+                : config.modelPrompt;
 
             const modelRes = await fetch("/api/model-create", {
               method: "POST",
@@ -1416,6 +1436,12 @@ export default function JewelryPipelinePage() {
                 type: key === "scale" ? "ring" : job.subType,
                 mode: "modelo",
                 featureDescriptor: descriptor ?? undefined,
+                // El prompt de colocacion de Vision va al TRY-ON, que es quien
+                // pone la joya sobre el cuerpo. Se estaba mandando a
+                // model-create, o sea describiendo a la modelo en vez de dirigir
+                // la colocacion: la direccion se perdia.
+                placementDirection: key === "model" ? job.prompts?.model : undefined,
+                negative: job.prompts?.negative,
               }),
               signal,
             });
@@ -1668,7 +1694,7 @@ export default function JewelryPipelinePage() {
   /* ------------------------------------------------------------------ */
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-surface text-heading">
+    <div className="min-h-screen bg-surface text-heading">
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 py-3 backdrop-blur md:px-6">
         <Link
           href="/"

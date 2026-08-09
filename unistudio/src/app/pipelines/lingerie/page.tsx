@@ -1518,7 +1518,9 @@ interface StepCardProps {
 // no cambia nada es peor que no tenerlo — la usuaria eligio "Uwear" y el badge
 // del resultado dijo "LEFFA", que se lee como un bug aunque sea lo correcto.
 // Su selector de pose tampoco hacia nada: la pose la fija el asset del avatar.
-const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoSide", "photoDetail", "photoFullBody"];
+// photoSide sale por el mismo motivo que photoBack: ahora usa el asset
+// "full_body_side" del avatar, asi que el proveedor y la pose son fijos.
+const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoDetail", "photoFullBody"];
 
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const { t } = useI18n();
@@ -2509,12 +2511,14 @@ async function tryOnLeffaAsync(
   abortSignal?: AbortSignal,
   /** Foto Espalda: el servidor usa la vista trasera real del avatar de Uwear. */
   backView = false,
+  /** Foto Lateral: el servidor usa el perfil real del avatar de Uwear. */
+  sideView = false,
 ): Promise<{ resultUrl: string; cost: number; usedProvider: string }> {
   const submitRes = await fetch("/api/tryon/async", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: abortSignal,
-    body: JSON.stringify({ modelImage, garmentImage, category, backView }),
+    body: JSON.stringify({ modelImage, garmentImage, category, backView, sideView }),
   });
   const submitJson = await submitRes.json();
   if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
@@ -2942,9 +2946,6 @@ async function runStep(
   // ALEJA y se para a 90 grados: aca interesa el CONTORNO (proyeccion de la copa,
   // ancho de banda, caida del tirante), no la textura de cerca.
   if (stepId === "photoSide") {
-    if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
-      throw new Error("La Foto Lateral necesita la modelo IA con este proveedor. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
-    }
     const category =
       productType === "panty" ? "bottoms"
       : productType === "set" ? "one-pieces"
@@ -2963,40 +2964,32 @@ async function runStep(
     // puede verse — un solo hombro, la nariz apuntando al borde del cuadro, el
     // contorno del busto recortado contra el fondo. Eso el modelo lo puede
     // comprobar mientras genera; "90 grados" no.
-    const sideScene =
-      "TRUE SIDE PROFILE, 90 degrees. The model's body and face both point to the side of the frame, NOT at the camera. " +
-      "Her nose points at the left edge of the picture and we see only ONE eye, ONE ear and ONE cheek — never both eyes, " +
-      "never a frontal face. Only ONE shoulder and ONE arm are visible; the far shoulder and far arm are hidden behind " +
-      "her body. The bust is seen edge-on, so its curve is cut out as an outline against the background. " +
-      "The single visible arm is RAISED, hand behind the head, elbow up, so the armpit, the side panel, the armhole seam " +
-      "and the side band are fully exposed. That arm must never hang down or cross the body. " +
-      "This is a contour shot: it must show how far the cup projects forward, the real width of the band around the ribs " +
-      "and how the strap sits on the shoulder. Waist-up framing, clean seamless studio background, even light with a soft " +
-      "rim along the contour. Do NOT produce a front-facing photo — a frontal shot is a failed result for this image.";
-    const res = await fetch("/api/tryon", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: abortSignal,
-      body: JSON.stringify({
-        modelImage: sharedModelUrl,
-        garmentImage: inputUrl,
-        // La foto REAL de la espalda del mismo REF. Sin esto Uwear solo veia el
-        // frente y tenia que INVENTAR como sigue la prenda hacia atras — de ahi
-        // que el costado saliera con una construccion que no es la del producto.
-        // El paso de try-on ya se la pasaba; la lateral no, y es donde mas hace
-        // falta: el perfil es justo la transicion entre frente y espalda.
-        garmentBackUrl: (providerOverride ?? "uwear") === "uwear" ? backGarmentUrl : undefined,
-        category,
-        garmentType: garmentTypeForApi,
-        provider: providerOverride && providerOverride !== "auto" ? providerOverride : "uwear",
-        forceProvider: true,
-        garmentDescription,
-        scenePrompt: sideScene,
-      }),
-    });
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error || "Foto Lateral falló");
-    return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
+    // EL PROMPT NO PODIA GANAR ESTA.
+    // Se intento dos veces: primero pidiendo "turned 90 degrees", despues
+    // describiendo el resultado observable (un ojo, un hombro, la nariz al borde
+    // del cuadro). Las dos devolvieron una foto DE FRENTE.
+    //
+    // La razon es estructural, no de redaccion: un try-on NO puede rotar a
+    // nadie. Deforma la prenda sobre la modelo que recibe, asi que si la modelo
+    // de entrada esta de frente, la salida esta de frente — diga lo que diga el
+    // texto. Seguir puliendo el prompt era insistir con la herramienta
+    // equivocada.
+    //
+    // Es el MISMO error que tenia la Foto Espalda, y se resuelve igual: el
+    // avatar de Uwear ya trae su perfil real como asset "full_body_side". Se usa
+    // esa foto como entrada y el giro deja de negociarse con un modelo
+    // generativo. Deterministico: misma mujer que en los demas pasos, perfil
+    // real, sin generar personas.
+    const sideGarment = backGarmentUrl ?? inputUrl;
+    const leffaSide = await tryOnLeffaAsync(
+      "", // la modelo la pone el servidor desde el avatar
+      sideGarment,
+      category,
+      abortSignal,
+      false, // backView
+      true,  // sideView
+    );
+    return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
   }
 
   if (stepId === "photoDetail") {

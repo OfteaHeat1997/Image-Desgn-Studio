@@ -226,3 +226,80 @@ export async function directJewelryPrompts(
     return null;
   }
 }
+
+
+/**
+ * Región a acercar para el macro, mirando la pieza YA RECORTADA.
+ *
+ * El recorte macro era mecánico: buscaba la zona con más masa de píxeles. Eso
+ * sabe dónde hay más metal, no qué parte de ESTA pieza demuestra calidad — por
+ * eso el zoom salía raro (a veces un tramo de cadena vacío, a veces media
+ * pieza). Acá Claude mira el producto aislado y devuelve el rectángulo exacto,
+ * normalizado 0-1, que después usa sharp para recortar píxeles REALES.
+ *
+ * Se corre sobre la imagen aislada y no sobre la original a propósito: las
+ * coordenadas tienen que corresponder a lo que el recortador va a abrir.
+ *
+ * Devuelve null si no hay key o la respuesta no es usable — en ese caso el
+ * recortador vuelve a su heurística.
+ */
+export async function findMacroRegion(
+  isolatedUrl: string,
+): Promise<{ region: { x: number; y: number; w: number; h: number }; reason: string } | null> {
+  const key = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!key) return null;
+  const img = await imageToBase64(isolatedUrl);
+  if (!img) return null;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: CLAUDE_SONNET,
+        max_tokens: 300,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } },
+              {
+                type: 'text',
+                text:
+                  'Esta es una pieza de joyería recortada sobre fondo transparente. ' +
+                  'Elegí la ZONA que mejor demuestra la calidad de fabricación en una foto macro: ' +
+                  'el engaste de una piedra, el cierre, la medalla o dije, la unión de eslabones, ' +
+                  'un grabado o una textura. Evitá tramos vacíos de cadena y evitá encuadrar la pieza entera. ' +
+                  'La zona debe ocupar entre el 15% y el 45% del ancho de la imagen. ' +
+                  'Respondé SOLO con JSON, sin markdown: ' +
+                  '{"x":0.0,"y":0.0,"w":0.0,"h":0.0,"reason":"qué parte elegiste y por qué, en español"}. ' +
+                  'x e y son la esquina superior izquierda, normalizados 0-1 sobre ESTA imagen. ' +
+                  'w y h son ancho y alto normalizados. El rectángulo debe ser aproximadamente cuadrado.',
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = String(data?.content?.[0]?.text ?? '')
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim();
+    const p = JSON.parse(text) as { x: number; y: number; w: number; h: number; reason?: string };
+    if (![p.x, p.y, p.w, p.h].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+    if (p.w <= 0 || p.h <= 0) return null;
+    return {
+      region: { x: p.x, y: p.y, w: p.w, h: p.h },
+      reason: p.reason ?? '',
+    };
+  } catch (err) {
+    console.warn('[art-director] findMacroRegion falló:', err);
+    return null;
+  }
+}
