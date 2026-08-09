@@ -4955,7 +4955,7 @@ export default function LingeriePipelinePage() {
 
               {/* Reuso de modelos IA ya generadas — ahorro $0.055 por REF */}
               {savedModels.length > 0 && (
-                <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-[var(--border-accent)] bg-[var(--accent)]/[0.03] p-5">
+                <section className="rounded-xl border border-[var(--border-accent)] bg-[var(--accent)]/[0.03] p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
@@ -4985,7 +4985,7 @@ export default function LingeriePipelinePage() {
                       fila, se hojea con el dedo o la rueda, y al pasar el mouse
                       cada modelo se levanta. Una fila dice "elegi una si querés";
                       tres filas dicen "tenés que revisar esto". */}
-                  <div className="flex w-full min-w-0 max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
                     {savedModels.slice(0, 18).map((m) => {
                       const isSelected = sharedModelUrl === m.previewUrl;
                       return (
@@ -5002,11 +5002,13 @@ export default function LingeriePipelinePage() {
                             toast.success(lg.messages.modelSelected(m.name));
                           }}
                           className={cn(
-                            // w-28 + snap-start: cada modelo es una tarjeta de ancho
-                            // fijo que "engancha" al hojear, en vez de una celda de
-                            // grilla. -translate-y al hover: la tarjeta se levanta,
-                            // que es lo que comunica "esto se puede elegir".
-                            "group relative flex w-28 shrink-0 snap-start flex-col overflow-hidden rounded-lg border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/40",
+                            // REVERTIDO al layout de grilla (2026-08-09): la version
+                            // en carrusel horizontal (w-28 shrink-0 + overflow-x-auto)
+                            // ensanchaba el contenedor y rompia el layout de toda la
+                            // pagina — la columna derecha quedaba fuera de pantalla y
+                            // no se podia clickear nada. Se conserva solo el
+                            // micro-movimiento al hover, que no afecta el ancho.
+                            "group relative flex flex-col overflow-hidden rounded-lg border transition-all duration-200 hover:-translate-y-0.5",
                             isSelected
                               ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40"
                               : "border-white/10 hover:border-[var(--accent)]/50",
