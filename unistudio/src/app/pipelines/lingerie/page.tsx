@@ -2925,9 +2925,48 @@ async function runStep(
           12000,
         );
       }
+      // AISLAR LA ESPALDA ANTES DE DEFORMARLA.
+      //
+      // Aca se le pasaba a Leffa la foto de espalda TAL CUAL la subio la usuaria
+      // — o sea, la foto de catalogo CON la modelo puesta. Leffa deforma pixeles:
+      // si recibe una persona, tiene que adivinar donde termina la prenda, se
+      // queda con la banda del centro y pierde los tirantes. Por eso el racerback
+      // desaparecia y el resultado salia como un bandeau con los hombros
+      // desnudos.
+      //
+      // Aislando primero, Leffa recibe SOLO la prenda sobre fondo limpio y puede
+      // mapear los tirantes. Si el aislado falla seguimos con la foto original:
+      // un resultado imperfecto es mejor que ninguno.
+      let backGarmentForLeffa = backGarmentUrl ?? garmentForTryon;
+      if (backGarmentUrl) {
+        try {
+          const isoRes = await fetch("/api/bg-remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: abortSignal,
+            body: JSON.stringify({
+              imageUrl: backGarmentUrl,
+              provider: "replicate",
+              removeSubject: true,
+              garmentType: garmentTypeForApi,
+              isolateMethod: "auto",
+              garmentDescription,
+            }),
+          });
+          const isoJson = await isoRes.json();
+          if (isoJson.success && isoJson.data?.url) {
+            backGarmentForLeffa = isoJson.data.url;
+            console.log("[lingerie] photoBack: espalda AISLADA antes del warp");
+          } else {
+            console.warn("[lingerie] photoBack: no se pudo aislar la espalda, uso la foto tal cual:", isoJson.error);
+          }
+        } catch (e) {
+          console.warn("[lingerie] photoBack: fallo el aislado de la espalda:", e instanceof Error ? e.message : e);
+        }
+      }
       const leffa = await tryOnLeffaAsync(
         newModelImage,
-        backGarmentUrl ?? garmentForTryon,
+        backGarmentForLeffa,
         category,
         abortSignal,
         true,
