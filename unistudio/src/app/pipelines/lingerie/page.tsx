@@ -5142,11 +5142,10 @@ export default function LingeriePipelinePage() {
                 </h2>
                 {uwearWillHandleModel && (
                   <p className="mb-4 rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 py-2.5 text-sm leading-relaxed text-[var(--accent-light)]">
-                    <strong>No aplica con Uwear.</strong> Uwear genera su propia modelo
-                    (siempre la misma), así que estos ajustes no cambian nada y el paso
-                    &quot;Crear Modelo IA&quot; se salta — te ahorrás $0.055 por producto.
-                    Si querés controlar tono de piel, edad y cuerpo, elegí <strong>Leffa</strong> en
-                    la Foto Frontal.
+                    <strong>{lg.modelConfig.uwearNoticeBold}</strong>
+                    {lg.modelConfig.uwearNoticeBody}
+                    <strong>{lg.modelConfig.uwearNoticeProvider}</strong>
+                    {lg.modelConfig.uwearNoticeTail}
                   </p>
                 )}
                 <p className="mb-4 rounded-lg bg-[var(--warning-dim)] px-3 py-2 text-xs text-[var(--warning)]">
