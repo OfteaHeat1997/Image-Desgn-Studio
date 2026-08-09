@@ -2956,13 +2956,24 @@ async function runStep(
     // sisa y la malla de la axila — el motivo entero de la toma de perfil. Por eso
     // los catalogos de lenceria disparan el perfil con el brazo LEVANTADO y la
     // mano detras de la nuca: despeja el costado y estira la banda a su forma real.
+    // DESCRIBIR EL RESULTADO, NO DAR LA ORDEN.
+    // "turned 90 degrees" + "raise the arm" dio una foto DE FRENTE con los dos
+    // brazos arriba: el modelo obedecio la instruccion mas concreta (el brazo) y
+    // solto la abstracta (el giro). Las instrucciones abstractas se pierden; las
+    // verificables no. Por eso ahora se describe que TIENE que verse y que NO
+    // puede verse — un solo hombro, la nariz apuntando al borde del cuadro, el
+    // contorno del busto recortado contra el fondo. Eso el modelo lo puede
+    // comprobar mientras genera; "90 grados" no.
     const sideScene =
-      "Strict side profile product shot: the model turned 90 degrees to the camera, full side view of the garment. " +
-      "The arm nearest the camera is RAISED with the hand resting behind the head or neck, elbow open and pointing up, " +
-      "so the armpit, the side panel, the armhole seam and the side band are fully exposed and unobstructed. " +
-      "Never let the arm hang down or cross the body — it must not cover any part of the garment. " +
-      "Show the silhouette clearly — how far the cup projects, the real width of the band and how the strap sits on " +
-      "the shoulder. Waist-up framing, clean seamless studio background, even light with a soft rim on the contour.";
+      "TRUE SIDE PROFILE, 90 degrees. The model's body and face both point to the side of the frame, NOT at the camera. " +
+      "Her nose points at the left edge of the picture and we see only ONE eye, ONE ear and ONE cheek — never both eyes, " +
+      "never a frontal face. Only ONE shoulder and ONE arm are visible; the far shoulder and far arm are hidden behind " +
+      "her body. The bust is seen edge-on, so its curve is cut out as an outline against the background. " +
+      "The single visible arm is RAISED, hand behind the head, elbow up, so the armpit, the side panel, the armhole seam " +
+      "and the side band are fully exposed. That arm must never hang down or cross the body. " +
+      "This is a contour shot: it must show how far the cup projects forward, the real width of the band around the ribs " +
+      "and how the strap sits on the shoulder. Waist-up framing, clean seamless studio background, even light with a soft " +
+      "rim along the contour. Do NOT produce a front-facing photo — a frontal shot is a failed result for this image.";
     const res = await fetch("/api/tryon", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
