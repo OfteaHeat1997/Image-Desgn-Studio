@@ -1994,7 +1994,7 @@ export default function StaticProductPipelinePage() {
                         </div>
 
                         {/* Outputs — big thumbnails with download + zoom + re-run */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4">
                           {outputStepsFor(job).map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
