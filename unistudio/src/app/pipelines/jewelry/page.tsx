@@ -31,6 +31,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   ChevronLeft,
   Download,
   Eraser,
@@ -371,6 +372,150 @@ function VisionPanel({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Vista previa del recorrido (pantalla inicial)                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Los 8 pasos, visibles ANTES de subir nada.
+ *
+ * Hasta ahora la pantalla inicial solo nombraba dos pasos — las dos casillas
+ * opcionales — porque el resto se creaba recién al subir una foto. Se entraba,
+ * se veían dos nombres sueltos y no había forma de saber que el pipeline tenía
+ * ocho pasos ni qué iba a producir. Verificado en el HTML del deploy: de los 8
+ * nombres, solo "En modelo" y "Foto de escala" aparecían.
+ */
+function FlowPreview({
+  includeModel,
+  includeScale,
+}: {
+  includeModel: boolean;
+  includeScale: boolean;
+}) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
+
+  return (
+    <div className="mb-4 rounded-xl border border-white/8 bg-white/[0.02] p-4">
+      <div className="space-y-3">
+        {STAGES.map((stage) => (
+          <div key={stage.key}>
+            <div className="mb-1.5 flex items-baseline gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                {jt.stages[stage.key].label}
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {jt.stages[stage.key].hint}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {stage.steps.map((k) => {
+                const off =
+                  (k === "model" && !includeModel) || (k === "scale" && !includeScale);
+                const Icon = STEP_ICONS[k];
+                return (
+                  <span
+                    key={k}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px]",
+                      off
+                        ? "border-white/8 bg-transparent text-[var(--text-muted)] line-through"
+                        : "border-white/10 bg-white/[0.03] text-gray-200",
+                    )}
+                    title={jt.steps[k].description}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {jt.steps[k].label}
+                    <span className="text-[10px] text-[var(--text-secondary)]">
+                      {jt.steps[k].costHint}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Barra de pasos                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Mapa fijo de todo el recorrido, siempre visible bajo el encabezado.
+ *
+ * El reclamo fue "no puedo ver los otros pasos": ocho tarjetas altas apiladas
+ * dejan el resto fuera de pantalla y no hay forma de saber qué viene ni cuánto
+ * falta. Esta barra muestra los ocho de un vistazo con su estado, y al tocar
+ * uno salta a su tarjeta.
+ */
+function StepRail({
+  steps,
+  onJump,
+}: {
+  steps: Record<StepKey, StepState>;
+  onJump: (k: StepKey) => void;
+}) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
+
+  return (
+    <div className="sticky top-[57px] z-20 -mx-4 mb-5 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.92)] px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {STAGES.map((stage) => {
+          const visible = stage.steps.filter((k) => steps[k].enabled);
+          if (visible.length === 0) return null;
+          return (
+            <div key={stage.key} className="flex shrink-0 items-center gap-1.5">
+              <span className="px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                {jt.stages[stage.key].label}
+              </span>
+              {visible.map((k) => {
+                const st = steps[k];
+                const Icon = STEP_ICONS[k];
+                const dot =
+                  st.status === "done" || st.status === "accepted"
+                    ? "bg-[var(--success)]"
+                    : st.status === "processing"
+                      ? "bg-[var(--accent)] lz-dot"
+                      : st.status === "error"
+                        ? "bg-red-400"
+                        : st.status === "skipped"
+                          ? "bg-white/25"
+                          : "bg-white/15";
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => onJump(k)}
+                    title={jt.steps[k].label}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors",
+                      st.status === "processing"
+                        ? "border-[var(--accent)]/50 bg-[var(--accent-dim)] text-[var(--accent)]"
+                        : st.status === "error"
+                          ? "border-red-500/40 bg-red-500/10 text-red-300"
+                          : "border-white/10 bg-white/[0.03] text-[var(--text-secondary)] hover:border-white/25 hover:text-gray-200",
+                    )}
+                  >
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="hidden whitespace-nowrap sm:inline">{jt.steps[k].label}</span>
+                  </button>
+                );
+              })}
+              <span className="px-0.5 text-[var(--text-muted)]">›</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Tarjeta de paso                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -388,6 +533,9 @@ interface StepCardProps {
   onSelectVariant: (url: string) => void;
   /** "No me gusta": descarta la versión actual y vuelve a la anterior. */
   onDiscard: () => void;
+  /** Plegada = fila compacta. Permite ver varios pasos a la vez. */
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 function StepCard({
@@ -402,6 +550,8 @@ function StepCard({
   onStop,
   onSelectVariant,
   onDiscard,
+  collapsed,
+  onToggleCollapse,
 }: StepCardProps) {
   const { t } = useI18n();
   const jt = t.pipelines.jewelry;
@@ -458,10 +608,13 @@ function StepCard({
                 : "border-white/8 bg-white/[0.02]",
       )}
     >
-      {/* Encabezado */}
-      <div
-        className="flex items-center justify-between gap-3 px-5 py-4"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      {/* Encabezado. Al plegar, toda la tarjeta se reduce a esta fila: asi
+          entran varios pasos en pantalla en vez de uno solo. */}
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        style={{ borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="flex min-w-0 items-center gap-3.5">
           <div className="relative shrink-0">
@@ -492,7 +645,7 @@ function StepCard({
               </span>
               <button
                 type="button"
-                onClick={() => setShowDocs((s) => !s)}
+                onClick={(e) => { e.stopPropagation(); setShowDocs((s) => !s); }}
                 className={cn(
                   "flex h-4 w-4 items-center justify-center rounded-full transition-colors",
                   showDocs
@@ -519,21 +672,28 @@ function StepCard({
           </span>
           <StatusBadge status={step.status} labels={jt.statusBadge} />
           {step.status === "processing" && (
-            <button
-              type="button"
-              onClick={onStop}
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onStop(); }}
               className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/20"
               title={jt.stepCard.stopTitle}
             >
               <StopCircle className="h-3 w-3" />
               {jt.buttons.stop}
-            </button>
+            </span>
           )}
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform",
+              collapsed ? "" : "rotate-180",
+            )}
+          />
         </div>
-      </div>
+      </button>
 
       {/* Documentación del paso */}
-      {showDocs && (
+      {!collapsed && showDocs && (
         <div className="border-b border-white/6 bg-[var(--accent)]/[0.03] px-5 py-4 text-xs">
           <div className="space-y-3">
             <div>
@@ -583,6 +743,7 @@ function StepCard({
       )}
 
       {/* Cuerpo */}
+      {!collapsed && (
       <div className="px-5 py-4">
         {step.status === "processing" ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
@@ -735,6 +896,8 @@ function StepCard({
           </div>
         )}
       </div>
+
+      )}
 
       {/* Vista grande al pasar el mouse */}
       {peek && step.resultUrl && !isSocial && (
@@ -894,6 +1057,31 @@ export default function JewelryPipelinePage() {
   const [busy, setBusy] = useState(false);
   const [includeModel, setIncludeModel] = useState(true);
   const [includeScale, setIncludeScale] = useState(false);
+  /**
+   * Pasos desplegados. Por defecto solo se abre el que corre y el ultimo que
+   * fallo: con los ocho abiertos la pagina medía varias pantallas y no se veia
+   * el recorrido. El resto queda plegado en una fila y se abre al tocarlo.
+   */
+  const [expanded, setExpanded] = useState<Set<StepKey>>(new Set());
+
+  const toggleExpanded = useCallback((k: StepKey) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }, []);
+
+  /** Salta a la tarjeta desde la barra y la abre. */
+  const jumpToStep = useCallback((k: StepKey) => {
+    setExpanded((prev) => new Set(prev).add(k));
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-step-id="${k}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, []);
 
   const previewUrlsRef = useRef<string[]>([]);
   // Espejo del estado: los pasos encadenan y setState es asíncrono, así que
@@ -1493,6 +1681,8 @@ export default function JewelryPipelinePage() {
                 <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">{jt.config.outputsHint}</p>
               </div>
 
+              <FlowPreview includeModel={includeModel} includeScale={includeScale} />
+
               <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 py-2">
                 <span className="text-xs font-medium text-[var(--accent)]">{jt.config.estimated}</span>
                 <span className="font-mono text-sm font-semibold text-[var(--accent)]">
@@ -1596,6 +1786,8 @@ export default function JewelryPipelinePage() {
               </div>
             )}
 
+            <StepRail steps={activeJob.steps} onJump={jumpToStep} />
+
             <VisionPanel
               job={activeJob}
               disabled={busy}
@@ -1640,6 +1832,12 @@ export default function JewelryPipelinePage() {
                           patchStep(activeJob.id, key, { resultUrl: url, status: "done" })
                         }
                         onDiscard={() => handleDiscard(activeJob.id, key)}
+                        collapsed={
+                          !expanded.has(key) &&
+                          activeJob.steps[key].status !== "processing" &&
+                          activeJob.steps[key].status !== "error"
+                        }
+                        onToggleCollapse={() => toggleExpanded(key)}
                       />
                     ))}
                   </div>
