@@ -127,6 +127,13 @@ interface Job {
    * Sharp puro (gratis) — aterriza el producto para que no parezca pegado.
    */
   addShadow?: boolean;
+  /**
+   * Toggle: ¿generar el blanco e-commerce con Photoroom (recorte + fondo +
+   * sombra en un solo paso) en vez del Sharp puro? Opt-in, default OFF — no
+   * cambia nada salvo que la usuaria lo active. Usa el sandbox de Photoroom
+   * (gratis, con marca de agua) para no quemar la cuota del plan de prueba.
+   */
+  usePhotoroom?: boolean;
 }
 
 const INITIAL_STEPS: Record<StepKey, StepSnapshot> = {
@@ -761,6 +768,7 @@ export default function StaticProductPipelinePage() {
     key: StepKey,
     config: ReturnType<typeof getAdaptiveBgConfig>,
     overridePrompt?: string,
+    usePhotoroom?: boolean,
   ): Promise<{ url: string; cost: number }> => {
     // 90s timeout client-side — Vercel route caps at 60s, but giving us 30s
     // grace prevents the "infinite spinner" bug when a request hangs (e.g.
@@ -768,16 +776,17 @@ export default function StaticProductPipelinePage() {
     const timeoutSignal = AbortSignal.timeout(90_000);
 
     if (key === "white") {
+      // Opt-in Photoroom: recorte + blanco real + sombra suave en UN paso.
+      // Default OFF → sigue el camino Sharp puro. Sandbox por defecto (gratis,
+      // con marca de agua) — el backend usa sandbox:true salvo sandbox:false.
+      const whiteBody = usePhotoroom
+        ? { imageUrl: inputUrl, provider: "photoroom", style: "pure-white", shadow: "soft", mode: "fast" }
+        : { imageUrl: inputUrl, mode: "fast", style: "pure-white", aspectRatio: "1:1" };
       const r = await fetch("/api/bg-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: timeoutSignal,
-        body: JSON.stringify({
-          imageUrl: inputUrl,
-          mode: "fast", // ignored by route when style is solid-color; included for safety
-          style: "pure-white",
-          aspectRatio: "1:1",
-        }),
+        body: JSON.stringify(whiteBody),
       });
       const d = await safeJson(r);
       if (!d.success) throw new Error(d.error || "Falló blanco e-commerce");
@@ -813,10 +822,11 @@ export default function StaticProductPipelinePage() {
     inputUrl: string,
     config: ReturnType<typeof getAdaptiveBgConfig>,
     overridePrompt?: string,
+    usePhotoroom?: boolean,
   ): Promise<{ url?: string; cost: number }> => {
     updateStep(jobId, key, { status: "running", error: undefined });
     try {
-      const { url, cost } = await generateOneOutput(inputUrl, key, config, overridePrompt);
+      const { url, cost } = await generateOneOutput(inputUrl, key, config, overridePrompt, usePhotoroom);
       updateStep(jobId, key, { status: "done", resultUrl: url, cost });
       return { url, cost };
     } catch (err) {
@@ -940,7 +950,7 @@ export default function StaticProductPipelinePage() {
 
       const sharedInput = currentUrl;
       const [whiteRes, adaptiveRes, heroRes, verticalRes] = await Promise.all([
-        runOutputStep(job.id, "white", sharedInput, enrichedConfig),
+        runOutputStep(job.id, "white", sharedInput, enrichedConfig, undefined, job.usePhotoroom),
         runOutputStep(job.id, "adaptive", sharedInput, enrichedConfig),
         runOutputStep(job.id, "hero", sharedInput, enrichedConfig),
         runOutputStep(job.id, "vertical", sharedInput, enrichedConfig),
@@ -1178,7 +1188,9 @@ export default function StaticProductPipelinePage() {
     updateJob(jobId, { status: "generating", error: undefined });
     try {
       const results = await Promise.all(
-        keys.map((key) => runOutputStep(jobId, key, inputUrl, config, overridePrompt)),
+        keys.map((key) =>
+          runOutputStep(jobId, key, inputUrl, config, overridePrompt, key === "white" ? job.usePhotoroom : undefined),
+        ),
       );
       const addedCost = results.reduce((s, r) => s + r.cost, 0);
       const adaptive = job.steps.adaptive.resultUrl;
@@ -1618,6 +1630,19 @@ export default function StaticProductPipelinePage() {
                           <div className="flex-1 min-w-0">
                             <span className="text-[11px] font-semibold text-gray-100">{sp.job.shadowToggle}</span>
                             <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.shadowDesc}</p>
+                          </div>
+                        </label>
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={job.usePhotoroom ?? false}
+                            onChange={(e) => updateJob(job.id, { usePhotoroom: e.target.checked })}
+                            disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
+                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[11px] font-semibold text-gray-100">{sp.job.photoroomToggle}</span>
+                            <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.photoroomDesc}</p>
                           </div>
                         </label>
                       </div>

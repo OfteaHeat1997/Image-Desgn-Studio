@@ -143,6 +143,117 @@ export async function ghostMannequinPhotoroom(
   return await enhanceSatinSheen(png);
 }
 
+// =============================================================================
+// STATIC PRODUCT — cut-out + fondo + sombra en UNA sola llamada ("los dos de una")
+//
+// A diferencia de ghost-mannequin (que es para prendas sobre modelo), acá el
+// producto es un objeto rígido (perfume, crema, frasco, tubo). Photoroom hace en
+// una sola pasada del endpoint /v2/edit: recorta el producto, le pone fondo
+// (blanco puro o una escena por prompt) y — opcionalmente — le agrega una sombra
+// de IA. Eso reemplaza los 2-3 pasos de Sharp/Flux del pipeline de estáticos.
+//
+// NO se aplica enhanceSatinSheen: ese realce es específico de la lencería de
+// satén; en un frasco de perfume endurecería reflejos que no queremos tocar.
+// =============================================================================
+
+/** Sombra de IA de Photoroom para el pipeline de estáticos. */
+export type PhotoroomStaticShadow = 'none' | 'soft' | 'floating';
+
+export interface StaticProductPhotoroomOptions {
+  /**
+   * Fondo del resultado:
+   *   'white'            → fondo blanco puro (#FFFFFF), listo para marketplace.
+   *   { prompt: string } → escena generada a partir del prompt (mesa de mármol,
+   *                        vanity, playa…). Va al campo `background.prompt`.
+   */
+  background: 'white' | { prompt: string };
+  /**
+   * Sombra de IA. 'soft' = sombra de contacto suave; 'floating' = sombra de
+   * objeto flotando. 'none' (default) omite el campo → sin sombra añadida.
+   */
+  shadow?: PhotoroomStaticShadow;
+  /**
+   * Tamaño de salida. Photoroom expone presets de size, pero para el endpoint
+   * base de /v2/edit el encuadre 1:1 se logra de forma más confiable con
+   * `padding` + fondo. Por eso el default es OMITIR el campo y confiar en el
+   * padding (evita un 400 si el preset no aplica al edit base). Si el caller
+   * pasa un `size` explícito (ej. 'SQUARE_HD') se envía tal cual.
+   */
+  size?: string;
+  /** Padding alrededor del producto (fracción). Default 0.05, igual que ghost. */
+  padding?: number;
+  /**
+   * SANDBOX: default TRUE para las rutas NUEVAS de estáticos.
+   *
+   * El plan de la usuaria es una prueba y el fondo/sombra de IA son de pago y
+   * queman cuota. Por eso estas rutas nuevas arrancan en sandbox (gratis, con
+   * marca de agua) salvo que el request mande explícitamente `sandbox: false`.
+   */
+  sandbox?: boolean;
+}
+
+/**
+ * Recorta + fondo + sombra de un producto estático en UNA sola llamada a
+ * Photoroom /v2/edit. Devuelve el Buffer del PNG; el caller lo persiste (data
+ * URL / storage) igual que los otros proveedores del pipeline.
+ *
+ * Construye el FormData con el MISMO patrón que ghostMannequinPhotoroom
+ * (imageFile Blob, header x-api-key, Accept 'image/png, application/json') y
+ * lanza con el cuerpo de la respuesta si Photoroom rechaza.
+ */
+export async function editStaticProductPhotoroom(
+  imageUrl: string,
+  opts: StaticProductPhotoroomOptions,
+): Promise<Buffer> {
+  const imageBuffer = await toBuffer(imageUrl);
+
+  const form = new FormData();
+  // Campo de imagen para upload directo (multipart), igual que ghost mannequin.
+  form.append('imageFile', new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' }), 'input.jpg');
+
+  // Fondo: blanco puro (marketplace) o escena por prompt.
+  if (opts.background === 'white') {
+    form.append('background.color', 'FFFFFF');
+  } else {
+    form.append('background.prompt', opts.background.prompt);
+  }
+
+  // Sombra de IA (opcional). 'none' → no se añade el campo.
+  if (opts.shadow && opts.shadow !== 'none') {
+    form.append('shadow.mode', opts.shadow === 'floating' ? 'ai.floating' : 'ai.soft');
+  }
+
+  // Size sólo si el caller lo pide explícito (ver comentario en la interfaz).
+  if (opts.size) {
+    form.append('size', opts.size);
+  }
+
+  // Padding: encuadre del objeto con margen. Default 0.05.
+  form.append('padding', String(opts.padding ?? 0.05));
+
+  // SANDBOX por defecto TRUE para estas rutas nuevas de estáticos: sólo se
+  // desactiva si el request manda explícitamente sandbox:false.
+  const sandbox = opts.sandbox ?? true;
+
+  const res = await fetch(PHOTOROOM_EDIT_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': getPhotoroomKey(sandbox),
+      Accept: 'image/png, application/json',
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Photoroom /v2/edit (static) ${res.status}: ${txt.slice(0, 400)}`);
+  }
+
+  // Sin enhanceSatinSheen: ese realce es de la lencería de satén, no aplica a
+  // frascos/tubos rígidos. Devolvemos el PNG crudo de Photoroom.
+  return Buffer.from(await res.arrayBuffer());
+}
+
 /** Poses de Virtual Model que expone Photoroom (12 presets). */
 export type PhotoroomPose = 'standing' | 'seated' | 'crossedarms' | 'back' | 'random';
 

@@ -97,6 +97,8 @@ export interface StaticProductPipelineCopy {
     upscaleDesc: string;
     shadowToggle: string;
     shadowDesc: string;
+    photoroomToggle: string;
+    photoroomDesc: string;
     featuresTitle: string;
     cap: (value: string) => string;
     zoomSmall: string;
@@ -231,6 +233,9 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
     shadowToggle: '🌑 Sombra de contacto en el blanco',
     shadowDesc:
       'Aterriza el producto sobre el blanco e-commerce para que no parezca pegado. Gratis.',
+    photoroomToggle: '⚡ Usar Photoroom (blanco real + sombra)',
+    photoroomDesc:
+      'Genera el blanco e-commerce con recorte, fondo y sombra en un solo paso. En modo prueba (sandbox) sale con marca de agua.',
     featuresTitle: '✨ Lo que la IA ve en tu foto',
     cap: (value) => `tapa ${value}`,
     zoomSmall: 'Ver en grande',
@@ -484,6 +489,9 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
     shadowToggle: '🌑 Contact shadow on the white',
     shadowDesc:
       'Grounds the product on the e-commerce white so it does not look pasted. Free.',
+    photoroomToggle: '⚡ Use Photoroom (true white + shadow)',
+    photoroomDesc:
+      'Builds the e-commerce white with cut-out, background and shadow in a single step. In test mode (sandbox) it comes out watermarked.',
     featuresTitle: '✨ What AI sees in your photo',
     cap: (value) => `cap ${value}`,
     zoomSmall: 'View larger',

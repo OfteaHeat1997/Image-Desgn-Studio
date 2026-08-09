@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { addDropShadow, addContactShadow, addReflection, relightIcLight, relightKontext } from '@/lib/processing/shadows';
+import { editStaticProductPhotoroom } from '@/lib/api/photoroom';
 import { urlToBuffer, bufferToDataUrl } from '@/lib/utils/image';
 import { saveJob } from '@/lib/db/persist';
 import { withApiErrorHandler } from '@/lib/api/route-helpers';
@@ -62,6 +63,12 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
   let params: Record<string, any> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any -- dynamic JSON params
   let preset: string | undefined;
   let prompt: string | undefined;
+  // Proveedor opcional. Default = Sharp/IC-Light (rutas existentes intactas).
+  // 'photoroom' → sombra de IA de Photoroom sobre fondo blanco (pipeline estáticos).
+  let provider: string | undefined;
+  // Sólo para provider:'photoroom'. Default TRUE (sandbox gratis) — sólo se
+  // desactiva si el request manda explícitamente sandbox:false.
+  let sandbox: boolean | undefined;
 
   if (contentType.includes('multipart/form-data')) {
     const formData = await request.formData();
@@ -84,6 +91,8 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
       params = parsed;
       preset = parsed.preset;
       prompt = parsed.prompt;
+      provider = parsed.provider;
+      sandbox = parsed.sandbox;
     } catch {
       return NextResponse.json({ success: false, error: 'Invalid JSON in "params" field.' }, { status: 400 });
     }
@@ -94,6 +103,8 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
     params = body.params || body;
     preset = body.preset;
     prompt = body.prompt;
+    provider = body.provider;
+    sandbox = body.sandbox;
 
     if (!imageUrl) {
       return NextResponse.json({ success: false, error: 'Missing "imageUrl" in JSON body or "file" in form data.' }, { status: 400 });
@@ -107,8 +118,45 @@ export const POST = withApiErrorHandler('shadows', async (request: NextRequest) 
     );
   }
 
-  const cost = SHADOW_COSTS[shadowType] ?? 0;
+  let cost = SHADOW_COSTS[shadowType] ?? 0;
   let resultUrl: string;
+
+  // Photoroom provider: sombra de IA sobre fondo blanco, en UNA sola llamada.
+  // Aditivo — sólo se activa con provider:'photoroom'. Sharp/IC-Light quedan
+  // intactos como default. Sandbox por defecto TRUE (gratis, con marca de agua):
+  // sólo se desactiva si el request manda explícitamente sandbox:false.
+  if (provider === 'photoroom') {
+    // Necesita una imagen: si vino como buffer (form-data) la pasamos como data URL.
+    if (!imageUrl && imageBuffer) {
+      imageUrl = bufferToDataUrl(imageBuffer, 'image/png');
+    }
+    if (!imageUrl) {
+      return NextResponse.json({ success: false, error: 'Image URL required for Photoroom shadow.' }, { status: 400 });
+    }
+    // 'floating' explícito (por type o por params.shadow) → sombra flotante;
+    // en cualquier otro caso, sombra de contacto suave.
+    const prShadow =
+      shadowType === 'floating' || params.shadow === 'floating' ? 'floating' : 'soft';
+    const png = await editStaticProductPhotoroom(imageUrl, {
+      background: 'white',
+      shadow: prShadow,
+      sandbox: sandbox === false ? false : true,
+    });
+    resultUrl = bufferToDataUrl(png, 'image/png');
+    cost = 0; // sandbox = gratis; en producción Photoroom tiene su propio costo por plan
+    await saveJob({
+      operation: 'shadows',
+      provider: 'photoroom',
+      inputParams: { imageUrl, shadowType, shadow: prShadow, sandbox: sandbox === false ? false : true },
+      outputUrl: resultUrl,
+      cost,
+    });
+    return NextResponse.json({
+      success: true,
+      data: { url: proxyReplicateUrl(resultUrl), type: shadowType, provider: 'photoroom' },
+      cost,
+    });
+  }
 
   switch (shadowType) {
     case 'drop': {

@@ -14,7 +14,8 @@ import {
 } from '@/lib/processing/bg-generate';
 import { ensureHttpUrl } from '@/lib/api/replicate';
 import { saveJob } from '@/lib/db/persist';
-import { proxyReplicateUrl } from '@/lib/utils/image';
+import { proxyReplicateUrl, bufferToDataUrl } from '@/lib/utils/image';
+import { editStaticProductPhotoroom, type PhotoroomStaticShadow } from '@/lib/api/photoroom';
 
 // Cost estimates in dollars per generation
 const MODE_COSTS: Record<string, number> = {
@@ -44,6 +45,9 @@ export async function POST(request: NextRequest) {
       aspectRatio = '1:1',
       productDescription,
       seed,
+      provider,
+      shadow,
+      sandbox,
     } = body as {
       imageUrl?: string;
       mode: 'precise' | 'creative' | 'fast';
@@ -57,6 +61,20 @@ export async function POST(request: NextRequest) {
        * Forwarded to Flux models via runModel.
        */
       seed?: number;
+      /**
+       * Proveedor opcional. Default = Flux (rutas existentes intactas).
+       * 'photoroom' → recorte + fondo + sombra en UNA llamada a Photoroom, para
+       * el pipeline de estáticos. Aditivo: no cambia el comportamiento por
+       * defecto de ningún estilo/modo existente.
+       */
+      provider?: 'photoroom';
+      /** Sombra de IA de Photoroom (sólo aplica con provider:'photoroom'). */
+      shadow?: PhotoroomStaticShadow;
+      /**
+       * Sólo para provider:'photoroom'. Default TRUE (sandbox gratis) — sólo se
+       * desactiva si el request manda explícitamente sandbox:false.
+       */
+      sandbox?: boolean;
     };
 
     if (!mode) {
@@ -99,6 +117,42 @@ export async function POST(request: NextRequest) {
     let httpImageUrl = imageUrl;
     if (imageUrl && imageUrl.startsWith('data:')) {
       httpImageUrl = await ensureHttpUrl(imageUrl);
+    }
+
+    // Photoroom provider: recorte + fondo + sombra en UNA sola llamada. Aditivo
+    // — sólo se activa cuando el request pide provider:'photoroom'. El resto de
+    // proveedores (Flux precise/creative/fast, Sharp solid) quedan intactos.
+    // Sandbox por defecto TRUE (gratis, con marca de agua): sólo se desactiva
+    // si el request manda explícitamente sandbox:false.
+    if (provider === 'photoroom') {
+      if (!httpImageUrl) {
+        return NextResponse.json(
+          { success: false, error: 'Photoroom provider requires "imageUrl".' },
+          { status: 400 },
+        );
+      }
+      // Blanco puro para 'pure-white'; escena por prompt en cualquier otro caso.
+      const isWhite = style === 'pure-white';
+      const scenePrompt = customPrompt || BACKGROUND_PRESETS[style]?.prompt || style;
+      const png = await editStaticProductPhotoroom(httpImageUrl, {
+        background: isWhite ? 'white' : { prompt: scenePrompt },
+        shadow: shadow ?? 'none',
+        sandbox: sandbox === false ? false : true,
+      });
+      resultUrl = bufferToDataUrl(png, 'image/png');
+      cost = 0; // sandbox = gratis; en producción Photoroom tiene su propio costo por plan
+      await saveJob({
+        operation: 'bg-generate',
+        provider: 'photoroom',
+        inputParams: { imageUrl, mode, style, customPrompt, shadow: shadow ?? 'none', sandbox: sandbox === false ? false : true },
+        outputUrl: resultUrl,
+        cost,
+      });
+      return NextResponse.json({
+        success: true,
+        data: { url: proxyReplicateUrl(resultUrl), mode: 'photoroom', style },
+        cost,
+      });
     }
 
     // Solid-color shortcut: bypass Flux entirely. The bg-remove + Sharp
