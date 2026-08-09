@@ -283,6 +283,12 @@ async function isolateGarment(
   imageUrl: string,
   garmentType: string | null,
   returnMaskOnly = false,
+  // Vocabulario dirigido por Claude Vision para ESTA foto. Sin esto la
+  // segmentacion usa la tabla fija por tipo, que no sabe distinguir el producto
+  // de la utileria del taller: con una pulsera apoyada en un cilindro blanco se
+  // queda con los dos.
+  subjectPrompt?: string,
+  propPrompt?: string,
 ): Promise<string> {
   // Load the image as a buffer so we can both ship it to the segmentation
   // model (needs an HTTP URL) and keep the pixel data locally for masking.
@@ -309,8 +315,8 @@ async function isolateGarment(
   const height = meta.height ?? 0;
   if (!width || !height) throw new Error('Could not read image dimensions');
 
-  const maskPrompt = garmentTypeToPrompt(garmentType);
-  const negPrompt = garmentNegativePrompt(garmentType);
+  const maskPrompt = garmentTypeToPrompt(garmentType, subjectPrompt);
+  const negPrompt = garmentNegativePrompt(garmentType, propPrompt);
   console.log(`[bg-remove:isolate] running grounded_sam prompt="${maskPrompt}" neg="${negPrompt}" size=${width}x${height}`);
 
   // Upload the prepared JPEG so Replicate can fetch it by URL
@@ -334,7 +340,7 @@ async function isolateGarment(
       {
         image: httpInput,
         mask_prompt: maskPrompt,
-        negative_mask_prompt: garmentNegativePrompt(garmentType),
+        negative_mask_prompt: negPrompt,
         adjustment_factor: 0,
       },
     );
@@ -647,7 +653,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // compuesta, no una máscara, así que no aplican. Si grounded_sam falla,
     // fallamos hacia arriba con error claro.
     if (returnMaskOnly) {
-      const maskUrl = await isolateGarment(imageUrl, garmentType ?? null, true);
+      const maskUrl = await isolateGarment(imageUrl, garmentType ?? null, true, subjectPrompt, propPrompt);
       await saveJob({
         operation: 'bg-remove',
         provider: 'grounded-sam-mask',
@@ -692,7 +698,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const tryGroundedSam = async (): Promise<boolean> => {
       for (let attempt = 1; attempt <= MAX_SAM_ATTEMPTS; attempt++) {
         try {
-          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+          resultUrl = await isolateGarment(imageUrl, garmentType ?? null, false, subjectPrompt, propPrompt);
           usedProvider = 'grounded-sam-isolate';
           if (attempt > 1) console.log(`[bg-remove:removeSubject] grounded_sam OK en el intento ${attempt}`);
           return true;
