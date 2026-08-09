@@ -1483,6 +1483,17 @@ interface StepCardProps {
   autoMode: boolean;
 }
 
+/**
+ * Pasos que generan una foto de la modelo con la prenda y por lo tanto aceptan
+ * elegir proveedor y pose.
+ *
+ * Antes esta lista estaba escrita a mano dentro del JSX, y al sumar Foto Lateral
+ * y Foto Detalle quedaron fuera: sus tarjetas se renderizaban sin ningun control
+ * y no se podia elegir nada. Centralizarla evita que el proximo paso nuevo nazca
+ * mudo.
+ */
+const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoSide", "photoBack", "photoDetail", "photoFullBody"];
+
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const { t } = useI18n();
   const lg = t.pipelines.lingerie;
@@ -1705,7 +1716,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           generación para recién poder elegir con qué proveedor generarla — justo
           al revés de lo útil. Pose y Acción siempre se pudieron elegir antes;
           Proveedor era la excepción. Ahora los tres se comportan igual. */}
-      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangeProvider && (
+      {MODEL_PHOTO_STEPS.includes(step.id) && onChangeProvider && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.providerLabel}</span>
@@ -1728,7 +1739,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
       {/* Manual overrides — siempre visibles para que la usuaria pueda elegir
           ángulo/acción ANTES de procesar (no solo cuando hay error). */}
-      {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangePose && (
+      {MODEL_PHOTO_STEPS.includes(step.id) && onChangePose && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.poseLabel}</span>
@@ -1742,6 +1753,11 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 .filter((p) => {
                   // Foto Frontal: solo tomas de frente (frontal / 3-4).
                   if (step.id === "tryon") return ["auto", "frontal", "tres-cuartos"].includes(p.value);
+                  // Foto Lateral: es una vista de perfil por definicion — ofrecer
+                  // "frontal" ahi seria contradecir el proposito del paso.
+                  if (step.id === "photoSide") return ["auto", "lateral"].includes(p.value);
+                  // Foto Detalle: toma cercana en diagonal; el 3/4 es su razon de ser.
+                  if (step.id === "photoDetail") return ["auto", "tres-cuartos", "lateral"].includes(p.value);
                   // Foto Espalda: el avatar solo tiene UNA vista trasera, asi que
                   // la pose no cambia nada. Se deja solo "auto" para no prometer
                   // opciones que el paso ignora.
@@ -2459,6 +2475,22 @@ async function tryOnLeffaAsync(
   throw new Error("Leffa tardo mas de 6 minutos. Dale 'Rehacer' o proba otro proveedor.");
 }
 
+/**
+ * ¿Este proveedor necesita que le pasemos una imagen de modelo?
+ *
+ * Uwear NO: genera su propia modelo desde un avatar fijo, y de hecho descarta la
+ * que le mandemos. Leffa y SeedDream SI: visten exactamente la modelo recibida.
+ *
+ * Importa porque el paso "Crear Modelo IA" se saltea cuando va a correr Uwear
+ * (para no pagar $0.055 por una modelo que se descarta). Sin esta distincion, los
+ * pasos siguientes morian con "Falta la modelo IA" pidiendo algo que su proveedor
+ * ni siquiera usa.
+ */
+function providerNeedsModelImage(provider?: TryonProvider): boolean {
+  const p = provider ?? "auto";
+  return p !== "uwear" && p !== "auto";
+}
+
 async function runStep(
   stepId: StepId,
   inputUrl: string,
@@ -2853,8 +2885,8 @@ async function runStep(
   // ALEJA y se para a 90 grados: aca interesa el CONTORNO (proyeccion de la copa,
   // ancho de banda, caida del tirante), no la textura de cerca.
   if (stepId === "photoSide") {
-    if (!sharedModelUrl) {
-      throw new Error("La Foto Lateral necesita la modelo IA. Corré antes el paso 'Crear Modelo IA'.");
+    if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
+      throw new Error("La Foto Lateral necesita la modelo IA con este proveedor. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
     }
     const category =
       productType === "panty" ? "bottoms"
@@ -2885,8 +2917,8 @@ async function runStep(
   }
 
   if (stepId === "photoDetail") {
-    if (!sharedModelUrl) {
-      throw new Error("La Foto Detalle necesita la modelo IA. Corré antes el paso 'Crear Modelo IA'.");
+    if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
+      throw new Error("La Foto Detalle necesita la modelo IA con este proveedor. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
     }
     const category =
       productType === "panty" ? "bottoms"
@@ -2926,8 +2958,8 @@ async function runStep(
       : "tops";
     // Refuse to run tryon without a separate model image — otherwise both
     // inputs become the same URL and Kolors produces garbage.
-    if (!sharedModelUrl) {
-      throw new Error("Falta la modelo IA (paso 'model' no corrió o falló). Corré ese paso antes del try-on.");
+    if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
+      throw new Error("Este proveedor necesita la modelo IA. Corré el paso 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
     }
 
     // LEFFA VA POR EL FLUJO ASÍNCRONO. Es el único proveedor verificado que
@@ -2966,6 +2998,12 @@ async function runStep(
     // textura exacta de la tela y el producto tiene buen contraste.
     const useLeffa = providerOverride === "leffa";
     if (useLeffa) {
+      // Leffa SI necesita la modelo: viste exactamente la que le pasamos. El guard
+      // de arriba solo la exige para proveedores que la usan, asi que aca se
+      // vuelve a verificar con un mensaje que dice como salir del problema.
+      if (!sharedModelUrl) {
+        throw new Error("Leffa viste TU modelo IA, así que necesita ese paso. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
+      }
       return await tryOnLeffaAsync(sharedModelUrl, inputUrl, category, abortSignal);
     }
 
