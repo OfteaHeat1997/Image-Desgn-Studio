@@ -1429,6 +1429,27 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
   // pipeline. La usuaria quedo trabada justo asi al agotarse la cuota de
   // Photoroom: no podia cambiar a "Recorte real" y reintentar.
   const canInteract = (step.status === "done" || step.status === "accepted") && !autoMode;
+
+  // VISTA PREVIA AL PASAR EL MOUSE (sin clic).
+  // La usuaria: "hablo de que se haga grande solo con pasar el mouse, no oprimir".
+  // Escalar el panel un 3% dentro de la tarjeta no alcanza — la referencia de
+  // ecommerce dice que el zoom tiene que ser generoso y obvio. Asi que al pasar
+  // el mouse se abre una vista grande de las DOS imagenes, centrada en pantalla.
+  //
+  // hover-intent de 180ms: sin el, el preview se dispara al pasar de largo
+  // scrolleando y la pagina "parpadea". Con el, solo aparece si de verdad te
+  // detenes sobre el par.
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openPeek = () => {
+    if (peekTimer.current) clearTimeout(peekTimer.current);
+    peekTimer.current = setTimeout(() => setPeek(true), 180);
+  };
+  const closePeek = () => {
+    if (peekTimer.current) clearTimeout(peekTimer.current);
+    setPeek(false);
+  };
+  useEffect(() => () => { if (peekTimer.current) clearTimeout(peekTimer.current); }, []);
   const isVideo = step.resultUrl && (step.resultUrl.includes(".mp4") || step.resultUrl.includes(".webm") || step.resultUrl.includes("video"));
   const [showDocs, setShowDocs] = useState(false);
   // Lightbox: cuando es null no está abierto. Cuando tiene número, esa es
@@ -1691,7 +1712,51 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {/* Card body — before/after comparison */}
       {(step.status !== "idle" && step.status !== "pending") && (
         <div className="p-5">
-          <div className="group/compare flex items-center gap-4">
+          {/* VISTA PREVIA GRANDE AL PASAR EL MOUSE — sin clic.
+              Referencia de ecommerce: el zoom tiene que ser generoso y obvio; un
+              3% dentro de la tarjeta no comunica nada. Y NN/g: el contenido que
+              se revela al pasar el mouse necesita un retardo de intencion para no
+              dispararse al pasar de largo — de ahi los 180ms.
+              pointer-events-none a proposito: si el overlay capturara el mouse,
+              al aparecer "saldria" del par y parpadearia sin parar. */}
+          {peek && step.resultUrl && (
+            <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm">
+              <div className="flex max-h-full w-full max-w-5xl items-center gap-4">
+                <figure className="min-w-0 flex-1">
+                  <figcaption className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                    Original
+                  </figcaption>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={step.originalUrl ?? inputUrl}
+                    alt="Original en grande"
+                    className="max-h-[70vh] w-full rounded-xl object-contain"
+                  />
+                </figure>
+                <ArrowRight className="h-6 w-6 shrink-0 text-[var(--accent)]" />
+                <figure className="min-w-0 flex-1">
+                  <figcaption className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+                    Resultado
+                  </figcaption>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={step.resultUrl}
+                    alt="Resultado en grande"
+                    className="max-h-[70vh] w-full rounded-xl object-contain ring-1 ring-[var(--border-accent)]"
+                  />
+                </figure>
+              </div>
+              <p className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-4 py-1.5 text-xs text-[var(--text-secondary)]">
+                Hacé clic para abrir el comparador y descargar
+              </p>
+            </div>
+          )}
+
+          <div
+            className="group/compare flex items-center gap-4"
+            onMouseEnter={step.resultUrl ? openPeek : undefined}
+            onMouseLeave={closePeek}
+          >
             {/* Input (before) — clickeable, igual que el resultado. Las dos se
                 agrandan a la vez al pasar el mouse por cualquiera: comunica que
                 son un par comparable, no dos imagenes sueltas. */}
