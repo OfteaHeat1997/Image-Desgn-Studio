@@ -238,13 +238,14 @@ const VIDEO_ACTION_OPTIONS: { value: VideoActionOption; label: string; promptHin
 type TryonProvider = "seedream" | "uwear" | "leffa" | "kolors" | "fashn" | "idm-vton" | "auto";
 
 const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: string }[] = [
-  { value: "auto",     label: "Automático (Leffa)", hint: "Para lencería usa Leffa: warpea los píxeles REALES de tu prenda en vez de redibujarla. Tarda ~4 min pero respeta la silueta, el cierre y los paneles. Antes esta opción caía en SeedDream, que reinterpreta el producto." },
-  { value: "seedream", label: "SeedDream edit", hint: "Default lencería · preserva el producto real (encaje, tirantes) · $0.03" },
-  { value: "uwear",    label: "Uwear (dedicado)", hint: "Plataforma de moda · genera la modelo + viste tu prenda · permite lencería · SeedDream 4.5/Qwen Intimate · requiere UWEAR_API_KEY · ~$0.20" },
-  { value: "leffa",    label: "Leffa (probar)", hint: "OTRO proveedor · warpea la prenda real en vez de re-dibujarla · probalo si SeedDream te cambia el producto · $0.04" },
-  { value: "kolors",   label: "Kolors",        hint: "Backup · rápido · tiende a inventar prendas genéricas · $0.02" },
-  { value: "fashn",    label: "FASHN v1.6",    hint: "Bloquea lencería · útil solo para no-íntimos · $0.05" },
-  { value: "idm-vton", label: "IDM-VTON",      hint: "Backup · $0.02" },
+  // SOLO LO QUE FUNCIONA CON LENCERIA. Antes habia 7 opciones y 4 no servian:
+  // FASHN bloquea ropa interior, Kolors e IDM-VTON inventan prendas genericas.
+  // Tenerlas en la lista solo hacia perder tiempo y creditos probando caminos
+  // que ya sabemos que fallan.
+  { value: "auto",     label: "Recomendado (Leffa)",  hint: "La opcion segura. Warpea los pixeles REALES de tu prenda en vez de redibujarla: respeta silueta, cierre y paneles. Tarda ~4 min." },
+  { value: "uwear",    label: "Uwear — rapido",       hint: "Plataforma de moda: modelo mas realista y solo ~35 s. Usa SU propio avatar (siempre el mismo), no la modelo IA del paso anterior. ~$0.20." },
+  { value: "leffa",    label: "Leffa — maxima fidelidad", hint: "Igual que Recomendado, elegido a mano. Viste TU modelo IA, asi que la misma mujer aparece en todos los pasos. ~4 min · $0.04." },
+  { value: "seedream", label: "SeedDream — solo para probar rapido", hint: "25 s, pero REDIBUJA el producto: cambia el escote y el cierre. Sirve para ver el encuadre rapido, NO para el catalogo. $0.03." },
 ];
 
 /**
@@ -254,11 +255,12 @@ const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: strin
 type IsolateMethod = "photoroom" | "photoroom-sandbox" | "combo" | "grounded-sam" | "ghost" | "auto";
 
 const ISOLATE_METHOD_OPTIONS: { value: IsolateMethod; label: string; hint: string }[] = [
-  { value: "photoroom",    label: "Photoroom Ghost Mannequin (recomendado)", hint: "Servicio dedicado: deja tu producto flotando 3D sobre blanco preservando la tela. Es el que mejor resultado da. Requiere plan pago — si la key no está o no tiene plan, se salta solo y usa el recorte real." },
-  { value: "photoroom-sandbox", label: "Photoroom — MODO PRUEBA (gratis, con marca de agua)", hint: "El MISMO ghost-mannequin de Photoroom pero en sandbox: 1.000 llamadas gratis al mes (máx 100/día) que NO gastan tu cuota del plan. El resultado sale CON MARCA DE AGUA — usalo para probar encuadre y calidad todas las veces que quieras, y recién cuando esté como querés cambiá a Photoroom normal para la foto final." },
-  { value: "grounded-sam", label: "Recorte real (respaldo fiel)", hint: "Recorta los píxeles REALES de tu foto — NO inventa nada. $0.01 y sin suscripción. Sale más plano que Photoroom, y en fotos difíciles puede no encontrar la prenda." },
-  { value: "ghost",        label: "Ghost 3D (regenera)", hint: "SeedDream redibuja el producto con volumen 3D — se ve lindo pero PUEDE cambiar textura/forma." },
-  { value: "auto",         label: "Automático", hint: "Recorte real primero; si falla, ghost 3D; si falla, quita fondo." },
+  // SOLO 3 OPCIONES CON PROPOSITO CLARO. Antes habia 5 y dos no aportaban:
+  // "ghost" (SeedDream) alucinaba el producto y "auto" encadenaba en silencio,
+  // asi que se elegia una cosa y corria otra sin avisar.
+  { value: "photoroom-sandbox", label: "Probar — gratis (con marca de agua)", hint: "Para iterar sin gastar: 1.000 llamadas gratis al mes. Misma calidad que el modo final, pero la imagen sale con marca de agua. Usalo hasta que el recorte te guste." },
+  { value: "photoroom",         label: "Final — sin marca de agua", hint: "El mismo ghost-mannequin, limpio y listo para el catalogo. Consume tu cuota de Photoroom. Usalo una sola vez, cuando ya te guste el resultado." },
+  { value: "grounded-sam",      label: "Respaldo — sin Photoroom", hint: "Recorta los pixeles reales de tu foto, sin depender de Photoroom. $0.01 y sin cuota. Sale mas plano y a veces le come un tirante." },
 ];
 
 /**
@@ -1616,7 +1618,18 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               disabled={step.status === "processing"}
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
-              {POSE_OPTIONS.map((p) => (
+              {POSE_OPTIONS
+                .filter((p) => {
+                  // Foto Frontal: solo tomas de frente (frontal / 3-4).
+                  if (step.id === "tryon") return ["auto", "frontal", "tres-cuartos"].includes(p.value);
+                  // Foto Espalda: el avatar solo tiene UNA vista trasera, asi que
+                  // la pose no cambia nada. Se deja solo "auto" para no prometer
+                  // opciones que el paso ignora.
+                  if (step.id === "photoBack") return p.value === "auto";
+                  // Cuerpo completo: de pie, frontal o 3-4.
+                  return ["auto", "cuerpo-completo", "frontal", "tres-cuartos"].includes(p.value);
+                })
+                .map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}{p.value === "auto" ? ` (default: ${step.id === "photoBack" ? "espalda" : step.id === "photoFullBody" ? "cuerpo completo" : "frontal"})` : ""}
                 </option>
@@ -1832,23 +1845,9 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   proveedor que corrió está en la cabecera, siempre visible).
                   Cambiá el proveedor acá y dale Rehacer para comparar Kolors
                   vs FASHN antes de aceptar. */}
-              {onChangeProvider && (step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && (
-                <div className="mr-auto flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Proveedor:</span>
-                  <select
-                    value={step.providerOverride ?? "auto"}
-                    onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
-                    className="rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[11px] text-white outline-none focus:border-[var(--accent)]/50"
-                    title="Cambiá el proveedor y dale Rehacer para comparar"
-                  >
-                    {TRYON_PROVIDER_OPTIONS.map((p) => (
-                      <option key={p.value} value={p.value} title={p.hint}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* El selector de PROVEEDOR vive arriba, junto a Pose. Antes estaba
+                  tambien aca abajo: dos controles para lo mismo, y no quedaba claro
+                  cual mandaba. */}
               <button
                 onClick={onSkip}
                 className="lz-lift flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-white/5 hover:text-white"
