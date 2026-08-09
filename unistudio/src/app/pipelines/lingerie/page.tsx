@@ -139,7 +139,7 @@ async function urlToDataUrl(url: string): Promise<string> {
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoBack" | "photoFullBody" | "productVideo" | "modelVideo";
+type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoBack" | "photoDetail" | "photoFullBody" | "productVideo" | "modelVideo";
 type StepStatus = "idle" | "pending" | "processing" | "done" | "error" | "skipped" | "accepted";
 type Phase = "setup" | "pipeline";
 
@@ -663,6 +663,12 @@ const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error
   { id: "tryon",           label: "Foto Frontal (opcional)", description: "Vestir la modelo IA con TU prenda, vista frontal 3/4. Si falla, el pipeline sigue con el resto.", icon: Shirt,     cost: "$0.02",  enabled: true  },
   { id: "texturePreserve", label: "Restaurar Textura",       description: "Inpaint sobre la zona del bra para recuperar la textura real de la prenda (Kolors la deja satinada/plástica). EXPERIMENTAL — desactivado por default mientras lo estabilizamos.", icon: Sparkles,  cost: "$0.05",  enabled: false },
   { id: "photoBack",       label: "Foto Espalda",            description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
+  // FOTO DE DETALLE (diagonal). Pedido de la usuaria: en Leonisa hay tomas
+  // cercanas en diagonal donde se ve la TEXTURA de la tela — el brillo del saten,
+  // el tejido de la malla, la costura. Ni la frontal ni la de espalda lo muestran:
+  // la frontal es plana y la de espalda esta lejos. Va entre las dos porque es la
+  // misma modelo y la misma prenda, solo cambia el angulo de camara.
+  { id: "photoDetail",     label: "Foto Detalle (diagonal)", description: "Toma cercana en diagonal (3/4) para que se vea la textura real de la tela: brillo, tejido de la malla y costuras. Es la foto que convence de la calidad del producto.", icon: Sparkles, cost: "$0.20", enabled: true },
   { id: "photoFullBody",   label: "Foto Cuerpo Completo",    description: "Extiende el resultado del try-on hacia abajo con outpaint — misma cara y mismo bra real, agrega piernas + panty nude. NO regenera la modelo.", icon: User,      cost: "$0.05",  enabled: true  },
   { id: "productVideo",    label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
   { id: "modelVideo",      label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento humano fotorealista (5s, 9:16). Provider premium Kling 2.6 Pro — apto para catálogo.",    icon: Film,      cost: "$0.35",  enabled: true  },
@@ -764,6 +770,20 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
       "Si el resultado no sirve, saltá este paso — el pipeline sigue con los otros.",
     ],
   },
+  photoDetail: {
+    what: "Toma cercana en diagonal (3/4) del producto puesto, pensada para que se vea la TEXTURA real: el brillo del saten, el tejido de la malla y las costuras. Es la foto que convence de la calidad — ni la frontal ni la de espalda la muestran, porque la frontal es plana y la de espalda esta lejos.",
+    provider: "El mismo del Paso 2 (Uwear por default), con la camara en diagonal y encuadre cerrado.",
+    duration: "30-60 s",
+    costDetail: "$0.20 con Uwear — mismo costo que un try-on normal.",
+    canFail: [
+      "Necesita el producto aislado del Paso 1. Sin el, se salta.",
+      "Si la ficha del producto no se pudo leer, la textura puede salir generica.",
+    ],
+    tips: [
+      "Es la foto que mas vende en lenceria: se ve la calidad de la tela de cerca.",
+      "Si el detalle no se aprecia, revisa que la ficha del producto tenga el material identificado.",
+    ],
+  },
   photoFullBody: {
     what: "Extiende el resultado del try-on hacia abajo con outpainting — agrega piernas + panty nude SIN regenerar la modelo. Garantiza misma cara y mismo bra real porque solo agrega canvas, no genera persona nueva.",
     provider: "/api/outpaint (flux-fill-pro con direction:'down', expandRatio:0.65) sobre el resultado del paso tryon (o texturePreserve si corrió).",
@@ -850,6 +870,7 @@ function humanizeStepError(stepId: StepId, rawError?: string): string {
     tryon: "No pudimos vestir la modelo con tu prenda. Reintentá — si sigue fallando podés saltar este paso y los videos se generan igual.",
     texturePreserve: "No pudimos restaurar la textura del bra. Si el resultado del try-on ya se ve bien, podés saltar este paso.",
     photoBack: "No pudimos generar la foto de espalda. El resto del pipeline sigue sin problema.",
+    photoDetail: "No pudimos generar la foto de detalle. El resto del pipeline sigue sin problema.",
     photoFullBody: "No pudimos generar la foto de cuerpo completo. El resto del pipeline sigue sin problema.",
     productVideo: "No pudimos generar el video 360°. Reintentá.",
     modelVideo: "No pudimos generar el video de la modelo. Reintentá.",
@@ -868,6 +889,7 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
     tryon: 0.02,
     texturePreserve: 0.06,  // máscara (~$0.01) + flux-fill-pro inpaint ($0.05)
     photoBack: 0.075,    // model-create (0.055) + tryon (0.02) — nueva modelo con mismo seed + distinta pose
+    photoDetail: 0.20,   // Uwear con camara cercana en diagonal — mismo costo que un try-on
     photoFullBody: 0.05,    // outpaint flux-fill-pro sobre tryon — NO regenera modelo+tryon
     productVideo: 0.05,  // wan-2.2-fast — calidad standard, ok para producto sin humano
     modelVideo: 0.35,    // kling-2.6 Pro ($0.07/s × 5s) — premium humano fotorealista
@@ -2759,6 +2781,44 @@ async function runStep(
     return { resultUrl: tryonJson.data.url, cost: modelCost + tryonCost, usedProvider: tryonJson.data.provider };
   }
 
+  // FOTO DE DETALLE (diagonal). Misma mecanica que la Foto Frontal, pero con la
+  // camara cerca y en 3/4 para que se lea la TEXTURA de la tela. Va por el mismo
+  // proveedor del Paso 2 (Uwear por default) porque es el que recibe la ficha del
+  // producto: sin esa descripcion, el brillo del saten y el tejido de la malla
+  // salen genericos, que es justo lo que esta foto tiene que mostrar.
+  if (stepId === "photoDetail") {
+    if (!sharedModelUrl) {
+      throw new Error("La Foto Detalle necesita la modelo IA. Corré antes el paso 'Crear Modelo IA'.");
+    }
+    const category =
+      productType === "panty" ? "bottoms"
+      : productType === "set" ? "one-pieces"
+      : "tops";
+    const detailScene =
+      "Close-up three-quarter diagonal product shot: camera near the garment, angled about 45 degrees, " +
+      "cropped to the chest and upper torso so the fabric fills the frame. Sharp macro-level focus on the " +
+      "material: show the real weave, the sheen of the fabric, the mesh panels and the stitching. " +
+      "Clean seamless studio background, soft directional light that reveals texture without blowing out highlights.";
+    const res = await fetch("/api/tryon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        modelImage: sharedModelUrl,
+        garmentImage: inputUrl,
+        category,
+        garmentType: garmentTypeForApi,
+        provider: providerOverride && providerOverride !== "auto" ? providerOverride : "uwear",
+        forceProvider: true,
+        garmentDescription,
+        scenePrompt: detailScene,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Foto Detalle falló");
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
+  }
+
   if (stepId === "tryon") {
     // Kolors-compatible category names (tryon route maps them):
     // bra → "tops", panty → "bottoms", set → "one-pieces"
@@ -3884,6 +3944,18 @@ export default function LingeriePipelinePage() {
           return false;
         }
         inputForStep = baseUrl;
+      } else if (stepDef.id === "photoDetail") {
+        // Igual que el try-on: necesita el producto AISLADO, no la foto original
+        // (que trae la modelo con copyright). Sin aislado, se salta con aviso.
+        const base = stepResults.isolate;
+        if (!base) {
+          updateStep(jobId, stepDef.id, {
+            status: "skipped",
+            error: "La Foto Detalle necesita la prenda aislada. Corré el Paso 1 primero.",
+          });
+          return false;
+        }
+        inputForStep = base;
       } else if (stepDef.id === "tryon") {
         // tryon → Kolors (fal.ai). Preferir URLs de fal nativas para evitar
         // el round-trip Replicate→fal en ensureFalAccessibleUrl que descarga
