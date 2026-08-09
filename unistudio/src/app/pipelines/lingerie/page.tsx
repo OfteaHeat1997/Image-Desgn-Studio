@@ -404,7 +404,13 @@ interface ImageJob {
  *   del producto sin cambiar el pipeline legalmente. Más caro por step pero
  *   control total.
  */
-type GenerationMode = "default" | "face-swap" | "multi-sample";
+// El modo "face-swap" se elimino (2026-08-09). Dos razones, y la primera es la
+// grave: partia de la FOTO ORIGINAL de Leonisa y solo cambiaba la cara, asi que
+// el cuerpo, la pose y la imagen seguian siendo material con copyright — publicar
+// eso en el catalogo es un riesgo legal, no un atajo. Ademas quedo obsoleto:
+// existia para tapar que el try-on cambiaba la cara, y hoy Uwear y Leffa ya
+// devuelven el producto bien sin necesidad de pegar una cara encima.
+type GenerationMode = "default" | "multi-sample";
 
 const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: string; cost: string; disabled?: boolean; disabledReason?: string }[] = [
   {
@@ -412,12 +418,6 @@ const GENERATION_MODE_OPTIONS: { value: GenerationMode; label: string; desc: str
     label: "Modelo IA + Try-on (clásico)",
     desc: "Genera una modelo IA nueva y le pone tu prenda aislada. Legalmente limpio. La prenda se reinterpreta un poco en cada vista.",
     cost: "~$0.15 / producto",
-  },
-  {
-    value: "face-swap",
-    label: "Cambiar cara sobre tu foto real",
-    desc: "Usa TU foto real (frontal/espalda) y solo cambia la cara por una modelo IA. Producto idéntico al original. Más rápido y barato.",
-    cost: "~$0.01 / producto",
   },
   {
     value: "multi-sample",
@@ -3715,46 +3715,15 @@ export default function LingeriePipelinePage() {
       // real de la usuaria — cuerpo, pose, prenda, iluminación quedan intactos.
       //
       // Si no tenemos modelo IA aún o no hay foto real para esta vista, caemos
-      // al flow default (runStep).
-      if (generationMode === "face-swap" && currentSharedModel) {
-        let targetPhoto: ImageJob | undefined;
-        if (step.id === "tryon") {
-          targetPhoto = findMatchingPhoto(job, jobsSnapshot, ["frontal"]) || job;
-        } else if (step.id === "photoBack") {
-          targetPhoto = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
-        } else if (step.id === "photoFullBody") {
-          // Priorizar "flat" o "otra" (cuerpo completo); fallback a frontal si no hay.
-          targetPhoto = findMatchingPhoto(job, jobsSnapshot, ["flat", "otra"])
-            || findMatchingPhoto(job, jobsSnapshot, ["frontal"])
-            || job;
-        }
-        if (targetPhoto?.uploadedUrl) {
-          console.log(`[lingerie] ${step.id}: face-swap sobre foto real "${targetPhoto.filename}"`);
-          const res = await fetch("/api/face-swap", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: controller.signal,
-            body: JSON.stringify({
-              targetImage: targetPhoto.uploadedUrl,
-              sourceImage: currentSharedModel,
-            }),
-          });
-          const json = await res.json();
-          if (!json.success) throw new Error(json.error || "face-swap failed");
-          return { resultUrl: json.data.url, cost: json.cost ?? 0.003 };
-        }
-        // No hay foto real para esta vista → fallback a runStep default con warning.
-        if (step.id !== "isolate" && step.id !== "model" && step.id !== "productVideo" && step.id !== "modelVideo") {
-          toast.info(lg.messages.noRealPhoto(lg.steps.items[step.id]?.label ?? step.label));
-        }
-      }
+      // (el modo face-swap se elimino — ver el comentario en GenerationMode)
+
 
       // Foto real de ESPALDA del mismo REF (tagged angle="espalda"). Se usa:
       //  - photoBack: como garment reference para la vista trasera.
       //  - tryon con Uwear: como clothing_item_back_url, así Uwear genera desde
       //    frente + espalda reales (clava broche, banda y racerback de CADA bra).
       let backGarmentUrl: string | undefined;
-      if ((step.id === "isolate" || step.id === "photoBack" || step.id === "tryon") && generationMode !== "face-swap") {
+      if (step.id === "isolate" || step.id === "photoBack" || step.id === "tryon") {
         const matchingBack = findMatchingPhoto(job, jobsSnapshot, ["espalda"]);
         if (matchingBack && matchingBack.id !== job.id) {
           // Preferir el falUrl PÚBLICO (el uploadedUrl es el de Replicate privado que
@@ -5192,11 +5161,6 @@ export default function LingeriePipelinePage() {
                     );
                   })}
                 </div>
-                {generationMode === "face-swap" && (
-                  <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[10px] leading-snug text-amber-200">
-                    {lg.generationMode.faceSwapWarning}
-                  </p>
-                )}
               </section>
 
               {/* Art Direction — brief reutilizable del "look" del shoot. Inyecta
