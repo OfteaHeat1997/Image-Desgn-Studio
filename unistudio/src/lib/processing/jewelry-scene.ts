@@ -88,20 +88,45 @@ export async function composeJewelryScene(
   // la escena en vez de la silueta — se ve como un recuadro gris alrededor de la
   // pieza. Se avisa en el log para poder distinguirlo de un problema de prompt.
   const productMeta = await sharp(productBuf).metadata();
+  let productSource = productBuf;
   if (!productMeta.hasAlpha) {
-    console.warn(
-      '[jewelry-scene] el recorte llegó SIN transparencia: la pieza se va a pegar como rectángulo. ' +
-        'Revisar que la URL del paso "Recortar" no pase por un reencode.',
-    );
+    // El recorte llegó APLANADO (el proxy de imágenes lo reencodea y se come el
+    // canal alfa). Sin alfa, componer pega el RECTÁNGULO entero sobre la escena
+    // — el recuadro gris alrededor de la pieza que se veía en producción.
+    // Se reconstruye la transparencia quitando el fondo uniforme desde los
+    // bordes: es exactamente lo que hace `trim`, pero devolviendo alfa.
+    console.warn('[jewelry-scene] recorte sin alfa: reconstruyendo transparencia desde el borde');
+    const { data, info } = await sharp(productBuf)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    // Color de referencia: la esquina superior izquierda, que en un recorte
+    // aplanado es siempre fondo.
+    const [br, bg, bb] = [data[0], data[1], data[2]];
+    const TOL = 26;
+    for (let i = 0; i < data.length; i += info.channels) {
+      if (
+        Math.abs(data[i] - br) <= TOL &&
+        Math.abs(data[i + 1] - bg) <= TOL &&
+        Math.abs(data[i + 2] - bb) <= TOL
+      ) {
+        data[i + 3] = 0;
+      }
+    }
+    productSource = await sharp(data, {
+      raw: { width: info.width, height: info.height, channels: 4 },
+    })
+      .png()
+      .toBuffer();
   }
 
   // 2. El recorte, recortado a su contenido real: un PNG aislado suele traer
   //    mucho margen transparente, y sin quitarlo la pieza queda diminuta.
   let trimmed: Buffer;
   try {
-    trimmed = await sharp(productBuf).trim({ threshold: 2 }).png().toBuffer();
+    trimmed = await sharp(productSource).trim({ threshold: 2 }).png().toBuffer();
   } catch {
-    trimmed = await sharp(productBuf).png().toBuffer();
+    trimmed = await sharp(productSource).png().toBuffer();
   }
 
   const product = await sharp(trimmed)
