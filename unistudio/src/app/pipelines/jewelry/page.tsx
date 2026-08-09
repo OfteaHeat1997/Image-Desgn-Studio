@@ -188,6 +188,7 @@ interface Job {
     pieceDescription: string;
     packshot: string;
     luxury: string;
+    luxuryBackdrop: string;
     macroFocus: string;
     model: string;
     negative: string;
@@ -1247,16 +1248,46 @@ export default function JewelryPipelinePage() {
             return true;
           }
 
-          case "packshot":
+          // ESCENA DE LUJO POR COMPOSICIÓN. La IA genera SOLO el decorado y
+          // encima se pegan los píxeles REALES del recorte. Los pasos 1-3
+          // respetaban la pieza porque casi no la tocan; del 4 en adelante
+          // Kontext la redibujaba dentro de la escena y la reinterpretaba
+          // (duplicaba el crucifijo, perdía la medalla, cambiaba las cuentas).
+          // Componiendo, la joya no puede cambiar: nunca entra al modelo.
           case "luxury": {
+            const input = productUrl(job);
+            if (!input) return fail(jt.messages.needsIsolate);
+            const backdrop = job.prompts?.luxuryBackdrop;
+            if (!backdrop) {
+              // Sin decorado dirigido no hay compuesto posible: se marca saltado
+              // en vez de caer al camino que reinterpreta la pieza.
+              patchStep(jobId, key, { status: "skipped" });
+              return false;
+            }
+            patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
+            const res = await fetch("/api/jewelry-scene", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ productUrl: input, backdropPrompt: backdrop, aspectRatio: "4:5" }),
+              signal,
+            });
+            const data = await safeJson(res);
+            const url = pickUrl(data.data);
+            if (!data.success || !url) return fail(data.error);
+            done(url, data.cost ?? 0.04);
+            return true;
+          }
+
+          case "packshot": {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
             // El prompt de Vision gana sobre la plantilla: nombra la cadena, el
             // tamaño de las cuentas y el colgante reales de ESTA pieza.
-            const directed = key === "packshot" ? job.prompts?.packshot : job.prompts?.luxury;
-            const base = directed ?? (key === "packshot" ? config.packshotPrompt : config.estantePrompt);
+            const directed = job.prompts?.packshot;
+            const base = directed ?? config.packshotPrompt;
             // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
             // plantilla genérica del sub-tipo.
             const suffix = descriptor ? `. Featuring this exact piece: ${descriptor}.` : "";
@@ -1273,7 +1304,7 @@ export default function JewelryPipelinePage() {
                   (job.prompts?.negative ? ` Do NOT include: ${job.prompts.negative}.` : ""),
                 // 4:5 en vez de 1:1 — es el formato de Instagram y deja más
                 // espacio negativo vertical, que es lo que hace editorial la toma.
-                aspectRatio: key === "luxury" ? "4:5" : "1:1",
+                aspectRatio: "1:1",
               }),
               signal,
             });

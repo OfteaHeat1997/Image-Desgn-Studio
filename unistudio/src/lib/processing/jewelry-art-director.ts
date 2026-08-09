@@ -32,6 +32,13 @@ export interface JewelryPromptSet {
   packshot: string;
   /** Escena de lujo con superficie, props y espacio negativo, para redes. */
   luxury: string;
+  /**
+   * SOLO el decorado, sin la joya. Se genera aparte y después se le pega encima
+   * el recorte real del producto: así la pieza no puede cambiar, porque nunca
+   * pasa por el modelo de imagen. Es la misma razón por la que el detalle macro
+   * respeta el producto — son píxeles reales.
+   */
+  luxuryBackdrop: string;
   /** Encuadre del macro: qué parte de la pieza merece el zoom. */
   macroFocus: string;
   /** Colocación sobre la modelo, con la anatomía y el encuadre correctos. */
@@ -67,6 +74,12 @@ construida. Tiene que nombrar explícitamente:
   · ESPACIO NEGATIVO generoso y encuadre editorial: la pieza NO debe llenar el cuadro
   · profundidad: primer plano nítido, fondo con caída suave
 
+ESCENA DE LUJO — VERSIÓN DECORADO: la MISMA escena pero SIN la joya. Describís
+solo la superficie, los props, la luz y la composición, dejando explícitamente
+libre la zona central donde después se va a colocar la pieza. Terminá siempre con
+"no jewelry, no product, empty center". Este prompt se usa para generar el fondo
+solo, y el producto real se compone encima.
+
 MACRO: qué parte concreta de ESTA pieza merece el zoom y por qué (el engaste, el
 cierre, el grabado, la unión de eslabones, la textura del martillado).
 
@@ -90,6 +103,7 @@ Mirá la foto y respondé SOLO con JSON válido, sin markdown:
   "pieceDescription": "descripción literal y precisa de la pieza en español, nombrando el tipo de cadena/eslabón, el tamaño y separación de las cuentas si las hay, la forma del colgante y el acabado",
   "packshot": "prompt en inglés para el packshot",
   "luxury": "prompt en inglés para la escena de lujo, con superficie + soporte + props + luz + espacio negativo",
+  "luxuryBackdrop": "el MISMO decorado pero SIN la joya, terminando en 'no jewelry, no product, empty center'",
   "macroFocus": "prompt en inglés que nombre qué parte de ESTA pieza hay que acercar",
   "model": "prompt en inglés para la colocación sobre la modelo",
   "negative": "lista en inglés, separada por comas, de lo que NO debe aparecer ni cambiar"
@@ -176,6 +190,7 @@ export async function directJewelryPrompts(
       pieceDescription: parsed.pieceDescription ?? '',
       packshot: parsed.packshot,
       luxury: parsed.luxury,
+      luxuryBackdrop: parsed.luxuryBackdrop ?? '',
       macroFocus: parsed.macroFocus ?? '',
       model: parsed.model,
       negative: parsed.negative ?? '',
