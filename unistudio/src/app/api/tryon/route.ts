@@ -307,7 +307,18 @@ async function tryOnUwear(
     camera: 'auto',
     aspectRatio: isQwen ? undefined : '3:4',
     resolution: isQwen ? '1024X1280' : '2K',
-    avatarId: null,
+    // AVATAR FIJO = MISMA MODELO EN TODO EL CATALOGO.
+    // Uwear no viste la modelo que le pasamos: castea la SUYA a partir de la
+    // prenda. Con avatarId:null eso significaba una mujer distinta en cada paso
+    // (Foto Frontal con una, Foto Espalda con otra), lo que rompe la coherencia
+    // del catalogo — la usuaria lo detecto comparando el antes/despues.
+    //
+    // La cuenta trae avatares de sistema, cada uno con assets por rol
+    // (upper_body_front, full_body_front, full_body_back, full_body_side), asi
+    // que un avatar fijo sirve tambien para la foto de espalda. Default 21663
+    // ("Demo - Adult Woman - Latina"), acorde al catalogo de Unistyles.
+    // Configurable con UWEAR_AVATAR_ID sin tocar codigo.
+    avatarId: Number(process.env.UWEAR_AVATAR_ID?.trim() || 21663),
     artDirectionId: effectiveArtDir,
   });
 
