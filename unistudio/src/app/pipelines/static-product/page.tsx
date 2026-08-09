@@ -957,11 +957,18 @@ export default function StaticProductPipelinePage() {
       ]);
       totalCost += whiteRes.cost + adaptiveRes.cost + heroRes.cost + verticalRes.cost;
 
+      // Los 3 pasos opcionales (upscale, sombra, video) son INDEPENDIENTES entre
+      // sí: upscale trabaja sobre adaptive, sombra sobre white, video sobre
+      // adaptive. Antes corrían en SECUENCIA con await, así que la sombra y el
+      // video "esperaban" a que el upscale (lento, y con OOM en joyería)
+      // terminara. Ahora se lanzan EN PARALELO — ninguno bloquea a los otros.
+      const optionalTasks: Array<Promise<void>> = [];
+
       // Optional: upscale the adaptive output (or white if adaptive failed) to a
       // higher-res, sharper version — opt-in ($0.05, ~15-40s). Clarity Upscaler
       // (resemblance 0.85, creativity 0.25) keeps the bottle faithful. softFail
       // so a GPU hiccup degrades sharpness of ONE output instead of erroring.
-      if (job.upscaleOutput) {
+      if (job.upscaleOutput) optionalTasks.push((async () => {
         const upscaleSrc = adaptiveRes.url || whiteRes.url;
         if (upscaleSrc) {
           updateStep(job.id, "upscale", { status: "running" });
@@ -993,11 +1000,11 @@ export default function StaticProductPipelinePage() {
         } else {
           updateStep(job.id, "upscale", { status: "skipped", error: "Sin base para escalar (adaptive/white fallaron)." });
         }
-      }
+      })());
 
       // Optional: contact shadow on the white e-commerce output — opt-in (free,
       // Sharp-only). Grounds the product so it doesn't look cut out and pasted.
-      if (job.addShadow) {
+      if (job.addShadow) optionalTasks.push((async () => {
         const shadowSrc = whiteRes.url;
         if (shadowSrc) {
           updateStep(job.id, "shadow", { status: "running" });
@@ -1024,13 +1031,13 @@ export default function StaticProductPipelinePage() {
         } else {
           updateStep(job.id, "shadow", { status: "skipped", error: "Sin blanco e-commerce sobre el cual aplicar sombra." });
         }
-      }
+      })());
 
       // Optional: video lifestyle 5s 9:16 (opt-in, costs $0.05). Solo se
       // ejecuta si la usuaria activó el toggle generateVideo en el job.
       // Toma el frame del adaptive como starting image y lo anima con
       // wan-2.2-fast según la acción elegida (spray, mist, rotación...).
-      if (job.generateVideo && adaptiveRes.url) {
+      if (job.generateVideo && adaptiveRes.url) optionalTasks.push((async () => {
         updateStep(job.id, "lifestyleVideo", { status: "running" });
         try {
           const action = LIFESTYLE_VIDEO_ACTIONS.find((a) => a.value === (job.videoAction ?? "auto")) ?? LIFESTYLE_VIDEO_ACTIONS[0];
@@ -1070,7 +1077,10 @@ export default function StaticProductPipelinePage() {
             error: vErr instanceof Error ? vErr.message : String(vErr),
           });
         }
-      }
+      })());
+
+      // Correr upscale + sombra + video en paralelo (no en fila).
+      await Promise.all(optionalTasks);
 
       // Optional Gap-6 validator on the adaptive output only (the most likely to
       // surface a "missing product" or "duplicate" issue from Flux).
