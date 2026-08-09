@@ -1078,9 +1078,15 @@ export default function StaticProductPipelinePage() {
         config.prompt = manualScene.prompt;
         config.label = manualScene.label;
       }
-      const featureSuffix = features
-        ? `. The product in the photo is: ${staticProductDescriptor(features)}. Compose the scene around this exact bottle — preserve its shape, color, label and material.`
-        : "";
+      // FIX (diagnóstico Vision #1 — frasco fantasma): NO describir el producto
+      // en el prompt del FONDO. El producto real se compone encima (composite-
+      // first), así que describirlo contradecía el "escena VACÍA, sin frascos" de
+      // los presets → Flux pintaba un frasco borroso duplicado detrás. Ahora solo
+      // REFORZAMOS la escena vacía; la fidelidad del producto la garantiza el
+      // composite, no el texto. (features se sigue usando para marca y video.)
+      void features;
+      const featureSuffix =
+        ". Keep the scene completely EMPTY — absolutely no bottles, jars or products anywhere in the background; only the empty pedestal and backdrop. Soft background lighting that harmonizes elegantly with the product placed on top.";
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
       // PASO HD (primero): subir el PRODUCTO a alta resolución/nitidez ANTES de
