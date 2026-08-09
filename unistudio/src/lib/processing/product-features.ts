@@ -74,7 +74,16 @@ export interface StaticProductFeatures {
 
 export interface JewelryFeatures {
   category: 'jewelry';
-  tipo: 'anillo' | 'arete' | 'cadena' | 'pulsera' | 'topos' | 'candongas' | 'set' | 'other';
+  /**
+   * Tipo de pieza. ABIERTO a proposito (`string`), no un enum cerrado.
+   *
+   * El catalogo real trae mas tipos de los que cabe listar y sigue creciendo:
+   * probando 8 fotos del inventario, Vision devolvio `armband`, que no estaba
+   * en ningun enum. Con un union cerrado, cada tipo nuevo que trae la clienta
+   * habria que agregarlo a mano o el pipeline se rompia. La familia con la que
+   * SI se trabaja se resuelve con `featuresToSubType()` en pipelines/jewelry.ts.
+   */
+  tipo: string;
   material: 'oro' | 'plata' | 'rosa' | 'mixto' | 'acero' | 'otro';
   acabado: 'brillante' | 'mate' | 'satinado' | 'martillado' | null;
   piedras: boolean;
@@ -83,6 +92,18 @@ export interface JewelryFeatures {
   grabados: boolean;
   vista: 'plano' | 'lateral' | '3-4' | 'flat-lay';
   detalles_visibles: string[];
+  /**
+   * Cuantos productos DISTINTOS hay en la foto. En el inventario real hay fotos
+   * con 3 pares de candongas diferentes: no es un producto con variantes, son
+   * tres articulos, y la UI tiene que avisarlo en vez de tratarlo como uno.
+   */
+  num_productos: number;
+  /** Tipo de cadena cuando aplica: "curb", "rolo", "snake", "figaro", "bolitas". */
+  tipo_cadena: string | null;
+  /** Cierre visible: "mosqueton", "bisagra", "resorte", "tuerca", null. */
+  cierre: string | null;
+  /** Texto LITERAL grabado o legible en la pieza (ej "MOM Love"). */
+  texto_grabado: string | null;
 }
 
 export type ProductFeatures = LingerieFeatures | StaticProductFeatures | JewelryFeatures;
@@ -142,9 +163,14 @@ Responde SOLO con JSON válido (sin markdown, sin comentarios):
 }`,
 
   jewelry: `Analiza esta foto de joyería. Extrae features ESPECÍFICOS de ESTA foto, no genéricos.
+El catálogo es variado y cambia seguido: NO fuerces la pieza dentro de una lista corta.
 Responde SOLO con JSON válido:
 {
-  "tipo": "anillo" | "arete" | "cadena" | "pulsera" | "topos" | "candongas" | "set" | "other",
+  "tipo": string — la palabra que mejor describa la pieza en español, en singular o
+    plural según corresponda. Usá el término común: "anillo", "aretes", "topos",
+    "candongas", "cadena", "collar", "rosario", "pulsera", "esclava", "tobillera",
+    "brazalete", "set", "dije", "piercing". Si es algo que no está en esa lista,
+    escribí igual el nombre correcto — NO devuelvas "other" si sabés qué es,
   "material": "oro" | "plata" | "rosa" | "mixto" | "acero" | "otro",
   "acabado": "brillante" | "mate" | "satinado" | "martillado" | null,
   "piedras": boolean,
@@ -152,7 +178,14 @@ Responde SOLO con JSON válido:
   "color_piedras": [string] (ej ["transparente", "azul"]),
   "grabados": boolean,
   "vista": "plano" | "lateral" | "3-4" | "flat-lay",
-  "detalles_visibles": [string] (lista específica: "circonias en banda", "grabado interior", "cadena tipo cubana")
+  "detalles_visibles": [string] (lista específica: "circonias en banda", "grabado interior", "cadena tipo cubana"),
+  "num_productos": number — cuántos productos DISTINTOS aparecen en la foto.
+    Un par de aretes = 1 producto. Tres pares de candongas diferentes = 3.
+    Una cadena con su dije = 1. Un set de collar + aretes a juego = 1.
+  "tipo_cadena": string | null — "curb", "rolo", "snake", "figaro", "bolitas",
+    "cubana", "veneciana"… null si la pieza no lleva cadena,
+  "cierre": string | null — "mosquetón", "bisagra", "resorte", "tuerca", "gancho"… null si no se ve,
+  "texto_grabado": string | null — texto LITERAL legible en la pieza (ej "MOM Love"), null si no hay
 }`,
 };
 

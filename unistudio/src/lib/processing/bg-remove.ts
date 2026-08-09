@@ -46,6 +46,53 @@ export async function removeBgReplicate(imageUrl: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Server-side: BiRefNet (fal.ai) — el mejor para joyería
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove background using BiRefNet on fal.ai.
+ *
+ * POR QUÉ ESTE Y NO rembg PARA JOYERÍA
+ * ------------------------------------
+ * Medido el 2026-08-09 sobre la foto real de un rosario (cadena de bolitas +
+ * crucifijo + medalla, sobre pedestales blancos y fondo negro). Resultados:
+ *
+ *   BiRefNet        1.8 s  → rosario completo, cadena entera, crucifijo y
+ *                            medalla CON su textura y grabado. Ganador.
+ *   Grounded SAM   78.9 s  → agarra la cadena pero blanquea crucifijo y medalla
+ *   Bria RMBG 2.0   4.0 s  → conserva los pedestales: no aísla nada
+ *   rembg           8.4 s  → conserva toda la escena: no aísla nada
+ *   WithoutBG       6.1 s  → cayó al mismo resultado que rembg
+ *   remove.bg          —   → HTTP 400 leyendo la imagen
+ *
+ * Bria gana el benchmark GENERAL (90% vs 85% de BiRefNet) pero pierde en este
+ * caso: la calidad del borde depende del tipo de imagen, no del promedio. Por
+ * eso la elección está medida y no copiada de un ranking.
+ *
+ * Funciona tan bien porque corre DESPUÉS de /api/photo-clean: sin los textos
+ * encima, el sujeto queda inequívoco.
+ *
+ * @param imageUrl - data URL o URL pública de la imagen.
+ * @returns URL de la imagen con fondo transparente.
+ */
+export async function removeBgBirefnet(imageUrl: string): Promise<string> {
+  const { runFal } = await import('@/lib/api/fal');
+  const output = await runFal('fal-ai/birefnet/v2', {
+    image_url: imageUrl,
+    // "General Use (Heavy)" es el checkpoint más preciso en bordes finos —
+    // que en joyería es literalmente el producto (eslabones, aros, cadena).
+    model: 'General Use (Heavy)',
+    output_format: 'png',
+  });
+
+  const url = output?.image?.url ?? output?.images?.[0]?.url ?? output?.url;
+  if (typeof url !== 'string') {
+    throw new Error('BiRefNet no devolvió una URL de imagen.');
+  }
+  return url;
+}
+
+// ---------------------------------------------------------------------------
 // Server-side: withoutBG Docker (free local background removal)
 // ---------------------------------------------------------------------------
 
