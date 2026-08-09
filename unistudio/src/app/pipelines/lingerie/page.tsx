@@ -1522,6 +1522,11 @@ interface StepCardProps {
 // "full_body_side" del avatar, asi que el proveedor y la pose son fijos.
 const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoDetail", "photoFullBody"];
 
+// Pasos sin selector: parten del asset real del avatar (perfil / espalda) y le
+// deforman la prenda encima. No se elige proveedor porque no hay alternativa
+// que devuelva esa vista — pero la tarjeta igual dice cual corre y por que.
+const FIXED_PROVIDER_STEPS: StepId[] = ["photoSide", "photoBack"];
+
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const { t } = useI18n();
   const lg = t.pipelines.lingerie;
@@ -1751,6 +1756,28 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           generación para recién poder elegir con qué proveedor generarla — justo
           al revés de lo útil. Pose y Acción siempre se pudieron elegir antes;
           Proveedor era la excepción. Ahora los tres se comportan igual. */}
+      {/* PASOS DE PROVEEDOR FIJO. La Lateral y la Espalda no llevan selector
+          porque solo hay un camino que produce esa vista: partir del asset real
+          del avatar (perfil / espalda) y deformarle la prenda encima. Pero
+          quitar el selector sin poner nada dejaba la tarjeta muda — no se sabia
+          que estaba corriendo. Se declara el proveedor y, sobre todo, POR QUE no
+          se elige. */}
+      {FIXED_PROVIDER_STEPS.includes(step.id) && (
+        <div className="px-5 py-3 border-t border-white/[0.04]">
+          <div className="flex items-start gap-2">
+            <span className="text-[12px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">
+              {lg.stepCard.providerLabel}
+            </span>
+            <span className="text-[13px] text-white">
+              {lg.stepCard.fixedProvider}
+              <span className="mt-0.5 block text-[12px] text-[var(--text-secondary)]">
+                {lg.stepCard.fixedProviderWhy}
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {MODEL_PHOTO_STEPS.includes(step.id) && onChangeProvider && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">

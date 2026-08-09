@@ -179,6 +179,8 @@ export interface LingeriePipelineCopy {
     docsTips: string;
     methodLabel: string;
     providerLabel: string;
+    fixedProvider: string;
+    fixedProviderWhy: string;
     poseLabel: string;
     actionLabel: string;
     poseDefaultSuffix: (label: string) => string;
@@ -747,6 +749,8 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
     docsTips: 'Tips',
     methodLabel: 'Método:',
     providerLabel: 'Proveedor:',
+    fixedProvider: 'Vista real del avatar + Leffa',
+    fixedProviderWhy: 'No se elige: es el único camino que devuelve esta vista. Parte de una foto real del avatar (perfil o espalda) y le deforma tu prenda encima, sin generar una persona nueva.',
     poseLabel: 'Pose:',
     actionLabel: 'Acción:',
     poseDefaultSuffix: (label) => ` (default: ${label})`,
@@ -1428,6 +1432,8 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
     docsTips: 'Tips',
     methodLabel: 'Method:',
     providerLabel: 'Provider:',
+    fixedProvider: 'Real avatar view + Leffa',
+    fixedProviderWhy: 'Not selectable: it is the only path that returns this view. It starts from a real avatar photo (side or back) and warps your garment onto it, without generating a new person.',
     poseLabel: 'Pose:',
     actionLabel: 'Action:',
     poseDefaultSuffix: (label) => ` (default: ${label})`,
