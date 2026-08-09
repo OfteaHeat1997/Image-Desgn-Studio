@@ -139,7 +139,7 @@ async function urlToDataUrl(url: string): Promise<string> {
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoSide" | "photoBack" | "photoDetail" | "photoFullBody" | "productVideo" | "modelVideo";
+type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoSide" | "photoBack" | "photoDetail" | "photoFullBody" | "productVideo" | "modelVideo" | "heroVideo";
 type StepStatus = "idle" | "pending" | "processing" | "done" | "error" | "skipped" | "accepted";
 type Phase = "setup" | "pipeline";
 
@@ -679,6 +679,12 @@ const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error
   { id: "photoFullBody",   label: "Foto Cuerpo Completo",    description: "Extiende el resultado del try-on hacia abajo con outpaint — misma cara y mismo bra real, agrega piernas + panty nude. NO regenera la modelo.", icon: User,      cost: "$0.05",  enabled: true  },
   { id: "productVideo",    label: "Video 360° del Producto", description: "Rotación 360° de la prenda aislada, estilo producto rotando (5s, 1:1)",     icon: Film,      cost: "$0.05",  enabled: true  },
   { id: "modelVideo",      label: "Video de la Modelo",      description: "Modelo vestida con la prenda, movimiento humano fotorealista (5s, 9:16). Provider premium Kling 2.6 Pro — apto para catálogo.",    icon: Film,      cost: "$0.35",  enabled: true  },
+  // VIDEO HERO (giro). Pedido de la usuaria: un video DISTINTO al de catalogo,
+  // para el carrusel de la home de Unistyles. No es el mismo material: el de
+  // catalogo muestra el producto puesto y quieto; el del hero tiene que llamar la
+  // atencion en 3 segundos mientras alguien scrollea, y por eso es un giro
+  // continuo, en vertical y en loop.
+  { id: "heroVideo",       label: "Video Hero (giro para el carrusel)", description: "Giro suave de 360° de la modelo con la prenda, formato vertical y pensado para repetirse en loop. Es el video de la portada de tu tienda, distinto al de catálogo.", icon: Film, cost: "$0.35", enabled: false },
 ];
 
 function makeSteps(): PipelineStep[] {
@@ -833,6 +839,20 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
       "Si la rotación queda rara, reintentá — el random de wan-2.2 varía el motion.",
     ],
   },
+  heroVideo: {
+    what: "Giro suave de 360 grados de la modelo con la prenda, en vertical y pensado para repetirse en loop. Es el video de la PORTADA de tu tienda, no del catalogo: tiene que enganchar en los primeros segundos mientras alguien scrollea.",
+    provider: "Kling 2.6 Pro (fal) — el mismo motor del video de catalogo, con instruccion de giro continuo.",
+    duration: "60-180 s",
+    costDetail: "$0.35 por video de 5s.",
+    canFail: [
+      "Necesita una foto de la modelo con la prenda (cuerpo completo o try-on). Sin eso, se salta.",
+      "Si el giro sale brusco, reintenta: el motor varia entre corridas.",
+    ],
+    tips: [
+      "Desactivado por default: es material de portada, no hace falta uno por cada color.",
+      "Con uno o dos por REF alcanza para el carrusel.",
+    ],
+  },
   modelVideo: {
     what: "Video de la modelo posando con la prenda — movimiento humano natural, apto para catálogo de moda. Usa el resultado del tryon (con textura ya restaurada si texturePreserve corrió); si no hay tryon, la modelo sola.",
     provider: "Kling 2.6 Pro (fal-ai/kling-video/v2.6/pro/image-to-video) — calidad cinematográfica para humanos. wan-2.2-fast (el provider anterior, $0.05) generaba look de muñeco / piel waxy / identidad cambiando entre frames.",
@@ -896,6 +916,7 @@ function humanizeStepError(stepId: StepId, rawError?: string): string {
     photoFullBody: "No pudimos generar la foto de cuerpo completo. El resto del pipeline sigue sin problema.",
     productVideo: "No pudimos generar el video 360°. Reintentá.",
     modelVideo: "No pudimos generar el video de la modelo. Reintentá.",
+    heroVideo: "No pudimos generar el video hero. Reintentá.",
   };
   return byStep[stepId] ?? "Algo salió mal en este paso. Reintentá.";
 }
@@ -916,6 +937,7 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
     photoFullBody: 0.05,    // outpaint flux-fill-pro sobre tryon — NO regenera modelo+tryon
     productVideo: 0.05,  // wan-2.2-fast — calidad standard, ok para producto sin humano
     modelVideo: 0.35,    // kling-2.6 Pro ($0.07/s × 5s) — premium humano fotorealista
+    heroVideo: 0.35,     // kling-2.6 Pro — mismo motor, giro continuo para la portada
   };
   const enabledSteps = steps.filter((s) => s.enabled);
   let cost = 0;
