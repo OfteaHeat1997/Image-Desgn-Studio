@@ -2603,10 +2603,16 @@ async function runStep(
       productType === "panty" ? "bottoms"
       : productType === "set" ? "one-pieces"
       : "tops";
-    // FOTO ESPALDA CON LEFFA. Seguia siempre en la ruta sincrona (SeedDream), que
-    // REDIBUJA: devolvia un broche y un encaje con ojales que no existen en el
-    // producto real. Con Leffa se warpea la foto REAL de espalda sobre la modelo.
-    if (providerOverride === "leffa") {
+    // LA FOTO ESPALDA VA SIEMPRE POR ESTE CAMINO, sin importar el proveedor
+    // elegido. Es el UNICO que produce una espalda de verdad:
+    //   - SeedDream y Uwear generan su propia modelo, siempre DE FRENTE, y no
+    //     aceptan que les pasemos una vista trasera. La usuaria eligio Uwear y
+    //     volvio a salir de frente — el arreglo anterior solo cubria Leffa.
+    //   - Este camino toma el asset "full_body_back" del avatar de Uwear (una foto
+    //     real de esa misma modelo de espaldas) y le warpea encima la foto REAL de
+    //     espalda del producto. Las dos entradas son de espalda, asi que el
+    //     resultado tambien lo es. Deterministico, sin generar personas.
+    {
       // garmentForTryon puede ser undefined si no hay aislado NI foto de espalda;
       // el guard de arriba ya garantiza que hay una de las dos, pero TypeScript no
       // lo deduce — fallamos con mensaje claro en vez de mandar undefined.
