@@ -134,25 +134,33 @@ export async function POST(request: NextRequest) {
       // Blanco puro para 'pure-white'; escena por prompt en cualquier otro caso.
       const isWhite = style === 'pure-white';
       const scenePrompt = customPrompt || BACKGROUND_PRESETS[style]?.prompt || style;
-      const png = await editStaticProductPhotoroom(httpImageUrl, {
-        background: isWhite ? 'white' : { prompt: scenePrompt },
-        shadow: shadow ?? 'none',
-        sandbox: sandbox === false ? false : true,
-      });
-      resultUrl = bufferToDataUrl(png, 'image/png');
-      cost = 0; // sandbox = gratis; en producción Photoroom tiene su propio costo por plan
-      await saveJob({
-        operation: 'bg-generate',
-        provider: 'photoroom',
-        inputParams: { imageUrl, mode, style, customPrompt, shadow: shadow ?? 'none', sandbox: sandbox === false ? false : true },
-        outputUrl: resultUrl,
-        cost,
-      });
-      return NextResponse.json({
-        success: true,
-        data: { url: proxyReplicateUrl(resultUrl), mode: 'photoroom', style },
-        cost,
-      });
+      try {
+        const png = await editStaticProductPhotoroom(httpImageUrl, {
+          background: isWhite ? 'white' : { prompt: scenePrompt },
+          shadow: shadow ?? 'none',
+          sandbox: sandbox === false ? false : true,
+        });
+        resultUrl = bufferToDataUrl(png, 'image/png');
+        cost = 0; // sandbox = gratis; en producción Photoroom tiene su propio costo por plan
+        await saveJob({
+          operation: 'bg-generate',
+          provider: 'photoroom',
+          inputParams: { imageUrl, mode, style, customPrompt, shadow: shadow ?? 'none', sandbox: sandbox === false ? false : true },
+          outputUrl: resultUrl,
+          cost,
+        });
+        return NextResponse.json({
+          success: true,
+          data: { url: proxyReplicateUrl(resultUrl), mode: 'photoroom', style },
+          cost,
+        });
+      } catch (photoroomErr) {
+        // Photoroom falló (ej. HTTP 401 al bajar la imagen, o su filtro de
+        // contenido). NO rompemos el output: dejamos caer la ejecución al método
+        // Sharp (solid, para pure-white) o Flux de abajo, que SIEMPRE funcionan.
+        // Así la tarjeta nunca muestra "Falló" por culpa de Photoroom.
+        console.warn('[bg-generate] Photoroom falló, cayendo a Sharp/Flux:', photoroomErr);
+      }
     }
 
     // Solid-color shortcut: bypass Flux entirely. The bg-remove + Sharp
