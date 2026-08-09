@@ -1099,7 +1099,10 @@ export default function StaticProductPipelinePage() {
         const hdRes = await fetch("/api/upscale", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: currentUrl, provider: "clarity", scale: 2, softFail: true }),
+          // real-esrgan = super-resolución FIEL (no inventa ni deforma el frasco).
+          // Clarity es generativo (creativity) y deformaba el producto. Aquí, como
+          // el producto se compone pixel-perfect, el HD debe ser fiel.
+          body: JSON.stringify({ imageUrl: currentUrl, provider: "real-esrgan", scale: 2, softFail: true }),
         });
         const hdData = await safeJson(hdRes);
         if (hdData.success && hdData.data?.url) {
@@ -2099,34 +2102,36 @@ export default function StaticProductPipelinePage() {
                                       playsInline
                                     />
                                   ) : (
-                                  <div className="group relative h-72 w-full">
-                                    {/* Comparador antes/después: original vs output.
-                                        No va dentro de un <button> porque el slider
-                                        tiene su propio <input range> (conflicto de
-                                        anidado). El botón "ver grande" va superpuesto. */}
-                                    <BeforeAfterSlider
-                                      before={job.previewUrl}
-                                      after={step.resultUrl}
-                                      label={spMeta.label}
-                                      className="h-72 w-full"
-                                    />
+                                  // Dos paneles lado a lado (ANTES | DESPUÉS), ambos visibles y con zoom — como ORIGINAL | RESULT de lencería
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setLightbox({ url: job.previewUrl, label: `${job.file.name} — Original` })}
+                                      className="group/img relative h-72 w-full overflow-hidden rounded bg-black/40 ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
+                                      title={sp.steps.zoomBig}
+                                    >
+                                      <span className="absolute left-1.5 top-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Antes</span>
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={job.previewUrl} alt="original" className="h-full w-full object-contain" />
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
-                                      className="absolute inset-x-0 bottom-0 z-10 flex h-9 items-center justify-center gap-1.5 bg-gradient-to-t from-black/90 to-transparent opacity-100 transition hover:from-black"
+                                      className="group/img relative h-72 w-full overflow-hidden rounded bg-black ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
                                       title={sp.steps.zoomBig}
                                     >
-                                      <Maximize2 className="h-4 w-4 text-[var(--accent)]" />
-                                      <span className="text-[11px] font-semibold text-white">{sp.steps.zoomBig}</span>
-                                    </button>
-                                    {step.warning && (
-                                      <span
-                                        className="absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
-                                        title={step.warning}
-                                      >
-                                        {sp.steps.reviewBadge}
+                                      <span className="absolute right-1.5 top-1.5 z-10 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black">Después</span>
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={step.resultUrl} alt={spMeta.label} className="h-full w-full object-contain" />
+                                      <span className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-center gap-1.5 bg-gradient-to-t from-black/90 to-transparent text-[10px] font-semibold text-white opacity-0 transition group-hover/img:opacity-100">
+                                        <Maximize2 className="h-3.5 w-3.5 text-[var(--accent)]" /> {sp.steps.zoomBig}
                                       </span>
-                                    )}
+                                      {step.warning && (
+                                        <span className="absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow" title={step.warning}>
+                                          {sp.steps.reviewBadge}
+                                        </span>
+                                      )}
+                                    </button>
                                   </div>
                                   )
                                 ) : (
