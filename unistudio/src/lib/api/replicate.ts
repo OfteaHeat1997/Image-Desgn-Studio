@@ -56,13 +56,20 @@ export async function extractOutputUrl(output: any): Promise<string> {
   } else if (Array.isArray(output) && output.length > 0) {
     return await extractOutputUrl(output[0]);
   } else if (output && typeof output === 'object') {
-    // Replicate FileOutput has .url() as a method, not a property
+    // Replicate FileOutput has .url() as a method, not a property.
+    // Segun la version del SDK, .url() devuelve un objeto URL (con .href) O un
+    // string directo. Antes solo se manejaba el objeto → cuando venia string,
+    // `.href` era undefined y tumbaba adaptive/hero con "Unable to extract URL".
     if (typeof output.url === 'function') {
-      url = output.url().href;
+      const u = output.url();
+      url = typeof u === 'string' ? u : (u?.href ?? null);
     } else if ('url' in output && typeof output.url === 'string') {
       url = output.url;
+    } else if ('url' in output && output.url && typeof output.url === 'object' && typeof (output.url as { href?: string }).href === 'string') {
+      // Algunos outputs traen url como objeto URL directo (no funcion).
+      url = (output.url as { href: string }).href;
     } else {
-      // FileOutput also has toString() that returns the URL
+      // FileOutput tambien tiene toString() que devuelve la URL.
       const str = String(output);
       if (str.startsWith('http')) url = str;
     }
