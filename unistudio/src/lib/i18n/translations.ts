@@ -22,6 +22,11 @@ import {
   JEWELRY_PIPELINE_ES,
   JEWELRY_PIPELINE_EN,
 } from './pipelines/jewelry';
+import {
+  type StaticProductPipelineCopy,
+  STATIC_PRODUCT_PIPELINE_ES,
+  STATIC_PRODUCT_PIPELINE_EN,
+} from './pipelines/static-product';
 
 export type Locale = 'es' | 'en';
 
@@ -508,6 +513,12 @@ export interface AppCopy extends Omit<HomeCopy, 'pipelines'> {
    */
   pipelines: Omit<HomeCopy['pipelines'], 'jewelry'> & {
     jewelry: PipelineCopy & JewelryPipelineCopy;
+    /**
+     * El pipeline de perfumes/belleza cuelga su copy de página bajo una clave
+     * NUEVA `staticProduct` (la home usa `beauty` para su card). Claves
+     * disjuntas: ambos consumidores conviven sin romperse.
+     */
+    staticProduct: StaticProductPipelineCopy;
   };
 }
 
@@ -517,6 +528,7 @@ const esFull: AppCopy = {
   pipelines: {
     ...es.pipelines,
     jewelry: { ...es.pipelines.jewelry, ...JEWELRY_PIPELINE_ES },
+    staticProduct: STATIC_PRODUCT_PIPELINE_ES,
   },
 };
 const enFull: AppCopy = {
@@ -525,6 +537,7 @@ const enFull: AppCopy = {
   pipelines: {
     ...en.pipelines,
     jewelry: { ...en.pipelines.jewelry, ...JEWELRY_PIPELINE_EN },
+    staticProduct: STATIC_PRODUCT_PIPELINE_EN,
   },
 };
 

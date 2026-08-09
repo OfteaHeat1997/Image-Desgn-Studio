@@ -275,17 +275,9 @@ async function safeJson(res: Response): Promise<{ success: boolean; data?: any; 
   }
 }
 
-const STATUS_LABEL: Record<JobStatus, string> = {
-  idle: "Listo",
-  uploading: "Subiendo...",
-  isolating: "Quitando fondo...",
-  normalizing: "Centrando 2000×2000...",
-  generating: "Generando 3 fondos...",
-  done: "Listo",
-  error: "Error",
-};
-
 function StatusPill({ status }: { status: JobStatus }) {
+  const { t } = useI18n();
+  const sp = t.pipelines.staticProduct;
   const isError = status === "error";
   const isDone = status === "done";
   const isActive = !["idle", "done", "error"].includes(status);
@@ -302,7 +294,7 @@ function StatusPill({ status }: { status: JobStatus }) {
       {isActive && <Loader2 className="h-3 w-3 animate-spin" />}
       {isDone && <CheckCircle2 className="h-3 w-3" />}
       {isError && <AlertCircle className="h-3 w-3" />}
-      {STATUS_LABEL[status]}
+      {sp.statusLabels[status]}
     </span>
   );
 }
@@ -374,6 +366,8 @@ async function loadAllFromFolder(
 /* ------------------------------------------------------------------ */
 
 function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const { t } = useI18n();
+  const sp = t.pipelines.staticProduct;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -404,8 +398,8 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
     >
       <Upload className="h-6 w-6 text-gray-400" />
       <div>
-        <p className="text-sm font-medium text-gray-200">Arrastra fotos aquí o haz click</p>
-        <p className="mt-1 text-xs text-gray-500">Perfumes, cremas, bloqueador, desodorantes, limpieza facial, maquillaje</p>
+        <p className="text-sm font-medium text-gray-200">{sp.upload.dropCta}</p>
+        <p className="mt-1 text-xs text-gray-500">{sp.upload.dropHint}</p>
       </div>
       <input
         ref={inputRef}
@@ -425,6 +419,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 
 export default function StaticProductPipelinePage() {
   const { t } = useI18n();
+  const sp = t.pipelines.staticProduct;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [defaultType, setDefaultType] = useState<StaticProductType>("perfume");
@@ -524,7 +519,7 @@ export default function StaticProductPipelinePage() {
       });
       const skipped = files.length - uniqueFiles.length;
       if (skipped > 0) {
-        toast.warning(`${skipped} foto${skipped !== 1 ? "s" : ""} duplicada${skipped !== 1 ? "s" : ""} ignorada${skipped !== 1 ? "s" : ""}.`);
+        toast.warning(sp.messages.duplicatesIgnored(skipped));
       }
       if (uniqueFiles.length === 0) return;
       let ambiguousCount = 0;
@@ -555,9 +550,7 @@ export default function StaticProductPipelinePage() {
       });
       setJobs((prev) => [...prev, ...newJobs]);
       if (ambiguousCount > 0) {
-        toast.warning(
-          `${ambiguousCount} foto${ambiguousCount !== 1 ? "s" : ""} con nombre compartido entre perfumes y desodorantes — confirma el tipo antes de procesar.`,
-        );
+        toast.warning(sp.messages.ambiguousNames(ambiguousCount));
       }
 
       // Auto-detect brand + features INMEDIATAMENTE al subir (no esperar a
@@ -635,7 +628,7 @@ export default function StaticProductPipelinePage() {
     async (cat: InventoryCategoryLite) => {
       if (isRunning || batchLoadingId) return;
       if (cat.folders.length === 0) {
-        toast.error(`${cat.name} no tiene carpetas con imágenes.`);
+        toast.error(sp.messages.catNoFolders(cat.name));
         return;
       }
 
@@ -653,17 +646,17 @@ export default function StaticProductPipelinePage() {
           }
         }
         if (loadedFiles.length === 0) {
-          toast.info(`No se encontraron imágenes en ${cat.name}.`);
+          toast.info(sp.messages.noImagesFound(cat.name));
           return;
         }
         // Preset el productType desde el scan para esquivar la inferencia por filename
         // (que solo ve el nombre, no el folder — resultaría menos precisa).
         const presetType = cat.pipelineParams?.productType as StaticProductType | undefined;
         handleFiles(loadedFiles, { presetType });
-        toast.success(`${loadedFiles.length} foto(s) cargadas desde ${cat.name}.`);
+        toast.success(sp.messages.photosLoadedFrom(loadedFiles.length, cat.name));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        toast.error(`Error cargando ${cat.name}: ${msg}`);
+        toast.error(sp.messages.errorLoadingCategory(cat.name, msg));
       } finally {
         setBatchLoadingId(null);
         setBatchProgress(null);
@@ -930,9 +923,9 @@ export default function StaticProductPipelinePage() {
             const validateCost = (vData.cost as number) ?? 0.0002;
             totalCost += validateCost;
             if (v.productMissing) {
-              updateStep(job.id, "adaptive", { warning: `⚠ Producto no visible: ${v.reason}` });
+              updateStep(job.id, "adaptive", { warning: sp.messages.productNotVisible(v.reason) });
             } else if (v.looksLikeDuplicate || v.productCount > 1) {
-              updateStep(job.id, "adaptive", { warning: `⚠ Duplicado detectado (count=${v.productCount}): ${v.reason}` });
+              updateStep(job.id, "adaptive", { warning: sp.messages.duplicateDetected(v.productCount, v.reason) });
             }
           }
         } catch (vErr) {
@@ -958,7 +951,7 @@ export default function StaticProductPipelinePage() {
             if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
               const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
               updateStep(job.id, "adaptive", {
-                warning: `⚠ El producto cambió: ${changes || d.data.reason}`,
+                warning: sp.messages.productChanged(changes || d.data.reason),
               });
             }
           })
@@ -974,7 +967,7 @@ export default function StaticProductPipelinePage() {
         status: anyOutputSucceeded ? "done" : "error",
         resultUrl: main,
         cost: totalCost,
-        error: anyOutputSucceeded ? undefined : "Los 3 outputs fallaron — revisa los errores por paso.",
+        error: anyOutputSucceeded ? undefined : sp.messages.allOutputsFailed,
       });
 
       // Save each successful output to the gallery so it's not lost. The
@@ -1003,7 +996,7 @@ export default function StaticProductPipelinePage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(job.id, { status: "error", error: message });
-      toast.error(`Error en ${job.file.name}: ${message}`);
+      toast.error(sp.messages.jobError(job.file.name, message));
     }
   };
 
@@ -1022,7 +1015,7 @@ export default function StaticProductPipelinePage() {
     if (!job) return;
     const inputUrl = job.steps.normalize.resultUrl || job.steps.isolate.resultUrl;
     if (!inputUrl) {
-      toast.error("No hay imagen disponible. Procesa el job completo primero.");
+      toast.error(sp.messages.noImageAvailable);
       return;
     }
     const config = getAdaptiveBgConfig(job.productType, job.brand);
@@ -1040,11 +1033,11 @@ export default function StaticProductPipelinePage() {
         resultUrl: next,
         cost: job.cost + addedCost,
       });
-      toast.success(`Re-generado: ${keys.join(", ")}.`);
+      toast.success(sp.messages.regenerated(keys.join(", ")));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(jobId, { status: "error", error: message });
-      toast.error(`Error re-ejecutando: ${message}`);
+      toast.error(sp.messages.errorRerunning(message));
     } finally {
       setReRunningJobId(null);
     }
@@ -1054,7 +1047,7 @@ export default function StaticProductPipelinePage() {
     if (isRunning) return;
     const pending = jobs.filter((j) => j.status === "idle" || j.status === "error");
     if (pending.length === 0) {
-      toast.info("No hay fotos pendientes de procesar.");
+      toast.info(sp.messages.noPending);
       return;
     }
     setIsRunning(true);
@@ -1062,7 +1055,7 @@ export default function StaticProductPipelinePage() {
       for (const job of pending) {
         await processJob(job);
       }
-      toast.success(`${pending.length} foto(s) procesada(s).`);
+      toast.success(sp.messages.processed(pending.length));
     } finally {
       setIsRunning(false);
     }
@@ -1081,16 +1074,16 @@ export default function StaticProductPipelinePage() {
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
         <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
           <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Inicio</span>
+          <span className="hidden sm:inline">{sp.header.home}</span>
         </Link>
         <span className="text-[var(--border-default)]">/</span>
         <div className="flex items-center gap-2 min-w-0">
           <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
-          <span className="text-sm font-semibold text-heading truncate">Perfumes y Belleza</span>
+          <span className="text-sm font-semibold text-heading truncate">{sp.header.name}</span>
         </div>
         <div className="ml-auto hidden md:block">
           <span className="rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-            Perfumes · Cremas · Skincare · Maquillaje
+            {sp.header.categories}
           </span>
         </div>
       </header>
@@ -1109,36 +1102,36 @@ export default function StaticProductPipelinePage() {
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">
                 <FolderOpen className="mr-2 inline h-4 w-4" />
-                Batch desde inventario
+                {sp.batch.heading}
               </h2>
               <p className="mt-1 text-xs text-gray-400">
-                Carga todas las fotos de una categoría sin subir manualmente. Solo funciona en dev local (las imágenes viven en <code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code>, no se deployan).
+                {sp.batch.hintPre}<code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code>{sp.batch.hintPost}
               </p>
             </div>
             <button
               onClick={loadScan}
               disabled={batchLoadingId !== null}
               className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-gray-400 hover:border-white/20 hover:text-white disabled:opacity-50"
-              title="Refrescar inventario"
+              title={sp.batch.refreshTitle}
             >
               <RefreshCw className="h-3 w-3" />
-              Refrescar
+              {sp.batch.refresh}
             </button>
           </div>
 
           {scanError && (
             <div className="mb-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-              Error cargando inventario: {scanError}
+              {sp.batch.errorLoading(scanError)}
             </div>
           )}
 
           {batchCategories === null ? (
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Loader2 className="h-3 w-3 animate-spin" /> Escaneando inventario...
+              <Loader2 className="h-3 w-3 animate-spin" /> {sp.batch.scanning}
             </div>
           ) : batchCategories.length === 0 ? (
             <p className="text-xs text-gray-500">
-              No se encontraron categorías de estáticos en el inventario local. Verifica que <code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code> existe.
+              {sp.batch.emptyPre}<code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code>{sp.batch.emptyPost}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1167,7 +1160,7 @@ export default function StaticProductPipelinePage() {
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-gray-500">
                       <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono">{pt}</span>
-                      <span>{cat.imageCount} fotos</span>
+                      <span>{sp.batch.photos(cat.imageCount)}</span>
                     </div>
                     {isLoading && batchProgress && (
                       <div className="mt-1 w-full">
@@ -1180,7 +1173,7 @@ export default function StaticProductPipelinePage() {
                           />
                         </div>
                         <p className="mt-0.5 text-[9px] text-amber-300">
-                          Cargando {batchProgress.loaded}/{batchProgress.total}...
+                          {sp.batch.loading(batchProgress.loaded, batchProgress.total)}
                         </p>
                       </div>
                     )}
@@ -1194,12 +1187,12 @@ export default function StaticProductPipelinePage() {
         {/* Defaults + upload */}
         <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-            1 · Sube tus fotos <span className="font-normal normal-case text-gray-500">o usa el batch de arriba</span>
+            {sp.upload.heading} <span className="font-normal normal-case text-gray-500">{sp.upload.headingHint}</span>
           </h2>
 
           <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs text-gray-400">Tipo por defecto (aplicado a lo que subas)</label>
+              <label className="mb-1 block text-xs text-gray-400">{sp.upload.defaultType}</label>
               <select
                 value={defaultType}
                 onChange={(e) => setDefaultType(e.target.value as StaticProductType)}
@@ -1211,7 +1204,7 @@ export default function StaticProductPipelinePage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-400">Marca por defecto</label>
+              <label className="mb-1 block text-xs text-gray-400">{sp.upload.defaultBrand}</label>
               <select
                 value={defaultBrand}
                 onChange={(e) => setDefaultBrand(e.target.value as StaticBrand)}
@@ -1232,11 +1225,11 @@ export default function StaticProductPipelinePage() {
           <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-                2 · Revisa y procesa ({jobs.length} foto{jobs.length !== 1 && "s"})
+                {sp.review.heading(jobs.length)}
               </h2>
               <div className="flex items-center gap-3 text-xs text-gray-400">
-                <span>${totalCost.toFixed(3)} acumulado</span>
-                <span>{doneCount}/{jobs.length} listas</span>
+                <span>${totalCost.toFixed(3)} {sp.review.spent}</span>
+                <span>{doneCount}/{jobs.length} {sp.review.done}</span>
               </div>
             </div>
 
@@ -1261,7 +1254,7 @@ export default function StaticProductPipelinePage() {
                           href={job.resultUrl}
                           download={`${job.file.name.replace(/\.[^.]+$/, "")}-static.jpg`}
                           className="absolute bottom-1 right-1 rounded bg-black/70 p-1 text-white transition hover:bg-black"
-                          title="Descargar resultado"
+                          title={sp.job.downloadResult}
                         >
                           <Download className="h-3 w-3" />
                         </a>
@@ -1299,20 +1292,20 @@ export default function StaticProductPipelinePage() {
                                       } catch { /* skip individual failure */ }
                                     }
                                     if (added === 0) {
-                                      toast.error("No se pudo descargar ninguna versión.");
+                                      toast.error(sp.messages.noneDownloaded);
                                       return;
                                     }
                                     const zipBlob = await zip.generateAsync({ type: "blob" });
                                     saveAs(zipBlob, `${baseName}-3versiones.zip`);
-                                    toast.success(`ZIP listo (${added} versión${added !== 1 ? "es" : ""}).`);
+                                    toast.success(sp.messages.zipReady(added));
                                   } catch (err) {
-                                    toast.error(err instanceof Error ? err.message : "Error generando ZIP");
+                                    toast.error(err instanceof Error ? err.message : sp.messages.zipError);
                                   } finally {
                                     setZippingJobId(null);
                                   }
                                 }}
                                 className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
-                                title={`Descargar ${doneOutputs.length} de 3 versiones como ZIP`}
+                                title={sp.job.downloadNOf3Title(doneOutputs.length)}
                               >
                                 {zippingJobId === job.id ? (
                                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -1320,8 +1313,8 @@ export default function StaticProductPipelinePage() {
                                   <Download className="h-3 w-3" />
                                 )}
                                 {doneOutputs.length === 3
-                                  ? "Descargar las 3"
-                                  : `Descargar ${doneOutputs.length}/3`}
+                                  ? sp.job.downloadAll3
+                                  : sp.job.downloadNOf3(doneOutputs.length)}
                               </button>
                             );
                           })()}
@@ -1329,7 +1322,7 @@ export default function StaticProductPipelinePage() {
                             onClick={() => removeJob(job.id)}
                             disabled={isRunning}
                             className="text-gray-500 hover:text-red-400 disabled:opacity-30"
-                            title="Quitar"
+                            title={sp.job.remove}
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1366,8 +1359,8 @@ export default function StaticProductPipelinePage() {
                           por brand+tipo. */}
                       <div>
                         <label className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                          🎨 Escena del fondo
-                          <span className="text-muted normal-case font-normal">— elige o deja en automático</span>
+                          {sp.job.sceneLabel}
+                          <span className="text-muted normal-case font-normal">{sp.job.sceneHint}</span>
                         </label>
                         <select
                           value={job.sceneOverride ?? "auto"}
@@ -1378,7 +1371,7 @@ export default function StaticProductPipelinePage() {
                           disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
                           className="w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-white disabled:opacity-50"
                         >
-                          <option value="auto">🤖 Automático (decide la IA por marca+tipo)</option>
+                          <option value="auto">{sp.job.sceneAuto}</option>
                           {(["lujo", "natural", "lifestyle", "romantico", "editorial", "studio"] as SceneCategory[]).map((cat) => {
                             const presets = getScenePresetsForType(job.productType).filter((p) => p.category === cat);
                             if (presets.length === 0) return null;
@@ -1415,18 +1408,18 @@ export default function StaticProductPipelinePage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="text-[11px] font-semibold text-[var(--accent)]">
-                                🎬 Video lifestyle Reels (+$0.05)
+                                {sp.job.videoToggle}
                               </span>
                             </div>
                             <p className="text-[10px] text-muted leading-tight mt-0.5">
-                              5 segundos vertical 9:16 con animación cinemática. Listo para Reels, Stories, TikTok.
+                              {sp.job.videoDesc}
                             </p>
                           </div>
                         </label>
                         {job.generateVideo && (
                           <div className="mt-2 pl-5">
                             <label className="text-[10px] uppercase tracking-wider text-muted block mb-1">
-                              Acción del video
+                              {sp.job.videoAction}
                             </label>
                             <select
                               value={job.videoAction ?? "auto"}
@@ -1435,7 +1428,7 @@ export default function StaticProductPipelinePage() {
                               className="w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white disabled:opacity-50"
                             >
                               {LIFESTYLE_VIDEO_ACTIONS.map((a) => (
-                                <option key={a.value} value={a.value}>{a.icon} {a.label}</option>
+                                <option key={a.value} value={a.value}>{a.icon} {sp.job.videoActions[a.value]}</option>
                               ))}
                             </select>
                           </div>
@@ -1447,7 +1440,7 @@ export default function StaticProductPipelinePage() {
                       {job.productFeatures && (
                         <div className="rounded border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1.5">
                           <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
-                            ✨ Lo que la IA ve en tu foto
+                            {sp.job.featuresTitle}
                           </p>
                           <div className="flex flex-wrap gap-1">
                             <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
@@ -1463,7 +1456,7 @@ export default function StaticProductPipelinePage() {
                             )}
                             {job.productFeatures.tapa && (
                               <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
-                                tapa {job.productFeatures.tapa}
+                                {sp.job.cap(job.productFeatures.tapa)}
                               </span>
                             )}
                             {job.productFeatures.marca_legible && (
@@ -1502,6 +1495,7 @@ export default function StaticProductPipelinePage() {
                           {(["isolate", "normalize"] as StepKey[]).map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
+                            const spMeta = sp.steps.items[key];
                             const activeClass =
                               step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
                               step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
@@ -1512,18 +1506,18 @@ export default function StaticProductPipelinePage() {
                               <div
                                 key={key}
                                 className={cn("flex items-center gap-2 rounded border p-2 text-[11px]", activeClass)}
-                                title={step.error ?? meta.description}
+                                title={step.error ?? spMeta.description}
                               >
                                 <span className="text-base">{meta.icon}</span>
                                 {step.resultUrl ? (
                                   <button
                                     type="button"
-                                    onClick={() => setLightbox({ url: step.resultUrl!, label: meta.label })}
+                                    onClick={() => setLightbox({ url: step.resultUrl!, label: spMeta.label })}
                                     className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/60"
-                                    title="Ver en grande"
+                                    title={sp.job.zoomSmall}
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={step.resultUrl} alt={meta.label} className="h-full w-full object-contain" />
+                                    <img src={step.resultUrl} alt={spMeta.label} className="h-full w-full object-contain" />
                                   </button>
                                 ) : (
                                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-black/40 text-gray-600">
@@ -1531,13 +1525,13 @@ export default function StaticProductPipelinePage() {
                                   </div>
                                 )}
                                 <div className="flex flex-1 flex-col text-[10px]">
-                                  <span className="truncate font-medium text-gray-200">{meta.label}</span>
+                                  <span className="truncate font-medium text-gray-200">{spMeta.label}</span>
                                   <span className="text-gray-400">
                                     {step.status === "done" && <><CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" /> {step.cost > 0 && <span className="font-mono text-[var(--accent)]">${step.cost.toFixed(3)}</span>}</>}
-                                    {step.status === "error" && <span className="text-red-400"><AlertCircle className="inline h-2.5 w-2.5" /> falló</span>}
-                                    {step.status === "skipped" && "saltado"}
-                                    {step.status === "running" && "procesando…"}
-                                    {step.status === "idle" && meta.costHint}
+                                    {step.status === "error" && <span className="text-red-400"><AlertCircle className="inline h-2.5 w-2.5" /> {sp.steps.failedLower}</span>}
+                                    {step.status === "skipped" && sp.steps.skipped}
+                                    {step.status === "running" && sp.steps.processingLower}
+                                    {step.status === "idle" && spMeta.costHint}
                                   </span>
                                 </div>
                               </div>
@@ -1550,6 +1544,7 @@ export default function StaticProductPipelinePage() {
                           {OUTPUT_STEPS.map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
+                            const spMeta = sp.steps.items[key];
                             const activeClass =
                               step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
                               step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
@@ -1565,37 +1560,37 @@ export default function StaticProductPipelinePage() {
                               <div
                                 key={key}
                                 className={cn("flex flex-col rounded-lg border p-2", activeClass)}
-                                title={step.error ?? meta.description}
+                                title={step.error ?? spMeta.description}
                               >
                                 <div className="mb-1.5 flex items-center justify-between gap-1 text-[11px]">
                                   <span className="flex items-center gap-1 truncate font-semibold text-gray-100">
                                     <span className="text-base">{meta.icon}</span>
-                                    {meta.label}
-                                    {meta.what && (
+                                    {spMeta.label}
+                                    {spMeta.what && (
                                       <details className="relative ml-1">
                                         <summary
                                           className="cursor-pointer list-none rounded bg-white/5 px-1 text-[9px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
-                                          title="¿Qué hace este paso?"
+                                          title={sp.steps.infoTitle}
                                         >
                                           ⓘ
                                         </summary>
                                         <div className="absolute left-0 top-5 z-10 w-64 rounded-lg border border-white/10 bg-zinc-900 p-2.5 shadow-xl">
-                                          <p className="mb-1 text-[10px] leading-tight text-gray-200">{meta.what}</p>
-                                          {meta.provider && (
+                                          <p className="mb-1 text-[10px] leading-tight text-gray-200">{spMeta.what}</p>
+                                          {spMeta.provider && (
                                             <p className="mt-1.5 text-[9px] text-gray-400">
-                                              <span className="font-semibold text-[var(--accent)]">Proveedor:</span> {meta.provider}
+                                              <span className="font-semibold text-[var(--accent)]">{sp.steps.providerLabel}</span> {spMeta.provider}
                                             </p>
                                           )}
-                                          {meta.duration && (
+                                          {spMeta.duration && (
                                             <p className="text-[9px] text-gray-400">
-                                              <span className="font-semibold text-[var(--accent)]">Tiempo:</span> {meta.duration}
+                                              <span className="font-semibold text-[var(--accent)]">{sp.steps.durationLabel}</span> {spMeta.duration}
                                             </p>
                                           )}
-                                          {meta.tips && meta.tips.length > 0 && (
+                                          {spMeta.tips && spMeta.tips.length > 0 && (
                                             <div className="mt-1.5 border-t border-white/10 pt-1.5">
-                                              <p className="text-[9px] font-semibold text-amber-300">Tips:</p>
+                                              <p className="text-[9px] font-semibold text-amber-300">{sp.steps.tipsLabel}</p>
                                               <ul className="mt-0.5 list-disc pl-3 text-[9px] text-gray-300">
-                                                {meta.tips.map((t, i) => (
+                                                {spMeta.tips.map((t, i) => (
                                                   <li key={i} className="leading-tight">{t}</li>
                                                 ))}
                                               </ul>
@@ -1612,24 +1607,24 @@ export default function StaticProductPipelinePage() {
                                     )}
                                   >
                                     {step.status === "error"
-                                      ? "Falló"
+                                      ? sp.steps.failedCap
                                       : step.status === "done" && step.cost > 0
                                         ? `$${step.cost.toFixed(3)}`
-                                        : meta.costHint}
+                                        : spMeta.costHint}
                                   </span>
                                 </div>
 
                                 {step.resultUrl ? (
                                   <button
                                     type="button"
-                                    onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${meta.label}` })}
+                                    onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
                                     className="group relative h-40 w-full overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/70"
-                                    title="Click para ver en grande"
+                                    title={sp.steps.zoomBig}
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                       src={step.resultUrl}
-                                      alt={meta.label}
+                                      alt={spMeta.label}
                                       className="h-full w-full object-contain"
                                     />
                                     <span className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white opacity-0 transition group-hover:opacity-100">
@@ -1640,7 +1635,7 @@ export default function StaticProductPipelinePage() {
                                         className="absolute left-1 top-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
                                         title={step.warning}
                                       >
-                                        ⚠ Revisar
+                                        {sp.steps.reviewBadge}
                                       </span>
                                     )}
                                   </button>
@@ -1649,22 +1644,22 @@ export default function StaticProductPipelinePage() {
                                     {step.status === "running" ? (
                                       <>
                                         <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
-                                        <span className="text-[10px] text-amber-300">Generando…</span>
+                                        <span className="text-[10px] text-amber-300">{sp.steps.generating}</span>
                                       </>
                                     ) : step.status === "error" ? (
                                       <>
                                         <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-400" />
                                         <span className="line-clamp-3 text-center text-[10px] leading-tight text-red-300" title={step.error}>
-                                          {step.error || "Error desconocido"}
+                                          {step.error || sp.steps.unknownError}
                                         </span>
                                       </>
                                     ) : (
-                                      <span className="text-xs">esperando…</span>
+                                      <span className="text-xs">{sp.steps.waiting}</span>
                                     )}
                                   </div>
                                 )}
 
-                                <p className="mt-1.5 line-clamp-2 text-[10px] text-gray-500">{meta.description}</p>
+                                <p className="mt-1.5 line-clamp-2 text-[10px] text-gray-500">{spMeta.description}</p>
 
                                 {/* Per-output controls */}
                                 <div className="mt-2 flex items-center justify-end gap-1">
@@ -1673,10 +1668,10 @@ export default function StaticProductPipelinePage() {
                                       href={step.resultUrl}
                                       download={downloadName}
                                       className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25"
-                                      title={`Descargar ${meta.label}`}
+                                      title={sp.steps.downloadStep(spMeta.label)}
                                     >
                                       <Download className="h-2.5 w-2.5" />
-                                      Descargar
+                                      {sp.steps.download}
                                     </a>
                                   )}
                                   {canRerun && key === "adaptive" && (
@@ -1689,10 +1684,10 @@ export default function StaticProductPipelinePage() {
                                         })
                                       }
                                       className="inline-flex items-center gap-1 rounded bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-medium text-[var(--accent)] transition hover:bg-violet-500/25"
-                                      title="Cambiar prompt y re-generar adaptativo + vertical"
+                                      title={sp.steps.changeTitle}
                                     >
                                       <Palette className="h-2.5 w-2.5" />
-                                      Cambiar
+                                      {sp.steps.change}
                                     </button>
                                   )}
                                   {canRerun && (
@@ -1700,10 +1695,10 @@ export default function StaticProductPipelinePage() {
                                       type="button"
                                       onClick={() => reRunOutputs(job.id, [key])}
                                       className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-[10px] font-medium text-gray-300 transition hover:bg-white/10"
-                                      title="Re-ejecutar este output"
+                                      title={sp.steps.repeatTitle}
                                     >
                                       <RotateCw className="h-2.5 w-2.5" />
-                                      Repetir
+                                      {sp.steps.repeat}
                                     </button>
                                   )}
                                 </div>
@@ -1729,7 +1724,7 @@ export default function StaticProductPipelinePage() {
               className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:bg-violet-500/50"
             >
               {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {isRunning ? "Procesando..." : "Procesar todas"}
+              {isRunning ? sp.actions.processing : sp.actions.processAll}
             </button>
 
             {/* Gap 6 — toggle validador de fondos (default ON, costo despreciable) */}
@@ -1740,7 +1735,7 @@ export default function StaticProductPipelinePage() {
                   ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
                   : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
               )}
-              title="Corre un check de Claude Haiku después de generar el fondo adaptativo para detectar duplicados o producto faltante."
+              title={sp.actions.validateTitle}
             >
               <input
                 type="checkbox"
@@ -1749,7 +1744,7 @@ export default function StaticProductPipelinePage() {
                 disabled={isRunning}
                 className="h-3 w-3 accent-amber-500"
               />
-              <span>Validar fondos con IA <span className="text-[10px] opacity-70">(+$0.0002/foto)</span></span>
+              <span>{sp.actions.validateLabel} <span className="text-[10px] opacity-70">{sp.actions.validateCost}</span></span>
             </label>
             <button
               onClick={() => {
@@ -1761,7 +1756,7 @@ export default function StaticProductPipelinePage() {
               className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />
-              Limpiar todo
+              {sp.actions.clearAll}
             </button>
           </div>
         )}
@@ -1780,7 +1775,7 @@ export default function StaticProductPipelinePage() {
             <div className="mb-3 flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
                 <Palette className="h-4 w-4 text-violet-400" />
-                Cambiar fondo
+                {sp.modal.title}
               </h3>
               <button
                 onClick={() => setBgPromptModal(null)}
@@ -1818,13 +1813,13 @@ export default function StaticProductPipelinePage() {
             </div>
 
             <label className="mb-1 block text-xs text-gray-400">
-              Prompt del fondo (editable)
+              {sp.modal.promptLabel}
             </label>
             <textarea
               value={bgPromptModal.customPrompt}
               onChange={(e) => setBgPromptModal({ ...bgPromptModal, customPrompt: e.target.value })}
               className="mb-3 h-32 w-full rounded border border-white/10 bg-black/40 p-2 text-xs text-gray-200"
-              placeholder="Describe el fondo deseado..."
+              placeholder={sp.modal.promptPlaceholder}
             />
 
             <div className="flex items-center justify-end gap-2">
@@ -1832,7 +1827,7 @@ export default function StaticProductPipelinePage() {
                 onClick={() => setBgPromptModal(null)}
                 className="rounded border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-gray-300 hover:border-white/20"
               >
-                Cancelar
+                {sp.modal.cancel}
               </button>
               <button
                 onClick={() => {
@@ -1847,7 +1842,7 @@ export default function StaticProductPipelinePage() {
                 className="inline-flex items-center gap-1.5 rounded bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-400 disabled:opacity-50"
               >
                 <RotateCw className="h-3 w-3" />
-                Re-generar adaptativo + vertical
+                {sp.modal.regenerate}
               </button>
             </div>
           </div>
@@ -1869,7 +1864,7 @@ export default function StaticProductPipelinePage() {
               setLightbox(null);
             }}
             className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-            title="Cerrar"
+            title={sp.lightbox.close}
           >
             <X className="h-5 w-5" />
           </button>
@@ -1887,7 +1882,7 @@ export default function StaticProductPipelinePage() {
               className="inline-flex items-center gap-1.5 rounded bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-400"
             >
               <Download className="h-3 w-3" />
-              Descargar imagen
+              {sp.lightbox.download}
             </a>
           </div>
         </div>
