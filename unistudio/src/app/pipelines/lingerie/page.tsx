@@ -1830,31 +1830,35 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm">
               <div className="flex max-h-full w-full max-w-5xl items-center gap-4">
                 <figure className="min-w-0 flex-1">
+                  {/* Estos tres textos estaban HARDCODEADOS en español, asi que
+                      no se traducian nunca aunque el resto de la pagina cambiara
+                      de idioma — parte de la queja de "esta todo mezclado".
+                      lightbox.original / .result ya existian; peekHint es nueva. */}
                   <figcaption className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                    Original
+                    {lg.lightbox.original}
                   </figcaption>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={step.originalUrl ?? inputUrl}
-                    alt="Original en grande"
+                    alt={lg.lightbox.original}
                     className="max-h-[70vh] w-full rounded-xl object-contain"
                   />
                 </figure>
                 <ArrowRight className="h-6 w-6 shrink-0 text-[var(--accent)]" />
                 <figure className="min-w-0 flex-1">
                   <figcaption className="mb-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
-                    Resultado
+                    {lg.lightbox.result}
                   </figcaption>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={step.resultUrl}
-                    alt="Resultado en grande"
+                    alt={lg.lightbox.result}
                     className="max-h-[70vh] w-full rounded-xl object-contain ring-1 ring-[var(--border-accent)]"
                   />
                 </figure>
               </div>
               <p className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-4 py-1.5 text-xs text-[var(--text-secondary)]">
-                Hacé clic para abrir el comparador y descargar
+                {lg.lightbox.peekHint}
               </p>
             </div>
           )}
@@ -2036,12 +2040,15 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       <CheckCircle2 className="h-8 w-8 text-[var(--success)]" />
                     </div>
                   )}
+                  {/* Sin `title`: el boton ya muestra ese mismo texto como
+                      etiqueta visible, y el tooltip nativo del navegador se
+                      dibujaba ENCIMA de la vista previa grande, encimado con su
+                      propia pista. Dos textos superpuestos diciendo lo mismo. */}
                   {step.resultUrl && (
                     <button
                       type="button"
                       onClick={() => setLightboxIdx(0)}
                       className="absolute inset-x-0 bottom-0 z-10 flex h-9 items-center justify-center gap-2 bg-gradient-to-t from-black/85 to-transparent opacity-0 transition-opacity group-hover/compare:opacity-100"
-                      title={lg.stepCard.viewBothCompareTitle}
                     >
                       <Maximize2 className="h-4 w-4 text-[var(--accent)]" />
                       <span className="text-xs font-semibold text-white">{lg.stepCard.viewBoth}</span>
@@ -2943,8 +2950,17 @@ async function runStep(
       productType === "panty" ? "bottoms"
       : productType === "set" ? "one-pieces"
       : "tops";
+    // EL BRAZO TAPABA JUSTO LO QUE ESTA FOTO EXISTE PARA MOSTRAR.
+    // El prompt anterior no decia nada de los brazos, asi que la modelo salia
+    // con los brazos caidos y el brazo cubria el panel lateral, la costura de la
+    // sisa y la malla de la axila — el motivo entero de la toma de perfil. Por eso
+    // los catalogos de lenceria disparan el perfil con el brazo LEVANTADO y la
+    // mano detras de la nuca: despeja el costado y estira la banda a su forma real.
     const sideScene =
       "Strict side profile product shot: the model turned 90 degrees to the camera, full side view of the garment. " +
+      "The arm nearest the camera is RAISED with the hand resting behind the head or neck, elbow open and pointing up, " +
+      "so the armpit, the side panel, the armhole seam and the side band are fully exposed and unobstructed. " +
+      "Never let the arm hang down or cross the body — it must not cover any part of the garment. " +
       "Show the silhouette clearly — how far the cup projects, the real width of the band and how the strap sits on " +
       "the shoulder. Waist-up framing, clean seamless studio background, even light with a soft rim on the contour.";
     const res = await fetch("/api/tryon", {
@@ -2954,6 +2970,12 @@ async function runStep(
       body: JSON.stringify({
         modelImage: sharedModelUrl,
         garmentImage: inputUrl,
+        // La foto REAL de la espalda del mismo REF. Sin esto Uwear solo veia el
+        // frente y tenia que INVENTAR como sigue la prenda hacia atras — de ahi
+        // que el costado saliera con una construccion que no es la del producto.
+        // El paso de try-on ya se la pasaba; la lateral no, y es donde mas hace
+        // falta: el perfil es justo la transicion entre frente y espalda.
+        garmentBackUrl: (providerOverride ?? "uwear") === "uwear" ? backGarmentUrl : undefined,
         category,
         garmentType: garmentTypeForApi,
         provider: providerOverride && providerOverride !== "auto" ? providerOverride : "uwear",

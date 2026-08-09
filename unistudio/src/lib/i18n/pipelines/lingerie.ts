@@ -245,6 +245,7 @@ export interface LingeriePipelineCopy {
     close: string;
     original: string;
     result: string;
+    peekHint: string;
     imageAlt: (index: number) => string;
     prevTitle: string;
     nextTitle: string;
@@ -918,6 +919,7 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
     close: 'Cerrar',
     original: 'Original',
     result: 'Resultado',
+    peekHint: 'Hacé clic para abrir el comparador y descargar',
     imageAlt: (index) => `Imagen ${index}`,
     prevTitle: 'Anterior (←)',
     nextTitle: 'Siguiente (→)',
@@ -1598,6 +1600,7 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
     close: 'Close',
     original: 'Original',
     result: 'Result',
+    peekHint: 'Click to open the comparer and download',
     imageAlt: (index) => `Image ${index}`,
     prevTitle: 'Previous (←)',
     nextTitle: 'Next (→)',
