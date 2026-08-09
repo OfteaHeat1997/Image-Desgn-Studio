@@ -12,7 +12,15 @@
 
 **Qué está haciendo:** limpieza y reestructuración del repo para la revisión del lunes.
 **Alcance (SOLO esto):**
-1. Sacar del repo todo lo que **no es código** (research, notas personales, interview-prep, guías HTML gigantes, datos crudos) → se mueve a una carpeta EXTERNA: `C:\Users\maria\Documents\UniStudio-Workspace\` (fuera de GitHub, no se sube).
+
+
+
+
+
+
+
+nnesecito 
+
 2. Detectar y archivar **código muerto** (archivos sin imports, huérfanos) → se mueven a `UniStudio-Workspace\archive-dead-code\`, NO se borran.
 3. Crear el documento-mapa `docs/README.md` (dónde está cada cosa).
 
@@ -52,3 +60,34 @@ perdió), pero la próxima puede mezclar trabajo a medias. **Staging con rutas e
 ---
 
 *Regla de oro: si vas a mover, borrar o renombrar algo grande, primero anótalo aquí y avisa. Nunca `git add .` desde la raíz (ver CLAUDE.md).*
+
+---
+
+## 📋 PENDIENTES DEL PIPELINE DE LENCERÍA (2026-08-09, sesión nocturna)
+
+### Alta prioridad
+- **Leffa tarda 2–4 min** en el Paso 2. Es el proveedor que respeta el producto,
+  pero la espera es demasiado larga para iterar. Opciones a evaluar: correr los
+  pasos independientes en paralelo, mostrar un preview rápido con SeedDream
+  mientras Leffa termina, o precalentar la cola.
+- **El Paso 1 (ghost de Photoroom) es NO DETERMINISTA**: a veces conserva la
+  botonadura de ganchos y a veces no. Si sale sin ganchos, TODOS los pasos
+  siguientes heredan el error. Regla: no aceptar el Paso 1 sin verificar el cierre.
+- **El recorte real (grounded_sam) muerde los tirantes.** Probado sin éxito:
+  nombrar los tirantes en el mask prompt, unión de máscaras candidatas, cierre
+  morfológico (devolvía imagen en blanco).
+
+### Sin verificar
+- Paso 4 (Cuerpo Completo), Paso 5 (Video 360°), Paso 6 (Video Modelo).
+
+### Deuda de diseño
+- **"Crear Modelo IA" y Uwear se pisan**: Uwear genera su propia modelo (avatar
+  fijo `UWEAR_AVATAR_ID`, default 21663), así que ese paso se descarta. Si se usa
+  Uwear, conviene saltarlo.
+- **El avatar por defecto es "Latina"** pero la tienda es para **Curaçao**
+  (población mayoritariamente afrocaribeña). Los 3 avatares de mujer disponibles
+  son de sistema y ninguno representa bien a esa clienta. Crear uno propio en
+  platform.uwear.ai → Avatars y poner su id en `UWEAR_AVATAR_ID`.
+- **El ETA del Paso 3 dice "~40s típico"** y en realidad tarda ~4 min (quedó del
+  tiempo de SeedDream).
+
