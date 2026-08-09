@@ -1259,13 +1259,19 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             <Download className="h-3.5 w-3.5" />
             Descargar
           </button>
+          {/* Cerrar: antes era un icono gris de 36px sobre fondo translucido, facil
+              de no encontrar en una pantalla llena de imagenes. Ahora lleva texto
+              y el borde de marca — al abrir algo a pantalla completa, la salida
+              tiene que ser lo primero que se ve. */}
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+            className="flex h-10 items-center gap-2 rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-[#0C0C0E]"
             title="Cerrar (Esc)"
           >
             <X className="h-5 w-5" />
+            <span className="text-sm">Cerrar</span>
+            <kbd className="hidden rounded border border-current/30 px-1 text-[10px] opacity-70 sm:inline">Esc</kbd>
           </button>
         </div>
       </div>
@@ -1674,15 +1680,25 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {/* Card body — before/after comparison */}
       {(step.status !== "idle" && step.status !== "pending") && (
         <div className="p-5">
-          <div className="flex items-center gap-4">
-            {/* Input (before) */}
+          <div className="group/compare flex items-center gap-4">
+            {/* Input (before) — clickeable, igual que el resultado. Las dos se
+                agrandan a la vez al pasar el mouse por cualquiera: comunica que
+                son un par comparable, no dos imagenes sueltas. */}
             <div className="flex-1 min-w-0">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Original</p>
-              <ImageThumb
-                url={step.originalUrl ?? inputUrl}
-                label="Sin imagen"
-                className="h-40 w-full"
-              />
+              <button
+                type="button"
+                onClick={() => { if (step.resultUrl) setLightboxIdx(0); }}
+                disabled={!step.resultUrl}
+                className="relative block w-full cursor-zoom-in overflow-hidden rounded-lg ring-0 ring-[var(--accent)]/40 transition-all duration-200 group-hover/compare:scale-[1.03] group-hover/compare:ring-2 disabled:cursor-default disabled:group-hover/compare:scale-100 disabled:group-hover/compare:ring-0"
+                title="Ver las dos en grande"
+              >
+                <ImageThumb
+                  url={step.originalUrl ?? inputUrl}
+                  label="Sin imagen"
+                  className="h-40 w-full"
+                />
+              </button>
             </div>
 
             {/* Arrow */}
@@ -1821,7 +1837,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   </div>
                 </div>
               ) : (
-                <div className="group relative">
+                <div className="group relative transition-all duration-200 group-hover/compare:scale-[1.03]">
                   {/* Comparador antes/después (a prueba de fallos): "antes" = input
                       del paso, "después" = resultado. NO va dentro de un <button>
                       porque el slider tiene su propio <input range> (conflicto de
@@ -1841,11 +1857,11 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     <button
                       type="button"
                       onClick={() => setLightboxIdx(0)}
-                      className="absolute right-1.5 bottom-1.5 z-10 flex h-7 items-center gap-1 rounded-md bg-black/60 px-2 opacity-0 transition-opacity group-hover:opacity-100"
-                      title="Ver en grande + descargar"
+                      className="absolute inset-x-0 bottom-0 z-10 flex h-9 items-center justify-center gap-2 bg-gradient-to-t from-black/85 to-transparent opacity-0 transition-opacity group-hover/compare:opacity-100"
+                      title="Ver las dos en grande, con comparador"
                     >
-                      <Maximize2 className="h-3.5 w-3.5 text-white" />
-                      <span className="text-[10px] font-medium text-white">Ver grande</span>
+                      <Maximize2 className="h-4 w-4 text-[var(--accent)]" />
+                      <span className="text-xs font-semibold text-white">Ver las dos en grande</span>
                     </button>
                   )}
                 </div>
