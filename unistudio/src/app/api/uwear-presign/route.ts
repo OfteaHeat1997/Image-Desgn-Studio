@@ -41,9 +41,7 @@ const BODY = {
 // listan/crean los avatares. Misma tecnica que resolvio assets[] y
 // clothing_item_ids: leer lo que la cuenta YA tiene.
 const READ_PATHS = [
-  'https://api.uwear.ai/avatars?items_per_page=5',
-  'https://api.uwear.ai/avatar?items_per_page=5',
-  'https://api.uwear.ai/models?items_per_page=5',
+  'https://api.uwear.ai/avatars?items_per_page=20',
 ];
 
 export async function GET() {
@@ -62,7 +60,7 @@ export async function GET() {
     try {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${k}` } });
       const text = await res.text().catch(() => '');
-      results.push({ url, auth: 'Bearer', status: res.status, body: text.slice(0, 3000) });
+      results.push({ url, auth: 'Bearer', status: res.status, body: text.slice(0, 12000) });
     } catch (e) {
       results.push({ url, auth: 'Bearer', status: 0, body: e instanceof Error ? e.message : String(e) });
     }
