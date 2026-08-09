@@ -56,6 +56,30 @@ export interface StaticProductPipelineCopy {
     name: string;
     categories: string;
   };
+  /** Copy del flujo de dos fases (setup → pipeline), estilo Uwear. */
+  phase: {
+    configHeading: string;
+    configHint: string;
+    summaryHeading: string;
+    summaryImages: string;
+    summaryOutputs: string;
+    estimatedCost: string;
+    start: string;
+    startPhotos: (n: number) => string;
+    uploadHint: string;
+    backToSetup: string;
+    resultsHeading: string;
+    processRemaining: string;
+    readyBadge: string;
+    processingLabel: (done: number, total: number) => string;
+    completedLabel: (done: number, total: number) => string;
+  };
+  /** Comparador antes/después de las tarjetas de salida. */
+  beforeAfter: {
+    before: string;
+    after: string;
+    compareAria: (label: string) => string;
+  };
   batch: {
     heading: string;
     hintPre: string;
@@ -112,6 +136,7 @@ export interface StaticProductPipelineCopy {
     providerLabel: string;
     durationLabel: string;
     tipsLabel: string;
+    ranWith: string;
     failedLower: string;
     failedCap: string;
     skipped: string;
@@ -180,6 +205,28 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
     home: 'Inicio',
     name: 'Perfumes y Belleza',
     categories: 'Perfumes · Cremas · Skincare · Maquillaje',
+  },
+  phase: {
+    configHeading: '3 · Ajusta cada foto',
+    configHint: 'Tipo, marca, escena y extras por foto — o déjalo en automático',
+    summaryHeading: 'Resumen',
+    summaryImages: 'Fotos',
+    summaryOutputs: 'Salidas por foto',
+    estimatedCost: 'Costo estimado',
+    start: 'Empezar',
+    startPhotos: (n) => `(${n} foto${n !== 1 ? 's' : ''})`,
+    uploadHint: 'Sube al menos una foto para empezar.',
+    backToSetup: 'Configuración',
+    resultsHeading: 'Resultados',
+    processRemaining: 'Procesar pendientes',
+    readyBadge: 'Listo para procesar',
+    processingLabel: (done, total) => `Procesando ${done}/${total}...`,
+    completedLabel: (done, total) => `${done}/${total} listas`,
+  },
+  beforeAfter: {
+    before: 'Antes',
+    after: 'Después',
+    compareAria: (label) => `Comparar antes y después de ${label}`,
   },
   batch: {
     heading: 'Batch desde inventario',
@@ -257,6 +304,7 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
     providerLabel: 'Proveedor:',
     durationLabel: 'Tiempo:',
     tipsLabel: 'Tips:',
+    ranWith: 'Generado con',
     failedLower: 'falló',
     failedCap: 'Falló',
     skipped: 'saltado',
@@ -437,6 +485,28 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
     name: 'Perfume & Beauty',
     categories: 'Perfume · Creams · Skincare · Makeup',
   },
+  phase: {
+    configHeading: '3 · Tune each photo',
+    configHint: 'Type, brand, scene and extras per photo — or leave it on auto',
+    summaryHeading: 'Summary',
+    summaryImages: 'Photos',
+    summaryOutputs: 'Outputs per photo',
+    estimatedCost: 'Estimated cost',
+    start: 'Start',
+    startPhotos: (n) => `(${n} photo${n !== 1 ? 's' : ''})`,
+    uploadHint: 'Upload at least one photo to start.',
+    backToSetup: 'Setup',
+    resultsHeading: 'Results',
+    processRemaining: 'Process pending',
+    readyBadge: 'Ready to process',
+    processingLabel: (done, total) => `Processing ${done}/${total}...`,
+    completedLabel: (done, total) => `${done}/${total} done`,
+  },
+  beforeAfter: {
+    before: 'Before',
+    after: 'After',
+    compareAria: (label) => `Compare before and after of ${label}`,
+  },
   batch: {
     heading: 'Inventory batch',
     hintPre:
@@ -513,6 +583,7 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
     providerLabel: 'Provider:',
     durationLabel: 'Time:',
     tipsLabel: 'Tips:',
+    ranWith: 'Generated with',
     failedLower: 'failed',
     failedCap: 'Failed',
     skipped: 'skipped',

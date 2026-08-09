@@ -322,6 +322,34 @@ function outputStepsFor(job: Job): StepKey[] {
   return steps;
 }
 
+/**
+ * Proveedor REAL que produjo cada output — derivado de la config del job (NO
+ * cambia el procesamiento, es puramente presentación). Se muestra como badge en
+ * la tarjeta del output, igual que el badge de proveedor de lencería. `faithful`
+ * = motor sin IA que preserva pixel-perfect el producto (verde); el resto usa un
+ * modelo generativo (dorado de marca).
+ */
+function outputProvider(job: Job, key: StepKey): { label: string; faithful: boolean } | null {
+  switch (key) {
+    case "white":
+      return job.usePhotoroom
+        ? { label: "Photoroom", faithful: true }
+        : { label: "Sharp", faithful: true };
+    case "adaptive":
+    case "hero":
+    case "vertical":
+      return { label: "Flux Schnell", faithful: false };
+    case "upscale":
+      return { label: "Clarity", faithful: false };
+    case "shadow":
+      return { label: "Sharp", faithful: true };
+    case "lifestyleVideo":
+      return { label: "wan-2.2-fast", faithful: false };
+    default:
+      return null;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -504,6 +532,110 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  BeforeAfterSlider — comparador deslizable original vs output        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Comparador antes/después con divisor deslizable (portado del pipeline de
+ * lencería). "Antes" = foto original del producto; "Después" = output generado.
+ * A prueba de fallos: sin "después" válido cae a un placeholder; sin "antes"
+ * muestra solo el resultado sin slider.
+ */
+function BeforeAfterSlider({
+  before,
+  after,
+  label,
+  className,
+}: {
+  before?: string;
+  after?: string;
+  label: string;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  const sp = t.pipelines.staticProduct;
+  const [pos, setPos] = useState(50);
+  const [beforeErr, setBeforeErr] = useState(false);
+  const [afterErr, setAfterErr] = useState(false);
+
+  const checkerboard = { background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" };
+
+  if (!after || afterErr) {
+    return (
+      <div
+        className={cn("flex items-center justify-center rounded-lg border border-white/10 text-gray-600", className)}
+        style={checkerboard}
+      >
+        —
+      </div>
+    );
+  }
+  if (!before || beforeErr) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={after}
+        alt=""
+        className={cn("rounded-lg object-contain", className)}
+        style={checkerboard}
+        onError={() => setAfterErr(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn("relative select-none overflow-hidden rounded-lg border border-white/10", className)}
+      style={checkerboard}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={after}
+        alt=""
+        className="absolute inset-0 h-full w-full object-contain"
+        onError={() => setAfterErr(true)}
+        draggable={false}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={before}
+        alt=""
+        className="absolute inset-0 h-full w-full object-contain"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+        onError={() => setBeforeErr(true)}
+        draggable={false}
+      />
+      <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white/90">
+        {sp.beforeAfter.before}
+      </span>
+      <span className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-[var(--accent)]/80 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white">
+        {sp.beforeAfter.after}
+      </span>
+      <div
+        className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow-[0_0_6px_rgba(0,0,0,0.6)]"
+        style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
+      >
+        <div className="absolute top-1/2 left-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={pos}
+        onChange={(e) => setPos(Number(e.target.value))}
+        aria-label={sp.beforeAfter.compareAria(label)}
+        className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page component                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -512,6 +644,9 @@ export default function StaticProductPipelinePage() {
   const sp = t.pipelines.staticProduct;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  // Flujo de dos fases (estilo Uwear/lencería): "setup" = elegir tipo/marca/
+  // escena/extras + subir; "pipeline" = ver los step cards y resultados.
+  const [phase, setPhase] = useState<"setup" | "pipeline">("setup");
   const [defaultType, setDefaultType] = useState<StaticProductType>("perfume");
   const [defaultBrand, setDefaultBrand] = useState<StaticBrand>("other");
   const previewUrlsRef = useRef<string[]>([]);
@@ -1238,8 +1373,29 @@ export default function StaticProductPipelinePage() {
     }
   };
 
+  /**
+   * Transición setup → pipeline: cambia de fase y arranca el procesamiento.
+   * NO cambia la lógica de procesamiento — solo envuelve handleProcessAll con
+   * el salto de fase para replicar el flujo de dos pantallas de lencería.
+   */
+  const startPipeline = async () => {
+    if (isRunning || jobs.length === 0) return;
+    setPhase("pipeline");
+    await handleProcessAll();
+  };
+
   const totalCost = jobs.reduce((sum, j) => sum + j.cost, 0);
   const doneCount = jobs.filter((j) => j.status === "done").length;
+  const pendingCount = jobs.filter((j) => j.status === "idle" || j.status === "error").length;
+  // Estimación de costo por foto para el resumen de setup (presentación): base
+  // isolate ($0.01) + adaptive/hero/vertical (3×$0.003) + opt-ins activados.
+  const estimatedCost = jobs.reduce((sum, j) => {
+    let c = 0.01 + 3 * 0.003; // isolate + adaptive + hero + vertical (white es gratis)
+    if (j.upscaleOutput) c += 0.05;
+    if (j.generateVideo) c += 0.05;
+    if (validateBg) c += 0.0002;
+    return sum + c;
+  }, 0);
 
   /* ------------------------------------------------------------------ */
   /*  Render                                                              */
@@ -1247,32 +1403,73 @@ export default function StaticProductPipelinePage() {
 
   return (
     <div className="min-h-screen bg-surface text-heading overflow-x-hidden">
-      {/* Header — design tokens (oro brand en vez de amber random) */}
+      {/* Masthead — breadcrumb estilo Uwear. En pipeline, la miga izquierda
+          vuelve a la fase de configuración (como lencería) en vez de a Inicio. */}
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
-        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
-          <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">{sp.header.home}</span>
-        </Link>
+        {phase === "pipeline" ? (
+          <button
+            onClick={() => { if (!isRunning) setPhase("setup"); }}
+            className={cn(
+              "flex items-center gap-2 text-sm font-medium transition-default",
+              isRunning ? "cursor-not-allowed text-disabled" : "text-muted hover:text-[var(--accent)]",
+            )}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">{sp.phase.backToSetup}</span>
+          </button>
+        ) : (
+          <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">{sp.header.home}</span>
+          </Link>
+        )}
         <span className="text-[var(--border-default)]">/</span>
         <div className="flex items-center gap-2 min-w-0">
           <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
           <span className="text-sm font-semibold text-heading truncate">{sp.header.name}</span>
         </div>
-        <div className="ml-auto hidden md:block">
-          <span className="rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-            {sp.header.categories}
-          </span>
+        <div className="ml-auto flex items-center gap-3">
+          {phase === "pipeline" ? (
+            <>
+              {isRunning && (
+                <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                  <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
+                  {sp.phase.processingLabel(doneCount, jobs.length)}
+                </span>
+              )}
+              {!isRunning && doneCount > 0 && (
+                <span className="text-sm font-medium text-[var(--accent)]">
+                  {sp.phase.completedLabel(doneCount, jobs.length)}
+                </span>
+              )}
+              {totalCost > 0 && (
+                <span className="hidden text-xs text-[var(--text-secondary)] sm:inline">
+                  ${totalCost.toFixed(3)} {sp.review.spent}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="hidden rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)] md:inline">
+              {sp.header.categories}
+            </span>
+          )}
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
-        <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.staticProduct.title}</h1>
-          <p className="mt-1 text-sm text-body leading-relaxed">
-            {t.pages.staticProduct.subtitle}
-          </p>
-        </div>
+        {phase === "setup" && (
+          <div className="mb-6 md:mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.staticProduct.title}</h1>
+            <p className="mt-1 text-sm text-body leading-relaxed">
+              {t.pages.staticProduct.subtitle}
+            </p>
+          </div>
+        )}
 
+        {/* SETUP: batch + defaults + upload. Se ocultan en la fase pipeline
+            para que la pantalla de resultados quede limpia (flujo Uwear). */}
+        {phase === "setup" && (
+        <>
         {/* Gap 1 — Batch desde inventario local */}
         <section className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-5">
           <div className="mb-3 flex items-center justify-between">
@@ -1396,13 +1593,20 @@ export default function StaticProductPipelinePage() {
 
           <UploadZone onFiles={handleFiles} />
         </section>
+        </>
+        )}
 
-        {/* Jobs list */}
+        {/* Jobs list — en setup muestra la config editable por foto (los jobs
+            están idle, así que el timeline queda oculto); en pipeline muestra el
+            timeline de pasos + las tarjetas de output con antes/después. */}
         {jobs.length > 0 && (
           <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-                {sp.review.heading(jobs.length)}
+                {phase === "setup" ? sp.phase.configHeading : sp.phase.resultsHeading}
+                {phase === "setup" && (
+                  <span className="ml-2 font-normal normal-case text-gray-500">{sp.phase.configHint}</span>
+                )}
               </h2>
               <div className="flex items-center gap-3 text-xs text-gray-400">
                 <span>${totalCost.toFixed(3)} {sp.review.spent}</span>
@@ -1823,17 +2027,36 @@ export default function StaticProductPipelinePage() {
                                       </details>
                                     )}
                                   </span>
-                                  <span
-                                    className={cn(
-                                      "font-mono text-[10px]",
-                                      step.status === "error" ? "text-red-400" : "text-[var(--accent)]",
-                                    )}
-                                  >
-                                    {step.status === "error"
-                                      ? sp.steps.failedCap
-                                      : step.status === "done" && step.cost > 0
-                                        ? `$${step.cost.toFixed(3)}`
-                                        : spMeta.costHint}
+                                  <span className="flex items-center gap-1.5">
+                                    {(() => {
+                                      const prov = step.status === "done" ? outputProvider(job, key) : null;
+                                      if (!prov) return null;
+                                      return (
+                                        <span
+                                          className={cn(
+                                            "rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                                            prov.faithful
+                                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                              : "border-[var(--accent)]/30 bg-[var(--accent-dim)] text-[var(--accent)]",
+                                          )}
+                                          title={`${sp.steps.ranWith} ${prov.label}`}
+                                        >
+                                          {prov.label}
+                                        </span>
+                                      );
+                                    })()}
+                                    <span
+                                      className={cn(
+                                        "font-mono text-[10px]",
+                                        step.status === "error" ? "text-red-400" : "text-[var(--accent)]",
+                                      )}
+                                    >
+                                      {step.status === "error"
+                                        ? sp.steps.failedCap
+                                        : step.status === "done" && step.cost > 0
+                                          ? `$${step.cost.toFixed(3)}`
+                                          : spMeta.costHint}
+                                    </span>
                                   </span>
                                 </div>
 
@@ -1848,30 +2071,35 @@ export default function StaticProductPipelinePage() {
                                       playsInline
                                     />
                                   ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
-                                    className="group relative h-40 w-full overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/70"
-                                    title={sp.steps.zoomBig}
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={step.resultUrl}
-                                      alt={spMeta.label}
-                                      className="h-full w-full object-contain"
+                                  <div className="group relative h-40 w-full">
+                                    {/* Comparador antes/después: original vs output.
+                                        No va dentro de un <button> porque el slider
+                                        tiene su propio <input range> (conflicto de
+                                        anidado). El botón "ver grande" va superpuesto. */}
+                                    <BeforeAfterSlider
+                                      before={job.previewUrl}
+                                      after={step.resultUrl}
+                                      label={spMeta.label}
+                                      className="h-40 w-full"
                                     />
-                                    <span className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white opacity-0 transition group-hover:opacity-100">
-                                      <Maximize2 className="h-3 w-3" />
-                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
+                                      className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-center gap-1.5 bg-gradient-to-t from-black/85 to-transparent opacity-0 transition group-hover:opacity-100"
+                                      title={sp.steps.zoomBig}
+                                    >
+                                      <Maximize2 className="h-3.5 w-3.5 text-[var(--accent)]" />
+                                      <span className="text-[10px] font-semibold text-white">{sp.steps.zoomBig}</span>
+                                    </button>
                                     {step.warning && (
                                       <span
-                                        className="absolute left-1 top-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
+                                        className="absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
                                         title={step.warning}
                                       >
                                         {sp.steps.reviewBadge}
                                       </span>
                                     )}
-                                  </button>
+                                  </div>
                                   )
                                 ) : (
                                   <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded bg-black/40 px-2 text-gray-600">
@@ -1949,22 +2177,30 @@ export default function StaticProductPipelinePage() {
           </section>
         )}
 
-        {/* Actions */}
-        {jobs.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={handleProcessAll}
-              disabled={isRunning}
-              className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:bg-violet-500/50"
-            >
-              {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {isRunning ? sp.actions.processing : sp.actions.processAll}
-            </button>
+        {/* SETUP: resumen de costo + CTA primaria "Empezar" (estilo Uwear). */}
+        {phase === "setup" && jobs.length > 0 && (
+          <section className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] p-5">
+            <h2 className="mb-4 text-sm font-semibold text-white">{sp.phase.summaryHeading}</h2>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--text-secondary)]">{sp.phase.summaryImages}</span>
+                <span className="font-medium text-white">{jobs.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-[var(--text-secondary)]">{sp.phase.summaryOutputs}</span>
+                <span className="font-medium text-white">{OUTPUT_STEPS.length}</span>
+              </div>
+              <div className="my-3 border-t border-white/8" />
+              <div className="flex justify-between">
+                <span className="text-sm text-[var(--text-secondary)]">{sp.phase.estimatedCost}</span>
+                <span className="text-base font-bold text-[var(--accent)]">${estimatedCost.toFixed(3)}</span>
+              </div>
+            </div>
 
             {/* Gap 6 — toggle validador de fondos (default ON, costo despreciable) */}
             <label
               className={cn(
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
+                "mt-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
                 validateBg
                   ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
                   : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
@@ -1980,11 +2216,55 @@ export default function StaticProductPipelinePage() {
               />
               <span>{sp.actions.validateLabel} <span className="text-[10px] opacity-70">{sp.actions.validateCost}</span></span>
             </label>
+
+            <button
+              onClick={startPipeline}
+              disabled={jobs.length === 0 || isRunning}
+              className={cn(
+                "mt-5 flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-all",
+                jobs.length > 0 && !isRunning
+                  ? "bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent)] active:scale-[0.98]"
+                  : "cursor-not-allowed bg-white/5 text-[var(--text-secondary)]",
+              )}
+            >
+              <Play className="h-4 w-4" />
+              {sp.phase.start}
+              {jobs.length > 0 && <span className="ml-1 opacity-80">{sp.phase.startPhotos(jobs.length)}</span>}
+            </button>
+
             <button
               onClick={() => {
                 jobs.forEach((j) => URL.revokeObjectURL(j.previewUrl));
                 previewUrlsRef.current = [];
                 setJobs([]);
+              }}
+              disabled={isRunning}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" />
+              {sp.actions.clearAll}
+            </button>
+          </section>
+        )}
+
+        {/* PIPELINE: acciones sobre los resultados — reprocesar pendientes /
+            fallidos y limpiar. La CTA principal ya se disparó al entrar. */}
+        {phase === "pipeline" && jobs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleProcessAll}
+              disabled={isRunning || pendingCount === 0}
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--bg-primary)] transition hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              {isRunning ? sp.actions.processing : sp.phase.processRemaining}
+            </button>
+            <button
+              onClick={() => {
+                jobs.forEach((j) => URL.revokeObjectURL(j.previewUrl));
+                previewUrlsRef.current = [];
+                setJobs([]);
+                setPhase("setup");
               }}
               disabled={isRunning}
               className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white disabled:opacity-50"
