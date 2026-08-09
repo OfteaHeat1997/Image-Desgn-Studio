@@ -1010,12 +1010,12 @@ function StatusBadge({ status }: { status: StepStatus }) {
   const { t } = useI18n();
   const lg = t.pipelines.lingerie;
   const config = {
-    idle:       { label: lg.statusBadge.idle,       className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
-    pending:    { label: lg.statusBadge.pending,    className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
+    idle:       { label: lg.statusBadge.idle,       className: "bg-white/5 text-[var(--text-secondary)] border-[var(--border-default)]",                          icon: Clock         },
+    pending:    { label: lg.statusBadge.pending,    className: "bg-white/5 text-[var(--text-secondary)] border-[var(--border-default)]",                          icon: Clock         },
     processing: { label: lg.statusBadge.processing, className: "bg-[var(--accent-dim)] text-[var(--accent-light)] border-[var(--accent)]/25", icon: Loader2 },
     done:       { label: lg.statusBadge.done,       className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
     error:      { label: lg.statusBadge.error,      className: "bg-[var(--error-dim)] text-[var(--error)] border-[var(--error)]/25",                      icon: AlertCircle   },
-    skipped:    { label: lg.statusBadge.skipped,    className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: SkipForward   },
+    skipped:    { label: lg.statusBadge.skipped,    className: "bg-white/5 text-[var(--text-secondary)] border-[var(--border-default)]",                          icon: SkipForward   },
     accepted:   { label: lg.statusBadge.accepted,   className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
   }[status];
 
@@ -1078,7 +1078,7 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center gap-2 rounded-lg border border-white/10 text-center px-3",
+          "flex flex-col items-center justify-center gap-2 rounded-lg border border-[var(--border-default)] text-center px-3",
           className,
         )}
         style={{
@@ -1086,7 +1086,7 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
         }}
       >
         <ImageIcon className="h-6 w-6 text-[var(--text-muted)]" />
-        <span className="text-[11px] text-[var(--text-secondary)] leading-tight">
+        <span className="text-[13px] text-[var(--text-secondary)] leading-tight">
           {hasError
             ? lg.thumb.expired
             : lg.thumb.waiting}
@@ -1174,7 +1174,7 @@ function BeforeAfterSlider({
 
   return (
     <div
-      className={cn("relative select-none overflow-hidden rounded-lg border border-white/10", className)}
+      className={cn("relative select-none overflow-hidden rounded-lg border border-[var(--border-default)]", className)}
       style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1256,7 +1256,11 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
   const url = images[idx];
   const isVideo = url && (url.includes(".mp4") || url.includes(".webm"));
   const isSelected = url === selectedUrl;
-  const canCompare = !!compareWith && !isVideo;
+  // El video TAMBIEN se compara. Antes se bloqueaba (`&& !isVideo`) y al abrir un
+  // video en grande la foto de origen desaparecia, justo cuando mas se necesita:
+  // para juzgar si el video conserva la prenda hay que ver el antes al lado. El
+  // split ahora renderiza <video> del lado del resultado.
+  const canCompare = !!compareWith;
 
   // Cerrar con ESC, navegar con flechas, C para comparar
   useEffect(() => {
@@ -1264,11 +1268,11 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft" && images.length > 1) setIdx((i) => (i - 1 + images.length) % images.length);
       if (e.key === "ArrowRight" && images.length > 1) setIdx((i) => (i + 1) % images.length);
-      if ((e.key === "c" || e.key === "C") && compareWith && !isVideo) setCompareMode((c) => !c);
+      if ((e.key === "c" || e.key === "C") && compareWith) setCompareMode((c) => !c);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [images.length, onClose, compareWith, isVideo]);
+  }, [images.length, onClose, compareWith]);
 
   // Lock body scroll mientras está abierto
   useEffect(() => {
@@ -1347,7 +1351,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
           >
             <X className="h-5 w-5" />
             <span className="text-sm">{lg.lightbox.close}</span>
-            <kbd className="hidden rounded border border-current/30 px-1 text-[10px] opacity-70 sm:inline">Esc</kbd>
+            <kbd className="hidden rounded border border-current/30 px-1 text-[12px] opacity-70 sm:inline">Esc</kbd>
           </button>
         </div>
       </div>
@@ -1364,18 +1368,30 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
                 className="h-full w-full rounded-lg object-contain"
                 style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
               />
-              <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+              <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wider text-white">
                 {lg.lightbox.original}
               </span>
             </div>
             <div className="relative flex-1 h-full">
-              <img
-                src={url}
-                alt={lg.lightbox.result}
-                className="h-full w-full rounded-lg object-contain"
-                style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
-              />
-              <span className="absolute right-2 top-2 rounded-md bg-[var(--accent)]/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+              {isVideo ? (
+                <video
+                  src={url}
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="h-full w-full rounded-lg object-contain"
+                />
+              ) : (
+                <img
+                  src={url}
+                  alt={lg.lightbox.result}
+                  className="h-full w-full rounded-lg object-contain"
+                  style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
+                />
+              )}
+              <span className="absolute right-2 top-2 rounded-md bg-[var(--accent)]/80 px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wider text-white">
                 {lg.lightbox.result}
               </span>
             </div>
@@ -1507,6 +1523,13 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
   // pipeline. La usuaria quedo trabada justo asi al agotarse la cuota de
   // Photoroom: no podia cambiar a "Recorte real" y reintentar.
   const canInteract = (step.status === "done" || step.status === "accepted") && !autoMode;
+  // En modo Automatico canInteract es false y la barra de acciones NO se
+  // renderizaba: cuando terminaba el video de cuerpo completo la tarjeta quedaba
+  // sin un solo boton — no habia forma de bajar el archivo ni de repetir un
+  // resultado malo sin volver a correr todo. Aceptar/Saltar si son del flujo
+  // manual (en automatico los decide el pipeline), pero Descargar y Rehacer
+  // tienen que existir SIEMPRE que haya resultado.
+  const hasResult = step.status === "done" || step.status === "accepted";
 
   // VISTA PREVIA AL PASAR EL MOUSE (sin clic).
   // La usuaria: "hablo de que se haga grande solo con pasar el mouse, no oprimir".
@@ -1557,7 +1580,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           ? "border-white/5 bg-white/[0.01] opacity-60"
           : step.status === "error"
           ? "border-[var(--error)]/30 bg-[var(--error-dim)]"
-          : "border-white/8 bg-white/[0.02]",
+          : "border-[var(--border-subtle)] bg-[var(--bg-surface)]",
       )}
     >
       {/* Card header */}
@@ -1588,7 +1611,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)]">{lg.stepCard.step} {stepNumber}</span>
+              <span className="text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)]">{lg.stepCard.step} {stepNumber}</span>
               {/* P0-4: botón "i" que abre el panel de docs del step */}
               {docs && (
                 <button
@@ -1618,7 +1641,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               prendas genéricas → SeedDream falló para esta prenda). */}
           {step.usedProvider && (
             <span
-              className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+              className={`rounded-md border px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wider ${
                 step.usedProvider === "kolors"
                   ? "border-[var(--warning)]/30 bg-[var(--warning-dim)] text-[var(--warning)]"
                   : "border-[var(--border-accent)] bg-[var(--accent-dim)] text-[var(--accent)]"
@@ -1639,7 +1662,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             <button
               type="button"
               onClick={onStop}
-              className="flex items-center gap-1 rounded-md border border-[var(--error)]/40 bg-[var(--error-dim)] px-2 py-1 text-[11px] font-semibold text-[var(--error)] transition-colors hover:bg-[var(--error-dim)]"
+              className="flex items-center gap-1 rounded-md border border-[var(--error)]/40 bg-[var(--error-dim)] px-2 py-1 text-[13px] font-semibold text-[var(--error)] transition-colors hover:bg-[var(--error-dim)]"
               title={lg.stepCard.stopTitle}
             >
               <StopCircle className="h-3 w-3" />
@@ -1655,31 +1678,31 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
         <div className="border-b border-white/6 bg-[var(--accent)]/[0.03] px-5 py-4 text-xs">
           <div className="space-y-3">
             <div>
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsWhat}</p>
+              <p className="mb-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsWhat}</p>
               <p className="text-[var(--text-secondary)]">{docs.what}</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsProvider}</p>
+                <p className="mb-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsProvider}</p>
                 <p className="text-[var(--text-secondary)]">{docs.provider}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsDuration}</p>
+                <p className="mb-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsDuration}</p>
                 <p className="text-[var(--text-secondary)]">{docs.duration}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsCost}</p>
+                <p className="mb-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsCost}</p>
                 <p className="text-[var(--text-secondary)]">{docs.costDetail}</p>
               </div>
             </div>
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsCanFail}</p>
+              <p className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsCanFail}</p>
               <ul className="list-disc space-y-0.5 pl-4 text-[var(--text-secondary)]">
                 {docs.canFail.map((f, i) => <li key={i}>{f}</li>)}
               </ul>
             </div>
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsTips}</p>
+              <p className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsTips}</p>
               <ul className="list-disc space-y-0.5 pl-4 text-[var(--text-secondary)]">
                 {docs.tips.map((t, i) => <li key={i}>{t}</li>)}
               </ul>
@@ -1693,19 +1716,19 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {step.id === "isolate" && onChangeIsolateMethod && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.methodLabel}</span>
+            <span className="text-[12px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.methodLabel}</span>
             <select
               value={step.isolateMethodOverride ?? "photoroom"}
               onChange={(e) => onChangeIsolateMethod(e.target.value as IsolateMethod)}
               disabled={step.status === "processing"}
-              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[13px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {ISOLATE_METHOD_OPTIONS.map((m) => (
                 <option key={m.value} value={m.value} title={lg.isolateMethods[m.value]?.hint}>{lg.isolateMethods[m.value]?.label ?? m.label}</option>
               ))}
             </select>
           </div>
-          <p className="mt-1.5 text-[10px] text-[var(--text-secondary)]">
+          <p className="mt-1.5 text-[12px] text-[var(--text-secondary)]">
             {lg.isolateMethods[step.isolateMethodOverride ?? "photoroom"]?.hint}
           </p>
         </div>
@@ -1719,19 +1742,19 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {MODEL_PHOTO_STEPS.includes(step.id) && onChangeProvider && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.providerLabel}</span>
+            <span className="text-[12px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.providerLabel}</span>
             <select
               value={step.providerOverride ?? "auto"}
               onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
               disabled={step.status === "processing"}
-              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[13px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {TRYON_PROVIDER_OPTIONS.map((p) => (
                 <option key={p.value} value={p.value} title={lg.tryonProviders[p.value]?.hint}>{lg.tryonProviders[p.value]?.label ?? p.label}</option>
               ))}
             </select>
           </div>
-          <p className="mt-1.5 text-[10px] text-[var(--text-secondary)]">
+          <p className="mt-1.5 text-[12px] text-[var(--text-secondary)]">
             {lg.tryonProviders[step.providerOverride ?? "auto"]?.hint}
           </p>
         </div>
@@ -1742,12 +1765,12 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {MODEL_PHOTO_STEPS.includes(step.id) && onChangePose && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.poseLabel}</span>
+            <span className="text-[12px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.poseLabel}</span>
             <select
               value={step.poseOverride ?? "auto"}
               onChange={(e) => onChangePose(e.target.value as PoseOption)}
               disabled={step.status === "processing"}
-              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[13px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {POSE_OPTIONS
                 .filter((p) => {
@@ -1777,12 +1800,12 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {step.id === "modelVideo" && onChangeAction && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.actionLabel}</span>
+            <span className="text-[12px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.actionLabel}</span>
             <select
               value={step.actionOverride ?? "auto"}
               onChange={(e) => onChangeAction(e.target.value as VideoActionOption)}
               disabled={step.status === "processing"}
-              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
+              className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[13px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {VIDEO_ACTION_OPTIONS.map((a) => (
                 <option key={a.value} value={a.value}>{lg.videoActionOptions[a.value] ?? a.label}</option>
@@ -1844,7 +1867,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 agrandan a la vez al pasar el mouse por cualquiera: comunica que
                 son un par comparable, no dos imagenes sueltas. */}
             <div className="flex-1 min-w-0">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.stepCard.original}</p>
+              <p className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.stepCard.original}</p>
               <button
                 type="button"
                 onClick={() => { if (step.resultUrl) setLightboxIdx(0); }}
@@ -1870,7 +1893,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
             {/* Output (after) */}
             <div className="flex-1 min-w-0">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.stepCard.result}</p>
+              <p className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.stepCard.result}</p>
               {step.status === "processing" ? (
                 <div className="relative flex h-40 w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-glow)]">
                   {/* skeleton shimmer detrás, como que la imagen se está "revelando" */}
@@ -1887,7 +1910,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                         }}
                         aria-hidden="true"
                       />
-                      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold tabular-nums text-[var(--accent-light)]">
+                      <div className="absolute inset-0 flex items-center justify-center text-[13px] font-semibold tabular-nums text-[var(--accent-light)]">
                         {fmtClock(elapsed)}
                       </div>
                     </div>
@@ -1901,7 +1924,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                         ))}
                       </div>
                     </div>
-                    {proc.eta && <span className="text-[10px] text-[var(--text-secondary)]">{proc.eta}</span>}
+                    {proc.eta && <span className="text-[12px] text-[var(--text-secondary)]">{proc.eta}</span>}
                   </div>
                   {/* barra indeterminada con destello que barre */}
                   <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-white/5">
@@ -1916,7 +1939,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   </p>
                   {step.error && (
                     <details className="w-full">
-                      <summary className="cursor-pointer text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)]">
+                      <summary className="cursor-pointer text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)]">
                         {lg.stepCard.techDetail}
                       </summary>
                       <pre className="mt-1 max-h-20 overflow-auto rounded bg-black/40 p-2 text-[9px] leading-tight text-[var(--text-secondary)]">
@@ -1941,7 +1964,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                         const el = document.getElementById("lingerie-upload-area");
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="mt-1 rounded-md border border-[var(--warning)]/40 bg-[var(--warning-dim)] px-3 py-1 text-[11px] font-semibold text-[var(--warning)] transition-colors hover:bg-[var(--warning-dim)]"
+                      className="mt-1 rounded-md border border-[var(--warning)]/40 bg-[var(--warning-dim)] px-3 py-1 text-[13px] font-semibold text-[var(--warning)] transition-colors hover:bg-[var(--warning-dim)]"
                     >
                       {lg.stepCard.goUploadBack}
                     </button>
@@ -1953,7 +1976,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 // ABRE el lightbox (no selecciona directo) — la usuaria ve
                 // el detalle al tamaño grande y desde ahí puede elegir.
                 <div>
-                  <p className="mb-1.5 text-[10px] text-[var(--accent)]">
+                  <p className="mb-1.5 text-[12px] text-[var(--accent)]">
                     {lg.stepCard.variantsHint(step.candidates.length)}
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -2042,7 +2065,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   · Aceptar   -> primario, dorado y solo, a la derecha
                 Regla: la accion que hace avanzar el flujo tiene que ser la mas
                 visible y la mas lejos de la que lo descarta. */}
-          {canInteract && (
+          {hasResult && (
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/6 pt-4">
               {/* Selector para re-testear con otro proveedor (el badge del
                   proveedor que corrió está en la cabecera, siempre visible).
@@ -2051,14 +2074,18 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               {/* El selector de PROVEEDOR vive arriba, junto a Pose. Antes estaba
                   tambien aca abajo: dos controles para lo mismo, y no quedaba claro
                   cual mandaba. */}
-              <button
-                onClick={onSkip}
-                className="lz-lift mr-auto flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-secondary)]"
-                title="Descartar este paso y seguir sin su resultado"
-              >
-                <SkipForward className="h-3.5 w-3.5" />
-                {lg.stepCard.skip}
-              </button>
+              {canInteract ? (
+                <button
+                  onClick={onSkip}
+                  className="lz-lift mr-auto flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-secondary)]"
+                  title="Descartar este paso y seguir sin su resultado"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                  {lg.stepCard.skip}
+                </button>
+              ) : (
+                <span className="mr-auto" />
+              )}
               {/* Descargar directo sin abrir lightbox */}
               {step.resultUrl && (
                 <button
@@ -2070,7 +2097,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       `unistudio-${step.id}.${isVideo ? "mp4" : "jpg"}`,
                     );
                   }}
-                  className="lz-lift flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
+                  className="lz-lift flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
                   title={lg.stepCard.downloadTitle}
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -2079,18 +2106,20 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               )}
               <button
                 onClick={onRerun}
-                className="lz-lift flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
+                className="lz-lift flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 {lg.stepCard.rerun}
               </button>
-              <button
-                onClick={onAccept}
-                className="lz-lift flex items-center gap-2 rounded-lg border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] px-5 py-2.5 text-sm font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(212,180,138,0.55)] hover:brightness-110"
-              >
-                <Check className="h-3.5 w-3.5" />
-                {lg.stepCard.accept}
-              </button>
+              {canInteract && (
+                <button
+                  onClick={onAccept}
+                  className="lz-lift flex items-center gap-2 rounded-lg border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] px-5 py-2.5 text-sm font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(212,180,138,0.55)] hover:brightness-110"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {lg.stepCard.accept}
+                </button>
+              )}
             </div>
           )}
 
@@ -2268,7 +2297,7 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
           <Sparkles className="h-4 w-4 text-[var(--accent)]" />
           <div>
             <p className="text-sm font-semibold text-white">{lg.spec.title}</p>
-            <p className="text-[11px] text-[var(--text-secondary)]">{lg.spec.subtitle}</p>
+            <p className="text-[13px] text-[var(--text-secondary)]">{lg.spec.subtitle}</p>
           </div>
         </div>
         <ChevronRight className={cn("h-4 w-4 text-[var(--text-secondary)] transition-transform", open && "rotate-90")} />
@@ -2280,19 +2309,19 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
             const fields = SPEC_FIELDS.filter((f) => f.group === group);
             return (
               <div key={group}>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{lg.spec.groups[group]}</p>
+                <p className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{lg.spec.groups[group]}</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {fields.map((field) => {
                     const value = field.getter(spec) ?? "";
                     return (
                       <label key={field.key} className="flex flex-col gap-1">
-                        <span className="text-[11px] text-[var(--text-secondary)]">{lg.spec.fields[field.key]?.label ?? field.label}</span>
+                        <span className="text-[13px] text-[var(--text-secondary)]">{lg.spec.fields[field.key]?.label ?? field.label}</span>
                         <input
                           type="text"
                           value={value}
                           placeholder={lg.spec.fields[field.key]?.placeholder ?? field.placeholder}
                           onChange={(e) => onChange(field.setter(spec, e.target.value))}
-                          className="rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
+                          className="rounded-md border border-[var(--border-default)] bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
                         />
                       </label>
                     );
@@ -2304,12 +2333,12 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
 
           {spec.notes && (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{lg.spec.notes}</p>
+              <p className="mb-1 text-[13px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{lg.spec.notes}</p>
               <textarea
                 value={spec.notes}
                 onChange={(e) => onChange({ ...spec, notes: e.target.value })}
                 rows={2}
-                className="w-full rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
+                className="w-full rounded-md border border-[var(--border-default)] bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
               />
             </div>
           )}
@@ -2352,7 +2381,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
         "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 transition-all",
         dragging
           ? "border-[var(--accent)]/60 bg-[var(--accent)]/10"
-          : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]",
+          : "border-[var(--border-default)] bg-[var(--bg-surface)] hover:border-white/20 hover:bg-white/[0.04]",
       )}
     >
       <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleChange} />
@@ -2363,7 +2392,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
         <p className="text-sm font-semibold text-white">{lg.upload.dropTitle}</p>
         <p className="mt-1 text-xs text-[var(--text-secondary)]">{lg.upload.dropSub}</p>
       </div>
-      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-[var(--text-secondary)]">{lg.upload.formats}</span>
+      <span className="rounded-full border border-[var(--border-default)] px-3 py-1 text-xs text-[var(--text-secondary)]">{lg.upload.formats}</span>
     </div>
   );
 }
@@ -4720,9 +4749,15 @@ export default function LingeriePipelinePage() {
 
         <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8">
           {/* Page title */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">{lg.setup.title}</h1>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          {/* Cabecera de pagina. Escala tipografica: el titulo usa la serif de
+              marca (Fraunces) a 30px para que exista un salto real contra los
+              encabezados de seccion (14px). Antes todo vivia entre 10 y 16px y
+              la pagina se leia plana — sin saber que mirar primero. */}
+          <div className="mb-8 border-b border-[var(--border-subtle)] pb-6">
+            <h1 className="font-serif text-3xl font-semibold tracking-tight text-white md:text-4xl">
+              {lg.setup.title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-base leading-relaxed text-[var(--text-secondary)]">
               {lg.setup.subtitle}
             </p>
           </div>
@@ -4733,9 +4768,9 @@ export default function LingeriePipelinePage() {
                 en vez de hacer scroll dentro de su propia caja. */}
             <div className="min-w-0 space-y-6">
               {/* Upload */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-white">
                     {lg.setup.photosHeading}
                   </h2>
                   {/* Undo / Redo / Reset — controles "app profesional" */}
@@ -4745,7 +4780,7 @@ export default function LingeriePipelinePage() {
                       onClick={undoJobs}
                       disabled={!canUndo}
                       title={lg.setup.undoTitle}
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[var(--text-secondary)] transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-[var(--text-secondary)]"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-default)] text-[var(--text-secondary)] transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[var(--border-default)] disabled:hover:text-[var(--text-secondary)]"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
@@ -4754,7 +4789,7 @@ export default function LingeriePipelinePage() {
                       onClick={redoJobs}
                       disabled={!canRedo}
                       title={lg.setup.redoTitle}
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[var(--text-secondary)] transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-[var(--text-secondary)]"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-default)] text-[var(--text-secondary)] transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[var(--border-default)] disabled:hover:text-[var(--text-secondary)]"
                     >
                       <RotateCcw className="h-3.5 w-3.5 -scale-x-100" />
                     </button>
@@ -4764,7 +4799,7 @@ export default function LingeriePipelinePage() {
                       onClick={resetAll}
                       disabled={jobs.length === 0}
                       title={lg.setup.resetTitle}
-                      className="flex items-center gap-1 rounded-md border border-white/10 px-2 h-7 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--error)]/40 hover:bg-[var(--error-dim)] hover:text-[var(--error)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:bg-transparent disabled:hover:text-[var(--text-secondary)]"
+                      className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 h-7 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--error)]/40 hover:bg-[var(--error-dim)] hover:text-[var(--error)] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[var(--border-default)] disabled:hover:bg-transparent disabled:hover:text-[var(--text-secondary)]"
                     >
                       <X className="h-3 w-3" />
                       {lg.setup.reset}
@@ -4795,7 +4830,7 @@ export default function LingeriePipelinePage() {
                       </>
                     )}
                   </button>
-                  <span className="text-[10px] text-muted">
+                  <span className="text-[12px] text-muted">
                     {lg.setup.inventoryHint}
                   </span>
                 </div>
@@ -4803,12 +4838,12 @@ export default function LingeriePipelinePage() {
                 {/* Uploaded image grid */}
                 {jobs.length > 0 && (
                   <div id="lingerie-upload-area">
-                    <div className="mt-4 mb-2 flex items-center justify-between text-[11px]">
+                    <div className="mt-4 mb-2 flex items-center justify-between text-[13px]">
                       <span className="text-[var(--text-secondary)]">
                         {lg.setup.photosCount(jobs.length)}
                       </span>
                       {jobs.some((j) => j.photoAngle === 'espalda') && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-accent)] bg-[var(--accent)]/[0.06] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-accent)] bg-[var(--accent)]/[0.06] px-2 py-0.5 text-[12px] font-medium text-[var(--accent)]">
                           <Check className="h-2.5 w-2.5" />
                           {lg.setup.backReady}
                         </span>
@@ -4817,7 +4852,7 @@ export default function LingeriePipelinePage() {
                     {/* Hint de qué ángulos desbloquean qué steps. Si la usuaria
                         solo sube frontal, photoBack se va a saltar — mejor que
                         lo sepa ANTES de procesar, no después. */}
-                    <div className="mb-3 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[10px] text-[var(--text-secondary)]">
+                    <div className="mb-3 rounded-md border border-[var(--border-default)] bg-black/30 px-3 py-2 text-[12px] text-[var(--text-secondary)]">
                       <p className="mb-1 font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.setup.whichPhotos}</p>
                       <ul className="space-y-0.5">
                         <li><b className="text-white">{lg.setup.needFrontal}</b> {lg.setup.needFrontalRest}</li>
@@ -4840,13 +4875,13 @@ export default function LingeriePipelinePage() {
                       const mostCommon = Array.from(suggestions.entries()).sort((a, b) => b[1] - a[1])[0];
                       if (!mostCommon || mostCommon[0] === modelConfig.bodyType) return null;
                       return (
-                        <div className="mb-3 rounded-md border border-[var(--warning)]/30 bg-[var(--warning)]/[0.05] px-3 py-2 text-[11px] text-[var(--warning)]">
+                        <div className="mb-3 rounded-md border border-[var(--warning)]/30 bg-[var(--warning)]/[0.05] px-3 py-2 text-[13px] text-[var(--warning)]">
                           <span className="font-semibold">{lg.setup.sizeSuggestionLabel}</span>{lg.setup.sizeSuggestionPre}<b>{mostCommon[0]}</b>{lg.setup.sizeSuggestionMid}<b>{modelConfig.bodyType}</b>{lg.setup.sizeSuggestionPost}
                           {' '}
                           <button
                             type="button"
                             onClick={() => setModelConfig((prev) => ({ ...prev, bodyType: mostCommon[0] }))}
-                            className="ml-1 rounded border border-[var(--warning)]/40 bg-[var(--warning-dim)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning)] hover:bg-[var(--warning-dim)]"
+                            className="ml-1 rounded border border-[var(--warning)]/40 bg-[var(--warning-dim)] px-1.5 py-0.5 text-[12px] font-semibold text-[var(--warning)] hover:bg-[var(--warning-dim)]"
                           >
                             {lg.setup.changeTo(mostCommon[0])}
                           </button>
@@ -4866,7 +4901,7 @@ export default function LingeriePipelinePage() {
                       const namedGroups = Array.from(groups.entries()).filter(([k]) => k !== "sin-ref");
                       if (namedGroups.length === 0) return null;
                       return (
-                        <div className="mb-3 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] px-3 py-2 text-[11px]">
+                        <div className="mb-3 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] px-3 py-2 text-[13px]">
                           <span className="font-semibold text-[var(--accent)]">
                             {lg.setup.productsDetected(namedGroups.length)}
                           </span>{' '}
@@ -4881,7 +4916,7 @@ export default function LingeriePipelinePage() {
                               )}
                             </span>
                           ))}
-                          <p className="mt-1 text-[10px] text-[var(--text-secondary)]">
+                          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
                             {lg.setup.sharedModelNote}
                           </p>
                         </div>
@@ -4900,7 +4935,7 @@ export default function LingeriePipelinePage() {
                             <img
                               src={job.previewUrl}
                               alt={job.filename}
-                              className="aspect-square w-full rounded-lg object-cover border border-white/10"
+                              className="aspect-square w-full rounded-lg object-cover border border-[var(--border-default)]"
                             />
                             <button
                               onClick={() => removeJob(job.id)}
@@ -4934,14 +4969,14 @@ export default function LingeriePipelinePage() {
                               </div>
                             )}
                           </div>
-                          <p className="mt-1 truncate text-[10px] text-[var(--text-secondary)]">{job.filename}</p>
+                          <p className="mt-1 truncate text-[12px] text-[var(--text-secondary)]">{job.filename}</p>
                           {/* P0-1: dropdown para corregir el ángulo */}
                           <label className="mt-1 flex items-center gap-1">
                             <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">{lg.setup.angleLabel}</span>
                             <select
                               value={job.photoAngle}
                               onChange={(e) => updateJobAngle(job.id, e.target.value as PhotoAngle)}
-                              className="flex-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-1 text-[10px] text-white outline-none focus:border-[var(--accent)]/50"
+                              className="flex-1 rounded-md border border-[var(--border-default)] bg-black/40 px-1.5 py-1 text-[12px] text-white outline-none focus:border-[var(--accent)]/50"
                             >
                               {PHOTO_ANGLE_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value} title={lg.photoAngles[o.value]?.hint}>{lg.photoAngles[o.value]?.label ?? o.label}</option>
@@ -4971,7 +5006,7 @@ export default function LingeriePipelinePage() {
                       <button
                         type="button"
                         onClick={() => setSharedModelUrl(undefined)}
-                        className="rounded border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-[var(--text-secondary)] hover:border-white/20"
+                        className="rounded border border-[var(--border-default)] bg-white/[0.04] px-3 py-1 text-xs text-[var(--text-secondary)] hover:border-white/20"
                       >
                         {lg.setup.useNewModel}
                       </button>
@@ -5013,12 +5048,12 @@ export default function LingeriePipelinePage() {
                             "group relative flex w-28 shrink-0 snap-start flex-col overflow-hidden rounded-lg border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/40",
                             isSelected
                               ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40"
-                              : "border-white/10 hover:border-[var(--accent)]/50",
+                              : "border-[var(--border-default)] hover:border-[var(--accent)]/50",
                           )}
                           title={`${m.name} — ${m.gender ?? 'female'}, ${m.skinTone ?? 'medium'}, ${m.bodyType ?? 'average'}`}
                         >
                           <ModelThumb url={m.previewUrl} alt={m.name} name={m.name ?? 'Modelo'} />
-                          <div className="bg-black/60 px-1.5 py-1 text-[10px] text-[var(--text-secondary)]">
+                          <div className="bg-black/60 px-1.5 py-1 text-[12px] text-[var(--text-secondary)]">
                             <input
                               type="text"
                               defaultValue={m.name?.slice(0, 30) ?? 'Modelo'}
@@ -5043,7 +5078,7 @@ export default function LingeriePipelinePage() {
                                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                                 e.stopPropagation();
                               }}
-                              className="w-full bg-transparent text-[10px] text-[var(--text-secondary)] outline-none truncate placeholder:text-[var(--text-muted)] focus:text-white focus:bg-white/5 focus:rounded px-0.5"
+                              className="w-full bg-transparent text-[12px] text-[var(--text-secondary)] outline-none truncate placeholder:text-[var(--text-muted)] focus:text-white focus:bg-white/5 focus:rounded px-0.5"
                               placeholder={lg.setup.namePlaceholder}
                               title={lg.setup.renameTitle}
                             />
@@ -5058,7 +5093,7 @@ export default function LingeriePipelinePage() {
                     })}
                   </div>
                   {savedModels.length > 18 && (
-                    <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
+                    <p className="mt-2 text-[13px] text-[var(--text-secondary)]">
                       {lg.setup.showingModels(savedModels.length)}
                     </p>
                   )}
@@ -5066,8 +5101,8 @@ export default function LingeriePipelinePage() {
               )}
 
               {/* Reference + product type */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.setup.productInfoHeading}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -5078,7 +5113,7 @@ export default function LingeriePipelinePage() {
                       value={referenceNumber}
                       onChange={(e) => setReferenceNumber(e.target.value)}
                       placeholder={lg.setup.refNumberPlaceholder}
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/20"
+                      className="w-full rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/20"
                     />
                   </div>
                   <div>
@@ -5086,7 +5121,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={productType}
                       onChange={(e) => setProductType(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
+                      className="w-full rounded-lg border border-[var(--border-default)] bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="bra">{lg.productType.bra}</option>
                       <option value="panty">{lg.productType.panty}</option>
@@ -5098,8 +5133,8 @@ export default function LingeriePipelinePage() {
               </section>
 
               {/* Steps to run */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.setup.stepsHeading}
                 </h2>
                 <div className="space-y-2">
@@ -5154,8 +5189,8 @@ export default function LingeriePipelinePage() {
                   No se ocultan del todo: se explican. Si desaparecieran sin decir
                   por que, la siguiente pregunta seria "donde esta la configuracion
                   de la modelo". */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.modelConfig.heading}
                 </h2>
                 {uwearWillHandleModel && (
@@ -5175,7 +5210,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={modelConfig.skinTone}
                       onChange={(e) => setModelConfig((m) => ({ ...m, skinTone: e.target.value }))}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
+                      className="w-full rounded-lg border border-[var(--border-default)] bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="light">{lg.modelConfig.skinTones.light}</option>
                       <option value="medium-light">{lg.modelConfig.skinTones["medium-light"]}</option>
@@ -5189,7 +5224,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={modelConfig.bodyType}
                       onChange={(e) => setModelConfig((m) => ({ ...m, bodyType: e.target.value }))}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
+                      className="w-full rounded-lg border border-[var(--border-default)] bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="slim">{lg.modelConfig.bodyTypes.slim}</option>
                       <option value="regular">{lg.modelConfig.bodyTypes.regular}</option>
@@ -5202,7 +5237,7 @@ export default function LingeriePipelinePage() {
                     <select
                       value={modelConfig.ageRange}
                       onChange={(e) => setModelConfig((m) => ({ ...m, ageRange: e.target.value }))}
-                      className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
+                      className="w-full rounded-lg border border-[var(--border-default)] bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
                       <option value="18-25">{lg.modelConfig.ages["18-25"]}</option>
                       <option value="26-35">{lg.modelConfig.ages["26-35"]}</option>
@@ -5213,8 +5248,8 @@ export default function LingeriePipelinePage() {
               </section>
 
               {/* Mode toggle */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.executionMode.heading}</h2>
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.08em] text-white">{lg.executionMode.heading}</h2>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setAutoMode(true)}
@@ -5222,12 +5257,12 @@ export default function LingeriePipelinePage() {
                       "flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-xs transition-all",
                       autoMode
                         ? "border-[var(--accent)]/40 bg-[var(--accent)]/15 text-[var(--accent)]"
-                        : "border-white/8 bg-white/[0.02] text-[var(--text-secondary)] hover:border-white/15",
+                        : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-white/15",
                     )}
                   >
                     <Zap className="h-4 w-4" />
                     <span className="font-semibold">{lg.executionMode.auto}</span>
-                    <span className="text-center text-[10px] text-[var(--text-secondary)]">{lg.executionMode.autoSub}</span>
+                    <span className="text-center text-[12px] text-[var(--text-secondary)]">{lg.executionMode.autoSub}</span>
                   </button>
                   <button
                     onClick={() => setAutoMode(false)}
@@ -5235,23 +5270,23 @@ export default function LingeriePipelinePage() {
                       "flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-xs transition-all",
                       !autoMode
                         ? "border-[var(--accent)]/40 bg-[var(--accent)]/15 text-[var(--accent)]"
-                        : "border-white/8 bg-white/[0.02] text-[var(--text-secondary)] hover:border-white/15",
+                        : "border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-white/15",
                     )}
                   >
                     <Settings2 className="h-4 w-4" />
                     <span className="font-semibold">{lg.executionMode.manual}</span>
-                    <span className="text-center text-[10px] text-[var(--text-secondary)]">{lg.executionMode.manualSub}</span>
+                    <span className="text-center text-[12px] text-[var(--text-secondary)]">{lg.executionMode.manualSub}</span>
                   </button>
                 </div>
               </section>
 
               {/* Phase 2f: modo de generación — default / face-swap / multi-sample.
                   Elegible por la usuaria; cada uno tiene tradeoffs distintos. */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.generationMode.heading}
                 </h2>
-                <p className="mb-3 text-[11px] text-[var(--text-secondary)]">
+                <p className="mb-3 text-[13px] text-[var(--text-secondary)]">
                   {lg.generationMode.subtitle}
                 </p>
                 <div className="space-y-2">
@@ -5270,8 +5305,8 @@ export default function LingeriePipelinePage() {
                           !isDisabled && selected
                             ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                             : !isDisabled
-                            ? "border-white/8 bg-white/[0.02] hover:border-white/20"
-                            : "border-white/8 bg-white/[0.01]",
+                            ? "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-white/20"
+                            : "border-[var(--border-subtle)] bg-white/[0.01]",
                         )}
                       >
                         <div className="flex w-full items-center justify-between">
@@ -5288,9 +5323,9 @@ export default function LingeriePipelinePage() {
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] font-medium text-[var(--text-secondary)]">{lg.generationMode.options[opt.value].cost}</span>
+                          <span className="text-[12px] font-medium text-[var(--text-secondary)]">{lg.generationMode.options[opt.value].cost}</span>
                         </div>
-                        <p className="text-[10px] leading-snug text-[var(--text-secondary)]">{lg.generationMode.options[opt.value].desc}</p>
+                        <p className="text-[12px] leading-snug text-[var(--text-secondary)]">{lg.generationMode.options[opt.value].desc}</p>
                         {isDisabled && opt.disabledReason && (
                           <p className="text-[9px] italic leading-snug text-[var(--warning)]/70">{opt.disabledReason}</p>
                         )}
@@ -5304,11 +5339,11 @@ export default function LingeriePipelinePage() {
                   el fondo a model-create y el scenePrompt al try-on. Parte 1 del
                   roadmap Uwear (ver docs/research/uwear-accuracy-playbook.md):
                   prompts improvisados → preset estructurado = consistencia. */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.artDirection.heading}
                 </h2>
-                <p className="mb-3 text-[11px] text-[var(--text-secondary)]">
+                <p className="mb-3 text-[13px] text-[var(--text-secondary)]">
                   {lg.artDirection.subtitle}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-3">
@@ -5323,7 +5358,7 @@ export default function LingeriePipelinePage() {
                           "flex flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition-all",
                           selected
                             ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
-                            : "border-white/8 bg-white/[0.02] hover:border-white/20",
+                            : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-white/20",
                         )}
                         title={lg.artDirection.options[ad.id].desc}
                       >
@@ -5333,7 +5368,7 @@ export default function LingeriePipelinePage() {
                         )}>
                           {lg.artDirection.options[ad.id].label}
                         </span>
-                        <span className="text-[10px] leading-tight text-[var(--text-secondary)] line-clamp-3">{lg.artDirection.options[ad.id].desc}</span>
+                        <span className="text-[12px] leading-tight text-[var(--text-secondary)] line-clamp-3">{lg.artDirection.options[ad.id].desc}</span>
                       </button>
                     );
                   })}
@@ -5345,11 +5380,11 @@ export default function LingeriePipelinePage() {
                   default de lencería es SeedDream (preserva la prenda real),
                   con Kolors de backup. Por eso este panel es AVANZADO/opcional:
                   no nombramos FASHN como si fuera el motor o confundimos. */}
-              <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
+                <h2 className="mb-1 text-sm font-semibold uppercase tracking-[0.08em] text-white">
                   {lg.fashnQuality.heading}
                 </h2>
-                <p className="mb-3 text-[11px] text-[var(--text-secondary)]">
+                <p className="mb-3 text-[13px] text-[var(--text-secondary)]">
                   {lg.fashnQuality.descPre}<span className="font-semibold text-[var(--text-secondary)]">{lg.fashnQuality.descBold}</span>{lg.fashnQuality.descPost}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -5364,7 +5399,7 @@ export default function LingeriePipelinePage() {
                           "flex flex-col items-center gap-0.5 rounded-lg border px-2 py-2.5 transition-all",
                           selected
                             ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
-                            : "border-white/8 bg-white/[0.02] hover:border-white/20",
+                            : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-white/20",
                         )}
                         title={lg.fashnQuality.options[opt.value].hint}
                       >
@@ -5374,7 +5409,7 @@ export default function LingeriePipelinePage() {
                         )}>
                           {lg.fashnQuality.options[opt.value].label}
                         </span>
-                        <span className="text-[10px] text-[var(--text-secondary)]">{lg.fashnQuality.options[opt.value].duration}</span>
+                        <span className="text-[12px] text-[var(--text-secondary)]">{lg.fashnQuality.options[opt.value].duration}</span>
                       </button>
                     );
                   })}
@@ -5393,7 +5428,7 @@ export default function LingeriePipelinePage() {
                     <span className="text-[var(--text-secondary)]">{lg.summary.activeSteps}</span>
                     <span className="font-medium text-white">{steps.filter((s) => s.enabled).length} {lg.summary.of} {steps.length}</span>
                   </div>
-                  <div className="my-3 border-t border-white/8" />
+                  <div className="my-3 border-t border-[var(--border-subtle)]" />
                   <div className="flex justify-between">
                     <span className="text-sm text-[var(--text-secondary)]">{lg.summary.estimatedCost}</span>
                     <span className="text-base font-bold text-[var(--accent)]">
@@ -5457,7 +5492,7 @@ export default function LingeriePipelinePage() {
           {/* Sello de build: muestra el commit que está VIVO en este deploy. Si no
               coincide con el último push, estás viendo un build viejo (cache/deploy). */}
           <span
-            className="ml-2 shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]"
+            className="ml-2 shrink-0 rounded border border-[var(--border-default)] bg-white/5 px-1.5 py-0.5 font-mono text-[12px] text-[var(--text-secondary)]"
             title={lg.pipeline.buildTitle}
           >
             build {process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev"}
@@ -5499,7 +5534,7 @@ export default function LingeriePipelinePage() {
       {/* Batch progress — visible arriba cuando hay 2+ jobs, muestra cuántos
           van completados, cuántos en cola, y el gasto acumulado del batch. */}
       {jobs.length > 1 && (
-        <div className="border-b border-white/8 bg-white/[0.02] px-4 py-2">
+        <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2">
           {(() => {
             const done = jobs.filter((j) => j.status === "done").length;
             const active = jobs.filter((j) => j.status === "active").length;
@@ -5518,7 +5553,7 @@ export default function LingeriePipelinePage() {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
+                <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] whitespace-nowrap">
                   {done > 0 && <span className="text-[var(--accent)]">{lg.pipeline.batchDone(done)}</span>}
                   {active > 0 && <span className="text-[var(--accent)]">{lg.pipeline.batchActive(active)}</span>}
                   {errors > 0 && <span className="text-[var(--error)]">{lg.pipeline.batchErrors(errors)}</span>}
@@ -5529,7 +5564,7 @@ export default function LingeriePipelinePage() {
                     <button
                       type="button"
                       onClick={stopBatch}
-                      className="ml-1 flex items-center gap-1 rounded-md border border-[var(--error)]/40 bg-[var(--error-dim)] px-2 py-0.5 text-[10px] font-semibold text-[var(--error)] hover:bg-[var(--error-dim)]"
+                      className="ml-1 flex items-center gap-1 rounded-md border border-[var(--error)]/40 bg-[var(--error-dim)] px-2 py-0.5 text-[12px] font-semibold text-[var(--error)] hover:bg-[var(--error-dim)]"
                     >
                       <StopCircle className="h-3 w-3" />
                       {lg.pipeline.stopAll}
@@ -5544,8 +5579,8 @@ export default function LingeriePipelinePage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar — image list */}
-        <aside className="hidden w-52 shrink-0 overflow-y-auto border-r border-white/8 p-3 lg:block">
-          <p className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        <aside className="hidden w-52 shrink-0 overflow-y-auto border-r border-[var(--border-subtle)] p-3 lg:block">
+          <p className="mb-3 px-1 text-[13px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             {lg.pipeline.imagesCount(jobs.length)}
           </p>
           <div className="space-y-1.5">
@@ -5578,8 +5613,8 @@ export default function LingeriePipelinePage() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-medium text-white">{job.filename}</p>
-                  <p className="text-[10px] text-[var(--text-secondary)]">
+                  <p className="truncate text-[13px] font-medium text-white">{job.filename}</p>
+                  <p className="text-[12px] text-[var(--text-secondary)]">
                     {job.status === "done"
                       ? `$${job.totalCost.toFixed(3)}`
                       : job.status === "active"
@@ -5601,7 +5636,7 @@ export default function LingeriePipelinePage() {
                 <img
                   src={activeJob.previewUrl}
                   alt={activeJob.filename}
-                  className="h-14 w-14 rounded-lg border border-white/10 object-cover"
+                  className="h-14 w-14 rounded-lg border border-[var(--border-default)] object-cover"
                 />
                 <div>
                   <h2 className="text-base font-bold text-white">{activeJob.filename}</h2>
@@ -5649,7 +5684,7 @@ export default function LingeriePipelinePage() {
                             />
                           ))}
                         </div>
-                        <span className="text-[10px] tabular-nums text-[var(--text-secondary)]">
+                        <span className="text-[12px] tabular-nums text-[var(--text-secondary)]">
                           {done}/{total} · ${spent.toFixed(3)} / ~${estimated.toFixed(2)}
                         </span>
                       </div>
@@ -5661,7 +5696,7 @@ export default function LingeriePipelinePage() {
                   <button
                     onClick={() => setActiveJobIndex((i) => Math.max(0, i - 1))}
                     disabled={activeJobIndex === 0}
-                    className="rounded-lg border border-white/10 p-1.5 text-[var(--text-secondary)] disabled:opacity-30 hover:text-white"
+                    className="rounded-lg border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] disabled:opacity-30 hover:text-white"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -5669,7 +5704,7 @@ export default function LingeriePipelinePage() {
                   <button
                     onClick={() => setActiveJobIndex((i) => Math.min(jobs.length - 1, i + 1))}
                     disabled={activeJobIndex === jobs.length - 1}
-                    className="rounded-lg border border-white/10 p-1.5 text-[var(--text-secondary)] disabled:opacity-30 hover:text-white"
+                    className="rounded-lg border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] disabled:opacity-30 hover:text-white"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -5796,7 +5831,7 @@ export default function LingeriePipelinePage() {
                       {activeJobIndex < jobs.length - 1 && (
                         <button
                           onClick={() => setActiveJobIndex(activeJobIndex + 1)}
-                          className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-white/20 hover:text-white"
+                          className="flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:border-white/20 hover:text-white"
                         >
                           {lg.pipeline.nextImage}
                           <ChevronRight className="h-3.5 w-3.5" />
@@ -5843,7 +5878,7 @@ export default function LingeriePipelinePage() {
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-center text-[11px] text-[var(--text-muted)]">
+            <p className="mt-4 text-center text-[13px] text-[var(--text-muted)]">
               {lg.help.footer}
             </p>
           </div>
