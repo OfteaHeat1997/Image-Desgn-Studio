@@ -4955,7 +4955,7 @@ export default function LingeriePipelinePage() {
 
               {/* Reuso de modelos IA ya generadas — ahorro $0.055 por REF */}
               {savedModels.length > 0 && (
-                <section className="rounded-xl border border-[var(--border-accent)] bg-[var(--accent)]/[0.03] p-5">
+                <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-[var(--border-accent)] bg-[var(--accent)]/[0.03] p-5">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
@@ -4985,7 +4985,7 @@ export default function LingeriePipelinePage() {
                       fila, se hojea con el dedo o la rueda, y al pasar el mouse
                       cada modelo se levanta. Una fila dice "elegi una si querés";
                       tres filas dicen "tenés que revisar esto". */}
-                  <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
+                  <div className="flex w-full min-w-0 max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
                     {savedModels.slice(0, 18).map((m) => {
                       const isSelected = sharedModelUrl === m.previewUrl;
                       return (
