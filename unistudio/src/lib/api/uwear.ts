@@ -302,18 +302,21 @@ export async function createUwearGeneration(params: {
   avatarId?: number | null;
   artDirectionId?: number | null;
 }): Promise<number> {
+  // `clothing_item_ids` en PLURAL. El singular ahora se rechaza con
+  // "extra_forbidden". Descubierto leyendo una generacion ya hecha desde la web
+  // de Uwear (GET /generations), que devuelve clothing_item_ids:[325429] y
+  // generation_setting:{resolution:"1024X1280"} — misma tecnica con la que se
+  // resolvio el formato de assets[].
   const body: Record<string, unknown> = {
-    clothing_item_id: params.clothingItemId,
+    clothing_item_ids: [params.clothingItemId],
     model_slug: params.modelSlug,
     use_case: 'generate',
     prompt: params.prompt,
     num_images: params.numImages ?? 1,
-    camera: params.camera ?? 'auto',
     avatar_id: params.avatarId ?? null,
-    enhance_user_prompt: true,
   };
-  if (params.aspectRatio) body.aspect_ratio = params.aspectRatio;
-  if (params.resolution) body.resolution = params.resolution;
+  // La resolucion viaja dentro de generation_setting, no suelta.
+  body.generation_setting = { resolution: params.resolution ?? '1024X1280' };
   if (params.artDirectionId !== undefined && params.artDirectionId !== null) body.art_direction_id = params.artDirectionId;
 
   const res = await fetch(`${UWEAR_BASE_URL}/generation`, {
