@@ -1,22 +1,19 @@
 // =============================================================================
-// DIAGNÓSTICO — encontrar el endpoint real de creación de prenda en Uwear
+// DIAGNÓSTICO — encontrar host + auth correctos de la API de Uwear
 //
-// Uwear cambió su API y el camino que usa el pipeline dejó de funcionar. Estado:
-//   POST https://api.uwear.ai/clothing-item        → 415/422 (pide assets[] con
-//        asset_kind/asset_view, enums NO documentados; probé 6 valores, todos mal)
-//   POST https://api.uwear.ai/clothing-items       → 405 (no acepta POST)
-//   POST https://api.uwear.ai/api/v1/clothing-item → 404 en un intento previo
+// La key es la correcta: creada en platform.uwear.ai/api/keys, activa, con
+// creditos. Funciona con GET https://api.uwear.ai/clothing-items (devuelve las
+// prendas de la cuenta). Pero:
+//   POST https://api.uwear.ai/clothing-item        → 422, pide assets[] con
+//        asset_kind/asset_view (enums no documentados)
+//   POST https://api.uwear.ai/api/v1/clothing-item → 404, y es el path que dice
+//        la especificacion OpenAPI oficial
 //
-// PERO su especificación OpenAPI (docs.dev.uwear.ai/openapi.json) dice que el
-// endpoint externo ES `POST /api/v1/clothing-item` sobre `https://api.uwear.ai`,
-// con body `{clothing_item_name, external_clothing_item_url, ...}` — sin assets.
-// Esta ruta prueba esa combinación EXACTA y algunas variantes de path, para
-// distinguir si el 404 fue un error de construcción de URL o si el endpoint
-// realmente no existe en producción.
+// Hipotesis a descartar: (a) el host real es otro (platform.uwear.ai), (b) la API
+// externa espera otra cabecera de auth (x-api-key en vez de Bearer).
 //
 // Importa porque Uwear falla dentro de un try/catch en smartTryOn: el error se
-// traga y corre SeedDream, que REDIBUJA el producto. Ese catch silencioso ocultó
-// el problema durante meses.
+// traga y corre SeedDream, que REDIBUJA el producto de la usuaria.
 //
 // GET /api/uwear-presign
 // =============================================================================
@@ -30,12 +27,11 @@ const BODY = {
   use_image_enhancement: true,
 };
 
-const PATHS = [
+const HOSTS = [
   'https://api.uwear.ai/api/v1/clothing-item',
-  'https://api.uwear.ai/api/v1/clothing-items',
-  'https://api.uwear.ai/v1/clothing-item',
-  'https://api.uwear.ai/external/clothing-item',
-  'https://api.uwear.ai/api/clothing-item',
+  'https://platform.uwear.ai/api/v1/clothing-item',
+  'https://platform.uwear.ai/api/clothing-item',
+  'https://api.uwear.ai/clothing-item',
 ];
 
 export async function GET() {
@@ -44,21 +40,29 @@ export async function GET() {
     return NextResponse.json({ success: false, error: 'UWEAR_API_KEY no configurada' }, { status: 500 });
   }
 
+  const authVariants: Array<[string, Record<string, string>]> = [
+    ['Bearer', { Authorization: `Bearer ${k}` }],
+    ['x-api-key', { 'x-api-key': k }],
+  ];
+
   const results = [];
-  for (const url of PATHS) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${k}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(BODY),
-      });
-      const text = await res.text().catch(() => '');
-      results.push({ url, status: res.status, body: text.slice(0, 400) });
-      if (res.ok) break; // encontrado
-    } catch (e) {
-      results.push({ url, status: 0, body: e instanceof Error ? e.message : String(e) });
+  for (const url of HOSTS) {
+    for (const [authName, headers] of authVariants) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(BODY),
+          redirect: 'manual',
+        });
+        const text = await res.text().catch(() => '');
+        results.push({ url, auth: authName, status: res.status, body: text.slice(0, 300) });
+        if (res.ok) return NextResponse.json({ success: true, found: { url, auth: authName }, results });
+      } catch (e) {
+        results.push({ url, auth: authName, status: 0, body: e instanceof Error ? e.message : String(e) });
+      }
     }
   }
 
-  return NextResponse.json({ success: true, results });
+  return NextResponse.json({ success: true, found: null, results });
 }
