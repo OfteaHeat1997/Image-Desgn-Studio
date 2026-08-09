@@ -4975,7 +4975,17 @@ export default function LingeriePipelinePage() {
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                  {/* CARRUSEL, NO MURO.
+                      La usuaria: "que se vea arriba, que no parezca parte del
+                      pipeline... card diferente, motion, no solo esta mierda".
+                      Antes eran 18 miniaturas en una grilla de 3 filas: ocupaba
+                      media pantalla y se leia como un paso mas del proceso, no
+                      como un atajo opcional.
+                      Ahora es una tira horizontal con scroll y snap: ocupa UNA
+                      fila, se hojea con el dedo o la rueda, y al pasar el mouse
+                      cada modelo se levanta. Una fila dice "elegi una si querés";
+                      tres filas dicen "tenés que revisar esto". */}
+                  <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
                     {savedModels.slice(0, 18).map((m) => {
                       const isSelected = sharedModelUrl === m.previewUrl;
                       return (
@@ -4992,10 +5002,14 @@ export default function LingeriePipelinePage() {
                             toast.success(lg.messages.modelSelected(m.name));
                           }}
                           className={cn(
-                            "group relative flex flex-col overflow-hidden rounded-lg border transition-all",
+                            // w-28 + snap-start: cada modelo es una tarjeta de ancho
+                            // fijo que "engancha" al hojear, en vez de una celda de
+                            // grilla. -translate-y al hover: la tarjeta se levanta,
+                            // que es lo que comunica "esto se puede elegir".
+                            "group relative flex w-28 shrink-0 snap-start flex-col overflow-hidden rounded-lg border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/40",
                             isSelected
                               ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40"
-                              : "border-white/10 hover:border-white/30",
+                              : "border-white/10 hover:border-[var(--accent)]/50",
                           )}
                           title={`${m.name} — ${m.gender ?? 'female'}, ${m.skinTone ?? 'medium'}, ${m.bodyType ?? 'average'}`}
                         >
