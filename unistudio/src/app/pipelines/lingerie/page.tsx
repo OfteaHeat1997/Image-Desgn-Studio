@@ -33,6 +33,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useI18n } from "@/hooks/useI18n";
 import { toast } from "@/hooks/use-toast";
 import { mapProductTypeToGarmentType } from "@/lib/constants/garment-types";
 import { useGalleryStore } from "@/stores/gallery-store";
@@ -939,14 +940,16 @@ function fmtClock(total: number): string {
 /* ------------------------------------------------------------------ */
 
 function StatusBadge({ status }: { status: StepStatus }) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const config = {
-    idle:       { label: "Pendiente",    className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
-    pending:    { label: "En cola",      className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
-    processing: { label: "En vivo",      className: "bg-[var(--accent-dim)] text-[var(--accent-light)] border-[var(--accent)]/25", icon: Loader2 },
-    done:       { label: "Listo",        className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
-    error:      { label: "Error",        className: "bg-red-500/15 text-red-300 border-red-500/25",                      icon: AlertCircle   },
-    skipped:    { label: "Saltado",      className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: SkipForward   },
-    accepted:   { label: "Aceptado",     className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
+    idle:       { label: lg.statusBadge.idle,       className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
+    pending:    { label: lg.statusBadge.pending,    className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
+    processing: { label: lg.statusBadge.processing, className: "bg-[var(--accent-dim)] text-[var(--accent-light)] border-[var(--accent)]/25", icon: Loader2 },
+    done:       { label: lg.statusBadge.done,       className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
+    error:      { label: lg.statusBadge.error,      className: "bg-red-500/15 text-red-300 border-red-500/25",                      icon: AlertCircle   },
+    skipped:    { label: lg.statusBadge.skipped,    className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: SkipForward   },
+    accepted:   { label: lg.statusBadge.accepted,   className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
   }[status];
 
   const Icon = config.icon;
@@ -998,6 +1001,8 @@ function ModelThumb({ url, alt, name }: { url: string; alt: string; name: string
 }
 
 function ImageThumb({ url, label, className }: { url?: string; label: string; className?: string }) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const [hasError, setHasError] = useState(false);
 
   if (!url || hasError) {
@@ -1016,8 +1021,8 @@ function ImageThumb({ url, label, className }: { url?: string; label: string; cl
         <ImageIcon className="h-6 w-6 text-[var(--text-muted)]" />
         <span className="text-[11px] text-[var(--text-secondary)] leading-tight">
           {hasError
-            ? "La imagen expiró. Refresca la página y reprocesa."
-            : "Esperando paso anterior"}
+            ? lg.thumb.expired
+            : lg.thumb.waiting}
         </span>
       </div>
     );
@@ -1072,6 +1077,8 @@ function BeforeAfterSlider({
   label: string;
   className?: string;
 }) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const [pos, setPos] = useState(50);
   const [beforeErr, setBeforeErr] = useState(false);
   const [afterErr, setAfterErr] = useState(false);
@@ -1121,10 +1128,10 @@ function BeforeAfterSlider({
         draggable={false}
       />
       <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white/90">
-        Antes
+        {lg.beforeAfter.before}
       </span>
       <span className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-rose-600/80 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white">
-        Después
+        {lg.beforeAfter.after}
       </span>
       <div
         className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow-[0_0_6px_rgba(0,0,0,0.6)]"
@@ -1143,7 +1150,7 @@ function BeforeAfterSlider({
         max={100}
         value={pos}
         onChange={(e) => setPos(Number(e.target.value))}
-        aria-label={`Comparar antes y después de ${label}`}
+        aria-label={lg.beforeAfter.compareAria(label)}
         className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
       />
     </div>
@@ -1172,6 +1179,8 @@ interface ImageLightboxProps {
  * "Usar esta variante".
  */
 function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, filenamePrefix, compareWith }: ImageLightboxProps) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const [idx, setIdx] = useState(Math.max(0, Math.min(startIndex, images.length - 1)));
   // Arranca EN modo comparación cuando hay una foto "antes" → al abrir full screen
   // se ve directo el antes/después (Original | Resultado) sin tener que buscar el
@@ -1229,7 +1238,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
           )}
           {isSelected && (
             <span className="rounded-md bg-[var(--accent)]/30 px-2.5 py-1 font-medium text-[var(--accent-light)]">
-              ✓ Variante elegida
+              {lg.lightbox.variantChosen}
             </span>
           )}
         </div>
@@ -1244,20 +1253,20 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
                   ? "bg-[var(--accent)] text-[var(--bg-primary)] hover:bg-[var(--accent)]"
                   : "bg-white/10 text-white hover:bg-white/20",
               )}
-              title="Comparar con la foto original (C)"
+              title={lg.lightbox.compareTitle}
             >
               <Maximize2 className="h-3.5 w-3.5" />
-              {compareMode ? "Solo resultado" : "Comparar con original"}
+              {compareMode ? lg.lightbox.onlyResult : lg.lightbox.compareWithOriginal}
             </button>
           )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); void downloadAsset(url, filename); }}
             className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
-            title="Descargar esta imagen"
+            title={lg.lightbox.downloadTitle}
           >
             <Download className="h-3.5 w-3.5" />
-            Descargar
+            {lg.lightbox.download}
           </button>
           {/* Cerrar: antes era un icono gris de 36px sobre fondo translucido, facil
               de no encontrar en una pantalla llena de imagenes. Ahora lleva texto
@@ -1267,10 +1276,10 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             type="button"
             onClick={onClose}
             className="flex h-10 items-center gap-2 rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-[#0C0C0E]"
-            title="Cerrar (Esc)"
+            title={lg.lightbox.closeTitle}
           >
             <X className="h-5 w-5" />
-            <span className="text-sm">Cerrar</span>
+            <span className="text-sm">{lg.lightbox.close}</span>
             <kbd className="hidden rounded border border-current/30 px-1 text-[10px] opacity-70 sm:inline">Esc</kbd>
           </button>
         </div>
@@ -1284,23 +1293,23 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             <div className="relative flex-1 h-full">
               <img
                 src={compareWith}
-                alt="Original"
+                alt={lg.lightbox.original}
                 className="h-full w-full rounded-lg object-contain"
                 style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
               />
               <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                Original
+                {lg.lightbox.original}
               </span>
             </div>
             <div className="relative flex-1 h-full">
               <img
                 src={url}
-                alt="Resultado"
+                alt={lg.lightbox.result}
                 className="h-full w-full rounded-lg object-contain"
                 style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
               />
               <span className="absolute right-2 top-2 rounded-md bg-[var(--accent)]/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                Resultado
+                {lg.lightbox.result}
               </span>
             </div>
           </div>
@@ -1315,7 +1324,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
         ) : (
           <img
             src={url}
-            alt={`Imagen ${idx + 1}`}
+            alt={lg.lightbox.imageAlt(idx + 1)}
             className="max-h-[80vh] max-w-[95vw] rounded-lg object-contain"
             style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
           />
@@ -1329,7 +1338,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             type="button"
             onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + images.length) % images.length); }}
             className="absolute left-2 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-            title="Anterior (←)"
+            title={lg.lightbox.prevTitle}
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -1337,7 +1346,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             type="button"
             onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % images.length); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-            title="Siguiente (→)"
+            title={lg.lightbox.nextTitle}
           >
             <ChevronRight className="h-6 w-6" />
           </button>
@@ -1359,7 +1368,7 @@ function ImageLightbox({ images, startIndex, selectedUrl, onClose, onSelect, fil
             )}
           >
             <Check className="h-4 w-4" />
-            {isSelected ? "Variante ya elegida" : `Usar variante ${idx + 1}`}
+            {isSelected ? lg.lightbox.variantChosenBtn : lg.lightbox.useVariant(idx + 1)}
           </button>
         </div>
       )}
@@ -1408,6 +1417,8 @@ interface StepCardProps {
 }
 
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const Icon = step.icon;
   // Fallback chain: step's own captured input > chain input > empty. Si los
   // dos son falsy, ImageThumb ahora muestra placeholder con ícono + "Esperando"
@@ -1427,10 +1438,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
   const lightboxImages = step.candidates && step.candidates.length > 1
     ? step.candidates
     : (step.resultUrl ? [step.resultUrl] : []);
-  const docs = STEP_DOCS[step.id];
+  const docs = lg.stepDocs[step.id];
   // UX en vivo: temporizador + microcopy rotativo mientras procesa.
   const elapsed = useElapsedSeconds(step.status === "processing");
-  const proc = PROCESSING_COPY[step.id] ?? DEFAULT_PROCESSING_COPY;
+  const proc = lg.processingCopy[step.id] ?? lg.defaultProcessingCopy;
 
   return (
     <div
@@ -1478,7 +1489,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)]">Paso {stepNumber}</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)]">{lg.stepCard.step} {stepNumber}</span>
               {/* P0-4: botón "i" que abre el panel de docs del step */}
               {docs && (
                 <button
@@ -1490,15 +1501,15 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       ? "bg-[var(--accent)]/30 text-[var(--accent-light)]"
                       : "bg-white/10 text-[var(--text-secondary)] hover:bg-[var(--accent)]/20 hover:text-[var(--accent-light)]",
                   )}
-                  title="Ver detalles de este paso"
-                  aria-label="Ver detalles"
+                  title={lg.stepCard.infoTitle}
+                  aria-label={lg.stepCard.infoAria}
                 >
                   <Info className="h-3 w-3" />
                 </button>
               )}
             </div>
-            <span className="block truncate text-[15px] font-semibold text-white">{step.label}</span>
-            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{step.description}</p>
+            <span className="block truncate text-[15px] font-semibold text-white">{lg.steps.items[step.id].label}</span>
+            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{lg.steps.items[step.id].description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -1515,11 +1526,11 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               }`}
               title={
                 step.usedProvider === "kolors"
-                  ? "Cayó a Kolors (backup): SeedDream falló para esta prenda. Kolors tiende a inventar prendas genéricas. Reintentá o subí mejor la prenda aislada."
-                  : `Proveedor que generó este resultado: ${step.usedProvider}.`
+                  ? lg.stepCard.providerBadgeKolors
+                  : lg.stepCard.providerBadgeGeneric(step.usedProvider)
               }
             >
-              {PROVIDER_LABELS[step.usedProvider] ?? step.usedProvider}
+              {lg.providerLabels[step.usedProvider] ?? step.usedProvider}
             </span>
           )}
           <span className="text-xs font-medium text-[var(--text-secondary)]">{step.cost}</span>
@@ -1530,10 +1541,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               type="button"
               onClick={onStop}
               className="flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-300 transition-colors hover:bg-red-500/20"
-              title="Cancelar este paso"
+              title={lg.stepCard.stopTitle}
             >
               <StopCircle className="h-3 w-3" />
-              Detener
+              {lg.stepCard.stop}
             </button>
           )}
         </div>
@@ -1545,31 +1556,31 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
         <div className="border-b border-white/6 bg-[var(--accent)]/[0.03] px-5 py-4 text-xs">
           <div className="space-y-3">
             <div>
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Qué hace</p>
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsWhat}</p>
               <p className="text-gray-300">{docs.what}</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Proveedor</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsProvider}</p>
                 <p className="text-[var(--text-secondary)]">{docs.provider}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Duración típica</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsDuration}</p>
                 <p className="text-[var(--text-secondary)]">{docs.duration}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Costo</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsCost}</p>
                 <p className="text-[var(--text-secondary)]">{docs.costDetail}</p>
               </div>
             </div>
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Qué puede fallar</p>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsCanFail}</p>
               <ul className="list-disc space-y-0.5 pl-4 text-[var(--text-secondary)]">
                 {docs.canFail.map((f, i) => <li key={i}>{f}</li>)}
               </ul>
             </div>
             <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">Tips</p>
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">{lg.stepCard.docsTips}</p>
               <ul className="list-disc space-y-0.5 pl-4 text-gray-300">
                 {docs.tips.map((t, i) => <li key={i}>{t}</li>)}
               </ul>
@@ -1583,7 +1594,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {step.id === "isolate" && onChangeIsolateMethod && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">Método:</span>
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.methodLabel}</span>
             <select
               value={step.isolateMethodOverride ?? "photoroom"}
               onChange={(e) => onChangeIsolateMethod(e.target.value as IsolateMethod)}
@@ -1591,12 +1602,12 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {ISOLATE_METHOD_OPTIONS.map((m) => (
-                <option key={m.value} value={m.value} title={m.hint}>{m.label}</option>
+                <option key={m.value} value={m.value} title={lg.isolateMethods[m.value]?.hint}>{lg.isolateMethods[m.value]?.label ?? m.label}</option>
               ))}
             </select>
           </div>
           <p className="mt-1.5 text-[10px] text-[var(--text-secondary)]">
-            {ISOLATE_METHOD_OPTIONS.find((m) => m.value === (step.isolateMethodOverride ?? "photoroom"))?.hint}
+            {lg.isolateMethods[step.isolateMethodOverride ?? "photoroom"]?.hint}
           </p>
         </div>
       )}
@@ -1609,7 +1620,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangeProvider && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">Proveedor:</span>
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.providerLabel}</span>
             <select
               value={step.providerOverride ?? "auto"}
               onChange={(e) => onChangeProvider(e.target.value as TryonProvider)}
@@ -1617,12 +1628,12 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {TRYON_PROVIDER_OPTIONS.map((p) => (
-                <option key={p.value} value={p.value} title={p.hint}>{p.label}</option>
+                <option key={p.value} value={p.value} title={lg.tryonProviders[p.value]?.hint}>{lg.tryonProviders[p.value]?.label ?? p.label}</option>
               ))}
             </select>
           </div>
           <p className="mt-1.5 text-[10px] text-[var(--text-secondary)]">
-            {TRYON_PROVIDER_OPTIONS.find((p) => p.value === (step.providerOverride ?? "auto"))?.hint}
+            {lg.tryonProviders[step.providerOverride ?? "auto"]?.hint}
           </p>
         </div>
       )}
@@ -1632,7 +1643,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {(step.id === "tryon" || step.id === "photoBack" || step.id === "photoFullBody") && onChangePose && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">Pose:</span>
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.poseLabel}</span>
             <select
               value={step.poseOverride ?? "auto"}
               onChange={(e) => onChangePose(e.target.value as PoseOption)}
@@ -1652,7 +1663,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 })
                 .map((p) => (
                 <option key={p.value} value={p.value}>
-                  {p.label}{p.value === "auto" ? ` (default: ${step.id === "photoBack" ? "espalda" : step.id === "photoFullBody" ? "cuerpo completo" : "frontal"})` : ""}
+                  {lg.poseOptions[p.value] ?? p.label}{p.value === "auto" ? lg.stepCard.poseDefaultSuffix(step.id === "photoBack" ? lg.stepCard.poseDefaults.photoBack : step.id === "photoFullBody" ? lg.stepCard.poseDefaults.photoFullBody : lg.stepCard.poseDefaults.tryon) : ""}
                 </option>
               ))}
             </select>
@@ -1662,7 +1673,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
       {step.id === "modelVideo" && onChangeAction && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">Acción:</span>
+            <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">{lg.stepCard.actionLabel}</span>
             <select
               value={step.actionOverride ?? "auto"}
               onChange={(e) => onChangeAction(e.target.value as VideoActionOption)}
@@ -1670,7 +1681,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               className="flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[var(--accent)]/50 disabled:opacity-50"
             >
               {VIDEO_ACTION_OPTIONS.map((a) => (
-                <option key={a.value} value={a.value}>{a.label}</option>
+                <option key={a.value} value={a.value}>{lg.videoActionOptions[a.value] ?? a.label}</option>
               ))}
             </select>
           </div>
@@ -1685,17 +1696,17 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 agrandan a la vez al pasar el mouse por cualquiera: comunica que
                 son un par comparable, no dos imagenes sueltas. */}
             <div className="flex-1 min-w-0">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Original</p>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.stepCard.original}</p>
               <button
                 type="button"
                 onClick={() => { if (step.resultUrl) setLightboxIdx(0); }}
                 disabled={!step.resultUrl}
                 className="relative block w-full cursor-zoom-in overflow-hidden rounded-lg ring-0 ring-[var(--accent)]/40 transition-all duration-200 group-hover/compare:scale-[1.03] group-hover/compare:ring-2 disabled:cursor-default disabled:group-hover/compare:scale-100 disabled:group-hover/compare:ring-0"
-                title="Ver las dos en grande"
+                title={lg.stepCard.viewBoth}
               >
                 <ImageThumb
                   url={step.originalUrl ?? inputUrl}
-                  label="Sin imagen"
+                  label={lg.stepCard.noImage}
                   className="h-40 w-full"
                 />
               </button>
@@ -1711,7 +1722,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
 
             {/* Output (after) */}
             <div className="flex-1 min-w-0">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Resultado</p>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.stepCard.result}</p>
               {step.status === "processing" ? (
                 <div className="relative flex h-40 w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-[var(--accent)]/25 bg-[var(--accent-glow)]">
                   {/* skeleton shimmer detrás, como que la imagen se está "revelando" */}
@@ -1758,7 +1769,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   {step.error && (
                     <details className="w-full">
                       <summary className="cursor-pointer text-[10px] text-[var(--text-secondary)] hover:text-gray-300">
-                        Ver detalle técnico
+                        {lg.stepCard.techDetail}
                       </summary>
                       <pre className="mt-1 max-h-20 overflow-auto rounded bg-black/40 p-2 text-[9px] leading-tight text-[var(--text-secondary)]">
                         {step.error}
@@ -1784,7 +1795,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       }}
                       className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/20"
                     >
-                      Ir a subir foto de espalda
+                      {lg.stepCard.goUploadBack}
                     </button>
                   )}
                 </div>
@@ -1795,7 +1806,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 // el detalle al tamaño grande y desde ahí puede elegir.
                 <div>
                   <p className="mb-1.5 text-[10px] text-[var(--accent)]">
-                    {step.candidates.length} variantes — tocá una para verla grande y elegirla
+                    {lg.stepCard.variantsHint(step.candidates.length)}
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {step.candidates.map((url, i) => {
@@ -1811,11 +1822,11 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                               ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/50"
                               : "border-white/15 hover:border-white/40",
                           )}
-                          title={`Tocá para ver variante ${i + 1} en grande${isSelected ? ' (seleccionada)' : ''}`}
+                          title={lg.stepCard.variantThumbTitle(i + 1, isSelected)}
                         >
                           <img
                             src={url}
-                            alt={`Variante ${i + 1}`}
+                            alt={lg.stepCard.variantAlt(i + 1)}
                             className="h-full w-full object-contain"
                             style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 10px 10px" }}
                           />
@@ -1845,7 +1856,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   <BeforeAfterSlider
                     before={step.originalUrl ?? inputUrl}
                     after={step.resultUrl}
-                    label="Resultado"
+                    label={lg.stepCard.result}
                     className="h-40 w-full"
                   />
                   {(step.status === "accepted") && (
@@ -1858,10 +1869,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                       type="button"
                       onClick={() => setLightboxIdx(0)}
                       className="absolute inset-x-0 bottom-0 z-10 flex h-9 items-center justify-center gap-2 bg-gradient-to-t from-black/85 to-transparent opacity-0 transition-opacity group-hover/compare:opacity-100"
-                      title="Ver las dos en grande, con comparador"
+                      title={lg.stepCard.viewBothCompareTitle}
                     >
                       <Maximize2 className="h-4 w-4 text-[var(--accent)]" />
-                      <span className="text-xs font-semibold text-white">Ver las dos en grande</span>
+                      <span className="text-xs font-semibold text-white">{lg.stepCard.viewBoth}</span>
                     </button>
                   )}
                 </div>
@@ -1884,7 +1895,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 className="lz-lift flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-white/5 hover:text-white"
               >
                 <SkipForward className="h-3.5 w-3.5" />
-                Saltar
+                {lg.stepCard.skip}
               </button>
               {/* Descargar directo sin abrir lightbox */}
               {step.resultUrl && (
@@ -1898,10 +1909,10 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     );
                   }}
                   className="lz-lift flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
-                  title="Descargar esta imagen"
+                  title={lg.stepCard.downloadTitle}
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Descargar
+                  {lg.stepCard.download}
                 </button>
               )}
               <button
@@ -1909,14 +1920,14 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 className="lz-lift flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Rehacer
+                {lg.stepCard.rerun}
               </button>
               <button
                 onClick={onAccept}
                 className="lz-lift flex items-center gap-1.5 rounded-lg border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)]/90 to-[var(--accent-muted)] px-4 py-2 text-xs font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(80,200,120,0.5)] hover:brightness-105"
               >
                 <Check className="h-3.5 w-3.5" />
-                Aceptar y continuar
+                {lg.stepCard.accept}
               </button>
             </div>
           )}
@@ -1932,7 +1943,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   onClick={onSkip}
                   className="text-xs font-medium text-[var(--text-secondary)] underline-offset-2 hover:text-gray-300 hover:underline"
                 >
-                  Saltar este paso
+                  {lg.stepCard.skipStep}
                 </button>
                 <button
                   onClick={onRerun}
@@ -1940,8 +1951,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 >
                   <RotateCcw className="h-4 w-4" />
                   {step.providerOverride && step.providerOverride !== "auto"
-                    ? `Reintentar con ${TRYON_PROVIDER_OPTIONS.find((p) => p.value === step.providerOverride)?.label ?? step.providerOverride}`
-                    : "Reintentar"}
+                    ? lg.stepCard.retryWith(lg.tryonProviders[step.providerOverride]?.label ?? step.providerOverride)
+                    : lg.stepCard.retry}
                 </button>
               </div>
             </div>
@@ -2036,6 +2047,8 @@ const SPEC_FIELDS: {
 ];
 
 function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: ProductSpecPanelProps) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const [open, setOpen] = useState(true);
 
   // Estado de análisis en curso
@@ -2045,8 +2058,8 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
         <div className="flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-[var(--accent)]" />
           <div>
-            <p className="text-sm font-semibold text-white">Entendiendo el producto…</p>
-            <p className="text-xs text-[var(--text-secondary)]">Claude Vision está leyendo la foto para extraer color, textura y detalles reales.</p>
+            <p className="text-sm font-semibold text-white">{lg.spec.analyzing}</p>
+            <p className="text-xs text-[var(--text-secondary)]">{lg.spec.analyzingSub}</p>
           </div>
         </div>
       </div>
@@ -2060,9 +2073,9 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-200">No se pudo leer la ficha técnica</p>
+            <p className="text-sm font-semibold text-amber-200">{lg.spec.errorTitle}</p>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {error || "Claude Vision no respondió."} El pipeline continúa igual que antes — los pasos siguientes van a inferir los detalles del producto.
+              {error || lg.spec.errorFallback} {lg.spec.errorRest}
             </p>
             {onReanalyze && (
               <button
@@ -2070,7 +2083,7 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
                 className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-200 hover:bg-amber-500/20"
               >
                 <RotateCcw className="h-3 w-3" />
-                Reintentar análisis
+                {lg.spec.retry}
               </button>
             )}
           </div>
@@ -2092,8 +2105,8 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
         <div className="flex items-center gap-2.5">
           <Sparkles className="h-4 w-4 text-[var(--accent)]" />
           <div>
-            <p className="text-sm font-semibold text-white">Ficha técnica del producto</p>
-            <p className="text-[11px] text-[var(--text-secondary)]">Leída por Claude Vision — podés editar cualquier campo antes de que corra el resto.</p>
+            <p className="text-sm font-semibold text-white">{lg.spec.title}</p>
+            <p className="text-[11px] text-[var(--text-secondary)]">{lg.spec.subtitle}</p>
           </div>
         </div>
         <ChevronRight className={cn("h-4 w-4 text-[var(--text-secondary)] transition-transform", open && "rotate-90")} />
@@ -2105,17 +2118,17 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
             const fields = SPEC_FIELDS.filter((f) => f.group === group);
             return (
               <div key={group}>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{group}</p>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{lg.spec.groups[group]}</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {fields.map((field) => {
                     const value = field.getter(spec) ?? "";
                     return (
                       <label key={field.key} className="flex flex-col gap-1">
-                        <span className="text-[11px] text-[var(--text-secondary)]">{field.label}</span>
+                        <span className="text-[11px] text-[var(--text-secondary)]">{lg.spec.fields[field.key]?.label ?? field.label}</span>
                         <input
                           type="text"
                           value={value}
-                          placeholder={field.placeholder}
+                          placeholder={lg.spec.fields[field.key]?.placeholder ?? field.placeholder}
                           onChange={(e) => onChange(field.setter(spec, e.target.value))}
                           className="rounded-md border border-white/10 bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none focus:border-[var(--accent)]/50"
                         />
@@ -2129,7 +2142,7 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
 
           {spec.notes && (
             <div>
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">Notas</p>
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--accent)]/70">{lg.spec.notes}</p>
               <textarea
                 value={spec.notes}
                 onChange={(e) => onChange({ ...spec, notes: e.target.value })}
@@ -2149,6 +2162,8 @@ function ProductSpecPanel({ status, spec, error, onChange, onReanalyze }: Produc
 /* ------------------------------------------------------------------ */
 
 function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const { t } = useI18n();
+  const lg = t.pipelines.lingerie;
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -2183,10 +2198,10 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
         <Upload className={cn("h-6 w-6", dragging ? "text-[var(--accent)]" : "text-[var(--text-secondary)]")} />
       </div>
       <div className="text-center">
-        <p className="text-sm font-semibold text-white">Arrastra las fotos aquí</p>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">O haz clic para seleccionar — múltiples ángulos/colores del mismo producto</p>
+        <p className="text-sm font-semibold text-white">{lg.upload.dropTitle}</p>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">{lg.upload.dropSub}</p>
       </div>
-      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-[var(--text-secondary)]">JPG, PNG, WebP — máx. 50MB por foto</span>
+      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-[var(--text-secondary)]">{lg.upload.formats}</span>
     </div>
   );
 }
@@ -2901,6 +2916,9 @@ async function runStep(
 /* ------------------------------------------------------------------ */
 
 export default function LingeriePipelinePage() {
+  const { t, locale } = useI18n();
+  const lg = t.pipelines.lingerie;
+  void locale;
   const [phase, setPhase] = useState<Phase>("setup");
   // Help dialog: keyboard shortcuts reference
   const [showHelp, setShowHelp] = useState(false);
@@ -3039,9 +3057,7 @@ export default function LingeriePipelinePage() {
     }
     abortControllersRef.current.clear();
     setIsRunning(false);
-    toast.warning(
-      "Procesamiento detenido. Lo que ya completaste se mantiene visible y descargable.",
-    );
+    toast.warning(lg.messages.stopBatch);
   }, []);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [savedModels, setSavedModels] = useState<Array<{ id: string; name: string; previewUrl: string; gender?: string; skinTone?: string; bodyType?: string; seed?: number }>>([]);
@@ -3171,7 +3187,7 @@ export default function LingeriePipelinePage() {
           if (saved?.preview_url) {
             setSharedModelUrl(saved.preview_url);
             setReusedModelFound(true);
-            toast.success(`Modelo IA de REF ${ref} encontrada — se va a reusar (ahorro $0.055).`);
+            toast.success(lg.messages.modelReused(ref));
           }
         }
       } catch {
@@ -3208,7 +3224,7 @@ export default function LingeriePipelinePage() {
       futureRef.current.push(prev);
       const last = historyRef.current.pop()!;
       setHistoryVersion((v) => v + 1);
-      toast.info("Deshecho");
+      toast.info(lg.messages.undone);
       return last;
     });
   }, []);
@@ -3219,7 +3235,7 @@ export default function LingeriePipelinePage() {
       historyRef.current.push(prev);
       const next = futureRef.current.pop()!;
       setHistoryVersion((v) => v + 1);
-      toast.info("Rehecho");
+      toast.info(lg.messages.redone);
       return next;
     });
   }, []);
@@ -3283,11 +3299,9 @@ export default function LingeriePipelinePage() {
       const json = await res.json();
       if (!json.success) {
         if (res.status === 404) {
-          toast.warning(
-            `No hay inventario pre-cargado de ${inventoryType}. Subí tus fotos arrastrándolas o tocando el área de upload de arriba.`,
-          );
+          toast.warning(lg.messages.inventoryNo(inventoryType));
         } else {
-          toast.error(`No se pudo escanear el inventario: ${json.error ?? "error desconocido"}`);
+          toast.error(lg.messages.inventoryScanError(json.error ?? "error desconocido"));
         }
         return;
       }
@@ -3295,7 +3309,7 @@ export default function LingeriePipelinePage() {
       type ScannedRef = { ref: string; photoCount: number; uniqueColors: string[]; hasBackPhoto: boolean; photos: ScannedPhoto[]; estimatedCost: number };
       const refs: ScannedRef[] = json.data.refs;
       const totalPhotos: number = json.data.totalPhotos;
-      toast.info(`Cargando ${totalPhotos} fotos de ${refs.length} REFs…`);
+      toast.info(lg.messages.inventoryLoading(totalPhotos, refs.length));
 
       // Aplanar + fetchear en paralelo con concurrencia limitada a 6.
       const flat: Array<ScannedPhoto & { ref: string }> = [];
@@ -3321,13 +3335,13 @@ export default function LingeriePipelinePage() {
       }
 
       if (newFiles.length === 0) {
-        toast.error("No se pudo cargar ninguna foto del inventario.");
+        toast.error(lg.messages.inventoryNoneLoaded);
         return;
       }
       handleFiles(newFiles);
-      toast.success(`Inventario cargado: ${newFiles.length} fotos${failed > 0 ? ` (${failed} fallaron)` : ''}.`);
+      toast.success(lg.messages.inventoryLoaded(newFiles.length, failed));
     } catch (err) {
-      toast.error(`Error cargando inventario: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(lg.messages.inventoryError(err instanceof Error ? err.message : String(err)));
     } finally {
       setLoadingInventory(false);
     }
@@ -3337,7 +3351,7 @@ export default function LingeriePipelinePage() {
    *  persistence). La ficha técnica y los resultados procesados se limpian,
    *  pero la galería (/gallery) y los settings quedan. */
   const resetAll = useCallback(() => {
-    if (jobs.length > 0 && !window.confirm("¿Estás segura? Se borran las fotos subidas y los resultados. Los settings se mantienen.")) {
+    if (jobs.length > 0 && !window.confirm(lg.messages.resetConfirm)) {
       return;
     }
     pushHistory();
@@ -3349,7 +3363,7 @@ export default function LingeriePipelinePage() {
     try {
       window.localStorage.removeItem("lingerie:pipeline:jobs:v1");
     } catch { /* ignore */ }
-    toast.success("Sesión reiniciada — podés subir fotos nuevas.");
+    toast.success(lg.messages.sessionReset);
   }, [jobs.length, pushHistory]);
 
   // Atajos Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y. Solo activan si el foco no está
@@ -3405,7 +3419,7 @@ export default function LingeriePipelinePage() {
     if (ctrl) {
       ctrl.abort();
       abortControllersRef.current.delete(key);
-      toast.info(`Paso "${stepId}" detenido.`);
+      toast.info(lg.messages.stepStopped(stepId));
     }
   }, []);
 
@@ -3478,7 +3492,7 @@ export default function LingeriePipelinePage() {
         }
         // No hay foto real para esta vista → fallback a runStep default con warning.
         if (step.id !== "isolate" && step.id !== "model" && step.id !== "productVideo" && step.id !== "modelVideo") {
-          toast.info(`Sin foto real para ${step.label} — usando modo clásico para este paso.`);
+          toast.info(lg.messages.noRealPhoto(lg.steps.items[step.id].label));
         }
       }
 
@@ -3614,7 +3628,7 @@ export default function LingeriePipelinePage() {
     if (!uploadedUrl) {
       if (!job.file) {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
-        toast.error(`${job.filename}: tenés que subir la foto de nuevo (esta sesión fue restaurada sin el archivo).`);
+        toast.error(lg.messages.reuploadNeeded(job.filename));
         return {};
       }
       try {
@@ -3632,7 +3646,7 @@ export default function LingeriePipelinePage() {
         ));
       } catch (err) {
         setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "error" } : j));
-        toast.error(`Error de carga — ${job.filename}: ${err instanceof Error ? err.message : "Error desconocido"}`);
+        toast.error(lg.messages.uploadError(job.filename, err instanceof Error ? err.message : lg.messages.unknownError));
         return {};
       }
     }
@@ -3655,13 +3669,13 @@ export default function LingeriePipelinePage() {
           j.id === jobId ? { ...j, productSpec: spec, analysisStatus: "done" } : j,
         ));
       } catch (analyzeErr) {
-        const msg = analyzeErr instanceof Error ? analyzeErr.message : "Análisis falló";
+        const msg = analyzeErr instanceof Error ? analyzeErr.message : lg.messages.analysisFailed;
         console.warn(`[lingerie] analyze-product failed for ${job.filename}:`, msg);
         setJobs((prev) => prev.map((j) =>
           j.id === jobId ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg } : j,
         ));
         // No bloquea el pipeline — solo warnea y seguimos como antes.
-        toast.warning(`No se pudo leer la ficha técnica de ${job.filename}. Sigo con los pasos normales.`);
+        toast.warning(lg.messages.specReadFailed(job.filename));
       }
     }
 
@@ -3693,7 +3707,7 @@ export default function LingeriePipelinePage() {
         if (!hasBackPhoto) {
           updateStep(jobId, "photoBack", {
             status: "skipped",
-            error: 'No subiste foto del producto desde atrás — no podemos inferirla del frente (Kolors generaría un bra distinto al original). Subí una foto etiquetada "Espalda" en el setup y reintentá.',
+            error: lg.messages.photoBackSkip,
           });
           console.warn(`[lingerie] photoBack skipeado: ${job.filename} no tiene foto etiquetada "espalda" asociada.`);
           return false;  // No es abort, sigue al siguiente step
@@ -3715,7 +3729,7 @@ export default function LingeriePipelinePage() {
         if (!base) {
           updateStep(jobId, stepDef.id, {
             status: "skipped",
-            error: "El video de la modelo necesita la Foto Frontal (try-on). Corré ese paso primero — no usamos tu foto original (copyright).",
+            error: lg.messages.modelVideoSkip,
           });
           return false;
         }
@@ -3725,7 +3739,7 @@ export default function LingeriePipelinePage() {
         // donde Kolors dejó la tela plástica. Sin tryon, no hay nada que corregir.
         if (!stepResults.tryon) {
           console.warn("[lingerie] texturePreserve: tryon no corrió, skip");
-          updateStep(jobId, stepDef.id, { status: "skipped", error: "Sin resultado del tryon — no hay nada para texturizar." });
+          updateStep(jobId, stepDef.id, { status: "skipped", error: lg.messages.texturePreserveSkip });
           return false;
         }
         inputForStep = stepResults.tryon;
@@ -3755,7 +3769,7 @@ export default function LingeriePipelinePage() {
         if (!baseUrl) {
           updateStep(jobId, stepDef.id, {
             status: "skipped",
-            error: "Foto Cuerpo Completo necesita el resultado del Try-On (Foto Frontal). Activá y corré la Foto Frontal primero.",
+            error: lg.messages.photoFullBodySkip,
           });
           return false;
         }
@@ -3782,7 +3796,7 @@ export default function LingeriePipelinePage() {
         if (!stepResults.isolate) {
           updateStep(jobId, stepDef.id, {
             status: "skipped",
-            error: "El Video 360° necesita la prenda aislada y el paso 'Aislar Producto' no dejó resultado. Reintentá ese paso, o desactivá este video.",
+            error: lg.messages.productVideoSkip,
           });
           return false;
         }
@@ -3908,14 +3922,14 @@ export default function LingeriePipelinePage() {
           updateStep(jobId, stepDef.id, { status: "accepted" });
         }
       } catch (err) {
-        const rawMsg = err instanceof Error ? err.message : "Error desconocido";
+        const rawMsg = err instanceof Error ? err.message : lg.messages.unknownError;
         // P0-3: si la usuaria apretó "Detener" (AbortController.abort()), el
         // fetch() tira DOMException con name "AbortError". Lo mostramos como
         // status "skipped" con mensaje claro, no como error rojo — fue una
         // acción deliberada de la usuaria, no un fallo.
         const isAbort = err instanceof Error && (err.name === "AbortError" || /aborted|the user aborted/i.test(rawMsg));
         if (isAbort) {
-          updateStep(jobId, stepDef.id, { status: "skipped", error: "Detenido por la usuaria" });
+          updateStep(jobId, stepDef.id, { status: "skipped", error: lg.messages.stoppedByUser });
           // Señal al caller: salir del loop, no procesar más steps.
           return true;
         }
@@ -3935,7 +3949,7 @@ export default function LingeriePipelinePage() {
           if (fallback?.uploadedUrl) {
             console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.filename}" como resultado.`);
             toast.warning(
-              `${stepDef.label} falló — usamos tu foto real (${fallback.filename}) en su lugar para no perder el paso.`,
+              lg.messages.stepFellBack(lg.steps.items[stepDef.id].label, fallback.filename),
             );
             updateStep(jobId, stepDef.id, {
               status: "done",
@@ -3955,7 +3969,7 @@ export default function LingeriePipelinePage() {
         // de ver un string técnico en inglés.
         const isNetworkError = /failed to fetch|networkerror|load failed|network request failed/i.test(rawMsg);
         const errorMsg = isNetworkError
-          ? "Error de conexión. Revisá tu internet y reintentá."
+          ? lg.messages.networkError
           : rawMsg;
         updateStep(jobId, stepDef.id, { status: "error", error: errorMsg });
 
@@ -3992,7 +4006,7 @@ export default function LingeriePipelinePage() {
           }
         } else {
           // Auto mode: skip errored step and continue
-          toast.error(`Error en "${stepDef.label}": ${errorMsg}`);
+          toast.error(lg.messages.stepError(lg.steps.items[stepDef.id].label, errorMsg));
         }
       }
       return false;
@@ -4212,13 +4226,13 @@ export default function LingeriePipelinePage() {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[lingerie] processJob explotó en ${job.filename}:`, err);
         setJobs((prev) => prev.map((j) => j.id === job.id ? { ...j, status: "done" } : j));
-        toast.error(`${job.filename}: ${msg}`);
+        toast.error(lg.messages.jobExploded(job.filename, msg));
       }
     }
 
     setIsRunning(false);
     if (!batchAbortRef.current) {
-      toast.success(`Pipeline completado — ${jobsSnapshot.length} imagen(es) procesada(s)`);
+      toast.success(lg.messages.pipelineComplete(jobsSnapshot.length));
     } else {
       batchAbortRef.current = false;
     }
@@ -4275,16 +4289,16 @@ export default function LingeriePipelinePage() {
         <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
           <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
             <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Inicio</span>
+            <span className="hidden sm:inline">{lg.setup.home}</span>
           </Link>
           <span className="text-[var(--border-default)]">/</span>
           <div className="flex items-center gap-2 min-w-0">
             <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
-            <span className="text-sm font-semibold text-heading truncate">Lencería</span>
+            <span className="text-sm font-semibold text-heading truncate">{lg.setup.breadcrumb}</span>
           </div>
           <div className="ml-auto hidden md:block">
             <span className="rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-              Bras · Panties · Shapewear · Fajas
+              {lg.setup.badge}
             </span>
           </div>
         </header>
@@ -4292,9 +4306,9 @@ export default function LingeriePipelinePage() {
         <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8">
           {/* Page title */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">Configura tu Pipeline de Lencería</h1>
+            <h1 className="text-2xl font-bold text-white">{lg.setup.title}</h1>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Bras, panties y shapewear. Sube fotos de una referencia con modelo original, y el pipeline quita la modelo, crea una nueva con licencia libre, y la viste con la prenda. Opcionalmente genera videos de producto y de modelo.
+              {lg.setup.subtitle}
             </p>
           </div>
 
@@ -4305,7 +4319,7 @@ export default function LingeriePipelinePage() {
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                    1 · Fotos del Producto
+                    {lg.setup.photosHeading}
                   </h2>
                   {/* Undo / Redo / Reset — controles "app profesional" */}
                   <div className="flex items-center gap-1">
@@ -4313,7 +4327,7 @@ export default function LingeriePipelinePage() {
                       type="button"
                       onClick={undoJobs}
                       disabled={!canUndo}
-                      title="Deshacer (Ctrl+Z)"
+                      title={lg.setup.undoTitle}
                       className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[var(--text-secondary)] transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-[var(--text-secondary)]"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -4322,7 +4336,7 @@ export default function LingeriePipelinePage() {
                       type="button"
                       onClick={redoJobs}
                       disabled={!canRedo}
-                      title="Rehacer (Ctrl+Shift+Z)"
+                      title={lg.setup.redoTitle}
                       className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-[var(--text-secondary)] transition-colors hover:border-white/25 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-[var(--text-secondary)]"
                     >
                       <RotateCcw className="h-3.5 w-3.5 -scale-x-100" />
@@ -4332,11 +4346,11 @@ export default function LingeriePipelinePage() {
                       type="button"
                       onClick={resetAll}
                       disabled={jobs.length === 0}
-                      title="Comenzar de nuevo — borra las fotos y resultados (settings se mantienen)"
+                      title={lg.setup.resetTitle}
                       className="flex items-center gap-1 rounded-md border border-white/10 px-2 h-7 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:bg-transparent disabled:hover:text-[var(--text-secondary)]"
                     >
                       <X className="h-3 w-3" />
-                      Comenzar de nuevo
+                      {lg.setup.reset}
                     </button>
                   </div>
                 </div>
@@ -4355,17 +4369,17 @@ export default function LingeriePipelinePage() {
                     {loadingInventory ? (
                       <>
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Cargando…
+                        {lg.setup.loading}
                       </>
                     ) : (
                       <>
                         <Package className="h-3.5 w-3.5" />
-                        Cargar inventario de {productType === "bra" ? "Bras" : productType === "panty" ? "Panties" : productType === "faja" ? "Shapewear" : "Sets"}
+                        {lg.setup.loadInventory(lg.setup.inventoryTypes[productType] ?? lg.setup.inventoryTypes.set)}
                       </>
                     )}
                   </button>
                   <span className="text-[10px] text-muted">
-                    Si no hay folder pre-cargado de este tipo, subí tus fotos manualmente arrastrándolas arriba.
+                    {lg.setup.inventoryHint}
                   </span>
                 </div>
 
@@ -4374,12 +4388,12 @@ export default function LingeriePipelinePage() {
                   <div id="lingerie-upload-area">
                     <div className="mt-4 mb-2 flex items-center justify-between text-[11px]">
                       <span className="text-[var(--text-secondary)]">
-                        {jobs.length} foto{jobs.length === 1 ? '' : 's'} · el ángulo se detecta del nombre, pero podés corregirlo abajo de cada foto
+                        {lg.setup.photosCount(jobs.length)}
                       </span>
                       {jobs.some((j) => j.photoAngle === 'espalda') && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-accent)] bg-[var(--accent)]/[0.06] px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]">
                           <Check className="h-2.5 w-2.5" />
-                          Espalda real lista
+                          {lg.setup.backReady}
                         </span>
                       )}
                     </div>
@@ -4387,12 +4401,12 @@ export default function LingeriePipelinePage() {
                         solo sube frontal, photoBack se va a saltar — mejor que
                         lo sepa ANTES de procesar, no después. */}
                     <div className="mb-3 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[10px] text-[var(--text-secondary)]">
-                      <p className="mb-1 font-semibold uppercase tracking-wider text-gray-300">Qué fotos necesitás</p>
+                      <p className="mb-1 font-semibold uppercase tracking-wider text-gray-300">{lg.setup.whichPhotos}</p>
                       <ul className="space-y-0.5">
-                        <li><b className="text-white">Frontal</b> — obligatoria (para tryon y modelo)</li>
-                        <li><b className="text-white">Espalda</b> — opcional, <span className="text-amber-300">necesaria si querés &quot;Foto Espalda&quot;</span> (Kolors no rota 180° solo)</li>
-                        <li><b className="text-white">Lateral / Detalle</b> — opcionales, mejoran fidelidad</li>
-                        <li><b className="text-white">Flat lay</b> — opcional, para video 360° del producto</li>
+                        <li><b className="text-white">{lg.setup.needFrontal}</b> {lg.setup.needFrontalRest}</li>
+                        <li><b className="text-white">{lg.setup.needBack}</b> {lg.setup.needBackRest1} <span className="text-amber-300">{lg.setup.needBackEmph}</span> {lg.setup.needBackRest2}</li>
+                        <li><b className="text-white">{lg.setup.needSide}</b> {lg.setup.needSideRest}</li>
+                        <li><b className="text-white">{lg.setup.needFlat}</b> {lg.setup.needFlatRest}</li>
                       </ul>
                     </div>
                     {/* Warning de talla vs bodyType: si las fotos tienen tallas que
@@ -4410,14 +4424,14 @@ export default function LingeriePipelinePage() {
                       if (!mostCommon || mostCommon[0] === modelConfig.bodyType) return null;
                       return (
                         <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-[11px] text-amber-200">
-                          <span className="font-semibold">Sugerencia de talla:</span> la mayoría de tus fotos son talla que sugiere modelo <b>{mostCommon[0]}</b>, pero tenés configurado <b>{modelConfig.bodyType}</b>.
+                          <span className="font-semibold">{lg.setup.sizeSuggestionLabel}</span>{lg.setup.sizeSuggestionPre}<b>{mostCommon[0]}</b>{lg.setup.sizeSuggestionMid}<b>{modelConfig.bodyType}</b>{lg.setup.sizeSuggestionPost}
                           {' '}
                           <button
                             type="button"
                             onClick={() => setModelConfig((prev) => ({ ...prev, bodyType: mostCommon[0] }))}
                             className="ml-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-100 hover:bg-amber-500/20"
                           >
-                            Cambiar a {mostCommon[0]}
+                            {lg.setup.changeTo(mostCommon[0])}
                           </button>
                         </div>
                       );
@@ -4437,21 +4451,21 @@ export default function LingeriePipelinePage() {
                       return (
                         <div className="mb-3 rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] px-3 py-2 text-[11px]">
                           <span className="font-semibold text-[var(--accent)]">
-                            {namedGroups.length} producto{namedGroups.length === 1 ? '' : 's'} detectado{namedGroups.length === 1 ? '' : 's'}:
+                            {lg.setup.productsDetected(namedGroups.length)}
                           </span>{' '}
                           {namedGroups.map(([ref, colorSet], i) => (
                             <span key={ref} className="text-gray-300">
                               {i > 0 && ' · '}
-                              REF {ref}
+                              {lg.setup.refPrefix}{ref}
                               {colorSet.size > 0 && (
                                 <span className="ml-1 text-[var(--text-secondary)]">
-                                  ({colorSet.size} color{colorSet.size === 1 ? '' : 'es'})
+                                  {lg.setup.colorsCount(colorSet.size)}
                                 </span>
                               )}
                             </span>
                           ))}
                           <p className="mt-1 text-[10px] text-[var(--text-secondary)]">
-                            Las fotos con misma REF comparten la modelo IA (se paga una sola vez por REF).
+                            {lg.setup.sharedModelNote}
                           </p>
                         </div>
                       );
@@ -4479,7 +4493,7 @@ export default function LingeriePipelinePage() {
                             </button>
                             {/* Badge con el ángulo detectado — siempre visible */}
                             <div className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-white">
-                              {PHOTO_ANGLE_OPTIONS.find((o) => o.value === job.photoAngle)?.label ?? job.photoAngle}
+                              {lg.photoAngles[job.photoAngle]?.label ?? job.photoAngle}
                             </div>
                             {/* P1-2: Color swatch + nombre */}
                             {job.color && (
@@ -4499,21 +4513,21 @@ export default function LingeriePipelinePage() {
                             )}
                             {job.referenceKey && (
                               <div className="absolute left-1 bottom-1 rounded-md bg-[var(--accent)]/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
-                                REF {job.referenceKey}
+                                {lg.setup.refPrefix}{job.referenceKey}
                               </div>
                             )}
                           </div>
                           <p className="mt-1 truncate text-[10px] text-[var(--text-secondary)]">{job.filename}</p>
                           {/* P0-1: dropdown para corregir el ángulo */}
                           <label className="mt-1 flex items-center gap-1">
-                            <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">Ángulo</span>
+                            <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)]">{lg.setup.angleLabel}</span>
                             <select
                               value={job.photoAngle}
                               onChange={(e) => updateJobAngle(job.id, e.target.value as PhotoAngle)}
                               className="flex-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-1 text-[10px] text-white outline-none focus:border-[var(--accent)]/50"
                             >
                               {PHOTO_ANGLE_OPTIONS.map((o) => (
-                                <option key={o.value} value={o.value} title={o.hint}>{o.label}</option>
+                                <option key={o.value} value={o.value} title={lg.photoAngles[o.value]?.hint}>{lg.photoAngles[o.value]?.label ?? o.label}</option>
                               ))}
                             </select>
                           </label>
@@ -4530,10 +4544,10 @@ export default function LingeriePipelinePage() {
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
-                        Reusar modelo IA existente (ahorro $0.055/foto)
+                        {lg.setup.reuseHeading}
                       </h2>
                       <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                        Click una modelo ya creada en sesiones anteriores para NO pagar por generar otra. O dejá sin seleccionar para crear nueva.
+                        {lg.setup.reuseDesc}
                       </p>
                     </div>
                     {sharedModelUrl && (
@@ -4542,7 +4556,7 @@ export default function LingeriePipelinePage() {
                         onClick={() => setSharedModelUrl(undefined)}
                         className="rounded border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-gray-300 hover:border-white/20"
                       >
-                        Usar nueva modelo ($0.055)
+                        {lg.setup.useNewModel}
                       </button>
                     )}
                   </div>
@@ -4560,7 +4574,7 @@ export default function LingeriePipelinePage() {
                             // identidad. Si no hay seed (modelos viejos), esas fotos extra
                             // usarán seed random → identidad similar pero no idéntica.
                             if (m.seed !== undefined) setSharedSeed(m.seed);
-                            toast.success(`Modelo "${m.name}" seleccionada — pipeline la reusa sin cobrar.`);
+                            toast.success(lg.messages.modelSelected(m.name));
                           }}
                           className={cn(
                             "group relative flex flex-col overflow-hidden rounded-lg border transition-all",
@@ -4588,7 +4602,7 @@ export default function LingeriePipelinePage() {
                                   const json = await res.json();
                                   if (json.success) {
                                     setSavedModels((prev) => prev.map((x) => x.id === m.id ? { ...x, name: newName } : x));
-                                    toast.success(`Modelo renombrada a "${newName}"`);
+                                    toast.success(lg.messages.modelRenamed(newName));
                                   }
                                 } catch { /* silent */ }
                               }}
@@ -4597,8 +4611,8 @@ export default function LingeriePipelinePage() {
                                 e.stopPropagation();
                               }}
                               className="w-full bg-transparent text-[10px] text-gray-300 outline-none truncate placeholder:text-[var(--text-muted)] focus:text-white focus:bg-white/5 focus:rounded px-0.5"
-                              placeholder="Nombre…"
-                              title="Click para renombrar esta modelo (ej: 'Karen', 'Ana')"
+                              placeholder={lg.setup.namePlaceholder}
+                              title={lg.setup.renameTitle}
                             />
                           </div>
                           {isSelected && (
@@ -4612,7 +4626,7 @@ export default function LingeriePipelinePage() {
                   </div>
                   {savedModels.length > 18 && (
                     <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
-                      Mostrando 18 de {savedModels.length} modelos guardadas. Más en /gallery.
+                      {lg.setup.showingModels(savedModels.length)}
                     </p>
                   )}
                 </section>
@@ -4621,30 +4635,30 @@ export default function LingeriePipelinePage() {
               {/* Reference + product type */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  2 · Información del Producto
+                  {lg.setup.productInfoHeading}
                 </h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Número de referencia</label>
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{lg.setup.refNumberLabel}</label>
                     <input
                       type="text"
                       value={referenceNumber}
                       onChange={(e) => setReferenceNumber(e.target.value)}
-                      placeholder="ej. 011473"
+                      placeholder={lg.setup.refNumberPlaceholder}
                       className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/20"
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Tipo de producto</label>
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{lg.setup.productTypeLabel}</label>
                     <select
                       value={productType}
                       onChange={(e) => setProductType(e.target.value)}
                       className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
-                      <option value="bra">Brassiere / Top</option>
-                      <option value="panty">Panty / Ropa interior</option>
-                      <option value="faja">Faja / Shapewear</option>
-                      <option value="set">Set completo</option>
+                      <option value="bra">{lg.productType.bra}</option>
+                      <option value="panty">{lg.productType.panty}</option>
+                      <option value="faja">{lg.productType.faja}</option>
+                      <option value="set">{lg.productType.set}</option>
                     </select>
                   </div>
                 </div>
@@ -4653,7 +4667,7 @@ export default function LingeriePipelinePage() {
               {/* Steps to run */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  3 · Pasos del Pipeline
+                  {lg.setup.stepsHeading}
                 </h2>
                 <div className="space-y-2">
                   {steps.map((step, idx) => {
@@ -4679,14 +4693,14 @@ export default function LingeriePipelinePage() {
                         </div>
                         <Icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white">{step.label}</p>
-                          <p className="text-xs text-[var(--text-secondary)]">{step.description}</p>
+                          <p className="text-sm font-medium text-white">{lg.steps.items[step.id].label}</p>
+                          <p className="text-xs text-[var(--text-secondary)]">{lg.steps.items[step.id].description}</p>
                         </div>
                         <span className={cn(
                           "shrink-0 text-xs font-semibold",
                           step.id === "model" ? "text-amber-400" : "text-[var(--text-secondary)]",
                         )}>
-                          {step.id === "model" && jobs.length > 1 ? `${step.cost} (1x)` : `${step.cost}/foto`}
+                          {step.id === "model" && jobs.length > 1 ? lg.setup.costOnce(step.cost) : lg.setup.costPerPhoto(step.cost)}
                         </span>
                       </label>
                     );
@@ -4700,49 +4714,49 @@ export default function LingeriePipelinePage() {
               {/* Model config */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Configuración del Modelo IA
+                  {lg.modelConfig.heading}
                 </h2>
                 <p className="mb-4 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-                  El modelo se genera <strong>una sola vez</strong> y se reutiliza para todas las fotos del producto — optimizando costos.
+                  {lg.modelConfig.reuseNotePre}<strong>{lg.modelConfig.reuseNoteBold}</strong>{lg.modelConfig.reuseNotePost}
                 </p>
                 <div className="space-y-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Tono de piel</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{lg.modelConfig.skinToneLabel}</label>
                     <select
                       value={modelConfig.skinTone}
                       onChange={(e) => setModelConfig((m) => ({ ...m, skinTone: e.target.value }))}
                       className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
-                      <option value="light">Clara</option>
-                      <option value="medium-light">Medio clara</option>
-                      <option value="medium">Media</option>
-                      <option value="medium-dark">Medio oscura</option>
-                      <option value="dark">Oscura</option>
+                      <option value="light">{lg.modelConfig.skinTones.light}</option>
+                      <option value="medium-light">{lg.modelConfig.skinTones["medium-light"]}</option>
+                      <option value="medium">{lg.modelConfig.skinTones.medium}</option>
+                      <option value="medium-dark">{lg.modelConfig.skinTones["medium-dark"]}</option>
+                      <option value="dark">{lg.modelConfig.skinTones.dark}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Tipo de cuerpo</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{lg.modelConfig.bodyTypeLabel}</label>
                     <select
                       value={modelConfig.bodyType}
                       onChange={(e) => setModelConfig((m) => ({ ...m, bodyType: e.target.value }))}
                       className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
-                      <option value="slim">Delgada</option>
-                      <option value="regular">Regular</option>
-                      <option value="curvy">Curvy</option>
-                      <option value="plus-size">Plus size</option>
+                      <option value="slim">{lg.modelConfig.bodyTypes.slim}</option>
+                      <option value="regular">{lg.modelConfig.bodyTypes.regular}</option>
+                      <option value="curvy">{lg.modelConfig.bodyTypes.curvy}</option>
+                      <option value="plus-size">{lg.modelConfig.bodyTypes["plus-size"]}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Rango de edad</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">{lg.modelConfig.ageLabel}</label>
                     <select
                       value={modelConfig.ageRange}
                       onChange={(e) => setModelConfig((m) => ({ ...m, ageRange: e.target.value }))}
                       className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)]/50"
                     >
-                      <option value="18-25">18 – 25 años</option>
-                      <option value="26-35">26 – 35 años</option>
-                      <option value="36-45">36 – 45 años</option>
+                      <option value="18-25">{lg.modelConfig.ages["18-25"]}</option>
+                      <option value="26-35">{lg.modelConfig.ages["26-35"]}</option>
+                      <option value="36-45">{lg.modelConfig.ages["36-45"]}</option>
                     </select>
                   </div>
                 </div>
@@ -4750,7 +4764,7 @@ export default function LingeriePipelinePage() {
 
               {/* Mode toggle */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Modo de Ejecución</h2>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{lg.executionMode.heading}</h2>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setAutoMode(true)}
@@ -4762,8 +4776,8 @@ export default function LingeriePipelinePage() {
                     )}
                   >
                     <Zap className="h-4 w-4" />
-                    <span className="font-semibold">Automático</span>
-                    <span className="text-center text-[10px] text-[var(--text-secondary)]">Todo sin pausas</span>
+                    <span className="font-semibold">{lg.executionMode.auto}</span>
+                    <span className="text-center text-[10px] text-[var(--text-secondary)]">{lg.executionMode.autoSub}</span>
                   </button>
                   <button
                     onClick={() => setAutoMode(false)}
@@ -4775,8 +4789,8 @@ export default function LingeriePipelinePage() {
                     )}
                   >
                     <Settings2 className="h-4 w-4" />
-                    <span className="font-semibold">Manual</span>
-                    <span className="text-center text-[10px] text-[var(--text-secondary)]">Revisar cada paso</span>
+                    <span className="font-semibold">{lg.executionMode.manual}</span>
+                    <span className="text-center text-[10px] text-[var(--text-secondary)]">{lg.executionMode.manualSub}</span>
                   </button>
                 </div>
               </section>
@@ -4785,10 +4799,10 @@ export default function LingeriePipelinePage() {
                   Elegible por la usuaria; cada uno tiene tradeoffs distintos. */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Modo de Generación
+                  {lg.generationMode.heading}
                 </h2>
                 <p className="mb-3 text-[11px] text-[var(--text-secondary)]">
-                  Elegí cómo se generan las fotos. El default es el más seguro; las otras opciones son alternativas con tradeoffs distintos.
+                  {lg.generationMode.subtitle}
                 </p>
                 <div className="space-y-2">
                   {GENERATION_MODE_OPTIONS.map((opt) => {
@@ -4816,17 +4830,17 @@ export default function LingeriePipelinePage() {
                               "text-xs font-semibold",
                               selected ? "text-[var(--accent-light)]" : "text-gray-300",
                             )}>
-                              {opt.label}
+                              {lg.generationMode.options[opt.value].label}
                             </span>
                             {isDisabled && (
                               <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
-                                Próximamente
+                                {lg.generationMode.comingSoon}
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] font-medium text-[var(--text-secondary)]">{opt.cost}</span>
+                          <span className="text-[10px] font-medium text-[var(--text-secondary)]">{lg.generationMode.options[opt.value].cost}</span>
                         </div>
-                        <p className="text-[10px] leading-snug text-[var(--text-secondary)]">{opt.desc}</p>
+                        <p className="text-[10px] leading-snug text-[var(--text-secondary)]">{lg.generationMode.options[opt.value].desc}</p>
                         {isDisabled && opt.disabledReason && (
                           <p className="text-[9px] italic leading-snug text-amber-400/70">{opt.disabledReason}</p>
                         )}
@@ -4836,7 +4850,7 @@ export default function LingeriePipelinePage() {
                 </div>
                 {generationMode === "face-swap" && (
                   <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[10px] leading-snug text-amber-200">
-                    ⚠️ Requiere que etiquetes tus fotos con su ángulo (Frontal/Espalda/Cuerpo). El face-swap solo se aplica a las fotos reales que subiste; las vistas sin foto real caen al modo clásico automáticamente.
+                    {lg.generationMode.faceSwapWarning}
                   </p>
                 )}
               </section>
@@ -4847,10 +4861,10 @@ export default function LingeriePipelinePage() {
                   prompts improvisados → preset estructurado = consistencia. */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Art Direction (look del shoot)
+                  {lg.artDirection.heading}
                 </h2>
                 <p className="mb-3 text-[11px] text-[var(--text-secondary)]">
-                  El &ldquo;look&rdquo; como preset reutilizable — da consistencia a todo el catálogo. Se aplica a la modelo y al try-on.
+                  {lg.artDirection.subtitle}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {ART_DIRECTIONS.map((ad) => {
@@ -4866,15 +4880,15 @@ export default function LingeriePipelinePage() {
                             ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                             : "border-white/8 bg-white/[0.02] hover:border-white/20",
                         )}
-                        title={ad.desc}
+                        title={lg.artDirection.options[ad.id].desc}
                       >
                         <span className={cn(
                           "text-xs font-semibold",
                           selected ? "text-[var(--accent-light)]" : "text-gray-300",
                         )}>
-                          {ad.label}
+                          {lg.artDirection.options[ad.id].label}
                         </span>
-                        <span className="text-[10px] leading-tight text-[var(--text-secondary)] line-clamp-3">{ad.desc}</span>
+                        <span className="text-[10px] leading-tight text-[var(--text-secondary)] line-clamp-3">{lg.artDirection.options[ad.id].desc}</span>
                       </button>
                     );
                   })}
@@ -4888,13 +4902,10 @@ export default function LingeriePipelinePage() {
                   no nombramos FASHN como si fuera el motor o confundimos. */}
               <section className="rounded-xl border border-white/8 bg-white/[0.02] p-5">
                 <h2 className="mb-1 text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Calidad de Try-on (avanzado)
+                  {lg.fashnQuality.heading}
                 </h2>
                 <p className="mb-3 text-[11px] text-[var(--text-secondary)]">
-                  El try-on de lencería usa <span className="font-semibold text-gray-300">SeedDream</span> por
-                  default (preserva tu prenda real), con Kolors de backup. Este control SOLO afecta si forzás
-                  FASHN manualmente al reintentar un paso — y FASHN bloquea lencería, así que normalmente no lo
-                  vas a necesitar.
+                  {lg.fashnQuality.descPre}<span className="font-semibold text-gray-300">{lg.fashnQuality.descBold}</span>{lg.fashnQuality.descPost}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {FASHN_MODE_OPTIONS.map((opt) => {
@@ -4910,15 +4921,15 @@ export default function LingeriePipelinePage() {
                             ? "border-[var(--accent)]/50 bg-[var(--accent)]/10"
                             : "border-white/8 bg-white/[0.02] hover:border-white/20",
                         )}
-                        title={opt.hint}
+                        title={lg.fashnQuality.options[opt.value].hint}
                       >
                         <span className={cn(
                           "text-xs font-semibold",
                           selected ? "text-[var(--accent-light)]" : "text-gray-300",
                         )}>
-                          {opt.label}
+                          {lg.fashnQuality.options[opt.value].label}
                         </span>
-                        <span className="text-[10px] text-[var(--text-secondary)]">{opt.duration}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)]">{lg.fashnQuality.options[opt.value].duration}</span>
                       </button>
                     );
                   })}
@@ -4927,19 +4938,19 @@ export default function LingeriePipelinePage() {
 
               {/* Cost summary + launch */}
               <section className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] p-5">
-                <h2 className="mb-4 text-sm font-semibold text-white">Resumen</h2>
+                <h2 className="mb-4 text-sm font-semibold text-white">{lg.summary.heading}</h2>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">Imágenes</span>
+                    <span className="text-[var(--text-secondary)]">{lg.summary.images}</span>
                     <span className="font-medium text-white">{jobs.length}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">Pasos activos</span>
-                    <span className="font-medium text-white">{steps.filter((s) => s.enabled).length} de {steps.length}</span>
+                    <span className="text-[var(--text-secondary)]">{lg.summary.activeSteps}</span>
+                    <span className="font-medium text-white">{steps.filter((s) => s.enabled).length} {lg.summary.of} {steps.length}</span>
                   </div>
                   <div className="my-3 border-t border-white/8" />
                   <div className="flex justify-between">
-                    <span className="text-sm text-[var(--text-secondary)]">Costo estimado</span>
+                    <span className="text-sm text-[var(--text-secondary)]">{lg.summary.estimatedCost}</span>
                     <span className="text-base font-bold text-[var(--accent)]">
                       ${estimatedCost.toFixed(3)}
                     </span>
@@ -4957,12 +4968,12 @@ export default function LingeriePipelinePage() {
                   )}
                 >
                   <Play className="h-4 w-4" />
-                  Iniciar Pipeline
-                  {jobs.length > 0 && <span className="ml-1 text-[var(--accent)]">({jobs.length} fotos)</span>}
+                  {lg.summary.start}
+                  {jobs.length > 0 && <span className="ml-1 text-[var(--accent)]">{lg.summary.startPhotos(jobs.length)}</span>}
                 </button>
 
                 {jobs.length === 0 && (
-                  <p className="mt-2 text-center text-xs text-[var(--text-muted)]">Sube al menos una imagen para continuar</p>
+                  <p className="mt-2 text-center text-xs text-[var(--text-muted)]">{lg.summary.uploadHint}</p>
                 )}
               </section>
             </div>
@@ -4987,7 +4998,7 @@ export default function LingeriePipelinePage() {
           )}
         >
           <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Configuración</span>
+          <span className="hidden sm:inline">{lg.pipeline.config}</span>
         </button>
         <span className="text-[var(--border-default)]">/</span>
         <div className="flex items-center gap-2.5 min-w-0">
@@ -4995,14 +5006,14 @@ export default function LingeriePipelinePage() {
             <Sparkles className="h-3.5 w-3.5" />
           </span>
           <span className="min-w-0 truncate">
-            <span className="font-serif text-[15px] font-semibold text-white">Lencería <span className="text-[var(--accent)]">Studio</span></span>
-            {referenceNumber ? <span className="ml-2 text-xs text-[var(--text-secondary)]">Ref. {referenceNumber}</span> : null}
+            <span className="font-serif text-[15px] font-semibold text-white">{lg.pipeline.studioName} <span className="text-[var(--accent)]">{lg.pipeline.studioSuffix}</span></span>
+            {referenceNumber ? <span className="ml-2 text-xs text-[var(--text-secondary)]">{lg.pipeline.refPrefix}{referenceNumber}</span> : null}
           </span>
           {/* Sello de build: muestra el commit que está VIVO en este deploy. Si no
               coincide con el último push, estás viendo un build viejo (cache/deploy). */}
           <span
             className="ml-2 shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]"
-            title="Versión del build que está sirviendo Vercel ahora mismo"
+            title={lg.pipeline.buildTitle}
           >
             build {process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev"}
           </span>
@@ -5014,13 +5025,13 @@ export default function LingeriePipelinePage() {
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
               <span className="text-sm text-[var(--text-secondary)]">
-                Procesando {activeJobIndex + 1} de {jobs.length}…
+                {lg.pipeline.processing(activeJobIndex + 1, jobs.length)}
               </span>
             </div>
           )}
           {!isRunning && completedCount > 0 && (
             <span className="text-sm text-[var(--accent)] font-medium">
-              ✓ {completedCount} de {jobs.length} completadas
+              {lg.pipeline.completed(completedCount, jobs.length)}
             </span>
           )}
           {!isRunning && completedCount === jobs.length && jobs.length > 0 && (
@@ -5029,12 +5040,12 @@ export default function LingeriePipelinePage() {
               className="flex items-center gap-2 rounded-lg bg-[var(--accent-dim)] border border-[var(--border-accent)] px-4 py-2 text-sm font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent-dim)]"
             >
               <Download className="h-4 w-4" />
-              Descargar todo
+              {lg.pipeline.downloadAll}
             </button>
           )}
           {totalCostAll > 0 && (
             <span className="text-xs text-[var(--text-secondary)]">
-              Gastado: <span className="font-semibold text-gray-300">${totalCostAll.toFixed(3)}</span>
+              {lg.pipeline.spentLabel} <span className="font-semibold text-gray-300">${totalCostAll.toFixed(3)}</span>
             </span>
           )}
         </div>
@@ -5063,10 +5074,10 @@ export default function LingeriePipelinePage() {
                   />
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
-                  {done > 0 && <span className="text-[var(--accent)]">{done} listo{done > 1 ? 's' : ''}</span>}
-                  {active > 0 && <span className="text-[var(--accent)]">{active} procesando</span>}
-                  {errors > 0 && <span className="text-red-400">{errors} error{errors > 1 ? 'es' : ''}</span>}
-                  {pending > 0 && <span>{pending} en cola</span>}
+                  {done > 0 && <span className="text-[var(--accent)]">{lg.pipeline.batchDone(done)}</span>}
+                  {active > 0 && <span className="text-[var(--accent)]">{lg.pipeline.batchActive(active)}</span>}
+                  {errors > 0 && <span className="text-red-400">{lg.pipeline.batchErrors(errors)}</span>}
+                  {pending > 0 && <span>{lg.pipeline.batchPending(pending)}</span>}
                   <span className="text-[var(--text-secondary)]">·</span>
                   <span className="font-medium text-white">${totalSpent.toFixed(2)}</span>
                   {isRunning && (
@@ -5076,7 +5087,7 @@ export default function LingeriePipelinePage() {
                       className="ml-1 flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-300 hover:bg-red-500/20"
                     >
                       <StopCircle className="h-3 w-3" />
-                      Parar todo
+                      {lg.pipeline.stopAll}
                     </button>
                   )}
                 </div>
@@ -5090,7 +5101,7 @@ export default function LingeriePipelinePage() {
         {/* Left sidebar — image list */}
         <aside className="hidden w-52 shrink-0 overflow-y-auto border-r border-white/8 p-3 lg:block">
           <p className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-            Imágenes ({jobs.length})
+            {lg.pipeline.imagesCount(jobs.length)}
           </p>
           <div className="space-y-1.5">
             {jobs.map((job, idx) => (
@@ -5127,8 +5138,8 @@ export default function LingeriePipelinePage() {
                     {job.status === "done"
                       ? `$${job.totalCost.toFixed(3)}`
                       : job.status === "active"
-                      ? "Procesando…"
-                      : "En cola"}
+                      ? lg.pipeline.processingShort
+                      : lg.pipeline.queued}
                   </p>
                 </div>
               </button>
@@ -5151,10 +5162,10 @@ export default function LingeriePipelinePage() {
                   <h2 className="text-base font-bold text-white">{activeJob.filename}</h2>
                   <p className="text-sm text-[var(--text-secondary)]">
                     {activeJob.status === "done"
-                      ? `Completado · costo: $${activeJob.totalCost.toFixed(3)}`
+                      ? lg.pipeline.headerDone(activeJob.totalCost.toFixed(3))
                       : activeJob.status === "active"
-                      ? "Procesando…"
-                      : "En cola"}
+                      ? lg.pipeline.processingShort
+                      : lg.pipeline.queued}
                   </p>
                   {/* Live cost progress: gastado vs estimado, en tiempo real. */}
                   {(() => {
@@ -5234,7 +5245,7 @@ export default function LingeriePipelinePage() {
                 }}
                 onReanalyze={async () => {
                   if (!activeJob.file) {
-                    toast.error("No hay archivo cargado para analizar.");
+                    toast.error(lg.messages.noFileToAnalyze);
                     return;
                   }
                   const fileToAnalyze: File = activeJob.file;
@@ -5254,7 +5265,7 @@ export default function LingeriePipelinePage() {
                         : j,
                     ));
                   } catch (err) {
-                    const msg = err instanceof Error ? err.message : "Análisis falló";
+                    const msg = err instanceof Error ? err.message : lg.messages.analysisFailed;
                     setJobs((prev) => prev.map((j) =>
                       j.id === activeJob.id
                         ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg }
@@ -5300,9 +5311,9 @@ export default function LingeriePipelinePage() {
                   <div className="flex flex-wrap items-center gap-3">
                     <CheckCircle2 className="h-6 w-6 text-[var(--accent)]" />
                     <div>
-                      <p className="font-semibold text-white">Imagen procesada</p>
+                      <p className="font-semibold text-white">{lg.pipeline.imageProcessed}</p>
                       <p className="text-sm text-[var(--text-secondary)]">
-                        Costo total: <span className="font-medium text-[var(--accent)]">${activeJob.totalCost.toFixed(3)}</span>
+                        {lg.pipeline.totalCostLabel} <span className="font-medium text-[var(--accent)]">${activeJob.totalCost.toFixed(3)}</span>
                       </p>
                     </div>
                     <div className="ml-auto flex flex-wrap gap-2">
@@ -5314,10 +5325,10 @@ export default function LingeriePipelinePage() {
                             .filter((s) => s.status === "done" || s.status === "accepted")
                             .filter((s) => s.resultUrl && !s.resultUrl.startsWith("/api/proxy-image?url=data:"));
                           if (results.length === 0) {
-                            toast.info("No hay resultados para descargar todavía.");
+                            toast.info(lg.messages.noResultsYet);
                             return;
                           }
-                          toast.info(`Descargando ${results.length} archivos…`);
+                          toast.info(lg.messages.downloadingFiles(results.length));
                           // downloadAsset hace fetch→Blob→download con detección
                           // de URLs caducadas (toast claro si el upstream ya
                           // expiró). Delay de 200ms entre cada uno para que el
@@ -5335,14 +5346,14 @@ export default function LingeriePipelinePage() {
                         className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-[var(--bg-primary)] shadow-md hover:brightness-105"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        Descargar todos
+                        {lg.pipeline.downloadAllResults}
                       </button>
                       {activeJobIndex < jobs.length - 1 && (
                         <button
                           onClick={() => setActiveJobIndex(activeJobIndex + 1)}
                           className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 hover:border-white/20 hover:text-white"
                         >
-                          Siguiente imagen
+                          {lg.pipeline.nextImage}
                           <ChevronRight className="h-3.5 w-3.5" />
                         </button>
                       )}
@@ -5366,20 +5377,20 @@ export default function LingeriePipelinePage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-bold text-white">Atajos de teclado</h3>
+              <h3 className="text-base font-bold text-white">{lg.help.title}</h3>
               <button onClick={() => setShowHelp(false)} className="text-[var(--text-secondary)] hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-2 text-sm">
               {[
-                ["Ctrl + Z", "Deshacer (undo)"],
-                ["Ctrl + Shift + Z", "Rehacer (redo)"],
-                ["Ctrl + Y", "Rehacer (alternativo)"],
-                ["?  o  /", "Abrir/cerrar esta ayuda"],
-                ["Esc", "Cerrar modal / lightbox"],
-                ["← →", "Navegar entre variantes (lightbox)"],
-                ["C", "Comparar con original (lightbox)"],
+                ["Ctrl + Z", lg.help.undo],
+                ["Ctrl + Shift + Z", lg.help.redo],
+                ["Ctrl + Y", lg.help.redoAlt],
+                ["?  o  /", lg.help.toggleHelp],
+                ["Esc", lg.help.closeModal],
+                ["← →", lg.help.navVariants],
+                ["C", lg.help.compareOriginal],
               ].map(([keys, desc]) => (
                 <div key={keys} className="flex items-center justify-between gap-3 border-b border-white/5 py-1.5">
                   <span className="text-gray-300">{desc}</span>
@@ -5388,7 +5399,7 @@ export default function LingeriePipelinePage() {
               ))}
             </div>
             <p className="mt-4 text-center text-[11px] text-[var(--text-muted)]">
-              Los atajos no funcionan cuando estás escribiendo en un campo de texto.
+              {lg.help.footer}
             </p>
           </div>
         </div>

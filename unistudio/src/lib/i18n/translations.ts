@@ -27,6 +27,11 @@ import {
   STATIC_PRODUCT_PIPELINE_ES,
   STATIC_PRODUCT_PIPELINE_EN,
 } from './pipelines/static-product';
+import {
+  type LingeriePipelineCopy,
+  LINGERIE_PIPELINE_ES,
+  LINGERIE_PIPELINE_EN,
+} from './pipelines/lingerie';
 
 export type Locale = 'es' | 'en';
 
@@ -511,7 +516,7 @@ export interface AppCopy extends Omit<HomeCopy, 'pipelines'> {
    * joyería suma su copy de página bajo la MISMA clave `jewelry` — claves
    * disjuntas, así ambos consumidores conviven sin romperse.
    */
-  pipelines: Omit<HomeCopy['pipelines'], 'jewelry'> & {
+  pipelines: Omit<HomeCopy['pipelines'], 'jewelry' | 'lingerie'> & {
     jewelry: PipelineCopy & JewelryPipelineCopy;
     /**
      * El pipeline de perfumes/belleza cuelga su copy de página bajo una clave
@@ -519,6 +524,12 @@ export interface AppCopy extends Omit<HomeCopy, 'pipelines'> {
      * disjuntas: ambos consumidores conviven sin romperse.
      */
     staticProduct: StaticProductPipelineCopy;
+    /**
+     * El pipeline de lencería suma su copy de página bajo la MISMA clave
+     * `lingerie` que la home usa como `PipelineCopy` — claves disjuntas, así
+     * la card de la home y la página interna conviven sin romperse.
+     */
+    lingerie: PipelineCopy & LingeriePipelineCopy;
   };
 }
 
@@ -529,6 +540,7 @@ const esFull: AppCopy = {
     ...es.pipelines,
     jewelry: { ...es.pipelines.jewelry, ...JEWELRY_PIPELINE_ES },
     staticProduct: STATIC_PRODUCT_PIPELINE_ES,
+    lingerie: { ...es.pipelines.lingerie, ...LINGERIE_PIPELINE_ES },
   },
 };
 const enFull: AppCopy = {
@@ -538,6 +550,7 @@ const enFull: AppCopy = {
     ...en.pipelines,
     jewelry: { ...en.pipelines.jewelry, ...JEWELRY_PIPELINE_EN },
     staticProduct: STATIC_PRODUCT_PIPELINE_EN,
+    lingerie: { ...en.pipelines.lingerie, ...LINGERIE_PIPELINE_EN },
   },
 };
 
