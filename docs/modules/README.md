@@ -23,6 +23,8 @@
 | 11 | Jewelry Try-On | `/api/jewelry-tryon` | Flux Kontext Pro | Joyería (los 7 sub-tipos: aretes, topos, candongas, cadenas, anillos, pulseras, sets) |
 | 12 | Video | `/api/video` | Ken Burns, wan-2.1, wan-2.2-fast, Kling, Minimax, LTX, fal/replicate | Lencería (modelo/flat-lay), Joyería (wan-2.2-fast sobre la escena de lujo) |
 | 19 | Macro Crop | `/api/macro-crop` | Sharp local (sin IA) | Joyería (paso "Detalle macro") |
+| 20 | Photo Clean | `/api/photo-clean` | Flux Kontext Pro | Joyería (paso 1: borra precio/título/marca de agua, conserva el exhibidor) |
+| 21 | Social Kit | `/api/social-kit` | Sharp (carrusel) + ffmpeg (reel), sin IA | Joyería (paso "Listo para Instagram") |
 | 13 | Ad Creator | `/api/ad-create` | fal.ai + Replicate varios | Ninguno (uso manual) |
 | 14 | Analyze Image | `/api/analyze-image` | Claude Vision (Sonnet) + Sharp | Los 3 pipelines |
 | 15 | AI Prompt | `/api/prompt` | Claude Haiku | Ninguno (uso manual) |

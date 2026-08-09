@@ -22,8 +22,9 @@ export type JewelrySubType =
   | 'studs'      // topos
   | 'hoops'      // candongas
   | 'necklace'   // cadenas, collares
+  | 'rosary'     // rosarios
   | 'ring'       // anillos
-  | 'bracelet'   // pulseras
+  | 'bracelet'   // pulseras, esclavas, tobilleras, brazaletes
   | 'set';       // sets (combo)
 
 export type JewelryBodyPart = 'ears' | 'neck' | 'hand' | 'wrist' | 'torso';
@@ -52,10 +53,57 @@ export const SUB_TYPE_LABELS: Record<JewelrySubType, string> = {
   studs: 'Topos',
   hoops: 'Candongas',
   necklace: 'Cadenas / Collares',
+  rosary: 'Rosarios',
   ring: 'Anillos',
-  bracelet: 'Pulseras',
+  bracelet: 'Pulseras / Esclavas',
   set: 'Sets (combo)',
 };
+
+/**
+ * Traduce lo que Claude Vision ve en la foto → la familia con la que trabaja el
+ * pipeline.
+ *
+ * POR QUÉ ESTA FUNCIÓN EXISTE
+ * ---------------------------
+ * El catálogo real son 202 fotos SIN catalogar, con nombres que son solo marcas
+ * de tiempo de cámara ("20250613_163539.jpg") — o sea, cero información en el
+ * nombre. Elegir el tipo a mano en un desplegable, foto por foto, no escala. Y
+ * la clienta trae productos nuevos todo el tiempo: probando 8 fotos, Vision
+ * devolvió `armband`, que no estaba en ninguna lista.
+ *
+ * Por eso `JewelryFeatures.tipo` es un string abierto y la reducción a familia
+ * vive acá: si aparece un tipo desconocido, cae en la familia más cercana por
+ * palabras clave en vez de romper el pipeline. Devuelve también `confident`
+ * para que la UI marque en ámbar lo que hubo que adivinar.
+ */
+export function featuresToSubType(
+  tipo: string | null | undefined,
+  detalles: string[] = [],
+): { subType: JewelrySubType; confident: boolean } {
+  const hay = `${tipo ?? ''} ${detalles.join(' ')}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, ''); // saca tildes: "candonga" vs "candongá"
+
+  const has = (...words: string[]) => words.some((w) => hay.includes(w));
+
+  // El orden importa: lo MÁS específico primero. Un rosario también contiene la
+  // palabra "cadena", y unos topos también son "aretes".
+  if (has('rosario', 'crucifijo', 'camandula')) return { subType: 'rosary', confident: true };
+  if (has('topo', 'stud')) return { subType: 'studs', confident: true };
+  if (has('candonga', 'argolla', 'aro ', 'hoop')) return { subType: 'hoops', confident: true };
+  if (has('arete', 'earring', 'pendiente', 'zarcillo')) return { subType: 'earrings', confident: true };
+  if (has('anillo', 'ring', 'sortija')) return { subType: 'ring', confident: true };
+  if (has('pulsera', 'esclava', 'brazalete', 'bracelet', 'tobillera', 'armband', 'bangle'))
+    return { subType: 'bracelet', confident: true };
+  if (has('cadena', 'collar', 'necklace', 'gargantilla', 'choker', 'dije', 'colgante', 'pendant'))
+    return { subType: 'necklace', confident: true };
+  if (has('set', 'juego', 'combo', 'conjunto')) return { subType: 'set', confident: true };
+
+  // Sin match: la cadena es lo más común del catálogo, pero se marca como
+  // adivinado para que la UI lo pida confirmar antes de gastar.
+  return { subType: 'necklace', confident: false };
+}
 
 // HD suffix para forzar Flux Pro a producir calidad editorial, sin artefactos.
 const HD = ', ultra high resolution, 8K, sharp focus, crystal clear metal and gem details, professional commercial jewelry photography, studio quality lighting, photo-realistic, magazine quality, no blur';
@@ -158,6 +206,33 @@ export function getJewelryConfig(subType: JewelrySubType): JewelryConfig {
         tryonPrompt:
           'Place the necklace around the neck of the model, sitting naturally on the collarbone. Preserve exact chain length, pendant position, metal finish, and any gems. Natural drape.',
         label: 'Cadenas / Collares (sobre cuello)',
+      };
+
+    case 'rosary':
+      // El rosario NO es una cadena cualquiera: se usa colgado o en la mano, y
+      // lo que la compradora mira es el crucifijo, la medalla central y el
+      // tamaño de las cuentas. Por eso el macro acerca menos que en un collar
+      // (hay que ver varias cuentas seguidas, no un eslabón suelto) y la escena
+      // lo muestra colgando en U, que es como se lleva.
+      return {
+        packshotPrompt:
+          'rosary laid out in a clean symmetrical U shape with the crucifix centered at the bottom and the bead chain spread evenly on both sides, the centerpiece medal visible, no tangles, ' +
+          PACKSHOT_BASE,
+        estantePrompt:
+          'rosary suspended as if worn on an invisible neck — ghost mannequin effect, ' +
+          'the bead chain hangs naturally under gravity in a soft U, the crucifix hanging straight down at the bottom, the centerpiece medal centered, ' +
+          'no bust form and no person visible, floating against a deep warm charcoal backdrop with a subtle vignette, ' +
+          'warm directional key light travelling bead by bead down the chain, soft reflected fill on the crucifix, ' +
+          'luxury devotional jewelry catalog photography' + HD,
+        macro: { zoom: 2.0, background: 'velvet-black' },
+        videoPrompt:
+          'slow cinematic camera push down the suspended rosary, warm highlight travelling bead by bead and settling on the crucifix, the chain sways almost imperceptibly, product stays unchanged, luxury jewelry commercial',
+        bodyPart: 'neck',
+        modelPrompt:
+          'beautiful woman upper-body portrait with collarbone and full neckline visible, soft diffused studio lighting, clean neutral background, commercial fashion photography, sharp focus on neck area' + HD,
+        tryonPrompt:
+          'Place the rosary around the neck of the model, the bead chain resting on the collarbone and the crucifix hanging at the center of the chest. Preserve the exact bead size and spacing, the centerpiece medal, the crucifix design and the metal finish.',
+        label: 'Rosarios (colgando)',
       };
 
     case 'ring':

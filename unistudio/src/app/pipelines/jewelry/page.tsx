@@ -3,21 +3,25 @@
 /* =============================================================================
  * Pipeline de Joyería — UniStudio
  * =============================================================================
- * Convierte una foto de celular de una joya en el set completo que hace falta
- * para venderla en línea:
+ * De una foto de celular al set completo para vender en línea.
  *
- *   1. Quitar fondo   → recorte transparente (base de todo lo demás)
- *   2. Nitidez        → 2x resolución, para que se lean eslabones y engastes
- *   3. Catálogo       → packshot fondo blanco, el que piden los marketplaces
- *   4. Escena de lujo → terciopelo/mármol, el que va a redes
- *   5. Detalle macro  → zoom con PÍXELES REALES, sin IA (prueba del acabado)
- *   6. En modelo      → opcional, la pieza puesta sobre una modelo IA
- *   7. Video          → opcional, cámara girando sobre la escena de lujo
+ * LO MANEJA VISION, NO UN DESPLEGABLE
+ * -----------------------------------
+ * El inventario real son 202 fotos SIN catalogar cuyos nombres son marcas de
+ * tiempo de cámara ("20250613_163539.jpg") — cero información. Y la clienta
+ * trae productos nuevos todo el tiempo: probando 8 fotos, Vision devolvió
+ * `armband`, que no estaba en ninguna lista cerrada. Elegir el tipo a mano,
+ * foto por foto, no escala.
  *
- * NINGÚN PASO FRENA A LOS DEMÁS. La versión anterior hacía hard-fail en el
- * upscale: una sola caída de GPU dejaba a la usuaria sin packshot, sin estante,
- * sin detalle, sin modelo y sin video — que es exactamente el bug que se veía
- * en producción como "Failed to run model nightmareai/real-esrgan".
+ * Por eso Claude Vision lee cada foto, `featuresToSubType()` la lleva a una
+ * familia y el pipeline se configura solo. Si Vision no está seguro, la tarjeta
+ * lo marca en ámbar y podés corregirlo antes de que gaste.
+ *
+ * TRES ETAPAS, NO OCHO PASOS SUELTOS
+ * ----------------------------------
+ * La referencia de UX dice que 3-6 pasos es lo que se abarca de un vistazo;
+ * con más, hay que dividir el recorrido. La versión anterior mostraba 7
+ * tarjetas planas y se sentía abrumadora. Ahora: Preparar → Generar → Publicar.
  *
  * Doc: docs/pipelines/jewelry.md
  * ========================================================================== */
@@ -29,15 +33,16 @@ import {
   Check,
   ChevronLeft,
   Download,
-  Film,
+  Eraser,
   Gem,
+  Hand,
   Info,
+  Instagram,
   Loader2,
   Play,
   RotateCcw,
   Scissors,
   SkipForward,
-  Sparkles,
   Square,
   StopCircle,
   Upload,
@@ -51,8 +56,8 @@ import { toast } from "@/hooks/use-toast";
 import { useGalleryStore } from "@/stores/gallery-store";
 import {
   getJewelryConfig,
+  featuresToSubType,
   SUB_TYPE_LABELS,
-  JEWELRY_UPSCALE_CONFIG,
   withJewelryPreserve,
   type JewelrySubType,
 } from "@/lib/pipelines/jewelry";
@@ -72,49 +77,50 @@ import {
   useElapsedSeconds,
   type PipelineStepStatus,
 } from "@/components/pipeline/primitives";
-import type { JewelryStepKey } from "@/lib/i18n/pipelines/jewelry";
+import type { JewelryStageKey, JewelryStepKey } from "@/lib/i18n/pipelines/jewelry";
 
 /* ------------------------------------------------------------------ */
 /*  Modelo de datos                                                     */
 /* ------------------------------------------------------------------ */
 
 type StepKey = JewelryStepKey;
+type StageKey = JewelryStageKey;
 type Phase = "setup" | "pipeline";
 
-/** Orden de ejecución. Es también el orden en que se pintan las tarjetas. */
-const STEP_ORDER: StepKey[] = [
-  "isolate",
-  "sharpen",
-  "packshot",
-  "estante",
-  "macro",
-  "modelo",
-  "video",
+/** Qué pasos viven en qué etapa, y en qué orden corren. */
+const STAGES: Array<{ key: StageKey; steps: StepKey[] }> = [
+  { key: "prepare", steps: ["clean", "isolate"] },
+  { key: "generate", steps: ["packshot", "luxury", "macro", "model", "scale"] },
+  { key: "publish", steps: ["social"] },
 ];
 
+const STEP_ORDER: StepKey[] = STAGES.flatMap((s) => s.steps);
+
 const STEP_ICONS: Record<StepKey, React.ElementType> = {
+  clean: Eraser,
   isolate: Scissors,
-  sharpen: Sparkles,
   packshot: Square,
-  estante: Gem,
+  luxury: Gem,
   macro: ZoomIn,
-  modelo: User,
-  video: Film,
+  model: User,
+  scale: Hand,
+  social: Instagram,
 };
 
-/** Costo estimado por paso, en dólares. Se usa para el presupuesto previo. */
+/** Costo estimado por paso, en dólares. */
 const STEP_COST: Record<StepKey, number> = {
+  clean: 0.04,
   isolate: 0.01,
-  sharpen: 0.02,
   packshot: 0.05,
-  estante: 0.05,
+  luxury: 0.05,
   macro: 0,
-  modelo: 0.1,
-  video: 0.05,
+  model: 0.1,
+  scale: 0.1,
+  social: 0,
 };
 
-/** Pasos que la usuaria puede apagar antes de correr. El resto van siempre. */
-const OPTIONAL_STEPS: StepKey[] = ["modelo", "video"];
+/** Pasos que se pueden apagar antes de correr. El resto van siempre. */
+const OPTIONAL_STEPS: StepKey[] = ["model", "scale"];
 
 interface StepState {
   status: PipelineStepStatus;
@@ -122,9 +128,14 @@ interface StepState {
   /** Imagen que entró a este paso — el "antes" del comparador. */
   inputUrl?: string;
   resultUrl?: string;
+  /** Slides del carrusel (solo el paso `social`). */
+  carousel?: string[];
+  /** Reel vertical (solo el paso `social`). */
+  reelUrl?: string;
+  reelError?: string;
   error?: string;
   cost: number;
-  /** Aviso no bloqueante: p. ej. el chequeo de identidad detectó que la joya cambió. */
+  /** Aviso no bloqueante: p. ej. la joya cambió al generar la escena. */
   warning?: string;
 }
 
@@ -135,23 +146,19 @@ interface Job {
   previewUrl: string;
   uploadedUrl?: string;
   subType: JewelrySubType;
+  /** false cuando Vision no reconoció el tipo y hubo que adivinar. */
+  subTypeConfident: boolean;
   steps: Record<StepKey, StepState>;
   status: "idle" | "active" | "done" | "error";
-  totalCost: number;
-  /**
-   * Ficha que Claude Vision extrae de ESTA foto (material, acabado, piedras).
-   * Se inyecta en los prompts de packshot/estante/modelo para anclar la IA al
-   * producto real en vez de a una plantilla genérica por sub-tipo.
-   */
-  productFeatures?: JewelryFeatures | null;
+  features?: JewelryFeatures | null;
   analysisStatus: "pending" | "analyzing" | "done" | "error";
 }
 
-function makeSteps(includeModel: boolean, includeVideo: boolean): Record<StepKey, StepState> {
+function makeSteps(includeModel: boolean, includeScale: boolean): Record<StepKey, StepState> {
   const base = {} as Record<StepKey, StepState>;
   for (const key of STEP_ORDER) {
-    const optional = OPTIONAL_STEPS.includes(key);
-    const enabled = !optional || (key === "modelo" ? includeModel : includeVideo);
+    const enabled =
+      key === "model" ? includeModel : key === "scale" ? includeScale : true;
     base[key] = { status: "idle", enabled, cost: 0 };
   }
   return base;
@@ -172,10 +179,9 @@ async function safeJson(
   }
 }
 
-/** Extrae la URL de una respuesta de módulo, que usa `url`, `imageUrl` o `videoUrl`. */
+/** Extrae la URL de una respuesta de módulo (`url`, `imageUrl` o `videoUrl`). */
 function pickUrl(data?: Record<string, unknown>): string | undefined {
-  if (!data) return undefined;
-  const candidate = data.url ?? data.imageUrl ?? data.videoUrl;
+  const candidate = data?.url ?? data?.imageUrl ?? data?.videoUrl;
   return typeof candidate === "string" ? candidate : undefined;
 }
 
@@ -234,6 +240,129 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Ficha de Vision                                                     */
+/* ------------------------------------------------------------------ */
+
+function VisionPanel({
+  job,
+  disabled,
+  onChangeType,
+}: {
+  job: Job;
+  disabled: boolean;
+  onChangeType: (s: JewelrySubType) => void;
+}) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
+  const f = job.features;
+
+  return (
+    <div className="mb-5 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+          {jt.vision.heading}
+        </p>
+        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+          {jt.vision.changeType}
+          <select
+            value={job.subType}
+            onChange={(e) => onChangeType(e.target.value as JewelrySubType)}
+            disabled={disabled}
+            className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white disabled:opacity-50"
+          >
+            {Object.entries(SUB_TYPE_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {job.analysisStatus === "analyzing" && (
+        <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {jt.vision.analyzing}
+        </p>
+      )}
+      {job.analysisStatus === "error" && (
+        <p className="text-xs text-[var(--text-secondary)]">{jt.vision.failed}</p>
+      )}
+
+      {f && (
+        <>
+          {/* Avisos que hay que ver ANTES de gastar */}
+          {!job.subTypeConfident && (
+            <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+              <p className="text-[11px] leading-snug text-amber-200">
+                <span className="font-semibold">{jt.vision.guessed}.</span> {jt.vision.guessedHint}
+              </p>
+            </div>
+          )}
+          {f.num_productos > 1 && (
+            <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+              <p className="text-[11px] leading-snug text-amber-200">
+                <span className="font-semibold">{jt.vision.multiProduct(f.num_productos)}.</span>{" "}
+                {jt.vision.multiProductHint}
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded bg-[var(--accent-dim)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
+              {jt.vision.detectedAs(f.tipo)}
+            </span>
+            <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
+              {f.material}
+              {f.acabado ? ` · ${f.acabado}` : ""}
+            </span>
+            {f.tipo_cadena && (
+              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
+                {jt.vision.chain}: {f.tipo_cadena}
+              </span>
+            )}
+            {f.cierre && (
+              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
+                {jt.vision.clasp}: {f.cierre}
+              </span>
+            )}
+            {f.texto_grabado && (
+              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
+                {jt.vision.engraved}: “{f.texto_grabado}”
+              </span>
+            )}
+            {f.piedras && f.num_piedras > 0 && (
+              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
+                {jt.features.stones(f.num_piedras)}
+                {f.color_piedras.length > 0 ? ` (${f.color_piedras.join(", ")})` : ""}
+              </span>
+            )}
+          </div>
+
+          {/* detalles_visibles es el campo MÁS rico que devuelve Vision — nombra
+              el tipo de eslabón, el cierre y los grabados. La versión anterior
+              lo descartaba y por eso la ficha se veía vacía. */}
+          {f.detalles_visibles.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1">
+              {f.detalles_visibles.map((d, i) => (
+                <li
+                  key={i}
+                  className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
+                >
+                  {d}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Tarjeta de paso                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -241,20 +370,18 @@ interface StepCardProps {
   stepKey: StepKey;
   step: StepState;
   stepNumber: number;
-  isActive: boolean;
   busy: boolean;
   filenamePrefix: string;
   onAccept: () => void;
   onSkip: () => void;
   onRerun: () => void;
-  onStop?: () => void;
+  onStop: () => void;
 }
 
 function StepCard({
   stepKey,
   step,
   stepNumber,
-  isActive,
   busy,
   filenamePrefix,
   onAccept,
@@ -268,12 +395,11 @@ function StepCard({
   const Icon = STEP_ICONS[stepKey];
 
   const [showDocs, setShowDocs] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
-  // VISTA PREVIA AL PASAR EL MOUSE, sin clic. Escalar la tarjeta un 3% no
-  // alcanza para juzgar el acabado de una joya: el zoom tiene que ser
-  // generoso y obvio. El retardo de 180 ms es hover-intent — sin él el
-  // preview se dispara al pasar de largo scrolleando y la página parpadea.
+  // VISTA GRANDE AL PASAR EL MOUSE, sin clic. Escalar la tarjeta un 3% no
+  // alcanza para juzgar el acabado de una joya. El retardo de 180 ms es
+  // hover-intent: sin él, el preview se dispara al pasar de largo scrolleando.
   const [peek, setPeek] = useState(false);
   const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openPeek = () => {
@@ -292,8 +418,15 @@ function StepCard({
   );
 
   const elapsed = useElapsedSeconds(step.status === "processing");
+  const isSocial = stepKey === "social";
+
+  // Los botones salen cuando ESTE paso terminó y no hay nada corriendo. Antes se
+  // exigía que TODO el lote estuviera libre, así que durante una corrida no
+  // aparecía ninguno — el "no tiene los botones" que se reportó.
   const canInteract =
-    (step.status === "done" || step.status === "accepted" || step.status === "error") && !busy;
+    !busy && ["done", "accepted", "error", "skipped"].includes(step.status);
+
+  const lightboxImages = isSocial ? (step.carousel ?? []) : step.resultUrl ? [step.resultUrl] : [];
 
   return (
     <div
@@ -308,9 +441,7 @@ function StepCard({
               ? "border-white/5 bg-white/[0.01] opacity-60"
               : step.status === "error"
                 ? "border-red-500/30 bg-red-500/[0.03]"
-                : isActive
-                  ? "border-[var(--accent)]/30 bg-[var(--accent-glow)]"
-                  : "border-white/8 bg-white/[0.02]",
+                : "border-white/8 bg-white/[0.02]",
       )}
     >
       {/* Encabezado */}
@@ -329,9 +460,7 @@ function StepCard({
                     ? "bg-gradient-to-br from-[var(--accent)]/25 to-[var(--accent-muted)]/15 text-[var(--accent-light)]"
                     : step.status === "error"
                       ? "bg-red-500/15 text-red-300"
-                      : isActive
-                        ? "bg-[var(--accent)]/12 text-[var(--accent-light)]"
-                        : "bg-white/[0.06] text-[var(--text-secondary)]",
+                      : "bg-white/[0.06] text-[var(--text-secondary)]",
               )}
             >
               <Icon className="h-[18px] w-[18px]" />
@@ -363,19 +492,19 @@ function StepCard({
               </button>
             </div>
             <span className="block truncate text-[15px] font-semibold text-white">{copy.label}</span>
-            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{copy.description}</p>
+            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">
+              {copy.description}
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
-            {step.status === "done" || step.status === "accepted"
-              ? step.cost > 0
-                ? `$${step.cost.toFixed(3)}`
-                : copy.costHint
+            {(step.status === "done" || step.status === "accepted") && step.cost > 0
+              ? `$${step.cost.toFixed(3)}`
               : copy.costHint}
           </span>
           <StatusBadge status={step.status} labels={jt.statusBadge} />
-          {step.status === "processing" && onStop && (
+          {step.status === "processing" && (
             <button
               type="button"
               onClick={onStop}
@@ -389,7 +518,7 @@ function StepCard({
         </div>
       </div>
 
-      {/* Panel de documentación */}
+      {/* Documentación del paso */}
       {showDocs && (
         <div className="border-b border-white/6 bg-[var(--accent)]/[0.03] px-5 py-4 text-xs">
           <div className="space-y-3">
@@ -400,24 +529,20 @@ function StepCard({
               <p className="text-gray-300">{copy.what}</p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                  {jt.stepCard.docsProvider}
-                </p>
-                <p className="text-[var(--text-secondary)]">{copy.provider}</p>
-              </div>
-              <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                  {jt.stepCard.docsDuration}
-                </p>
-                <p className="text-[var(--text-secondary)]">{copy.duration}</p>
-              </div>
-              <div>
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                  {jt.stepCard.docsCost}
-                </p>
-                <p className="text-[var(--text-secondary)]">{copy.costDetail}</p>
-              </div>
+              {(
+                [
+                  [jt.stepCard.docsProvider, copy.provider],
+                  [jt.stepCard.docsDuration, copy.duration],
+                  [jt.stepCard.docsCost, copy.costDetail],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                    {label}
+                  </p>
+                  <p className="text-[var(--text-secondary)]">{value}</p>
+                </div>
+              ))}
             </div>
             <div>
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
@@ -453,15 +578,13 @@ function StepCard({
               {fmtClock(elapsed)} · {copy.eta}
             </p>
           </div>
+        ) : isSocial ? (
+          <SocialResult step={step} filenamePrefix={filenamePrefix} onOpen={setLightboxIdx} />
         ) : (
-          <div
-            onMouseEnter={step.resultUrl ? openPeek : undefined}
-            onMouseLeave={closePeek}
-            className="relative"
-          >
+          <div onMouseEnter={step.resultUrl ? openPeek : undefined} onMouseLeave={closePeek}>
             <button
               type="button"
-              onClick={() => step.resultUrl && setLightboxOpen(true)}
+              onClick={() => step.resultUrl && setLightboxIdx(0)}
               disabled={!step.resultUrl}
               className="w-full cursor-zoom-in disabled:cursor-default"
               title={step.resultUrl ? jt.stepCard.zoomHint : undefined}
@@ -496,10 +619,9 @@ function StepCard({
           </div>
         )}
 
-        {/* Acciones */}
         {canInteract && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {step.status !== "accepted" && step.resultUrl && (
+            {step.status !== "accepted" && (step.resultUrl || step.carousel) && (
               <button
                 type="button"
                 onClick={onAccept}
@@ -517,15 +639,17 @@ function StepCard({
               <RotateCcw className="h-3.5 w-3.5" />
               {jt.buttons.rerun}
             </button>
-            <button
-              type="button"
-              onClick={onSkip}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-gray-200"
-            >
-              <SkipForward className="h-3.5 w-3.5" />
-              {jt.buttons.skip}
-            </button>
-            {step.resultUrl && (
+            {step.status !== "skipped" && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-gray-200"
+              >
+                <SkipForward className="h-3.5 w-3.5" />
+                {jt.buttons.skip}
+              </button>
+            )}
+            {step.resultUrl && !isSocial && (
               <button
                 type="button"
                 onClick={() =>
@@ -545,7 +669,7 @@ function StepCard({
       </div>
 
       {/* Vista grande al pasar el mouse */}
-      {peek && step.resultUrl && (
+      {peek && step.resultUrl && !isSocial && (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm">
           <div className="flex max-h-full w-full max-w-5xl items-center gap-3">
             {step.inputUrl && !isVideoUrl(step.resultUrl) && (
@@ -563,7 +687,13 @@ function StepCard({
             )}
             <div className="relative flex-1">
               {isVideoUrl(step.resultUrl) ? (
-                <video src={step.resultUrl} autoPlay loop muted className="max-h-[70vh] w-full rounded-xl" />
+                <video
+                  src={step.resultUrl}
+                  autoPlay
+                  loop
+                  muted
+                  className="max-h-[70vh] w-full rounded-xl"
+                />
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
@@ -580,16 +710,104 @@ function StepCard({
         </div>
       )}
 
-      {lightboxOpen && step.resultUrl && (
+      {lightboxIdx !== null && lightboxImages.length > 0 && (
         <ImageLightbox
-          images={[step.resultUrl]}
-          startIndex={0}
-          onClose={() => setLightboxOpen(false)}
+          images={lightboxImages}
+          startIndex={lightboxIdx}
+          onClose={() => setLightboxIdx(null)}
           filenamePrefix={`${filenamePrefix}-${stepKey}`}
-          compareWith={step.inputUrl}
+          compareWith={isSocial ? undefined : step.inputUrl}
           labels={jt.lightbox}
         />
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Resultado del paso "Redes"                                          */
+/* ------------------------------------------------------------------ */
+
+function SocialResult({
+  step,
+  filenamePrefix,
+  onOpen,
+}: {
+  step: StepState;
+  filenamePrefix: string;
+  onOpen: (i: number) => void;
+}) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
+
+  if (!step.carousel || step.carousel.length === 0) {
+    return (
+      <ImageThumb url={undefined} label={jt.social.carousel} className="h-40 w-full" labels={jt.thumb} />
+    );
+  }
+
+  const downloadAll = () => {
+    step.carousel?.forEach((url, i) =>
+      void downloadAsset(url, `${filenamePrefix}-ig-${i + 1}.jpg`),
+    );
+    if (step.reelUrl) void downloadAsset(step.reelUrl, `${filenamePrefix}-reel.mp4`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <p className="text-xs font-semibold text-white">{jt.social.carousel}</p>
+          <p className="text-[10px] text-[var(--text-secondary)]">{jt.social.carouselHint}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {step.carousel.map((url, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onOpen(i)}
+              className="group relative overflow-hidden rounded-lg border border-white/10 bg-black"
+              title={jt.social.slide(i + 1)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={jt.social.slide(i + 1)} className="aspect-[4/5] w-full object-cover" />
+              <span className="absolute left-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                {i + 1}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <p className="text-xs font-semibold text-white">{jt.social.reel}</p>
+          <p className="text-[10px] text-[var(--text-secondary)]">{jt.social.reelHint}</p>
+        </div>
+        {step.reelUrl ? (
+          <video
+            src={step.reelUrl}
+            controls
+            loop
+            muted
+            playsInline
+            className="mx-auto max-h-72 rounded-lg border border-white/10 bg-black"
+          />
+        ) : (
+          <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+            {step.reelError ?? jt.social.reelUnavailable}
+          </p>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={downloadAll}
+        className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2 text-xs font-medium text-gray-200 transition-colors hover:border-white/20 hover:text-white"
+      >
+        <Download className="h-3.5 w-3.5" />
+        {jt.social.downloadKit}
+      </button>
     </div>
   );
 }
@@ -606,26 +824,17 @@ export default function JewelryPipelinePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [defaultSubType, setDefaultSubType] = useState<JewelrySubType>("earrings");
   const [includeModel, setIncludeModel] = useState(true);
-  const [includeVideo, setIncludeVideo] = useState(false);
+  const [includeScale, setIncludeScale] = useState(false);
 
   const previewUrlsRef = useRef<string[]>([]);
-  // Espejo del estado para que runStep lea siempre los últimos resultados sin
-  // depender del closure de React (setState es asíncrono y los pasos encadenan).
+  // Espejo del estado: los pasos encadenan y setState es asíncrono, así que
+  // runStep lee de acá para ver siempre el último resultado.
   const jobsRef = useRef<Job[]>([]);
   useEffect(() => {
     jobsRef.current = jobs;
   }, [jobs]);
-  // Permite cancelar el paso en curso desde el botón Detener.
   const abortRef = useRef<AbortController | null>(null);
-
-  // Lee ?subType= del redirect del modo automático.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const st = params.get("subType") as JewelrySubType | null;
-    if (st && st in SUB_TYPE_LABELS) setDefaultSubType(st);
-  }, []);
 
   useEffect(() => {
     const urls = previewUrlsRef;
@@ -635,7 +844,17 @@ export default function JewelryPipelinePage() {
     };
   }, []);
 
-  /* ---- Alta de fotos ---- */
+  const patchJob = useCallback((id: string, patch: Partial<Job>) => {
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+    jobsRef.current = jobsRef.current.map((j) => (j.id === id ? { ...j, ...patch } : j));
+  }, []);
+
+  const patchStep = useCallback((id: string, key: StepKey, patch: Partial<StepState>) => {
+    const apply = (j: Job): Job =>
+      j.id === id ? { ...j, steps: { ...j.steps, [key]: { ...j.steps[key], ...patch } } } : j;
+    setJobs((prev) => prev.map(apply));
+    jobsRef.current = jobsRef.current.map(apply);
+  }, []);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -648,56 +867,40 @@ export default function JewelryPipelinePage() {
           file,
           filename: file.name,
           previewUrl: preview,
-          subType: defaultSubType,
-          steps: makeSteps(includeModel, includeVideo),
+          // Provisional: Vision lo corrige apenas lee la foto.
+          subType: "necklace" as JewelrySubType,
+          subTypeConfident: false,
+          steps: makeSteps(includeModel, includeScale),
           status: "idle",
-          totalCost: 0,
           analysisStatus: "pending",
         };
       });
       setJobs((prev) => [...prev, ...newJobs]);
+      jobsRef.current = [...jobsRef.current, ...newJobs];
       setActiveJobId((cur) => cur ?? newJobs[0].id);
     },
-    [defaultSubType, includeModel, includeVideo],
+    [includeModel, includeScale],
   );
-
-  const patchJob = useCallback((id: string, patch: Partial<Job>) => {
-    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)));
-  }, []);
-
-  const patchStep = useCallback((id: string, key: StepKey, patch: Partial<StepState>) => {
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === id ? { ...j, steps: { ...j.steps, [key]: { ...j.steps[key], ...patch } } } : j,
-      ),
-    );
-  }, []);
 
   const removeJob = (id: string) => {
     setJobs((prev) => prev.filter((j) => j.id !== id));
+    jobsRef.current = jobsRef.current.filter((j) => j.id !== id);
     setActiveJobId((cur) => (cur === id ? null : cur));
   };
-
-  /* ---- Traducción de errores técnicos a lenguaje humano ---- */
 
   const humanizeError = useCallback(
     (raw?: string): string => {
       const msg = (raw ?? "").toLowerCase();
-      if (msg.includes("out of memory") || msg.includes("cuda") || msg.includes("gpu"))
-        return jt.errors.gpuMemory;
-      if (msg.includes("content policy") || msg.includes("sensitive") || msg.includes("e005"))
-        return jt.errors.contentPolicy;
+      if (msg.includes("out of memory") || msg.includes("cuda")) return jt.errors.gpuMemory;
+      if (msg.includes("content policy") || msg.includes("sensitive")) return jt.errors.contentPolicy;
       if (msg.includes("401") || msg.includes("unauthorized")) return jt.errors.auth;
       if (msg.includes("404") || msg.includes("not found")) return jt.errors.notFound;
       if (msg.includes("timeout") || msg.includes("timed out")) return jt.errors.timeout;
-      if (msg.includes("image_load_error") || msg.includes("failed to load the image"))
-        return jt.errors.imageLoad;
+      if (msg.includes("image_load_error")) return jt.errors.imageLoad;
       return raw && raw.length < 160 ? raw : jt.errors.generic;
     },
     [jt.errors],
   );
-
-  /* ---- Chequeo de identidad (no bloqueante) ---- */
 
   const runIdentityCheck = useCallback(
     (jobId: string, stepKey: StepKey, inputUrl: string, outputUrl: string, onModel: boolean) => {
@@ -711,20 +914,20 @@ export default function JewelryPipelinePage() {
           if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
             const changes = (d.data.changes ?? []).slice(0, 2).join("; ") || d.data.reason;
             patchStep(jobId, stepKey, {
-              warning: onModel ? jt.messages.jewelryChangedModel(changes) : jt.messages.jewelryChanged(changes),
+              warning: onModel
+                ? jt.messages.jewelryChangedModel(changes)
+                : jt.messages.jewelryChanged(changes),
             });
           }
         })
-        .catch((err) => console.warn("[jewelry] identity-check failed:", err));
+        .catch((err) => console.warn("[jewelry] identity-check falló:", err));
     },
     [jt.messages, patchStep],
   );
 
-  /* ---- Ejecución de un paso ---- */
-
-  /** Imagen del producto lista para componer escenas: la nítida si existe. */
+  /** Foto base para generar escenas: el recorte si existe, si no la limpia. */
   const productUrl = (job: Job): string | undefined =>
-    job.steps.sharpen.resultUrl ?? job.steps.isolate.resultUrl;
+    job.steps.isolate.resultUrl ?? job.steps.clean.resultUrl ?? job.uploadedUrl;
 
   const runStep = useCallback(
     async (jobId: string, key: StepKey): Promise<boolean> => {
@@ -734,28 +937,53 @@ export default function JewelryPipelinePage() {
       const config = getJewelryConfig(job.subType);
       const controller = new AbortController();
       abortRef.current = controller;
+      const signal = controller.signal;
 
-      const fail = (msg: string): false => {
+      const fail = (msg?: string): false => {
         patchStep(jobId, key, { status: "error", error: humanizeError(msg) });
         return false;
       };
 
+      const descriptor = job.features ? jewelryDescriptor(job.features) : null;
+
       try {
         switch (key) {
-          /* ---------------- 1. Quitar fondo ---------------- */
-          case "isolate": {
+          case "clean": {
             const input = job.uploadedUrl;
-            if (!input) return fail("Missing upload");
+            if (!input) return fail("Falta la subida");
+            patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            const res = await fetch("/api/photo-clean", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageUrl: input }),
+              signal,
+            });
+            const data = await safeJson(res);
+            const url = pickUrl(data.data);
+            if (!data.success || !url) return fail(data.error);
+            patchStep(jobId, key, {
+              status: "done",
+              resultUrl: url,
+              cost: data.cost ?? STEP_COST.clean,
+            });
+            return true;
+          }
+
+          case "isolate": {
+            const input = job.steps.clean.resultUrl ?? job.uploadedUrl;
+            if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             const res = await fetch("/api/bg-remove", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ imageUrl: input, provider: "replicate" }),
-              signal: controller.signal,
+              // BiRefNet: ganó la comparativa contra rembg, WithoutBG,
+              // Bria RMBG 2.0, Grounded SAM y remove.bg sobre joyería real.
+              body: JSON.stringify({ imageUrl: input, provider: "birefnet" }),
+              signal,
             });
             const data = await safeJson(res);
             const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error ?? "bg-remove failed");
+            if (!data.success || !url) return fail(data.error);
             patchStep(jobId, key, {
               status: "done",
               resultUrl: url,
@@ -764,50 +992,15 @@ export default function JewelryPipelinePage() {
             return true;
           }
 
-          /* ---------------- 2. Nitidez ---------------- */
-          case "sharpen": {
-            const input = job.steps.isolate.resultUrl;
-            if (!input) return fail(jt.messages.needsIsolate);
-            patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
-            const res = await fetch("/api/upscale", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                imageUrl: input,
-                provider: JEWELRY_UPSCALE_CONFIG.provider,
-                scale: JEWELRY_UPSCALE_CONFIG.scale,
-                // La clave del arreglo: la ruta devuelve 200 con la imagen
-                // original si la GPU no puede, en vez de tumbar el pipeline.
-                softFail: JEWELRY_UPSCALE_CONFIG.softFail,
-              }),
-              signal: controller.signal,
-            });
-            const data = await safeJson(res);
-            const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error ?? "upscale failed");
-            const skipped = data.data?.skipped === true;
-            patchStep(jobId, key, {
-              status: skipped ? "skipped" : "done",
-              resultUrl: url,
-              cost: data.cost ?? 0,
-              warning: skipped ? jt.messages.skippedUpscale : undefined,
-            });
-            return true;
-          }
-
-          /* ---------------- 3 y 4. Packshot y escena de lujo ---------------- */
           case "packshot":
-          case "estante": {
+          case "luxury": {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
-
-            // La ficha de Vision ancla el prompt a ESTA pieza (oro, 3 piedras,
-            // grabados) en vez de a la plantilla genérica del sub-tipo.
-            const descriptor = job.productFeatures ? jewelryDescriptor(job.productFeatures) : null;
+            const base = key === "packshot" ? config.packshotPrompt : config.estantePrompt;
+            // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
+            // plantilla genérica del sub-tipo.
             const suffix = descriptor ? `. Featuring this exact piece: ${descriptor}.` : "";
-            const basePrompt = key === "packshot" ? config.packshotPrompt : config.estantePrompt;
-
             const res = await fetch("/api/bg-generate", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -815,14 +1008,16 @@ export default function JewelryPipelinePage() {
                 imageUrl: input,
                 mode: "precise",
                 style: "custom",
-                customPrompt: withJewelryPreserve(basePrompt + suffix),
+                customPrompt:
+                  withJewelryPreserve(base + suffix) +
+                  " Do NOT include any text, price tag, label or watermark in the output.",
                 aspectRatio: "1:1",
               }),
-              signal: controller.signal,
+              signal,
             });
             const data = await safeJson(res);
             const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error ?? "bg-generate failed");
+            if (!data.success || !url) return fail(data.error);
             patchStep(jobId, key, {
               status: "done",
               resultUrl: url,
@@ -832,7 +1027,6 @@ export default function JewelryPipelinePage() {
             return true;
           }
 
-          /* ---------------- 5. Detalle macro ---------------- */
           case "macro": {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
@@ -846,20 +1040,28 @@ export default function JewelryPipelinePage() {
                 background: config.macro.background,
                 aspectRatio: "1:1",
               }),
-              signal: controller.signal,
+              signal,
             });
             const data = await safeJson(res);
             const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error ?? "macro-crop failed");
+            if (!data.success || !url) return fail(data.error);
             patchStep(jobId, key, { status: "done", resultUrl: url, cost: 0 });
             return true;
           }
 
-          /* ---------------- 6. En modelo ---------------- */
-          case "modelo": {
+          case "model":
+          case "scale": {
             const jewelryUrl = productUrl(job);
             if (!jewelryUrl) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: jewelryUrl, error: undefined });
+
+            // La foto de escala siempre va sobre una mano: es la referencia que
+            // la compradora entiende sin pensar, y los anillos son lo que más
+            // se devuelve por no dimensionar bien el tamaño.
+            const modelPrompt =
+              key === "scale"
+                ? "elegant woman hand holding the piece between thumb and fingers, hand at natural scale, plain neutral background, soft studio light, commercial jewelry scale reference photography, sharp focus"
+                : config.modelPrompt;
 
             const modelRes = await fetch("/api/model-create", {
               method: "POST",
@@ -869,27 +1071,27 @@ export default function JewelryPipelinePage() {
                 ageRange: "26-35",
                 skinTone: "medium",
                 bodyType: "average",
-                customDetails: config.modelPrompt,
+                customDetails: modelPrompt,
               }),
-              signal: controller.signal,
+              signal,
             });
             const modelData = await safeJson(modelRes);
             const modelPhotoUrl = pickUrl(modelData.data);
-            if (!modelData.success || !modelPhotoUrl) return fail(modelData.error ?? "model-create failed");
+            if (!modelData.success || !modelPhotoUrl) return fail(modelData.error);
             const modelCost = modelData.cost ?? 0.055;
 
-            const descriptor = job.productFeatures ? jewelryDescriptor(job.productFeatures) : undefined;
             const tryonRes = await fetch("/api/jewelry-tryon", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 modelImage: modelPhotoUrl,
                 jewelryImage: jewelryUrl,
-                type: job.subType,
+                // La escala se compone siempre contra una mano.
+                type: key === "scale" ? "ring" : job.subType,
                 mode: "modelo",
-                featureDescriptor: descriptor,
+                featureDescriptor: descriptor ?? undefined,
               }),
-              signal: controller.signal,
+              signal,
             });
             const tryonData = await safeJson(tryonRes);
             const url = pickUrl(tryonData.data);
@@ -910,30 +1112,36 @@ export default function JewelryPipelinePage() {
             return true;
           }
 
-          /* ---------------- 7. Video ---------------- */
-          case "video": {
-            const input = job.steps.estante.resultUrl;
-            if (!input) return fail(jt.messages.needsEstante);
-            patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
-            const res = await fetch("/api/video", {
+          case "social": {
+            const current = jobsRef.current.find((j) => j.id === jobId);
+            if (!current) return false;
+            // ORDEN DELIBERADO. La slide 1 se lleva el 80% del resultado, así
+            // que va la escena de lujo; el detalle macro (prueba de calidad)
+            // queda en el medio, donde el engagement cae.
+            const order: StepKey[] = ["luxury", "packshot", "macro", "model", "scale"];
+            const urls = order
+              .map((k) => current.steps[k].resultUrl)
+              .filter((u): u is string => Boolean(u) && !isVideoUrl(u));
+            if (urls.length === 0) return fail(jt.messages.needsEstante);
+
+            patchStep(jobId, key, { status: "processing", inputUrl: urls[0], error: undefined });
+            const res = await fetch("/api/social-kit", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                imageUrl: input,
-                provider: "wan-2.2-fast",
-                prompt: config.videoPrompt,
-                duration: 5,
-                aspectRatio: "1:1",
-              }),
-              signal: controller.signal,
+              body: JSON.stringify({ imageUrls: urls.slice(0, 10), includeReel: true }),
+              signal,
             });
             const data = await safeJson(res);
-            const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error ?? "video failed");
+            if (!data.success) return fail(data.error);
+            const carousel = (data.data?.carousel as string[]) ?? [];
+            const reel = data.data?.reel as string | null;
             patchStep(jobId, key, {
               status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST.video,
+              carousel,
+              resultUrl: carousel[0],
+              reelUrl: reel ?? undefined,
+              reelError: (data.data?.reelError as string) ?? undefined,
+              cost: 0,
             });
             return true;
           }
@@ -952,16 +1160,34 @@ export default function JewelryPipelinePage() {
     [humanizeError, jt.messages, patchStep, runIdentityCheck],
   );
 
-  /* ---- Corrida completa de un job ---- */
+  const saveToGallery = useCallback(async (job: Job) => {
+    const addImages = useGalleryStore.getState().addImages;
+    const baseName = job.filename.replace(/\.[^.]+$/, "");
+    const stamp = Date.now();
+    const items = [];
+    for (const key of STEP_ORDER) {
+      // El recorte es intermedio; el kit de redes se descarga aparte.
+      if (key === "isolate" || key === "social") continue;
+      const step = job.steps[key];
+      if (!step.resultUrl || step.status === "error") continue;
+      items.push({
+        id: `jewelry-${key}-${stamp}-${job.id}`,
+        filename: `${baseName}-${key}.jpg`,
+        resultUrl: await urlToDataUrl(step.resultUrl),
+        originalUrl: job.previewUrl,
+        date: new Date().toISOString(),
+        operations: [`jewelry-${key}`],
+        project: `jewelry-${job.subType}`,
+      });
+    }
+    if (items.length > 0) addImages(items);
+  }, []);
 
-  const processJob = useCallback(
-    async (jobId: string): Promise<void> => {
-      patchJob(jobId, { status: "active" });
-
-      // Subida + análisis de la ficha, en paralelo. El análisis nunca bloquea:
-      // si falla, los prompts caen a la plantilla del sub-tipo.
+  /** Sube la foto y deja que Vision decida el tipo antes de gastar en generar. */
+  const prepareJob = useCallback(
+    async (jobId: string): Promise<boolean> => {
       const job = jobsRef.current.find((j) => j.id === jobId);
-      if (!job) return;
+      if (!job) return false;
 
       let uploadedUrl = job.uploadedUrl;
       if (!uploadedUrl) {
@@ -971,16 +1197,14 @@ export default function JewelryPipelinePage() {
           const upRes = await fetch("/api/upload", { method: "POST", body: form });
           const upData = await safeJson(upRes);
           uploadedUrl = pickUrl(upData.data);
-          if (!upData.success || !uploadedUrl) throw new Error(upData.error ?? "Upload failed");
+          if (!upData.success || !uploadedUrl) throw new Error(upData.error ?? "Falló la subida");
           patchJob(jobId, { uploadedUrl });
-          jobsRef.current = jobsRef.current.map((j) =>
-            j.id === jobId ? { ...j, uploadedUrl } : j,
-          );
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
           patchJob(jobId, { status: "error" });
-          toast.error(jt.messages.jobError(job.filename, humanizeError(msg)));
-          return;
+          toast.error(
+            jt.messages.jobError(job.filename, humanizeError(err instanceof Error ? err.message : String(err))),
+          );
+          return false;
         }
       }
 
@@ -992,17 +1216,33 @@ export default function JewelryPipelinePage() {
           body: JSON.stringify({ imageUrl: uploadedUrl, category: "jewelry" }),
         });
         const data = await res.json();
-        const features = data?.success ? (data.data as JewelryFeatures) : null;
-        patchJob(jobId, { productFeatures: features, analysisStatus: features ? "done" : "error" });
-        jobsRef.current = jobsRef.current.map((j) =>
-          j.id === jobId ? { ...j, productFeatures: features } : j,
-        );
+        const features: JewelryFeatures | null = data?.success ? data.data : null;
+        if (features) {
+          const { subType, confident } = featuresToSubType(features.tipo, features.detalles_visibles);
+          patchJob(jobId, {
+            features,
+            analysisStatus: "done",
+            subType,
+            subTypeConfident: confident,
+          });
+        } else {
+          patchJob(jobId, { analysisStatus: "error" });
+        }
       } catch {
         patchJob(jobId, { analysisStatus: "error" });
       }
+      return true;
+    },
+    [humanizeError, jt.messages, patchJob],
+  );
 
-      // Los pasos corren en orden. Un fallo NUNCA aborta la cadena: cada paso
-      // decide si tiene con qué correr mirando el resultado de los anteriores.
+  const processJob = useCallback(
+    async (jobId: string): Promise<void> => {
+      patchJob(jobId, { status: "active" });
+      const ok = await prepareJob(jobId);
+      if (!ok) return;
+
+      // Un fallo NUNCA aborta la cadena: cada paso mira si tiene con qué correr.
       for (const key of STEP_ORDER) {
         const current = jobsRef.current.find((j) => j.id === jobId);
         if (!current) return;
@@ -1011,47 +1251,11 @@ export default function JewelryPipelinePage() {
           continue;
         }
         await runStep(jobId, key);
-        // Deja que React aplique el patch antes de que el próximo paso lea el ref.
-        await new Promise((r) => setTimeout(r, 0));
       }
-
-      const finished = jobsRef.current.find((j) => j.id === jobId);
-      const total = finished
-        ? Object.values(finished.steps).reduce((sum, s) => sum + s.cost, 0)
-        : 0;
-      patchJob(jobId, { status: "done", totalCost: total });
+      patchJob(jobId, { status: "done" });
     },
-    [humanizeError, jt.messages, patchJob, patchStep, runStep],
+    [patchJob, patchStep, prepareJob, runStep],
   );
-
-  /* ---- Guardado en galería ---- */
-
-  const saveToGallery = useCallback(async (job: Job) => {
-    const addImages = useGalleryStore.getState().addImages;
-    const baseName = job.filename.replace(/\.[^.]+$/, "");
-    const stamp = Date.now();
-    const items = [];
-    for (const key of STEP_ORDER) {
-      const step = job.steps[key];
-      // El recorte y la nitidez son intermedios: no son entregables.
-      if (key === "isolate" || key === "sharpen") continue;
-      if (!step.resultUrl || step.status === "error") continue;
-      const isVid = isVideoUrl(step.resultUrl);
-      items.push({
-        id: `jewelry-${key}-${stamp}-${job.id}`,
-        filename: `${baseName}-${key}.${isVid ? "mp4" : "jpg"}`,
-        // Los videos se guardan por URL: convertirlos a data URL revienta la cuota.
-        resultUrl: isVid ? step.resultUrl : await urlToDataUrl(step.resultUrl),
-        originalUrl: job.previewUrl,
-        date: new Date().toISOString(),
-        operations: [`jewelry-${key}`],
-        project: `jewelry-${job.subType}`,
-      });
-    }
-    if (items.length > 0) addImages(items);
-  }, []);
-
-  /* ---- Disparadores ---- */
 
   const handleProcessAll = async () => {
     if (busy) return;
@@ -1087,17 +1291,15 @@ export default function JewelryPipelinePage() {
 
   const activeJob = jobs.find((j) => j.id === activeJobId) ?? jobs[0];
 
-  const estimatedCost = useMemo(() => {
-    let total = 0;
-    for (const key of STEP_ORDER) {
-      if (OPTIONAL_STEPS.includes(key)) {
-        if (key === "modelo" && !includeModel) continue;
-        if (key === "video" && !includeVideo) continue;
-      }
-      total += STEP_COST[key];
-    }
-    return total;
-  }, [includeModel, includeVideo]);
+  const estimatedCost = useMemo(
+    () =>
+      STEP_ORDER.reduce((sum, key) => {
+        if (key === "model" && !includeModel) return sum;
+        if (key === "scale" && !includeScale) return sum;
+        return sum + STEP_COST[key];
+      }, 0),
+    [includeModel, includeScale],
+  );
 
   const spentTotal = jobs.reduce(
     (sum, j) => sum + Object.values(j.steps).reduce((s, st) => s + st.cost, 0),
@@ -1105,8 +1307,6 @@ export default function JewelryPipelinePage() {
   );
   const doneCount = jobs.filter((j) => j.status === "done").length;
 
-  /* ------------------------------------------------------------------ */
-  /*  Render                                                              */
   /* ------------------------------------------------------------------ */
 
   return (
@@ -1124,9 +1324,6 @@ export default function JewelryPipelinePage() {
           <Gem className="h-4 w-4 shrink-0 text-[var(--accent)]" />
           <span className="truncate text-sm font-semibold text-heading">Joyería</span>
         </div>
-        {/* Sello de build: muestra el commit que está VIVO en este deploy. Si no
-            coincide con el último push, estás viendo un build viejo (cache o
-            deploy todavía corriendo). Mismo sello que lleva lencería. */}
         <span
           className="shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]"
           title={jt.stepCard.buildTitle}
@@ -1151,7 +1348,7 @@ export default function JewelryPipelinePage() {
           <p className="mt-1 text-sm leading-relaxed text-body">{t.pages.jewelry.subtitle}</p>
         </div>
 
-        {/* ---------------- Fase de configuración ---------------- */}
+        {/* ---------------- Configuración ---------------- */}
         {phase === "setup" && (
           <>
             <section className="mb-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
@@ -1160,66 +1357,39 @@ export default function JewelryPipelinePage() {
                 {jt.config.subheading}
               </p>
 
-              <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="defaultSubType"
-                    className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]"
-                  >
-                    {jt.config.defaultType}
+              <div className="mb-4">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">
+                  {jt.config.outputs}
+                </p>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={includeModel}
+                      onChange={(e) => setIncludeModel(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/20 bg-white/[0.04] accent-[var(--accent)]"
+                    />
+                    <User className="h-4 w-4 text-[var(--accent)]" />
+                    {jt.steps.model.label}
+                    <span className="text-[11px] text-[var(--text-secondary)]">(+$0.10)</span>
                   </label>
-                  <select
-                    id="defaultSubType"
-                    value={defaultSubType}
-                    onChange={(e) => setDefaultSubType(e.target.value as JewelrySubType)}
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white"
-                  >
-                    {Object.entries(SUB_TYPE_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={includeScale}
+                      onChange={(e) => setIncludeScale(e.target.checked)}
+                      className="h-4 w-4 rounded border-white/20 bg-white/[0.04] accent-[var(--accent)]"
+                    />
+                    <Hand className="h-4 w-4 text-[var(--accent)]" />
+                    {jt.steps.scale.label}
+                    <span className="text-[11px] text-[var(--text-secondary)]">(+$0.10)</span>
+                  </label>
                 </div>
-
-                <div>
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">
-                    {jt.config.outputs}
-                  </p>
-                  <div className="space-y-2">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
-                      <input
-                        type="checkbox"
-                        checked={includeModel}
-                        onChange={(e) => setIncludeModel(e.target.checked)}
-                        className="h-4 w-4 rounded border-white/20 bg-white/[0.04] accent-[var(--accent)]"
-                      />
-                      <User className="h-4 w-4 text-[var(--accent)]" />
-                      {jt.config.includeModel}
-                      <span className="text-[11px] text-[var(--text-secondary)]">(+$0.10)</span>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-200">
-                      <input
-                        type="checkbox"
-                        checked={includeVideo}
-                        onChange={(e) => setIncludeVideo(e.target.checked)}
-                        className="h-4 w-4 rounded border-white/20 bg-white/[0.04] accent-[var(--accent)]"
-                      />
-                      <Film className="h-4 w-4 text-[var(--accent)]" />
-                      {jt.config.includeVideo}
-                      <span className="text-[11px] text-[var(--text-secondary)]">(+$0.05)</span>
-                    </label>
-                  </div>
-                  <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
-                    {jt.config.outputsHint}
-                  </p>
-                </div>
+                <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">{jt.config.outputsHint}</p>
               </div>
 
               <div className="mb-4 flex items-center justify-between rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 py-2">
-                <span className="text-xs font-medium text-[var(--accent)]">
-                  {jt.config.estimated}
-                </span>
+                <span className="text-xs font-medium text-[var(--accent)]">{jt.config.estimated}</span>
                 <span className="font-mono text-sm font-semibold text-[var(--accent)]">
                   ${estimatedCost.toFixed(2)}
                 </span>
@@ -1245,25 +1415,9 @@ export default function JewelryPipelinePage() {
                         className="h-16 w-16 shrink-0"
                         labels={jt.thumb}
                       />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-200" title={job.filename}>
-                          {job.filename}
-                        </p>
-                        <select
-                          value={job.subType}
-                          onChange={(e) =>
-                            patchJob(job.id, { subType: e.target.value as JewelrySubType })
-                          }
-                          disabled={busy}
-                          className="mt-1.5 rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white disabled:opacity-50"
-                        >
-                          {Object.entries(SUB_TYPE_LABELS).map(([k, v]) => (
-                            <option key={k} value={k}>
-                              {v}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <p className="min-w-0 flex-1 truncate text-sm text-gray-200" title={job.filename}>
+                        {job.filename}
+                      </p>
                       <button
                         type="button"
                         onClick={() => removeJob(job.id)}
@@ -1284,11 +1438,7 @@ export default function JewelryPipelinePage() {
                     disabled={busy}
                     className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-[var(--bg-primary)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {busy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                     {busy ? jt.buttons.processing : jt.buttons.processAll}
                   </button>
                   <button
@@ -1297,6 +1447,7 @@ export default function JewelryPipelinePage() {
                       jobs.forEach((j) => URL.revokeObjectURL(j.previewUrl));
                       previewUrlsRef.current = [];
                       setJobs([]);
+                      jobsRef.current = [];
                       setActiveJobId(null);
                     }}
                     disabled={busy}
@@ -1311,10 +1462,9 @@ export default function JewelryPipelinePage() {
           </>
         )}
 
-        {/* ---------------- Fase de pipeline ---------------- */}
+        {/* ---------------- Pipeline ---------------- */}
         {phase === "pipeline" && activeJob && (
           <>
-            {/* Selector de pieza cuando hay varias */}
             {jobs.length > 1 && (
               <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
                 {jobs.map((job) => (
@@ -1341,151 +1491,52 @@ export default function JewelryPipelinePage() {
               </div>
             )}
 
-            {/* Ficha que la IA leyó de la foto */}
-            <div className="mb-5 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-                {jt.features.heading}
-              </p>
-              {activeJob.analysisStatus === "analyzing" && (
-                <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  {jt.features.analyzing}
-                </p>
-              )}
-              {activeJob.analysisStatus === "error" && (
-                <p className="text-xs text-[var(--text-secondary)]">{jt.features.failed}</p>
-              )}
-              {activeJob.productFeatures && (
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                    {activeJob.productFeatures.tipo} · {activeJob.productFeatures.material}
-                  </span>
-                  {activeJob.productFeatures.acabado && (
-                    <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                      {activeJob.productFeatures.acabado}
+            <VisionPanel
+              job={activeJob}
+              disabled={busy}
+              onChangeType={(s) =>
+                patchJob(activeJob.id, { subType: s, subTypeConfident: true })
+              }
+            />
+
+            {/* Etapas */}
+            {STAGES.map((stage) => {
+              const visible = stage.steps.filter((k) => activeJob.steps[k].enabled);
+              if (visible.length === 0) return null;
+              const stageCopy = jt.stages[stage.key];
+              const doneInStage = visible.filter((k) =>
+                ["done", "accepted", "skipped"].includes(activeJob.steps[k].status),
+              ).length;
+              return (
+                <section key={stage.key} className="mb-7">
+                  <div className="mb-3 flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold text-white">{stageCopy.label}</h2>
+                      <p className="text-[11px] text-[var(--text-secondary)]">{stageCopy.hint}</p>
+                    </div>
+                    <span className="shrink-0 text-[11px] font-medium text-[var(--text-secondary)]">
+                      {doneInStage}/{visible.length}
                     </span>
-                  )}
-                  {activeJob.productFeatures.piedras &&
-                    activeJob.productFeatures.num_piedras > 0 && (
-                      <span className="rounded bg-[var(--accent-dim)] px-2 py-0.5 text-[11px] text-[var(--accent)]">
-                        {jt.features.stones(activeJob.productFeatures.num_piedras)}
-                        {activeJob.productFeatures.color_piedras.length > 0 &&
-                          ` (${activeJob.productFeatures.color_piedras.join(", ")})`}
-                      </span>
-                    )}
-                  {activeJob.productFeatures.grabados && (
-                    <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                      {jt.features.engraved}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Tarjetas de paso */}
-            <div className="space-y-4">
-              {STEP_ORDER.filter((key) => activeJob.steps[key].enabled).map((key, i) => (
-                <StepCard
-                  key={key}
-                  stepKey={key}
-                  step={activeJob.steps[key]}
-                  stepNumber={i + 1}
-                  isActive={activeJob.steps[key].status === "processing"}
-                  busy={busy}
-                  filenamePrefix={activeJob.filename.replace(/\.[^.]+$/, "")}
-                  onAccept={() => patchStep(activeJob.id, key, { status: "accepted" })}
-                  onSkip={() => patchStep(activeJob.id, key, { status: "skipped" })}
-                  onRerun={() => void handleRerun(activeJob.id, key)}
-                  onStop={() => abortRef.current?.abort()}
-                />
-              ))}
-            </div>
-
-            {/* Resultados */}
-            <section className="mt-8 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-white">{jt.results.heading}</h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const prefix = activeJob.filename.replace(/\.[^.]+$/, "");
-                    STEP_ORDER.forEach((key) => {
-                      const url = activeJob.steps[key].resultUrl;
-                      if (!url || key === "isolate" || key === "sharpen") return;
-                      void downloadAsset(
-                        url,
-                        `${prefix}-${key}.${isVideoUrl(url) ? "mp4" : "jpg"}`,
-                      );
-                    });
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-gray-300 transition hover:border-white/20 hover:text-white"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {jt.buttons.downloadAll}
-                </button>
-              </div>
-
-              {STEP_ORDER.filter(
-                (k) => k !== "isolate" && k !== "sharpen" && activeJob.steps[k].resultUrl,
-              ).length === 0 ? (
-                <p className="text-xs text-[var(--text-secondary)]">{jt.results.empty}</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {STEP_ORDER.filter((k) => k !== "isolate" && k !== "sharpen").map((key) => {
-                    const step = activeJob.steps[key];
-                    if (!step.enabled) return null;
-                    const copy = jt.steps[key];
-                    if (!step.resultUrl) {
-                      if (step.status !== "error") return null;
-                      return (
-                        <div
-                          key={key}
-                          className="flex min-h-[8rem] flex-col items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-center"
-                        >
-                          <AlertCircle className="h-5 w-5 text-red-400" />
-                          <p className="text-[11px] font-semibold text-red-300">
-                            {copy.label} {jt.results.failedSuffix}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div
+                  </div>
+                  <div className="space-y-4">
+                    {visible.map((key) => (
+                      <StepCard
                         key={key}
-                        className="overflow-hidden rounded-lg border border-white/10 bg-black"
-                      >
-                        <ImageThumb
-                          url={step.resultUrl}
-                          label={copy.label}
-                          className="h-32 w-full"
-                          labels={jt.thumb}
-                        />
-                        <div className="flex items-center justify-between bg-black/60 px-2 py-1.5">
-                          <span className="truncate text-[11px] font-medium text-[var(--accent)]">
-                            {copy.label}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void downloadAsset(
-                                step.resultUrl as string,
-                                `${activeJob.filename.replace(/\.[^.]+$/, "")}-${key}.${
-                                  isVideoUrl(step.resultUrl) ? "mp4" : "jpg"
-                                }`,
-                              )
-                            }
-                            className="shrink-0 rounded p-0.5 text-gray-300 transition hover:text-white"
-                            title={`${jt.results.download} ${copy.label}`}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
+                        stepKey={key}
+                        step={activeJob.steps[key]}
+                        stepNumber={STEP_ORDER.indexOf(key) + 1}
+                        busy={busy}
+                        filenamePrefix={activeJob.filename.replace(/\.[^.]+$/, "")}
+                        onAccept={() => patchStep(activeJob.id, key, { status: "accepted" })}
+                        onSkip={() => patchStep(activeJob.id, key, { status: "skipped" })}
+                        onRerun={() => void handleRerun(activeJob.id, key)}
+                        onStop={() => abortRef.current?.abort()}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button

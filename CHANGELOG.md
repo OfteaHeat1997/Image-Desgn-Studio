@@ -1,5 +1,55 @@
 # UniStudio — Changelog
 
+## 2026-08-09 — Joyería: pipeline guiado por Vision, 3 etapas y kit de Instagram
+
+Segunda pasada sobre joyería, esta vez **midiendo contra el inventario real** en vez de
+suponer. Todo lo de abajo se probó contra la foto de un rosario y contra 8 productos
+distintos del catálogo de Unistyles.
+
+**El aislado usaba la herramienta equivocada.** rembg dejaba la foto casi intacta —
+conservaba los pedestales blancos y el fondo. Comparativa medida sobre el rosario:
+BiRefNet 1.8 s (rosario completo, crucifijo y medalla con textura), Grounded SAM 78.9 s
+(blanquea el crucifijo), Bria RMBG 2.0 4.0 s (no aísla), rembg 8.4 s (no aísla),
+WithoutBG (cae a rembg), remove.bg (HTTP 400). **Gana BiRefNet**, que ahora es el
+proveedor del paso. Bria gana el benchmark general (90% vs 85%) pero pierde en este caso:
+la calidad del borde depende del tipo de imagen, no del promedio.
+
+**Módulo nuevo `/api/photo-clean`.** Las fotos del taller ya vienen bien tomadas; lo que
+sobra es el texto que les ponen encima para WhatsApp. Borrarlo NO es "quitar fondo": es
+retoque. Ahora es el paso 1 y su salida ya es publicable. La redacción del prompt se
+eligió midiendo — la versión corta dejaba una mancha gris donde estaba el título.
+
+**Módulo nuevo `/api/social-kit`.** Carrusel 1080x1350 (4:5) con margen seguro de 50 px y
+reel 1080x1920 (9:16). El reel se arma con **ffmpeg**, que ya estaba instalado y declarado
+en `serverExternalPackages` sin que ningún archivo lo usara: costo $0 y determinista,
+frente a $0.05-0.35 y un resultado distinto por corrida si lo generara un modelo de video.
+El relleno del lienzo muestrea las **esquinas** de cada foto — promediar todo el borde
+mezclaba el fondo con los pedestales y dejaba un recuadro gris visible.
+
+**El pipeline lo maneja Vision, no un desplegable.** El inventario real son 202 fotos sin
+catalogar cuyos nombres son marcas de tiempo de cámara. `JewelryFeatures.tipo` pasó a ser
+un string ABIERTO (Vision devolvió `armband`, que no estaba en ningún enum) y
+`featuresToSubType()` lo lleva a una familia por palabras clave, marcando en ámbar lo que
+tuvo que adivinar. Se agregaron `num_productos` (hay fotos con 5 productos distintos),
+`tipo_cadena`, `cierre` y `texto_grabado` — Vision leyó "MOM Love" de un dije.
+
+**Sub-tipo `rosary`** con su propia escena: ghost neckline, colgando de un cuello
+invisible con caída por gravedad.
+
+**UI reescrita en 3 etapas** (Preparar → Generar → Publicar) en vez de 7 tarjetas planas
+— la referencia de UX dice que 3-6 pasos es el límite de lo que se abarca de un vistazo.
+Se arregló el gating de los botones: `busy` era global, así que durante una corrida no
+apareciía ningún Aceptar/Rehacer/Saltar. La ficha ahora muestra `detalles_visibles`, que
+es el campo más rico de Vision y se estaba descartando.
+
+**Verificado:** `next build` completo pasa; cadena de 7 pasos contra el rosario real sin
+fallos (Vision → rosario → limpiar → recortar → packshot → lujo → macro → carrusel).
+**NO verificado:** el reel — el binario de `ffmpeg-static` en node_modules es ELF (Linux),
+correcto para Vercel pero no ejecutable en el Windows de desarrollo.
+
+**Pendiente conocido:** el packshot duplicó la medalla del rosario (Kontext espeja al pedir
+simetría) y la escena de lujo le agregó circonias que el producto no tiene.
+
 ## 2026-08-09 — Joyería: arreglo funcional + rediseño UX
 
 El pipeline de joyería no producía **nada**. Subías un collar y terminaba con "Estante lujoso"

@@ -18,13 +18,17 @@
 
 /** Claves de paso — deben coincidir con `StepKey` en page.tsx. */
 export type JewelryStepKey =
+  | 'clean'
   | 'isolate'
-  | 'sharpen'
   | 'packshot'
-  | 'estante'
+  | 'luxury'
   | 'macro'
-  | 'modelo'
-  | 'video';
+  | 'model'
+  | 'scale'
+  | 'social';
+
+/** Las 3 etapas en las que se agrupan los pasos. */
+export type JewelryStageKey = 'prepare' | 'generate' | 'publish';
 
 /** Copy de un paso: encabezado de tarjeta + panel de documentación. */
 interface StepItemCopy {
@@ -118,6 +122,30 @@ export interface JewelryPipelineCopy {
     nextTitle: string;
   };
   steps: Record<JewelryStepKey, StepItemCopy>;
+  stages: Record<JewelryStageKey, { label: string; hint: string }>;
+  vision: {
+    heading: string;
+    analyzing: string;
+    failed: string;
+    detectedAs: (tipo: string) => string;
+    guessed: string;
+    guessedHint: string;
+    multiProduct: (n: number) => string;
+    multiProductHint: string;
+    chain: string;
+    clasp: string;
+    engraved: string;
+    changeType: string;
+  };
+  social: {
+    carousel: string;
+    carouselHint: string;
+    reel: string;
+    reelHint: string;
+    reelUnavailable: string;
+    slide: (n: number) => string;
+    downloadKit: string;
+  };
   features: {
     heading: string;
     analyzing: string;
@@ -239,137 +267,183 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     nextTitle: 'Siguiente',
   },
   steps: {
-    isolate: {
-      label: 'Quitar fondo',
-      description: 'Deja la joya sola sobre fondo transparente',
-      costHint: '$0.01',
-      what: 'Recorta la joya de tu foto y la deja flotando sobre fondo transparente. Es la base de todos los pasos que siguen: cada foto que generes se arma a partir de este recorte.',
-      provider: 'Replicate rembg, con WithoutBG de respaldo.',
-      duration: '5–15 s',
-      costDetail: '$0.01 si el primer proveedor responde; hasta $0.02 si cae al respaldo.',
+    clean: {
+      label: 'Limpiar la foto',
+      description: 'Borra precio, titulo y marca de agua',
+      costHint: '$0.04',
+      what: 'Quita los textos que le pusieron encima a la foto (nombre, precio, marca de agua) y reconstruye lo que habia detras. NO toca el producto ni el exhibidor: si tu foto ya estaba bien tomada, el resultado de este paso YA es publicable.',
+      provider: 'Flux Kontext Pro, con instruccion de retoque estricta.',
+      duration: '15-25 s',
+      costDetail: '$0.04 por foto.',
       canFail: [
-        'Con fondo muy cargado o poca luz, el recorte se puede comer una parte de la cadena.',
-        'Si la joya es del mismo color que el fondo, el borde queda irregular.',
+        'Si el texto esta encima del producto, al reconstruir puede alterar esa zona.',
+        'Con muchisimo texto puede quedar alguna letra suelta.',
       ],
       tips: [
-        'Fotografiá sobre un fondo liso y contrastante — es lo que más mejora este paso.',
-        'Si el recorte sale mal, rehacelo: el resultado varía un poco entre intentos.',
+        'Este paso solo por si ya te sirve la foto: descargala y publicala.',
+        'Si borro de mas, rehacelo — varia entre intentos.',
       ],
-      processing: ['Buscando tu joya en la foto…', 'Separándola del fondo…', 'Limpiando los bordes…'],
-      eta: '~10 s típico',
+      processing: ['Leyendo los textos de la foto...', 'Borrando precio y marca de agua...', 'Reconstruyendo el fondo...'],
+      eta: '~20 s tipico',
     },
-    sharpen: {
-      label: 'Nitidez',
-      description: 'Duplica la resolución sin cambiar la pieza',
-      costHint: '$0.02',
-      what: 'Duplica la resolución del recorte para que se lean los eslabones, los grabados y el engaste. En joyería el detalle ES el producto.',
-      provider: 'Real-ESRGAN 2x, con Clarity de respaldo automático.',
-      duration: '10–25 s',
-      costDetail: '$0.02 con el primero; $0.05 si tiene que usar el respaldo.',
+    isolate: {
+      label: 'Recortar la pieza',
+      description: 'Deja la joya sola, sin fondo',
+      costHint: '$0.01',
+      what: 'Recorta la joya y la deja sobre fondo transparente. Es la base de las fotos generadas: packshot, escena de lujo, detalle y modelo se arman todos a partir de este recorte.',
+      provider: 'BiRefNet (fal). Elegido midiendo contra 5 proveedores mas.',
+      duration: '2-5 s',
+      costDetail: '$0.01 por foto.',
       canFail: [
-        'La GPU de Replicate se puede quedar sin memoria si la foto es enorme. Se reintenta sola con la imagen más chica.',
+        'Con fondo del mismo tono que la pieza el borde puede quedar irregular.',
+        'Si falla, cae a rembg — que en joyeria recorta bastante peor.',
       ],
       tips: [
-        'Este paso NUNCA frena el pipeline: si no lo logra, sigue con tu foto original y te avisa en ámbar.',
-        'Podés saltarlo si tu foto ya viene en alta resolución.',
+        'Corre DESPUES de limpiar la foto: sin los textos encima acierta mucho mas.',
+        'Se probo contra rembg, WithoutBG, Bria RMBG 2.0, Grounded SAM y remove.bg. BiRefNet fue el unico que conservo la cadena fina Y la textura del colgante.',
       ],
-      processing: ['Leyendo el detalle del metal…', 'Duplicando la resolución…', 'Afinando los bordes…'],
-      eta: '~20 s típico',
+      processing: ['Separando la pieza del fondo...', 'Siguiendo la cadena eslabon por eslabon...', 'Afinando los bordes...'],
+      eta: '~4 s tipico',
     },
     packshot: {
-      label: 'Foto para catálogo',
-      description: 'Fondo blanco con sombra — lista para publicar',
+      label: 'Foto para catalogo',
+      description: 'Fondo blanco con sombra, lista para publicar',
       costHint: '$0.05',
-      what: 'La foto de fondo blanco que piden los marketplaces: pieza centrada, sombra de contacto suave para que no parezca recortada, y nada más en cuadro. Es la que subís a Mercado Libre o a tu tienda.',
-      provider: 'Flux Kontext Pro sobre tu recorte, con el guard de preservación.',
-      duration: '20–40 s',
+      what: 'La foto de fondo blanco que piden los marketplaces: pieza centrada y sombra de contacto suave para que no parezca recortada. Es la que subis a tu tienda.',
+      provider: 'Flux Kontext Pro sobre el recorte, con el guard de preservacion.',
+      duration: '20-40 s',
       costDetail: '$0.05 por foto.',
       canFail: [
-        'Si el recorte del paso 1 quedó incompleto, acá se nota más.',
-        'Ocasionalmente la sombra sale muy marcada — rehacelo y varía.',
+        'Si el recorte quedo incompleto, aca se nota mas.',
+        'Puede reinterpretar detalles chicos: en una prueba convirtio una medalla en un broche.',
       ],
       tips: [
-        'Esta es la foto principal de tu publicación: revisala con la vista grande antes de aceptar.',
-        'Si la joya cambió de color o de forma, te aparece un aviso ámbar. Rehacé el paso.',
+        'Es la foto principal de tu publicacion: revisala grande antes de aceptar.',
+        'Si la pieza cambio, te sale un aviso ambar. Rehacela.',
       ],
-      processing: ['Preparando el fondo blanco…', 'Centrando la pieza…', 'Calculando la sombra…'],
-      eta: '~30 s típico',
+      processing: ['Preparando el fondo blanco...', 'Centrando la pieza...', 'Calculando la sombra...'],
+      eta: '~30 s tipico',
     },
-    estante: {
+    luxury: {
       label: 'Escena de lujo',
-      description: 'Terciopelo, mármol y luz cálida — para redes',
+      description: 'Terciopelo, marmol y luz calida, para redes',
       costHint: '$0.05',
-      what: 'La foto bonita: tu joya sobre terciopelo, mármol o seda, con luz cálida de boutique. En collares se genera colgando de un cuello invisible para que se vea el largo real y cómo cae el dije.',
-      provider: 'Flux Kontext Pro sobre tu recorte, con el guard de preservación.',
-      duration: '20–40 s',
+      what: 'La foto bonita: tu joya sobre terciopelo, marmol o seda con luz de boutique. Collares y rosarios se generan colgando de un cuello invisible, para que se lea el largo real y como cae el dije.',
+      provider: 'Flux Kontext Pro sobre el recorte, con el guard de preservacion.',
+      duration: '20-40 s',
       costDetail: '$0.05 por foto.',
       canFail: [
-        'La IA puede reinterpretar la joya si tu foto tiene poco contraste (oro puede salir plateado).',
-        'El chequeo de identidad avisa en ámbar cuando eso pasa, pero no bloquea el resultado.',
+        'Con fotos de poco contraste puede reinterpretar el metal (oro sale plateado).',
+        'El chequeo de identidad lo avisa en ambar, pero no bloquea.',
       ],
       tips: [
-        'Usa la ficha que la IA leyó de tu foto (material, acabado, piedras) para anclar el resultado.',
-        'Si la pieza cambió, rehacé el paso — el resultado varía entre intentos.',
+        'Usa la ficha que Vision leyo de tu foto para anclar el resultado.',
+        'Es la slide 1 del carrusel: la que gana el swipe.',
       ],
-      processing: ['Montando el estante…', 'Ajustando la luz cálida…', 'Puliendo los reflejos…'],
-      eta: '~30 s típico',
+      processing: ['Montando la escena...', 'Ajustando la luz calida...', 'Puliendo los reflejos...'],
+      eta: '~30 s tipico',
     },
     macro: {
       label: 'Detalle macro',
-      description: 'Zoom real al eslabón, la piedra o el broche',
+      description: 'Zoom real al eslabon, la piedra o el broche',
       costHint: 'Gratis',
-      what: 'Acerca a la parte con más cuerpo de la pieza — el dije de un collar, la piedra de un anillo, los eslabones de una cadena — y la muestra sobre un fondo sobrio.',
+      what: 'Acerca a la parte con mas cuerpo de la pieza y la muestra sobre fondo sobrio. Son los PIXELES REALES de tu foto: nada aca lo invento una IA, por eso sirve como prueba del acabado.',
       provider: 'Recorte local con sharp. NO pasa por ninguna IA.',
-      duration: '1–3 s',
-      costDetail: 'Gratis. Se procesa en el servidor, sin llamar a ningún proveedor.',
+      duration: '1-3 s',
+      costDetail: 'Gratis. Se procesa en el servidor.',
       canFail: [
-        'Si el paso 1 dejó el fondo pegado, el recorte puede apuntar al lugar equivocado.',
+        'Si el recorte del paso anterior quedo sucio, puede apuntar al lugar equivocado.',
       ],
       tips: [
-        'Estos son los píxeles REALES de tu foto: nada acá está inventado por IA. Por eso sirve como prueba del acabado.',
-        'Si apuntó al lugar equivocado, rehacé el paso 1 y este se recalcula.',
+        'Es la foto que convence de la calidad: se ve el acabado de cerca.',
+        'Si apunto mal, rehace el recorte y este se recalcula.',
       ],
-      processing: ['Buscando la parte más rica…', 'Recortando el detalle…', 'Montando el fondo…'],
+      processing: ['Buscando la parte mas rica...', 'Recortando el detalle...', 'Montando el fondo...'],
       eta: '~2 s',
     },
-    modelo: {
+    model: {
       label: 'En modelo',
       description: 'La pieza puesta sobre una modelo IA',
       costHint: '$0.10',
-      what: 'Pone TU joya sobre una modelo generada por IA, en la parte del cuerpo que corresponde: orejas, cuello, mano o muñeca según el tipo de pieza.',
-      provider: 'Modelo IA + colocación con Flux Kontext Pro sobre un compuesto lado a lado.',
-      duration: '40–90 s',
-      costDetail: '$0.10 ($0.055 la modelo + $0.05 la colocación).',
+      what: 'Pone TU joya sobre una modelo generada por IA, en la parte del cuerpo que corresponde segun lo que Vision detecto: orejas, cuello, mano o muneca.',
+      provider: 'Modelo IA + colocacion con Flux Kontext Pro.',
+      duration: '40-90 s',
+      costDetail: '$0.10 ($0.055 modelo + $0.05 colocacion).',
       canFail: [
-        'Es el paso más difícil: la IA puede reinterpretar la joya al ponerla sobre la piel.',
-        'Si falla, los otros pasos siguen igual — este nunca frena el resto.',
+        'Es el paso mas dificil: la IA puede reinterpretar la joya sobre la piel.',
+        'Si falla, los demas pasos siguen igual.',
       ],
       tips: [
-        'Opcional. Si vendés solo por catálogo, podés apagarlo y ahorrar.',
-        'Revisá el aviso de identidad: te dice si la pieza cambió al montarla.',
+        'Opcional. Si vendes solo por catalogo, apagalo y ahorras.',
+        'Mira el aviso de identidad: te dice si la pieza cambio al montarla.',
       ],
-      processing: ['Convocando a la modelo…', 'Colocando tu pieza…', 'Ajustando luz y sombra…'],
-      eta: '~60 s típico',
+      processing: ['Convocando a la modelo...', 'Colocando tu pieza...', 'Ajustando luz y sombra...'],
+      eta: '~60 s tipico',
     },
-    video: {
-      label: 'Video de la pieza',
-      description: 'Cámara girando sobre la escena de lujo',
-      costHint: '$0.05',
-      what: 'Video corto con la cámara girando alrededor de tu joya sobre la escena de lujo, con el brillo recorriendo el metal. Para Reels, Stories y la ficha de producto.',
-      provider: 'Generación de video a partir de la foto del estante.',
-      duration: '60–120 s',
-      costDetail: '$0.05 por video de 5 s.',
+    scale: {
+      label: 'Foto de escala',
+      description: 'Muestra el tamano real sobre una mano',
+      costHint: '$0.10',
+      what: 'La pieza sostenida o puesta sobre una mano, para que se entienda cuanto mide de verdad. Los anillos son lo que mas se devuelve, y la causa documentada es que el cliente no entiende el tamano.',
+      provider: 'Modelo IA (mano) + colocacion con Flux Kontext Pro.',
+      duration: '40-90 s',
+      costDetail: '$0.10 por foto.',
       canFail: [
-        'Necesita que la escena de lujo haya salido bien — si ese paso falló, este no tiene de dónde partir.',
-        'El movimiento puede salir raro; rehacelo y varía.',
+        'Misma dificultad que el paso En modelo: puede reinterpretar la pieza.',
       ],
       tips: [
-        'Opcional. Es el paso más lento — apagalo si tenés apuro.',
-        'Aceptá primero la escena de lujo: el video se arma sobre esa foto.',
+        'Opcional, pero es de lo que mas baja las devoluciones.',
+        'En anillos y aretes chicos es donde mas aporta.',
       ],
-      processing: ['Preparando el giro…', 'Renderizando los cuadros…', 'Puliendo el video…'],
-      eta: '~90 s típico',
+      processing: ['Preparando la mano...', 'Colocando la pieza...', 'Ajustando la proporcion...'],
+      eta: '~60 s tipico',
     },
+    social: {
+      label: 'Listo para Instagram',
+      description: 'Carrusel 4:5 y reel vertical',
+      costHint: 'Gratis',
+      what: 'Toma las fotos ya generadas y arma el material de Instagram: el carrusel en 1080x1350 con el margen seguro, y el reel vertical 1080x1920 con zoom lento y transiciones.',
+      provider: 'sharp para el carrusel + ffmpeg para el reel. Sin IA, sin costo.',
+      duration: '3-15 s',
+      costDetail: 'Gratis.',
+      canFail: [
+        'El reel necesita ffmpeg; si el entorno no lo tiene, igual te entrega el carrusel.',
+      ],
+      tips: [
+        'El orden de las slides no es casual: la escena de lujo va primera porque la slide 1 se lleva el 80% del resultado.',
+        'Instagram admite hasta 10 slides y todas deben tener la misma proporcion.',
+      ],
+      processing: ['Reencuadrando a vertical...', 'Armando el carrusel...', 'Renderizando el reel...'],
+      eta: '~10 s tipico',
+    },
+  },
+  stages: {
+    prepare: { label: 'Preparar', hint: 'Dejar la foto limpia y la pieza recortada' },
+    generate: { label: 'Generar', hint: 'Las fotos del catalogo y de redes' },
+    publish: { label: 'Publicar', hint: 'Armado listo para Instagram' },
+  },
+  vision: {
+    heading: 'Lo que la IA ve en tu foto',
+    analyzing: 'Leyendo tu pieza...',
+    failed: 'No se pudo leer la ficha. El pipeline sigue igual.',
+    detectedAs: (tipo) => `Detectado: ${tipo}`,
+    guessed: 'Sin certeza',
+    guessedHint: 'La IA no reconocio el tipo de pieza y eligio el mas comun. Revisalo antes de generar.',
+    multiProduct: (n) => `${n} productos en esta foto`,
+    multiProductHint: 'Se procesa como un conjunto. Si son articulos distintos, conviene subir una foto por cada uno.',
+    chain: 'Cadena',
+    clasp: 'Cierre',
+    engraved: 'Grabado',
+    changeType: 'Cambiar tipo',
+  },
+  social: {
+    carousel: 'Carrusel',
+    carouselHint: '1080x1350 (4:5). Todas las slides con la misma proporcion, margen seguro de 50 px.',
+    reel: 'Reel',
+    reelHint: '1080x1920 (9:16), en loop.',
+    reelUnavailable: 'El reel no se pudo generar en este entorno. El carrusel esta listo.',
+    slide: (n) => `Slide ${n}`,
+    downloadKit: 'Descargar todo',
   },
   features: {
     heading: 'Lo que la IA ve en tu foto',
@@ -491,137 +565,183 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     nextTitle: 'Next',
   },
   steps: {
-    isolate: {
-      label: 'Remove background',
-      description: 'Leaves the piece alone on a transparent background',
-      costHint: '$0.01',
-      what: 'Cuts the piece out of your photo and leaves it floating on a transparent background. It is the base for everything that follows: every photo you generate is built from this cutout.',
-      provider: 'Replicate rembg, with WithoutBG as backup.',
-      duration: '5–15 s',
-      costDetail: '$0.01 if the first provider answers; up to $0.02 if it falls back.',
+    clean: {
+      label: 'Clean the photo',
+      description: 'Erases price, title and watermark',
+      costHint: '$0.04',
+      what: 'Removes the text overlaid on the photo (name, price, watermark) and rebuilds what was behind it. It does NOT touch the product or the display: if your photo was already well shot, this step alone gives you something publishable.',
+      provider: 'Flux Kontext Pro with a strict retouch instruction.',
+      duration: '15-25 s',
+      costDetail: '$0.04 per photo.',
       canFail: [
-        'On a busy background or in low light the cutout can eat part of the chain.',
-        'If the piece is the same colour as the background, the edge comes out ragged.',
+        'If the text sits on top of the product, rebuilding can alter that area.',
+        'With a lot of text a stray letter can survive.',
       ],
       tips: [
-        'Shoot against a plain, contrasting background — that is what improves this step the most.',
-        'If the cutout comes out wrong, redo it: results vary a little between attempts.',
+        'Sometimes this step is all you need: download it and publish.',
+        'If it erased too much, redo it — results vary between runs.',
       ],
-      processing: ['Finding your piece in the photo…', 'Separating it from the background…', 'Cleaning the edges…'],
-      eta: '~10 s typical',
-    },
-    sharpen: {
-      label: 'Sharpness',
-      description: 'Doubles the resolution without changing the piece',
-      costHint: '$0.02',
-      what: 'Doubles the resolution of the cutout so the links, engravings and stone setting read clearly. In jewelry, the detail IS the product.',
-      provider: 'Real-ESRGAN 2x, with automatic Clarity fallback.',
-      duration: '10–25 s',
-      costDetail: '$0.02 with the first one; $0.05 if it has to use the fallback.',
-      canFail: [
-        "Replicate's GPU can run out of memory on a huge photo. It retries on its own with a smaller image.",
-      ],
-      tips: [
-        'This step NEVER stops the pipeline: if it cannot manage, it continues with your original photo and flags it in amber.',
-        'You can skip it if your photo is already high resolution.',
-      ],
-      processing: ['Reading the metal detail…', 'Doubling the resolution…', 'Refining the edges…'],
+      processing: ['Reading the text on the photo...', 'Erasing price and watermark...', 'Rebuilding the background...'],
       eta: '~20 s typical',
+    },
+    isolate: {
+      label: 'Cut out the piece',
+      description: 'Leaves the jewelry alone, no background',
+      costHint: '$0.01',
+      what: 'Cuts the piece out onto a transparent background. Every generated photo — packshot, luxury scene, detail and on-model — is built from this cutout.',
+      provider: 'BiRefNet (fal). Chosen by measuring against 5 other providers.',
+      duration: '2-5 s',
+      costDetail: '$0.01 per photo.',
+      canFail: [
+        'On a background the same tone as the piece the edge can come out ragged.',
+        'If it fails it falls back to rembg, which is much worse at jewelry.',
+      ],
+      tips: [
+        'It runs AFTER cleaning the photo: without the text on top it is far more accurate.',
+        'Tested against rembg, WithoutBG, Bria RMBG 2.0, Grounded SAM and remove.bg. BiRefNet was the only one that kept the fine chain AND the pendant texture.',
+      ],
+      processing: ['Separating the piece from the background...', 'Following the chain link by link...', 'Refining the edges...'],
+      eta: '~4 s typical',
     },
     packshot: {
       label: 'Catalog photo',
-      description: 'White background with shadow — ready to publish',
+      description: 'White background with shadow, ready to publish',
       costHint: '$0.05',
-      what: 'The white-background photo marketplaces ask for: piece centred, soft contact shadow so it does not look pasted on, nothing else in frame. This is the one you upload to your store.',
-      provider: 'Flux Kontext Pro over your cutout, with the preservation guard.',
-      duration: '20–40 s',
+      what: 'The white-background photo marketplaces ask for: piece centred with a soft contact shadow so it does not look pasted on. This is the one you upload to your store.',
+      provider: 'Flux Kontext Pro over the cutout, with the preservation guard.',
+      duration: '20-40 s',
       costDetail: '$0.05 per photo.',
       canFail: [
-        'If the step 1 cutout came out incomplete, it shows more here.',
-        'Occasionally the shadow comes out too harsh — redo it and it varies.',
+        'If the cutout came out incomplete, it shows more here.',
+        'It can reinterpret small details: in one test it turned a medal into a clasp.',
       ],
       tips: [
-        'This is the main photo of your listing: check it in the large view before accepting.',
-        'If the piece changed colour or shape you get an amber warning. Redo the step.',
+        'This is the main photo of your listing: check it large before accepting.',
+        'If the piece changed you get an amber warning. Redo it.',
       ],
-      processing: ['Preparing the white background…', 'Centring the piece…', 'Working out the shadow…'],
+      processing: ['Preparing the white background...', 'Centring the piece...', 'Working out the shadow...'],
       eta: '~30 s typical',
     },
-    estante: {
+    luxury: {
       label: 'Luxury scene',
-      description: 'Velvet, marble and warm light — for social',
+      description: 'Velvet, marble and warm light, for social',
       costHint: '$0.05',
-      what: 'The pretty photo: your piece on velvet, marble or silk with warm boutique light. Necklaces are generated hanging from an invisible neck so the real length and the way the pendant falls are visible.',
-      provider: 'Flux Kontext Pro over your cutout, with the preservation guard.',
-      duration: '20–40 s',
+      what: 'The pretty photo: your piece on velvet, marble or silk with boutique light. Necklaces and rosaries are generated hanging from an invisible neck, so the real length and drape read.',
+      provider: 'Flux Kontext Pro over the cutout, with the preservation guard.',
+      duration: '20-40 s',
       costDetail: '$0.05 per photo.',
       canFail: [
-        'The AI can reinterpret the piece if your photo has low contrast (gold can come out silver).',
-        'The identity check flags that in amber, but it does not block the result.',
+        'On low-contrast photos it can reinterpret the metal (gold comes out silver).',
+        'The identity check flags it in amber but does not block.',
       ],
       tips: [
-        'It uses the spec the AI read from your photo (material, finish, stones) to anchor the result.',
-        'If the piece changed, redo the step — results vary between attempts.',
+        'It uses the spec Vision read from your photo to anchor the result.',
+        'This is slide 1 of the carousel: the one that earns the swipe.',
       ],
-      processing: ['Building the display…', 'Adjusting the warm light…', 'Polishing the reflections…'],
+      processing: ['Building the scene...', 'Adjusting the warm light...', 'Polishing the reflections...'],
       eta: '~30 s typical',
     },
     macro: {
       label: 'Detail macro',
       description: 'Real zoom on the link, the stone or the clasp',
       costHint: 'Free',
-      what: 'Zooms into the most substantial part of the piece — the pendant of a necklace, the stone of a ring, the links of a chain — and shows it against a restrained background.',
+      what: 'Zooms into the most substantial part of the piece against a restrained background. These are the REAL pixels of your photo: nothing here was invented by AI, which is what makes it proof of the finish.',
       provider: 'Local crop with sharp. It does NOT go through any AI.',
-      duration: '1–3 s',
-      costDetail: 'Free. Processed on the server, without calling any provider.',
+      duration: '1-3 s',
+      costDetail: 'Free. Processed on the server.',
       canFail: [
-        'If step 1 left background stuck to the piece, the crop can aim at the wrong spot.',
+        'If the cutout came out dirty, it can aim at the wrong spot.',
       ],
       tips: [
-        'These are the REAL pixels of your photo: nothing here is invented by AI. That is what makes it proof of the finish.',
-        'If it aimed at the wrong spot, redo step 1 and this one recalculates.',
+        'This is the photo that proves quality: the finish reads up close.',
+        'If it aimed wrong, redo the cutout and this recalculates.',
       ],
-      processing: ['Finding the richest part…', 'Cropping the detail…', 'Setting the background…'],
+      processing: ['Finding the richest part...', 'Cropping the detail...', 'Setting the background...'],
       eta: '~2 s',
     },
-    modelo: {
+    model: {
       label: 'On model',
       description: 'The piece worn by an AI model',
       costHint: '$0.10',
-      what: 'Puts YOUR piece on an AI-generated model, on the matching body part: ears, neck, hand or wrist depending on the type of piece.',
-      provider: 'AI model + placement with Flux Kontext Pro over a side-by-side composite.',
-      duration: '40–90 s',
-      costDetail: '$0.10 ($0.055 the model + $0.05 the placement).',
+      what: 'Puts YOUR piece on an AI-generated model, on the body part that matches what Vision detected: ears, neck, hand or wrist.',
+      provider: 'AI model + placement with Flux Kontext Pro.',
+      duration: '40-90 s',
+      costDetail: '$0.10 ($0.055 model + $0.05 placement).',
       canFail: [
-        'It is the hardest step: the AI can reinterpret the piece when placing it on skin.',
-        'If it fails, the other steps carry on — this one never stops the rest.',
+        'It is the hardest step: the AI can reinterpret the piece on skin.',
+        'If it fails, the other steps carry on.',
       ],
       tips: [
-        'Optional. If you only sell from a catalog you can turn it off and save.',
-        'Check the identity warning: it tells you whether the piece changed when mounted.',
+        'Optional. If you only sell from a catalog, turn it off and save.',
+        'Check the identity warning: it tells you whether the piece changed.',
       ],
-      processing: ['Summoning the model…', 'Placing your piece…', 'Matching light and shadow…'],
+      processing: ['Summoning the model...', 'Placing your piece...', 'Matching light and shadow...'],
       eta: '~60 s typical',
     },
-    video: {
-      label: 'Product video',
-      description: 'Camera orbiting the luxury scene',
-      costHint: '$0.05',
-      what: 'A short video with the camera orbiting your piece on the luxury scene, highlight travelling across the metal. For Reels, Stories and the product page.',
-      provider: 'Video generation from the display photo.',
-      duration: '60–120 s',
-      costDetail: '$0.05 per 5 s video.',
+    scale: {
+      label: 'Scale photo',
+      description: 'Shows the real size against a hand',
+      costHint: '$0.10',
+      what: 'The piece held or worn on a hand so the real size reads. Rings have the highest return rate in jewelry, and the documented cause is that the buyer misjudges the size.',
+      provider: 'AI hand model + placement with Flux Kontext Pro.',
+      duration: '40-90 s',
+      costDetail: '$0.10 per photo.',
       canFail: [
-        'It needs the luxury scene to have worked — if that step failed, this one has nothing to start from.',
-        'The motion can come out odd; redo it and it varies.',
+        'Same difficulty as the on-model step: it can reinterpret the piece.',
       ],
       tips: [
-        'Optional. It is the slowest step — turn it off if you are in a hurry.',
-        'Accept the luxury scene first: the video is built on that photo.',
+        'Optional, but it is one of the biggest levers on returns.',
+        'It matters most on rings and small earrings.',
       ],
-      processing: ['Preparing the orbit…', 'Rendering the frames…', 'Polishing the video…'],
-      eta: '~90 s typical',
+      processing: ['Preparing the hand...', 'Placing the piece...', 'Matching the proportion...'],
+      eta: '~60 s typical',
     },
+    social: {
+      label: 'Ready for Instagram',
+      description: '4:5 carousel and vertical reel',
+      costHint: 'Free',
+      what: 'Takes the photos already generated and builds the Instagram material: the 1080x1350 carousel with the safe margin, and the 1080x1920 vertical reel with slow zoom and transitions.',
+      provider: 'sharp for the carousel + ffmpeg for the reel. No AI, no cost.',
+      duration: '3-15 s',
+      costDetail: 'Free.',
+      canFail: [
+        'The reel needs ffmpeg; if the environment lacks it, you still get the carousel.',
+      ],
+      tips: [
+        'The slide order is not arbitrary: the luxury scene goes first because slide 1 carries 80% of the outcome.',
+        'Instagram allows up to 10 slides and they must all share the same ratio.',
+      ],
+      processing: ['Reframing to vertical...', 'Building the carousel...', 'Rendering the reel...'],
+      eta: '~10 s typical',
+    },
+  },
+  stages: {
+    prepare: { label: 'Prepare', hint: 'Get the photo clean and the piece cut out' },
+    generate: { label: 'Generate', hint: 'The catalog and social photos' },
+    publish: { label: 'Publish', hint: 'Packaged for Instagram' },
+  },
+  vision: {
+    heading: 'What AI sees in your photo',
+    analyzing: 'Reading your piece...',
+    failed: 'The spec could not be read. The pipeline carries on.',
+    detectedAs: (tipo) => `Detected: ${tipo}`,
+    guessed: 'Not sure',
+    guessedHint: 'AI did not recognise the piece type and picked the most common one. Check it before generating.',
+    multiProduct: (n) => `${n} products in this photo`,
+    multiProductHint: 'It is processed as one set. If these are separate items, upload one photo each.',
+    chain: 'Chain',
+    clasp: 'Clasp',
+    engraved: 'Engraved',
+    changeType: 'Change type',
+  },
+  social: {
+    carousel: 'Carousel',
+    carouselHint: '1080x1350 (4:5). Every slide shares the ratio, 50 px safe margin.',
+    reel: 'Reel',
+    reelHint: '1080x1920 (9:16), looping.',
+    reelUnavailable: 'The reel could not be generated in this environment. The carousel is ready.',
+    slide: (n) => `Slide ${n}`,
+    downloadKit: 'Download all',
   },
   features: {
     heading: 'What AI sees in your photo',
