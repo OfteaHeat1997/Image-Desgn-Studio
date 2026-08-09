@@ -1978,16 +1978,18 @@ export default function StaticProductPipelinePage() {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
                             const spMeta = sp.steps.items[key];
+                            // Mismo mapa de estado→color que lencería (StepCard):
+                            // dorado de marca en vez de verde/ámbar/rojo crudos.
                             const activeClass =
-                              step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
-                              step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
-                              step.status === "error" ? "bg-red-500/10 border-red-500/40" :
-                              step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
-                              "bg-white/[0.02] border-white/10";
+                              step.status === "running" ? "border-[var(--accent)]/35 bg-gradient-to-b from-[var(--accent-glow)] to-transparent lz-glow" :
+                              step.status === "done" ? "border-[var(--border-accent)] bg-[var(--accent)]/[0.02]" :
+                              step.status === "error" ? "border-[var(--error)]/30 bg-[var(--error-dim)]" :
+                              step.status === "skipped" ? "border-white/5 bg-white/[0.01] opacity-60" :
+                              "border-[var(--border-subtle)] bg-[var(--bg-surface)]";
                             return (
                               <div
                                 key={key}
-                                className={cn("flex items-center gap-2 rounded border p-2 text-[11px]", activeClass)}
+                                className={cn("lz-rise flex items-center gap-2 rounded-xl border p-2 text-[11px] transition-all duration-300", activeClass)}
                                 title={step.error ?? spMeta.description}
                               >
                                 <span className="text-base">{meta.icon}</span>
@@ -2028,12 +2030,14 @@ export default function StaticProductPipelinePage() {
                             const meta = STEP_META[key];
                             const spMeta = sp.steps.items[key];
                             const isVideo = key === "lifestyleVideo";
+                            // Mismo mapa de estado→color que lencería (StepCard):
+                            // dorado de marca en vez de verde/ámbar/rojo crudos.
                             const activeClass =
-                              step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
-                              step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
-                              step.status === "error" ? "bg-red-500/10 border-red-500/40" :
-                              step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
-                              "bg-white/[0.02] border-white/10";
+                              step.status === "running" ? "border-[var(--accent)]/35 bg-gradient-to-b from-[var(--accent-glow)] to-transparent lz-glow" :
+                              step.status === "done" ? "border-[var(--border-accent)] bg-[var(--accent)]/[0.02]" :
+                              step.status === "error" ? "border-[var(--error)]/30 bg-[var(--error-dim)]" :
+                              step.status === "skipped" ? "border-white/5 bg-white/[0.01] opacity-60" :
+                              "border-[var(--border-subtle)] bg-[var(--bg-surface)]";
                             const downloadName = `${job.file.name.replace(/\.[^.]+$/, "")}-${key}.${isVideo ? "mp4" : "jpg"}`;
                             const canRerun =
                               (job.status === "done" || job.status === "error") &&
@@ -2042,7 +2046,7 @@ export default function StaticProductPipelinePage() {
                             return (
                               <div
                                 key={key}
-                                className={cn("flex flex-col rounded-lg border p-2", activeClass)}
+                                className={cn("lz-rise flex flex-col rounded-2xl border p-3 transition-all duration-300", activeClass)}
                                 title={step.error ?? spMeta.description}
                               >
                                 <div className="mb-1.5 flex items-center justify-between gap-1 text-[11px]">
@@ -2132,22 +2136,22 @@ export default function StaticProductPipelinePage() {
                                     <button
                                       type="button"
                                       onClick={() => setLightbox({ url: step.resultUrl!, before: job.previewUrl, label: `${job.file.name} — ${spMeta.label}` })}
-                                      className="group/img relative h-72 w-full overflow-hidden rounded bg-black/40 ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
+                                      className="group/img relative h-72 w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
                                       title={sp.steps.zoomBig}
                                     >
                                       <span className="absolute left-1.5 top-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Antes</span>
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={job.previewUrl} alt="original" className="h-full w-full object-contain" />
+                                      <img src={job.previewUrl} alt="original" className="h-full w-full object-contain" style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }} />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setLightbox({ url: step.resultUrl!, before: job.previewUrl, label: `${job.file.name} — ${spMeta.label}` })}
-                                      className="group/img relative h-72 w-full overflow-hidden rounded bg-black ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
+                                      className="group/img relative h-72 w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition hover:ring-[var(--accent)]"
                                       title={sp.steps.zoomBig}
                                     >
                                       <span className="absolute right-1.5 top-1.5 z-10 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black">Después</span>
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={step.resultUrl} alt={spMeta.label} className="h-full w-full object-contain" />
+                                      <img src={step.resultUrl} alt={spMeta.label} className="h-full w-full object-contain" style={{ background: "repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 12px 12px" }} />
                                       <span className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-center gap-1.5 bg-gradient-to-t from-black/90 to-transparent text-[10px] font-semibold text-white opacity-0 transition group-hover/img:opacity-100">
                                         <Maximize2 className="h-3.5 w-3.5 text-[var(--accent)]" /> {sp.steps.zoomBig}
                                       </span>
@@ -2187,10 +2191,10 @@ export default function StaticProductPipelinePage() {
                                     <a
                                       href={step.resultUrl}
                                       download={downloadName}
-                                      className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25"
+                                      className="lz-lift inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
                                       title={sp.steps.downloadStep(spMeta.label)}
                                     >
-                                      <Download className="h-2.5 w-2.5" />
+                                      <Download className="h-3.5 w-3.5" />
                                       {sp.steps.download}
                                     </a>
                                   )}
@@ -2203,10 +2207,10 @@ export default function StaticProductPipelinePage() {
                                           customPrompt: getAdaptiveBgConfig(job.productType, job.brand).prompt,
                                         })
                                       }
-                                      className="inline-flex items-center gap-1 rounded bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-medium text-[var(--accent)] transition hover:bg-violet-500/25"
+                                      className="lz-lift inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
                                       title={sp.steps.changeTitle}
                                     >
-                                      <Palette className="h-2.5 w-2.5" />
+                                      <Palette className="h-3.5 w-3.5" />
                                       {sp.steps.change}
                                     </button>
                                   )}
@@ -2214,10 +2218,10 @@ export default function StaticProductPipelinePage() {
                                     <button
                                       type="button"
                                       onClick={() => reRunOutputs(job.id, [key])}
-                                      className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-[10px] font-medium text-gray-300 transition hover:bg-white/10"
+                                      className="lz-lift inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:text-[var(--accent-light)]"
                                       title={sp.steps.repeatTitle}
                                     >
-                                      <RotateCw className="h-2.5 w-2.5" />
+                                      <RotateCw className="h-3.5 w-3.5" />
                                       {sp.steps.repeat}
                                     </button>
                                   )}
@@ -2424,7 +2428,7 @@ export default function StaticProductPipelinePage() {
       {/* Lightbox — full-size preview of any thumbnail. ESC or click outside closes. */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
           onClick={() => setLightbox(null)}
           role="dialog"
           aria-modal="true"
@@ -2435,10 +2439,12 @@ export default function StaticProductPipelinePage() {
               e.stopPropagation();
               setLightbox(null);
             }}
-            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            className="absolute right-4 top-4 flex h-10 items-center gap-2 rounded-lg border border-[var(--border-accent)] bg-[var(--accent-dim)] px-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-[#0C0C0E]"
             title={sp.lightbox.close}
           >
             <X className="h-5 w-5" />
+            <span className="text-sm">{sp.lightbox.close}</span>
+            <kbd className="hidden rounded border border-current/30 px-1 text-[12px] opacity-70 sm:inline">Esc</kbd>
           </button>
           <div className="flex max-h-full max-w-full flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <p className="max-w-[80vw] truncate text-xs text-gray-300">{lightbox.label}</p>
@@ -2447,12 +2453,12 @@ export default function StaticProductPipelinePage() {
                 <div className="flex flex-col items-center gap-1.5">
                   <span className="rounded bg-black/70 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">Antes</span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={lightbox.before} alt="antes" className="max-h-[80vh] max-w-[45vw] rounded object-contain" />
+                  <img src={lightbox.before} alt="antes" className="max-h-[80vh] max-w-[45vw] rounded-lg object-contain" style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }} />
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
                   <span className="rounded bg-[var(--accent)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-black">Después</span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={lightbox.url} alt={lightbox.label} className="max-h-[80vh] max-w-[45vw] rounded object-contain" />
+                  <img src={lightbox.url} alt={lightbox.label} className="max-h-[80vh] max-w-[45vw] rounded-lg object-contain" style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }} />
                 </div>
               </div>
             ) : (
@@ -2460,15 +2466,16 @@ export default function StaticProductPipelinePage() {
               <img
                 src={lightbox.url}
                 alt={lightbox.label}
-                className="max-h-[85vh] max-w-[90vw] rounded object-contain"
+                className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
+                style={{ background: "repeating-conic-gradient(#1a1a1a 0% 25%, #0e0e0e 0% 50%) 0 0 / 16px 16px" }}
               />
             )}
             <a
               href={lightbox.url}
               download
-              className="inline-flex items-center gap-1.5 rounded bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-400"
+              className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-3.5 w-3.5" />
               {sp.lightbox.download}
             </a>
           </div>
