@@ -45,6 +45,7 @@ import {
   SkipForward,
   Square,
   StopCircle,
+  ThumbsDown,
   Upload,
   User,
   X,
@@ -128,6 +129,13 @@ interface StepState {
   /** Imagen que entró a este paso — el "antes" del comparador. */
   inputUrl?: string;
   resultUrl?: string;
+  /**
+   * TODOS los resultados que produjo este paso, en orden. "Rehacer" no pisa el
+   * anterior: lo guarda acá. Así se puede comparar y volver al que gustaba, que
+   * es lo que faltaba — antes rehacer destruía el resultado bueno sin vuelta
+   * atrás, y no había forma de decir "este pedazo no lo quiero".
+   */
+  candidates?: string[];
   /** Slides del carrusel (solo el paso `social`). */
   carousel?: string[];
   /** Reel vertical (solo el paso `social`). */
@@ -376,6 +384,10 @@ interface StepCardProps {
   onSkip: () => void;
   onRerun: () => void;
   onStop: () => void;
+  /** Elegir cuál de las versiones generadas se queda. */
+  onSelectVariant: (url: string) => void;
+  /** "No me gusta": descarta la versión actual y vuelve a la anterior. */
+  onDiscard: () => void;
 }
 
 function StepCard({
@@ -388,6 +400,8 @@ function StepCard({
   onSkip,
   onRerun,
   onStop,
+  onSelectVariant,
+  onDiscard,
 }: StepCardProps) {
   const { t } = useI18n();
   const jt = t.pipelines.jewelry;
@@ -582,6 +596,14 @@ function StepCard({
           <SocialResult step={step} filenamePrefix={filenamePrefix} onOpen={setLightboxIdx} />
         ) : (
           <div onMouseEnter={step.resultUrl ? openPeek : undefined} onMouseLeave={closePeek}>
+            {/* Antes de correr se explica QUE hace, sin obligar a abrir el panel.
+                El reclamo fue "faltan explicaciones": la doc estaba escondida
+                detrás del icono "i" y nadie la abría antes de gastar. */}
+            {step.status === "idle" && (
+              <p className="mb-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                {copy.what}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => step.resultUrl && setLightboxIdx(0)}
@@ -619,6 +641,41 @@ function StepCard({
           </div>
         )}
 
+        {/* Versiones generadas. Rehacer ya no pisa la anterior, así que se
+            puede comparar y volver a la que gustaba. */}
+        {!isSocial && (step.candidates?.length ?? 0) > 1 && (
+          <div className="mt-3">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              {jt.buttons.variants(step.candidates!.length)}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {step.candidates!.map((url, i) => {
+                const active = url === step.resultUrl;
+                return (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => onSelectVariant(url)}
+                    title={jt.buttons.useVariant(i + 1)}
+                    className={cn(
+                      "relative h-14 w-14 overflow-hidden rounded-lg border-2 transition-all",
+                      active
+                        ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
+                        : "border-white/10 opacity-70 hover:opacity-100",
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={jt.buttons.useVariant(i + 1)} className="h-full w-full object-cover" />
+                    <span className="absolute bottom-0 right-0 bg-black/70 px-1 text-[9px] font-semibold text-white">
+                      {i + 1}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {canInteract && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {step.status !== "accepted" && (step.resultUrl || step.carousel) && (
@@ -639,6 +696,17 @@ function StepCard({
               <RotateCcw className="h-3.5 w-3.5" />
               {jt.buttons.rerun}
             </button>
+            {(step.resultUrl || step.carousel) && (
+              <button
+                type="button"
+                onClick={onDiscard}
+                title={jt.buttons.discardTitle}
+                className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/5 px-3.5 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15"
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+                {jt.buttons.discard}
+              </button>
+            )}
             {step.status !== "skipped" && (
               <button
                 type="button"
@@ -944,6 +1012,27 @@ export default function JewelryPipelinePage() {
         return false;
       };
 
+      /**
+       * Marca el paso como hecho y ACUMULA el resultado en `candidates`, sin
+       * pisar los anteriores. Rehacer deja de ser destructivo.
+       */
+      const done = (url: string, cost: number, extra: Partial<StepState> = {}) => {
+        const prev = jobsRef.current.find((j) => j.id === jobId)?.steps[key].candidates ?? [];
+        const candidates = prev.includes(url) ? prev : [...prev, url];
+        patchStep(jobId, key, { status: "done", resultUrl: url, candidates, cost, ...extra });
+      };
+
+      // Auto-scroll a la tarjeta que arranca. Sin esto las tarjetas quedan
+      // below-the-fold y no se ve que un paso empezo — el "no puedo ir abajo ni
+      // arriba". Lo mismo que hace lenceria.
+      const focusCard = () => {
+        requestAnimationFrame(() => {
+          document
+            .querySelector(`[data-step-id="${key}"]`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      };
+
       const descriptor = job.features ? jewelryDescriptor(job.features) : null;
 
       try {
@@ -952,6 +1041,7 @@ export default function JewelryPipelinePage() {
             const input = job.uploadedUrl;
             if (!input) return fail("Falta la subida");
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const res = await fetch("/api/photo-clean", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -961,11 +1051,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST.clean,
-            });
+            done(url, data.cost ?? STEP_COST.clean);
             return true;
           }
 
@@ -973,6 +1059,7 @@ export default function JewelryPipelinePage() {
             const input = job.steps.clean.resultUrl ?? job.uploadedUrl;
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const res = await fetch("/api/bg-remove", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -984,11 +1071,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST.isolate,
-            });
+            done(url, data.cost ?? STEP_COST.isolate);
             return true;
           }
 
@@ -997,6 +1080,7 @@ export default function JewelryPipelinePage() {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const base = key === "packshot" ? config.packshotPrompt : config.estantePrompt;
             // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
             // plantilla genérica del sub-tipo.
@@ -1018,11 +1102,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: data.cost ?? STEP_COST[key],
-            });
+            done(url, data.cost ?? STEP_COST[key]);
             runIdentityCheck(jobId, key, input, url, false);
             return true;
           }
@@ -1031,6 +1111,7 @@ export default function JewelryPipelinePage() {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
+            focusCard();
             const res = await fetch("/api/macro-crop", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1045,7 +1126,7 @@ export default function JewelryPipelinePage() {
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            patchStep(jobId, key, { status: "done", resultUrl: url, cost: 0 });
+            done(url, 0);
             return true;
           }
 
@@ -1054,6 +1135,7 @@ export default function JewelryPipelinePage() {
             const jewelryUrl = productUrl(job);
             if (!jewelryUrl) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: jewelryUrl, error: undefined });
+            focusCard();
 
             // La foto de escala siempre va sobre una mano: es la referencia que
             // la compradora entiende sin pensar, y los anillos son lo que más
@@ -1071,6 +1153,12 @@ export default function JewelryPipelinePage() {
                 ageRange: "26-35",
                 skinTone: "medium",
                 bodyType: "average",
+                // `pose` y `expression` son OBLIGATORIOS en /api/model-create.
+                // Faltaban, así que el paso moría con
+                // 'Missing required field "pose"' antes de generar nada — esa
+                // era la causa real de "en la modelo no funciona".
+                pose: "standing",
+                expression: "natural",
                 customDetails: modelPrompt,
               }),
               signal,
@@ -1103,11 +1191,7 @@ export default function JewelryPipelinePage() {
               });
               return false;
             }
-            patchStep(jobId, key, {
-              status: "done",
-              resultUrl: url,
-              cost: modelCost + (tryonData.cost ?? 0.05),
-            });
+            done(url, modelCost + (tryonData.cost ?? 0.05));
             runIdentityCheck(jobId, key, jewelryUrl, url, true);
             return true;
           }
@@ -1125,6 +1209,7 @@ export default function JewelryPipelinePage() {
             if (urls.length === 0) return fail(jt.messages.needsEstante);
 
             patchStep(jobId, key, { status: "processing", inputUrl: urls[0], error: undefined });
+            focusCard();
             const res = await fetch("/api/social-kit", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1277,6 +1362,26 @@ export default function JewelryPipelinePage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * "No me gusta": saca la versión actual de la lista y vuelve a la anterior.
+   * Si era la única, el paso queda vacío y listo para rehacer — antes no había
+   * forma de rechazar un resultado sin gastar en otro.
+   */
+  const handleDiscard = (jobId: string, key: StepKey) => {
+    const step = jobsRef.current.find((j) => j.id === jobId)?.steps[key];
+    if (!step) return;
+    const remaining = (step.candidates ?? []).filter((u) => u !== step.resultUrl);
+    patchStep(jobId, key, {
+      candidates: remaining,
+      resultUrl: remaining[remaining.length - 1],
+      carousel: undefined,
+      reelUrl: undefined,
+      status: remaining.length > 0 ? "done" : "idle",
+      warning: undefined,
+      error: undefined,
+    });
   };
 
   const handleRerun = async (jobId: string, key: StepKey) => {
@@ -1531,6 +1636,10 @@ export default function JewelryPipelinePage() {
                         onSkip={() => patchStep(activeJob.id, key, { status: "skipped" })}
                         onRerun={() => void handleRerun(activeJob.id, key)}
                         onStop={() => abortRef.current?.abort()}
+                        onSelectVariant={(url) =>
+                          patchStep(activeJob.id, key, { resultUrl: url, status: "done" })
+                        }
+                        onDiscard={() => handleDiscard(activeJob.id, key)}
                       />
                     ))}
                   </div>
