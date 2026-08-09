@@ -2113,11 +2113,11 @@ export default function StaticProductPipelinePage() {
                                     <button
                                       type="button"
                                       onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
-                                      className="absolute inset-x-0 bottom-0 z-10 flex h-8 items-center justify-center gap-1.5 bg-gradient-to-t from-black/85 to-transparent opacity-0 transition group-hover:opacity-100"
+                                      className="absolute inset-x-0 bottom-0 z-10 flex h-9 items-center justify-center gap-1.5 bg-gradient-to-t from-black/90 to-transparent opacity-100 transition hover:from-black"
                                       title={sp.steps.zoomBig}
                                     >
-                                      <Maximize2 className="h-3.5 w-3.5 text-[var(--accent)]" />
-                                      <span className="text-[10px] font-semibold text-white">{sp.steps.zoomBig}</span>
+                                      <Maximize2 className="h-4 w-4 text-[var(--accent)]" />
+                                      <span className="text-[11px] font-semibold text-white">{sp.steps.zoomBig}</span>
                                     </button>
                                     {step.warning && (
                                       <span
