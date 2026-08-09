@@ -367,11 +367,11 @@ function StatusPill({ status }: { status: JobStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-        isError && "bg-red-500/15 text-red-300",
-        isDone && "bg-emerald-500/15 text-emerald-300",
-        isActive && "bg-amber-500/15 text-amber-300",
-        !isError && !isDone && !isActive && "bg-white/5 text-gray-400",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+        isError && "border-[var(--error)]/25 bg-[var(--error-dim)] text-[var(--error)]",
+        isDone && "border-[var(--success)]/25 bg-[var(--success-dim)] text-[var(--success)]",
+        isActive && "border-[var(--accent)]/30 bg-[var(--accent-dim)] text-[var(--accent)]",
+        !isError && !isDone && !isActive && "border-[var(--border-subtle)] bg-white/5 text-[var(--text-muted)]",
       )}
     >
       {isActive && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -473,16 +473,28 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
       }}
       onClick={() => inputRef.current?.click()}
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-all cursor-pointer",
+        "group focus-ring flex cursor-pointer flex-col items-center justify-center gap-4 rounded-[var(--radius-lg)] border border-dashed px-6 py-14 text-center transition-default",
         dragOver
-          ? "border-[var(--accent)]/60 bg-[var(--accent-dim)]"
-          : "border-white/10 bg-white/[0.02] hover:border-white/20",
+          ? "border-[var(--accent)]/70 bg-[var(--accent-dim)] scale-[1.01]"
+          : "border-[var(--border-default)] bg-[var(--bg-overlay)]/40 hover:border-[var(--accent)]/40 hover:bg-[var(--accent-glow)]",
       )}
     >
-      <Upload className="h-6 w-6 text-gray-400" />
+      <span
+        className={cn(
+          "flex h-14 w-14 items-center justify-center rounded-full border transition-default shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+          dragOver
+            ? "border-[var(--accent)]/50 bg-[var(--accent)]/15 text-[var(--accent-light)]"
+            : "border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--accent)] group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10",
+        )}
+      >
+        <Upload className="h-6 w-6" />
+      </span>
       <div>
-        <p className="text-sm font-medium text-gray-200">{sp.upload.dropCta}</p>
-        <p className="mt-1 text-xs text-gray-500">{sp.upload.dropHint}</p>
+        <p className="text-base font-semibold text-[var(--text-primary)]">
+          {sp.upload.dropCta}{" "}
+          <span className="font-normal text-[var(--text-muted)]">{sp.upload.dropClick}</span>
+        </p>
+        <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-[var(--text-muted)]">{sp.upload.dropHint}</p>
       </div>
       <input
         ref={inputRef}
@@ -1227,46 +1239,59 @@ export default function StaticProductPipelinePage() {
     <div className="min-h-screen bg-surface text-heading overflow-x-hidden">
       {/* Header — design tokens (oro brand en vez de amber random) */}
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
-        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
+        <Link href="/" className="flex items-center gap-2 text-sm font-medium text-[var(--text-muted)] transition-default hover:text-[var(--accent)]">
           <ChevronLeft className="h-4 w-4" />
           <span className="hidden sm:inline">{sp.header.home}</span>
         </Link>
         <span className="text-[var(--border-default)]">/</span>
-        <div className="flex items-center gap-2 min-w-0">
-          <Package className="h-4 w-4 text-[var(--accent)] shrink-0" />
-          <span className="text-sm font-semibold text-heading truncate">{sp.header.name}</span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-muted)] text-[var(--bg-primary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+            <Package className="h-4 w-4" />
+          </span>
+          <span className="font-serif text-[15px] font-semibold text-[var(--text-primary)] truncate">{sp.header.name}</span>
         </div>
         <div className="ml-auto hidden md:block">
-          <span className="rounded-full bg-[var(--accent-dim)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
+          <span className="rounded-full border border-[var(--border-accent)] bg-[var(--accent-glow)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
             {sp.header.categories}
           </span>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
-        <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.staticProduct.title}</h1>
-          <p className="mt-1 text-sm text-body leading-relaxed">
+      <div className="mx-auto max-w-5xl px-4 md:px-6 py-8 md:py-12">
+        <div className="mb-10 md:mb-12 lz-rise">
+          <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-accent)] bg-[var(--accent-glow)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">
+            <Sparkles className="h-3 w-3" />
+            {sp.header.name}
+          </span>
+          <h1 className="font-serif text-3xl font-semibold leading-tight tracking-tight text-[var(--text-primary)] md:text-[2.75rem]">
+            {t.pages.staticProduct.title}
+          </h1>
+          <p className="mt-3 max-w-2xl text-base leading-relaxed text-[var(--text-secondary)]">
             {t.pages.staticProduct.subtitle}
           </p>
         </div>
 
         {/* Gap 1 — Batch desde inventario local */}
-        <section className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-5">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="mb-8 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[0_1px_0_rgba(255,255,255,0.02)_inset]">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300">
-                <FolderOpen className="mr-2 inline h-4 w-4" />
-                {sp.batch.heading}
-              </h2>
-              <p className="mt-1 text-xs text-gray-400">
-                {sp.batch.hintPre}<code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code>{sp.batch.hintPost}
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-elevated)] text-[var(--accent)]">
+                  <FolderOpen className="h-4 w-4" />
+                </span>
+                <h2 className="text-base font-semibold text-[var(--text-primary)]">{sp.batch.heading}</h2>
+                <span className="rounded-full border border-[var(--border-subtle)] bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+                  {sp.batch.badge}
+                </span>
+              </div>
+              <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)]">
+                {sp.batch.hintPre}<code className="rounded bg-[var(--bg-overlay)] px-1 text-[var(--text-secondary)]">docs/inventory-final/images/</code>{sp.batch.hintPost}
               </p>
             </div>
             <button
               onClick={loadScan}
               disabled={batchLoadingId !== null}
-              className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-gray-400 hover:border-white/20 hover:text-white disabled:opacity-50"
+              className="lz-lift flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-default hover:border-[var(--accent)]/40 hover:text-[var(--accent-light)] disabled:opacity-50"
               title={sp.batch.refreshTitle}
             >
               <RefreshCw className="h-3 w-3" />
@@ -1275,18 +1300,18 @@ export default function StaticProductPipelinePage() {
           </div>
 
           {scanError && (
-            <div className="mb-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <div className="mb-3 rounded-[var(--radius-sm)] border border-[var(--error)]/30 bg-[var(--error-dim)] px-3 py-2 text-xs text-[var(--error)]">
               {sp.batch.errorLoading(scanError)}
             </div>
           )}
 
           {batchCategories === null ? (
-            <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Loader2 className="h-3 w-3 animate-spin" /> {sp.batch.scanning}
             </div>
           ) : batchCategories.length === 0 ? (
-            <p className="text-xs text-gray-500">
-              {sp.batch.emptyPre}<code className="rounded bg-black/40 px-1">docs/inventory-final/images/</code>{sp.batch.emptyPost}
+            <p className="text-xs text-[var(--text-muted)]">
+              {sp.batch.emptyPre}<code className="rounded bg-[var(--bg-overlay)] px-1 text-[var(--text-secondary)]">docs/inventory-final/images/</code>{sp.batch.emptyPost}
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1299,35 +1324,35 @@ export default function StaticProductPipelinePage() {
                     onClick={() => loadBatchFromCategory(cat)}
                     disabled={batchLoadingId !== null || isRunning}
                     className={cn(
-                      "group relative flex flex-col items-start gap-1 rounded-lg border bg-black/30 px-3 py-2.5 text-left transition",
+                      "lz-lift group relative flex flex-col items-start gap-1.5 rounded-[var(--radius-md)] border bg-[var(--bg-elevated)] px-3.5 py-3 text-left transition-default",
                       isLoading
-                        ? "border-amber-500/40 bg-amber-500/10"
-                        : "border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/5 disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:bg-black/30",
+                        ? "border-[var(--accent)]/40 bg-[var(--accent-glow)]"
+                        : "border-[var(--border-default)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-glow)] disabled:opacity-40 disabled:hover:border-[var(--border-default)] disabled:hover:bg-[var(--bg-elevated)]",
                     )}
                   >
                     <div className="flex w-full items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-gray-200">{cat.name}</span>
+                      <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{cat.name}</span>
                       {isLoading ? (
-                        <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-amber-300" />
+                        <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-[var(--accent)]" />
                       ) : (
-                        <Package className="h-3.5 w-3.5 flex-shrink-0 text-gray-500 group-hover:text-emerald-400" />
+                        <Package className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-muted)] transition-default group-hover:text-[var(--accent)]" />
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
                       <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono">{pt}</span>
                       <span>{sp.batch.photos(cat.imageCount)}</span>
                     </div>
                     {isLoading && batchProgress && (
                       <div className="mt-1 w-full">
-                        <div className="h-1 w-full overflow-hidden rounded-full bg-black/40">
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-[var(--bg-overlay)]">
                           <div
-                            className="h-full bg-amber-400 transition-all"
+                            className="h-full rounded-full bg-[var(--accent)] transition-all"
                             style={{
                               width: `${batchProgress.total > 0 ? Math.round((batchProgress.loaded / batchProgress.total) * 100) : 0}%`,
                             }}
                           />
                         </div>
-                        <p className="mt-0.5 text-[9px] text-amber-300">
+                        <p className="mt-1 text-[9px] text-[var(--accent)]">
                           {sp.batch.loading(batchProgress.loaded, batchProgress.total)}
                         </p>
                       </div>
@@ -1340,18 +1365,28 @@ export default function StaticProductPipelinePage() {
         </section>
 
         {/* Defaults + upload */}
-        <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-            {sp.upload.heading} <span className="font-normal normal-case text-gray-500">{sp.upload.headingHint}</span>
-          </h2>
-
-          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <section className="mb-8 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 md:p-7 lz-rise">
+          <div className="mb-5 flex items-center gap-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/12 font-serif text-lg font-semibold text-[var(--accent-light)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              1
+            </span>
             <div>
-              <label className="mb-1 block text-xs text-gray-400">{sp.upload.defaultType}</label>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">{sp.upload.stepKicker}</p>
+              <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">
+                {sp.upload.stepTitle}{" "}
+                <span className="font-sans text-sm font-normal text-[var(--text-muted)]">{sp.upload.headingHint}</span>
+              </h2>
+            </div>
+          </div>
+
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{sp.upload.defaultsTitle}</p>
+          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{sp.upload.defaultType}</label>
               <select
                 value={defaultType}
                 onChange={(e) => setDefaultType(e.target.value as StaticProductType)}
-                className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white"
+                className="focus-ring w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] transition-default hover:border-[var(--accent)]/40"
               >
                 {Object.entries(PRODUCT_TYPE_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
@@ -1359,11 +1394,11 @@ export default function StaticProductPipelinePage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-400">{sp.upload.defaultBrand}</label>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">{sp.upload.defaultBrand}</label>
               <select
                 value={defaultBrand}
                 onChange={(e) => setDefaultBrand(e.target.value as StaticBrand)}
-                className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white"
+                className="focus-ring w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2.5 text-sm text-[var(--text-primary)] transition-default hover:border-[var(--accent)]/40"
               >
                 {Object.entries(BRAND_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
@@ -1377,27 +1412,42 @@ export default function StaticProductPipelinePage() {
 
         {/* Jobs list */}
         {jobs.length > 0 && (
-          <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-                {sp.review.heading(jobs.length)}
-              </h2>
-              <div className="flex items-center gap-3 text-xs text-gray-400">
-                <span>${totalCost.toFixed(3)} {sp.review.spent}</span>
-                <span>{doneCount}/{jobs.length} {sp.review.done}</span>
+          <section className="mb-8 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 md:p-7 lz-rise">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/12 font-serif text-lg font-semibold text-[var(--accent-light)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  2
+                </span>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">{sp.review.stepKicker}</p>
+                  <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">{sp.review.stepTitle}</h2>
+                </div>
+              </div>
+              {/* Resumen — chips estilo checkout refinado */}
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+                  {jobs.length} {sp.review.photosLabel}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success)]/25 bg-[var(--success-dim)] px-3 py-1.5 text-xs font-medium text-[var(--success)]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {doneCount}/{jobs.length} {sp.review.done}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-accent)] bg-[var(--accent-glow)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]">
+                  ${totalCost.toFixed(3)} <span className="font-normal text-[var(--accent-muted)]">{sp.review.spent}</span>
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-4">
               {jobs.map((job) => {
                 const cfg = getAdaptiveBgConfig(job.productType, job.brand);
                 return (
                   <div
                     key={job.id}
-                    className="rounded-lg border border-white/8 bg-black/30 p-3"
-                  ><div className="flex gap-3">
+                    className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)] p-4 transition-default hover:border-[var(--border-accent)]"
+                  ><div className="flex gap-4">
                     {/* Preview */}
-                    <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded border border-white/10 bg-black">
+                    <div className="relative h-28 w-28 flex-shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-overlay)]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={job.resultUrl ?? job.previewUrl}
@@ -1408,7 +1458,7 @@ export default function StaticProductPipelinePage() {
                         <a
                           href={job.resultUrl}
                           download={`${job.file.name.replace(/\.[^.]+$/, "")}-static.jpg`}
-                          className="absolute bottom-1 right-1 rounded bg-black/70 p-1 text-white transition hover:bg-black"
+                          className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 p-1.5 text-white backdrop-blur transition-default hover:bg-[var(--accent)] hover:text-[var(--bg-primary)]"
                           title={sp.job.downloadResult}
                         >
                           <Download className="h-3 w-3" />
@@ -1417,9 +1467,9 @@ export default function StaticProductPipelinePage() {
                     </div>
 
                     {/* Metadata */}
-                    <div className="flex flex-1 flex-col gap-2">
+                    <div className="flex flex-1 flex-col gap-2.5 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-sm font-medium text-gray-200" title={job.file.name}>
+                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]" title={job.file.name}>
                           {job.file.name}
                         </p>
                         <div className="flex items-center gap-1">
@@ -1459,7 +1509,7 @@ export default function StaticProductPipelinePage() {
                                     setZippingJobId(null);
                                   }
                                 }}
-                                className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50"
+                                className="inline-flex items-center gap-1 rounded-md border border-[var(--success)]/25 bg-[var(--success-dim)] px-2 py-1 text-[10px] font-medium text-[var(--success)] transition-default hover:bg-[var(--success)]/20 disabled:opacity-50"
                                 title={sp.job.downloadNOfNTitle(doneOutputs.length, OUTPUT_STEPS.length)}
                               >
                                 {zippingJobId === job.id ? (
@@ -1476,7 +1526,7 @@ export default function StaticProductPipelinePage() {
                           <button
                             onClick={() => removeJob(job.id)}
                             disabled={isRunning}
-                            className="text-gray-500 hover:text-red-400 disabled:opacity-30"
+                            className="rounded-md p-1 text-[var(--text-muted)] transition-default hover:bg-[var(--error-dim)] hover:text-[var(--error)] disabled:opacity-30"
                             title={sp.job.remove}
                           >
                             <X className="h-4 w-4" />
@@ -1489,7 +1539,7 @@ export default function StaticProductPipelinePage() {
                           value={job.productType}
                           onChange={(e) => updateJob(job.id, { productType: e.target.value as StaticProductType })}
                           disabled={isRunning || job.status !== "idle"}
-                          className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white disabled:opacity-50"
+                          className="focus-ring rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] transition-default hover:border-[var(--accent)]/40 disabled:opacity-50"
                         >
                           {Object.entries(PRODUCT_TYPE_LABELS).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
@@ -1499,7 +1549,7 @@ export default function StaticProductPipelinePage() {
                           value={job.brand}
                           onChange={(e) => updateJob(job.id, { brand: e.target.value as StaticBrand })}
                           disabled={isRunning || job.status !== "idle"}
-                          className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white disabled:opacity-50"
+                          className="focus-ring rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] transition-default hover:border-[var(--accent)]/40 disabled:opacity-50"
                         >
                           {Object.entries(BRAND_LABELS).map(([k, v]) => (
                             <option key={k} value={k}>{v}</option>
@@ -1524,7 +1574,7 @@ export default function StaticProductPipelinePage() {
                             updateJob(job.id, { sceneOverride: v === "auto" ? null : v });
                           }}
                           disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
-                          className="w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-white disabled:opacity-50"
+                          className="focus-ring w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-2 text-xs text-[var(--text-primary)] transition-default hover:border-[var(--accent)]/40 disabled:opacity-50"
                         >
                           <option value="auto">{sp.job.sceneAuto}</option>
                           {(["lujo", "natural", "lifestyle", "romantico", "editorial", "studio"] as SceneCategory[]).map((cat) => {
@@ -1551,36 +1601,36 @@ export default function StaticProductPipelinePage() {
                           modelo poniéndosela, haciendo spray a la colonia,
                           un fondo interesante". 5s 9:16 wan-2.2-fast,
                           opt-in porque suma $0.05 + 60-120s. */}
-                      <div className="rounded border border-[var(--accent)]/20 bg-[var(--accent-dim)] px-2 py-2">
-                        <label className="flex items-start gap-2 cursor-pointer">
+                      <div className="rounded-[var(--radius-sm)] border border-[var(--accent)]/25 bg-[var(--accent-glow)] px-3 py-2.5">
+                        <label className="flex items-start gap-2.5 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={job.generateVideo ?? false}
                             onChange={(e) => updateJob(job.id, { generateVideo: e.target.checked })}
                             disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
-                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                            className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-[var(--accent)]">
+                              <span className="text-xs font-semibold text-[var(--accent-light)]">
                                 {sp.job.videoToggle}
                               </span>
                             </div>
-                            <p className="text-[10px] text-muted leading-tight mt-0.5">
+                            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mt-0.5">
                               {sp.job.videoDesc}
                             </p>
                           </div>
                         </label>
                         {job.generateVideo && (
-                          <div className="mt-2 pl-5">
-                            <label className="text-[10px] uppercase tracking-wider text-muted block mb-1">
+                          <div className="mt-2.5 pl-6">
+                            <label className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] block mb-1.5">
                               {sp.job.videoAction}
                             </label>
                             <select
                               value={job.videoAction ?? "auto"}
                               onChange={(e) => updateJob(job.id, { videoAction: e.target.value as LifestyleVideoAction })}
                               disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
-                              className="w-full rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white disabled:opacity-50"
+                              className="focus-ring w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] transition-default hover:border-[var(--accent)]/40 disabled:opacity-50"
                             >
                               {LIFESTYLE_VIDEO_ACTIONS.map((a) => (
                                 <option key={a.value} value={a.value}>{a.icon} {sp.job.videoActions[a.value]}</option>
@@ -1593,31 +1643,31 @@ export default function StaticProductPipelinePage() {
                       {/* Mejoras opt-in: alta resolución (upscale) + sombra de
                           contacto. Ambas suman una tarjeta de output cuando se
                           activan. Upscale cuesta $0.05; la sombra es gratis. */}
-                      <div className="space-y-1.5 rounded border border-white/10 bg-white/[0.02] px-2 py-2">
-                        <label className="flex items-start gap-2 cursor-pointer">
+                      <div className="divide-y divide-[var(--border-subtle)] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-surface)]">
+                        <label className="flex items-start gap-2.5 cursor-pointer px-3 py-2.5 transition-default hover:bg-white/[0.03]">
                           <input
                             type="checkbox"
                             checked={job.upscaleOutput ?? false}
                             onChange={(e) => updateJob(job.id, { upscaleOutput: e.target.checked })}
                             disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
-                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                            className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                           />
                           <div className="flex-1 min-w-0">
-                            <span className="text-[11px] font-semibold text-gray-100">{sp.job.upscaleToggle}</span>
-                            <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.upscaleDesc}</p>
+                            <span className="text-xs font-semibold text-[var(--text-primary)]">{sp.job.upscaleToggle}</span>
+                            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mt-0.5">{sp.job.upscaleDesc}</p>
                           </div>
                         </label>
-                        <label className="flex items-start gap-2 cursor-pointer">
+                        <label className="flex items-start gap-2.5 cursor-pointer px-3 py-2.5 transition-default hover:bg-white/[0.03]">
                           <input
                             type="checkbox"
                             checked={job.addShadow ?? false}
                             onChange={(e) => updateJob(job.id, { addShadow: e.target.checked })}
                             disabled={isRunning || (job.status !== "idle" && job.status !== "done" && job.status !== "error")}
-                            className="mt-0.5 h-3.5 w-3.5 accent-[var(--accent)]"
+                            className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
                           />
                           <div className="flex-1 min-w-0">
-                            <span className="text-[11px] font-semibold text-gray-100">{sp.job.shadowToggle}</span>
-                            <p className="text-[10px] text-muted leading-tight mt-0.5">{sp.job.shadowDesc}</p>
+                            <span className="text-xs font-semibold text-[var(--text-primary)]">{sp.job.shadowToggle}</span>
+                            <p className="text-[11px] text-[var(--text-muted)] leading-relaxed mt-0.5">{sp.job.shadowDesc}</p>
                           </div>
                         </label>
                       </div>
@@ -1625,24 +1675,24 @@ export default function StaticProductPipelinePage() {
                       {/* Per-photo features detected by Vision — shows that the
                            pipeline is using THIS bottle, not a generic template */}
                       {job.productFeatures && (
-                        <div className="rounded border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1.5">
-                          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
+                        <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
+                          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
                             {sp.job.featuresTitle}
                           </p>
-                          <div className="flex flex-wrap gap-1">
-                            <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
                               {job.productFeatures.tipo_envase} {job.productFeatures.forma}
                             </span>
-                            <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                            <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
                               {job.productFeatures.material_aparente}
                             </span>
                             {job.productFeatures.color_envase && (
-                              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                              <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
                                 {job.productFeatures.color_envase}
                               </span>
                             )}
                             {job.productFeatures.tapa && (
-                              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
+                              <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
                                 {sp.job.cap(job.productFeatures.tapa)}
                               </span>
                             )}
@@ -1667,7 +1717,7 @@ export default function StaticProductPipelinePage() {
                       </div>
 
                       {job.error && (
-                        <p className="text-[11px] text-red-400" title={job.error}>
+                        <p className="text-[11px] text-[var(--error)]" title={job.error}>
                           {job.error.length > 80 ? job.error.slice(0, 80) + "..." : job.error}
                         </p>
                       )}
@@ -1684,15 +1734,15 @@ export default function StaticProductPipelinePage() {
                             const meta = STEP_META[key];
                             const spMeta = sp.steps.items[key];
                             const activeClass =
-                              step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
-                              step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
-                              step.status === "error" ? "bg-red-500/10 border-red-500/40" :
-                              step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
-                              "bg-white/[0.02] border-white/10";
+                              step.status === "done" ? "border-[var(--success)]/30 bg-[var(--success-dim)]" :
+                              step.status === "running" ? "border-[var(--accent)]/40 bg-[var(--accent-glow)] animate-pulse" :
+                              step.status === "error" ? "border-[var(--error)]/40 bg-[var(--error-dim)]" :
+                              step.status === "skipped" ? "border-[var(--border-subtle)] bg-white/[0.02] opacity-60" :
+                              "border-[var(--border-default)] bg-[var(--bg-surface)]";
                             return (
                               <div
                                 key={key}
-                                className={cn("flex items-center gap-2 rounded border p-2 text-[11px]", activeClass)}
+                                className={cn("flex items-center gap-2.5 rounded-[var(--radius-sm)] border p-2.5 text-[11px]", activeClass)}
                                 title={step.error ?? spMeta.description}
                               >
                                 <span className="text-base">{meta.icon}</span>
@@ -1700,22 +1750,22 @@ export default function StaticProductPipelinePage() {
                                   <button
                                     type="button"
                                     onClick={() => setLightbox({ url: step.resultUrl!, label: spMeta.label })}
-                                    className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/60"
+                                    className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-[var(--bg-overlay)] transition-default hover:ring-2 hover:ring-[var(--accent)]/60"
                                     title={sp.job.zoomSmall}
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={step.resultUrl} alt={spMeta.label} className="h-full w-full object-contain" />
                                   </button>
                                 ) : (
-                                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-black/40 text-gray-600">
+                                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--bg-overlay)] text-[var(--text-disabled)]">
                                     {step.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : "—"}
                                   </div>
                                 )}
                                 <div className="flex flex-1 flex-col text-[10px]">
-                                  <span className="truncate font-medium text-gray-200">{spMeta.label}</span>
-                                  <span className="text-gray-400">
-                                    {step.status === "done" && <><CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" /> {step.cost > 0 && <span className="font-mono text-[var(--accent)]">${step.cost.toFixed(3)}</span>}</>}
-                                    {step.status === "error" && <span className="text-red-400"><AlertCircle className="inline h-2.5 w-2.5" /> {sp.steps.failedLower}</span>}
+                                  <span className="truncate font-medium text-[var(--text-primary)]">{spMeta.label}</span>
+                                  <span className="text-[var(--text-muted)]">
+                                    {step.status === "done" && <><CheckCircle2 className="inline h-2.5 w-2.5 text-[var(--success)]" /> {step.cost > 0 && <span className="font-mono text-[var(--accent)]">${step.cost.toFixed(3)}</span>}</>}
+                                    {step.status === "error" && <span className="text-[var(--error)]"><AlertCircle className="inline h-2.5 w-2.5" /> {sp.steps.failedLower}</span>}
                                     {step.status === "skipped" && sp.steps.skipped}
                                     {step.status === "running" && sp.steps.processingLower}
                                     {step.status === "idle" && spMeta.costHint}
@@ -1727,18 +1777,18 @@ export default function StaticProductPipelinePage() {
                         </div>
 
                         {/* Outputs — big thumbnails with download + zoom + re-run */}
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                           {outputStepsFor(job).map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
                             const spMeta = sp.steps.items[key];
                             const isVideo = key === "lifestyleVideo";
                             const activeClass =
-                              step.status === "done" ? "bg-emerald-500/10 border-emerald-500/30" :
-                              step.status === "running" ? "bg-amber-500/10 border-amber-500/40 animate-pulse" :
-                              step.status === "error" ? "bg-red-500/10 border-red-500/40" :
-                              step.status === "skipped" ? "bg-zinc-700/20 border-zinc-600/30 opacity-60" :
-                              "bg-white/[0.02] border-white/10";
+                              step.status === "done" ? "border-[var(--success)]/30 bg-[var(--success-dim)]" :
+                              step.status === "running" ? "border-[var(--accent)]/40 bg-[var(--accent-glow)] animate-pulse" :
+                              step.status === "error" ? "border-[var(--error)]/40 bg-[var(--error-dim)]" :
+                              step.status === "skipped" ? "border-[var(--border-subtle)] bg-white/[0.02] opacity-60" :
+                              "border-[var(--border-default)] bg-[var(--bg-surface)]";
                             const downloadName = `${job.file.name.replace(/\.[^.]+$/, "")}-${key}.${isVideo ? "mp4" : "jpg"}`;
                             const canRerun =
                               (job.status === "done" || job.status === "error") &&
@@ -1747,37 +1797,37 @@ export default function StaticProductPipelinePage() {
                             return (
                               <div
                                 key={key}
-                                className={cn("flex flex-col rounded-lg border p-2", activeClass)}
+                                className={cn("flex flex-col rounded-[var(--radius-md)] border p-3", activeClass)}
                                 title={step.error ?? spMeta.description}
                               >
-                                <div className="mb-1.5 flex items-center justify-between gap-1 text-[11px]">
-                                  <span className="flex items-center gap-1 truncate font-semibold text-gray-100">
+                                <div className="mb-2 flex items-center justify-between gap-1 text-[11px]">
+                                  <span className="flex items-center gap-1.5 truncate font-semibold text-[var(--text-primary)]">
                                     <span className="text-base">{meta.icon}</span>
                                     {spMeta.label}
                                     {spMeta.what && (
-                                      <details className="relative ml-1">
+                                      <details className="relative ml-0.5">
                                         <summary
-                                          className="cursor-pointer list-none rounded bg-white/5 px-1 text-[9px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                                          className="cursor-pointer list-none rounded-md bg-white/5 px-1 text-[9px] text-[var(--text-muted)] transition-default hover:bg-white/10 hover:text-[var(--accent)]"
                                           title={sp.steps.infoTitle}
                                         >
                                           ⓘ
                                         </summary>
-                                        <div className="absolute left-0 top-5 z-10 w-64 rounded-lg border border-white/10 bg-zinc-900 p-2.5 shadow-xl">
-                                          <p className="mb-1 text-[10px] leading-tight text-gray-200">{spMeta.what}</p>
+                                        <div className="absolute left-0 top-5 z-10 w-64 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+                                          <p className="mb-1 text-[10px] leading-relaxed text-[var(--text-secondary)]">{spMeta.what}</p>
                                           {spMeta.provider && (
-                                            <p className="mt-1.5 text-[9px] text-gray-400">
+                                            <p className="mt-1.5 text-[9px] text-[var(--text-muted)]">
                                               <span className="font-semibold text-[var(--accent)]">{sp.steps.providerLabel}</span> {spMeta.provider}
                                             </p>
                                           )}
                                           {spMeta.duration && (
-                                            <p className="text-[9px] text-gray-400">
+                                            <p className="text-[9px] text-[var(--text-muted)]">
                                               <span className="font-semibold text-[var(--accent)]">{sp.steps.durationLabel}</span> {spMeta.duration}
                                             </p>
                                           )}
                                           {spMeta.tips && spMeta.tips.length > 0 && (
-                                            <div className="mt-1.5 border-t border-white/10 pt-1.5">
-                                              <p className="text-[9px] font-semibold text-amber-300">{sp.steps.tipsLabel}</p>
-                                              <ul className="mt-0.5 list-disc pl-3 text-[9px] text-gray-300">
+                                            <div className="mt-1.5 border-t border-[var(--border-subtle)] pt-1.5">
+                                              <p className="text-[9px] font-semibold text-[var(--accent)]">{sp.steps.tipsLabel}</p>
+                                              <ul className="mt-0.5 list-disc pl-3 text-[9px] text-[var(--text-secondary)]">
                                                 {spMeta.tips.map((t, i) => (
                                                   <li key={i} className="leading-tight">{t}</li>
                                                 ))}
@@ -1791,7 +1841,7 @@ export default function StaticProductPipelinePage() {
                                   <span
                                     className={cn(
                                       "font-mono text-[10px]",
-                                      step.status === "error" ? "text-red-400" : "text-[var(--accent)]",
+                                      step.status === "error" ? "text-[var(--error)]" : "text-[var(--accent)]",
                                     )}
                                   >
                                     {step.status === "error"
@@ -1806,7 +1856,7 @@ export default function StaticProductPipelinePage() {
                                   isVideo ? (
                                     <video
                                       src={step.resultUrl}
-                                      className="h-40 w-full rounded bg-black object-contain"
+                                      className="h-40 w-full rounded-[var(--radius-sm)] bg-[var(--bg-overlay)] object-contain"
                                       controls
                                       loop
                                       muted
@@ -1816,7 +1866,7 @@ export default function StaticProductPipelinePage() {
                                   <button
                                     type="button"
                                     onClick={() => setLightbox({ url: step.resultUrl!, label: `${job.file.name} — ${spMeta.label}` })}
-                                    className="group relative h-40 w-full overflow-hidden rounded bg-black hover:ring-2 hover:ring-violet-400/70"
+                                    className="group relative h-40 w-full overflow-hidden rounded-[var(--radius-sm)] bg-[var(--bg-overlay)] transition-default hover:ring-2 hover:ring-[var(--accent)]/70"
                                     title={sp.steps.zoomBig}
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1825,12 +1875,12 @@ export default function StaticProductPipelinePage() {
                                       alt={spMeta.label}
                                       className="h-full w-full object-contain"
                                     />
-                                    <span className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white opacity-0 transition group-hover:opacity-100">
+                                    <span className="absolute right-1.5 top-1.5 rounded-md bg-black/70 p-1 text-white opacity-0 backdrop-blur transition-default group-hover:opacity-100">
                                       <Maximize2 className="h-3 w-3" />
                                     </span>
                                     {step.warning && (
                                       <span
-                                        className="absolute left-1 top-1 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
+                                        className="absolute left-1.5 top-1.5 rounded-md bg-[var(--warning)] px-1.5 py-0.5 text-[10px] font-semibold text-black shadow"
                                         title={step.warning}
                                       >
                                         {sp.steps.reviewBadge}
@@ -1839,16 +1889,16 @@ export default function StaticProductPipelinePage() {
                                   </button>
                                   )
                                 ) : (
-                                  <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded bg-black/40 px-2 text-gray-600">
+                                  <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-overlay)] px-2 text-[var(--text-disabled)]">
                                     {step.status === "running" ? (
                                       <>
-                                        <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
-                                        <span className="text-[10px] text-amber-300">{sp.steps.generating}</span>
+                                        <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" />
+                                        <span className="text-[10px] text-[var(--accent)]">{sp.steps.generating}</span>
                                       </>
                                     ) : step.status === "error" ? (
                                       <>
-                                        <AlertCircle className="h-6 w-6 flex-shrink-0 text-red-400" />
-                                        <span className="line-clamp-3 text-center text-[10px] leading-tight text-red-300" title={step.error}>
+                                        <AlertCircle className="h-6 w-6 flex-shrink-0 text-[var(--error)]" />
+                                        <span className="line-clamp-3 text-center text-[10px] leading-tight text-[var(--error)]" title={step.error}>
                                           {step.error || sp.steps.unknownError}
                                         </span>
                                       </>
@@ -1858,15 +1908,15 @@ export default function StaticProductPipelinePage() {
                                   </div>
                                 )}
 
-                                <p className="mt-1.5 line-clamp-2 text-[10px] text-gray-500">{spMeta.description}</p>
+                                <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[var(--text-muted)]">{spMeta.description}</p>
 
                                 {/* Per-output controls */}
-                                <div className="mt-2 flex items-center justify-end gap-1">
+                                <div className="mt-2.5 flex items-center justify-end gap-1.5">
                                   {step.resultUrl && (
                                     <a
                                       href={step.resultUrl}
                                       download={downloadName}
-                                      className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-1 text-[10px] font-medium text-emerald-300 transition hover:bg-emerald-500/25"
+                                      className="inline-flex items-center gap-1 rounded-md border border-[var(--success)]/25 bg-[var(--success-dim)] px-2 py-1 text-[10px] font-medium text-[var(--success)] transition-default hover:bg-[var(--success)]/20"
                                       title={sp.steps.downloadStep(spMeta.label)}
                                     >
                                       <Download className="h-2.5 w-2.5" />
@@ -1882,7 +1932,7 @@ export default function StaticProductPipelinePage() {
                                           customPrompt: getAdaptiveBgConfig(job.productType, job.brand).prompt,
                                         })
                                       }
-                                      className="inline-flex items-center gap-1 rounded bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-medium text-[var(--accent)] transition hover:bg-violet-500/25"
+                                      className="inline-flex items-center gap-1 rounded-md border border-[var(--accent)]/25 bg-[var(--accent-dim)] px-2 py-1 text-[10px] font-medium text-[var(--accent)] transition-default hover:bg-[var(--accent)]/20"
                                       title={sp.steps.changeTitle}
                                     >
                                       <Palette className="h-2.5 w-2.5" />
@@ -1893,7 +1943,7 @@ export default function StaticProductPipelinePage() {
                                     <button
                                       type="button"
                                       onClick={() => reRunOutputs(job.id, [key])}
-                                      className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-[10px] font-medium text-gray-300 transition hover:bg-white/10"
+                                      className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-white/5 px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)] transition-default hover:border-[var(--accent)]/40 hover:text-[var(--accent-light)]"
                                       title={sp.steps.repeatTitle}
                                     >
                                       <RotateCw className="h-2.5 w-2.5" />
@@ -1916,11 +1966,11 @@ export default function StaticProductPipelinePage() {
 
         {/* Actions */}
         {jobs.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
             <button
               onClick={handleProcessAll}
               disabled={isRunning}
-              className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:bg-violet-500/50"
+              className="lz-lift inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] px-5 py-2.5 text-sm font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(212,180,138,0.55)] transition-default hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {isRunning ? sp.actions.processing : sp.actions.processAll}
@@ -1929,10 +1979,10 @@ export default function StaticProductPipelinePage() {
             {/* Gap 6 — toggle validador de fondos (default ON, costo despreciable) */}
             <label
               className={cn(
-                "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition cursor-pointer",
+                "inline-flex items-center gap-2 rounded-[var(--radius-sm)] border px-3.5 py-2.5 text-xs transition-default cursor-pointer",
                 validateBg
-                  ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-                  : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20",
+                  ? "border-[var(--accent)]/40 bg-[var(--accent-glow)] text-[var(--accent-light)]"
+                  : "border-[var(--border-default)] bg-white/[0.03] text-[var(--text-muted)] hover:border-[var(--accent)]/30 hover:text-[var(--text-secondary)]",
               )}
               title={sp.actions.validateTitle}
             >
@@ -1941,7 +1991,7 @@ export default function StaticProductPipelinePage() {
                 checked={validateBg}
                 onChange={(e) => setValidateBg(e.target.checked)}
                 disabled={isRunning}
-                className="h-3 w-3 accent-amber-500"
+                className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
               <span>{sp.actions.validateLabel} <span className="text-[10px] opacity-70">{sp.actions.validateCost}</span></span>
             </label>
@@ -1952,9 +2002,9 @@ export default function StaticProductPipelinePage() {
                 setJobs([]);
               }}
               disabled={isRunning}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white disabled:opacity-50"
+              className="lz-lift ml-auto inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-default hover:border-[var(--accent)]/40 hover:text-[var(--accent-light)] disabled:opacity-50"
             >
-              <Sparkles className="h-4 w-4" />
+              <X className="h-4 w-4" />
               {sp.actions.clearAll}
             </button>
           </div>
@@ -1968,27 +2018,27 @@ export default function StaticProductPipelinePage() {
           onClick={() => setBgPromptModal(null)}
         >
           <div
-            className="w-full max-w-lg rounded-xl border border-white/10 bg-zinc-900 p-5"
+            className="w-full max-w-lg rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-elevated)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.6)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Palette className="h-4 w-4 text-violet-400" />
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 font-serif text-lg font-semibold text-[var(--text-primary)]">
+                <Palette className="h-4 w-4 text-[var(--accent)]" />
                 {sp.modal.title}
               </h3>
               <button
                 onClick={() => setBgPromptModal(null)}
-                className="text-gray-500 hover:text-white"
+                className="rounded-md p-1 text-[var(--text-muted)] transition-default hover:bg-white/5 hover:text-[var(--text-primary)]"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className="mb-2 text-xs text-gray-400">
+            <p className="mb-3 text-xs text-[var(--text-muted)]">
               {bgPromptModal.job.file.name} — {PRODUCT_TYPE_LABELS[bgPromptModal.job.productType]} / {BRAND_LABELS[bgPromptModal.job.brand]}
             </p>
 
-            <div className="mb-2 flex flex-wrap gap-1">
+            <div className="mb-3 flex flex-wrap gap-1.5">
               {(["perfume", "cream", "sunscreen", "deodorant", "facial", "makeup"] as StaticProductType[]).map((pt) => {
                 const altConfig = getAdaptiveBgConfig(pt, bgPromptModal.job.brand);
                 const isCurrent = altConfig.prompt === bgPromptModal.customPrompt;
@@ -1998,10 +2048,10 @@ export default function StaticProductPipelinePage() {
                     type="button"
                     onClick={() => setBgPromptModal({ ...bgPromptModal, customPrompt: altConfig.prompt })}
                     className={cn(
-                      "rounded border px-2 py-1 text-[10px] transition",
+                      "rounded-md border px-2.5 py-1 text-[10px] transition-default",
                       isCurrent
-                        ? "border-violet-400 bg-violet-500/20 text-violet-200"
-                        : "border-white/10 bg-white/[0.03] text-gray-400 hover:border-white/20 hover:text-white",
+                        ? "border-[var(--accent)]/50 bg-[var(--accent-dim)] text-[var(--accent-light)]"
+                        : "border-[var(--border-default)] bg-white/[0.03] text-[var(--text-muted)] hover:border-[var(--accent)]/40 hover:text-[var(--text-secondary)]",
                     )}
                     title={altConfig.prompt.slice(0, 100) + "..."}
                   >
@@ -2011,20 +2061,20 @@ export default function StaticProductPipelinePage() {
               })}
             </div>
 
-            <label className="mb-1 block text-xs text-gray-400">
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">
               {sp.modal.promptLabel}
             </label>
             <textarea
               value={bgPromptModal.customPrompt}
               onChange={(e) => setBgPromptModal({ ...bgPromptModal, customPrompt: e.target.value })}
-              className="mb-3 h-32 w-full rounded border border-white/10 bg-black/40 p-2 text-xs text-gray-200"
+              className="focus-ring mb-4 h-32 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--bg-overlay)] p-3 text-xs leading-relaxed text-[var(--text-secondary)]"
               placeholder={sp.modal.promptPlaceholder}
             />
 
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setBgPromptModal(null)}
-                className="rounded border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-gray-300 hover:border-white/20"
+                className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-white/[0.03] px-4 py-2 text-xs font-medium text-[var(--text-secondary)] transition-default hover:border-[var(--accent)]/40 hover:text-[var(--text-primary)]"
               >
                 {sp.modal.cancel}
               </button>
@@ -2038,7 +2088,7 @@ export default function StaticProductPipelinePage() {
                   reRunOutputs(modalJob.id, ["adaptive", "vertical"], prompt);
                 }}
                 disabled={!bgPromptModal.customPrompt.trim()}
-                className="inline-flex items-center gap-1.5 rounded bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-400 disabled:opacity-50"
+                className="lz-lift inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] px-4 py-2 text-xs font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(212,180,138,0.55)] transition-default hover:brightness-110 disabled:opacity-50"
               >
                 <RotateCw className="h-3 w-3" />
                 {sp.modal.regenerate}
@@ -2067,18 +2117,18 @@ export default function StaticProductPipelinePage() {
           >
             <X className="h-5 w-5" />
           </button>
-          <div className="flex max-h-full max-w-full flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <p className="max-w-[80vw] truncate text-xs text-gray-300">{lightbox.label}</p>
+          <div className="flex max-h-full max-w-full flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <p className="max-w-[80vw] truncate text-xs text-[var(--text-secondary)]">{lightbox.label}</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={lightbox.url}
               alt={lightbox.label}
-              className="max-h-[85vh] max-w-[90vw] rounded object-contain"
+              className="max-h-[85vh] max-w-[90vw] rounded-[var(--radius-md)] object-contain shadow-[0_16px_48px_rgba(0,0,0,0.6)]"
             />
             <a
               href={lightbox.url}
               download
-              className="inline-flex items-center gap-1.5 rounded bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-400"
+              className="lz-lift inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] px-4 py-2 text-xs font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(212,180,138,0.55)] transition-default hover:brightness-110"
             >
               <Download className="h-3 w-3" />
               {sp.lightbox.download}

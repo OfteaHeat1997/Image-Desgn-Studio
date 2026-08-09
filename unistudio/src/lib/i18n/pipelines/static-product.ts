@@ -57,6 +57,7 @@ export interface StaticProductPipelineCopy {
     categories: string;
   };
   batch: {
+    badge: string;
     heading: string;
     hintPre: string;
     hintPost: string;
@@ -70,14 +71,22 @@ export interface StaticProductPipelineCopy {
     loading: (loaded: number, total: number) => string;
   };
   upload: {
+    stepKicker: string;
+    stepTitle: string;
     heading: string;
     headingHint: string;
+    defaultsTitle: string;
     defaultType: string;
     defaultBrand: string;
     dropCta: string;
+    dropClick: string;
     dropHint: string;
   };
   review: {
+    stepKicker: string;
+    stepTitle: string;
+    summaryTitle: string;
+    photosLabel: string;
     heading: (count: number) => string;
     spent: string;
     done: string;
@@ -180,6 +189,7 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
     categories: 'Perfumes · Cremas · Skincare · Maquillaje',
   },
   batch: {
+    badge: 'Opcional · solo dev',
     heading: 'Batch desde inventario',
     hintPre:
       'Carga todas las fotos de una categoría sin subir manualmente. Solo funciona en dev local (las imágenes viven en ',
@@ -195,15 +205,23 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
     loading: (loaded, total) => `Cargando ${loaded}/${total}...`,
   },
   upload: {
-    heading: '1 · Sube tus fotos',
+    stepKicker: 'Paso 1',
+    stepTitle: 'Sube tus fotos',
+    heading: 'Sube tus fotos',
     headingHint: 'o usa el batch de arriba',
+    defaultsTitle: 'Valores por defecto',
     defaultType: 'Tipo por defecto (aplicado a lo que subas)',
     defaultBrand: 'Marca por defecto',
-    dropCta: 'Arrastra fotos aquí o haz click',
+    dropCta: 'Arrastra tus fotos aquí',
+    dropClick: 'o haz click para explorar',
     dropHint: 'Perfumes, cremas, bloqueador, desodorantes, limpieza facial, maquillaje',
   },
   review: {
-    heading: (count) => `2 · Revisa y procesa (${count} foto${count !== 1 ? 's' : ''})`,
+    stepKicker: 'Paso 2',
+    stepTitle: 'Revisa y procesa',
+    summaryTitle: 'Resumen',
+    photosLabel: 'fotos',
+    heading: (count) => `Revisa y procesa (${count} foto${count !== 1 ? 's' : ''})`,
     spent: 'acumulado',
     done: 'listas',
   },
@@ -433,6 +451,7 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
     categories: 'Perfume · Creams · Skincare · Makeup',
   },
   batch: {
+    badge: 'Optional · dev only',
     heading: 'Inventory batch',
     hintPre:
       'Load every photo in a category without uploading manually. Works only in local dev (the images live in ',
@@ -448,15 +467,23 @@ export const STATIC_PRODUCT_PIPELINE_EN: StaticProductPipelineCopy = {
     loading: (loaded, total) => `Loading ${loaded}/${total}...`,
   },
   upload: {
-    heading: '1 · Upload your photos',
+    stepKicker: 'Step 1',
+    stepTitle: 'Upload your photos',
+    heading: 'Upload your photos',
     headingHint: 'or use the batch above',
+    defaultsTitle: 'Defaults',
     defaultType: 'Default type (applied to whatever you upload)',
     defaultBrand: 'Default brand',
-    dropCta: 'Drag photos here or click',
+    dropCta: 'Drag your photos here',
+    dropClick: 'or click to browse',
     dropHint: 'Perfume, creams, sunscreen, deodorant, facial cleanser, makeup',
   },
   review: {
-    heading: (count) => `2 · Review and process (${count} photo${count !== 1 ? 's' : ''})`,
+    stepKicker: 'Step 2',
+    stepTitle: 'Review and process',
+    summaryTitle: 'Summary',
+    photosLabel: 'photos',
+    heading: (count) => `Review and process (${count} photo${count !== 1 ? 's' : ''})`,
     spent: 'spent',
     done: 'done',
   },
