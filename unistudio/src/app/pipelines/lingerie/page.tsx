@@ -201,6 +201,21 @@ type PoseOption =
   | "espalda"
   | "cuerpo-completo";
 
+/**
+ * Nombre humano de cada proveedor para el badge. Antes se mostraba el slug
+ * interno ("photoroom-ghost-mannequin", "grounded-sam-isolate"), que no le dice
+ * nada a quien usa la app — y esta app es para alguien que no programa.
+ */
+const PROVIDER_LABELS: Record<string, string> = {
+  "photoroom-ghost-mannequin": "Photoroom",
+  "grounded-sam-isolate": "Recorte real",
+  "rembg-last-resort": "Solo quitó el fondo",
+  seedream: "SeedDream",
+  leffa: "Leffa",
+  uwear: "Uwear",
+  kolors: "Kolors",
+};
+
 const POSE_OPTIONS: { value: PoseOption; label: string; modelCreatePose: string }[] = [
   { value: "auto",            label: "Automático",        modelCreatePose: "" /* depende del stepId */ },
   { value: "frontal",         label: "Frontal",           modelCreatePose: "standing-front-view" },
@@ -1498,7 +1513,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   : `Proveedor que generó este resultado: ${step.usedProvider}.`
               }
             >
-              {step.usedProvider}
+              {PROVIDER_LABELS[step.usedProvider] ?? step.usedProvider}
             </span>
           )}
           <span className="text-xs font-medium text-[var(--text-secondary)]">{step.cost}</span>
@@ -2449,7 +2464,11 @@ async function runStep(
     }
     const isolatedUrl = json.data?.url;
     if (!isolatedUrl) throw new Error("El recorte no devolvió una imagen. Dale 'Rehacer'.");
-    return { resultUrl: isolatedUrl, cost: json.cost ?? 0.01 };
+    // Reportar QUE proveedor corrio de verdad. Antes el Paso 1 no lo devolvia, asi
+    // que la tarjeta no mostraba badge y no habia forma de saber si el recorte lo
+    // habia hecho Photoroom o el respaldo — justo el dato que hace falta cuando el
+    // resultado sale distinto entre corridas.
+    return { resultUrl: isolatedUrl, cost: json.cost ?? 0.01, usedProvider: json.data?.provider };
   }
 
   // Step "background" (Fondo Profesional) removed 2026-04-21 — era para pipeline
