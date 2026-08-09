@@ -17,7 +17,8 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { submitFal, getFalStatus, ensureFalAccessibleUrl } from '@/lib/api/fal';
+import sharp from 'sharp';
+import { submitFal, getFalStatus, ensureFalAccessibleUrl, uploadToFalStorage } from '@/lib/api/fal';
 import { getUwearAvatarAsset } from '@/lib/api/uwear';
 import { withApiErrorHandler, requireFields } from '@/lib/api/route-helpers';
 
@@ -56,8 +57,32 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     const avatarId = Number(process.env.UWEAR_AVATAR_ID?.trim() || 21663);
     const backUrl = await getUwearAvatarAsset(avatarId, 'full_body_back');
     if (backUrl) {
-      modelImage = backUrl;
-      console.log(`[tryon-async] Foto Espalda: usando full_body_back del avatar ${avatarId}`);
+      // El avatar SOLO tiene la espalda en 'full_body_back' (no existe un
+      // 'upper_body_back'), asi que la modelo salia de cuerpo entero y lejos: el
+      // broche y la banda —que son el motivo de esta foto— quedaban ilegibles.
+      // Recortamos al torso ANTES del try-on para que Leffa trabaje sobre un
+      // encuadre cercano y el resultado sea un 3/4 de espalda con el detalle
+      // visible. Si el recorte falla, seguimos con la foto entera.
+      try {
+        const buf = Buffer.from(await (await fetch(backUrl)).arrayBuffer());
+        const meta = await sharp(buf).metadata();
+        const w = meta.width ?? 0;
+        const h = meta.height ?? 0;
+        if (w && h) {
+          // Desde la cabeza hasta ~la cadera: el 55% superior del encuadre.
+          const cropped = await sharp(buf)
+            .extract({ left: 0, top: 0, width: w, height: Math.round(h * 0.55) })
+            .png()
+            .toBuffer();
+          modelImage = await uploadToFalStorage(cropped, 'image/png', 'avatar-back-torso.png');
+          console.log(`[tryon-async] Foto Espalda: full_body_back del avatar ${avatarId} recortado al torso`);
+        } else {
+          modelImage = backUrl;
+        }
+      } catch (e) {
+        console.warn('[tryon-async] no se pudo recortar la espalda del avatar, uso la foto entera:', e instanceof Error ? e.message : e);
+        modelImage = backUrl;
+      }
     } else {
       console.warn('[tryon-async] no se pudo leer full_body_back del avatar — sigo con la modelo recibida');
     }
