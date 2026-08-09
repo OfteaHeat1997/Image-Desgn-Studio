@@ -629,7 +629,12 @@ export async function generateBgFast(
     const prodW = prodMeta.width || productMaxW;
     const prodH = prodMeta.height || productMaxH;
     const left = Math.round((canvas.width - prodW) / 2);
-    const top = Math.round((canvas.height - prodH) / 2);
+    // Anclar el producto ABAJO (apoyado en la superficie), NO centrado vertical.
+    // Bug reportado por usuaria: el producto quedaba FLOTANDO DELANTE del fondo
+    // en vez de apoyado encima de la superficie. Con ~10% de margen inferior el
+    // producto se asienta en el piso del fondo (que va plano, sin pedestal).
+    const bottomMargin = Math.round(canvas.height * 0.1);
+    const top = Math.max(0, canvas.height - prodH - bottomMargin);
 
     const resizedBg = await sharp(bgBuffer).resize(canvas.width, canvas.height, { fit: 'cover' }).png().toBuffer();
 

@@ -102,7 +102,7 @@ export function getAdaptiveBgConfig(
     if (PREMIUM_BRANDS.includes(brand)) {
       return {
         prompt:
-          'empty cream travertine pedestal, beige silk backdrop with soft folds, dried pampas grass to one side, warm golden sunlight and long soft shadows, luxury studio, bare empty pedestal' + HD + NO_DUP,
+          'warm cream seamless studio floor and backdrop, beige silk drape behind with soft folds, dried pampas grass to one side, warm golden sunlight and long soft shadows across the floor, luxury minimal, flat empty surface' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',
@@ -134,7 +134,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'yanbal' || brand === 'lbel') {
       return {
         prompt:
-          'pristine empty white Carrara marble pedestal in a clean photo studio, subtle gray veining in marble, soft mirror-like reflection on empty surface, diffused daylight from left, minimalist spa aesthetic, white seamless backdrop, NO products, NO shelves, NO objects, just empty marble in clean studio' + HD + NO_DUP,
+          'pristine flat white Carrara marble surface in a clean photo studio, subtle gray veining, soft reflection, diffused daylight from left, minimalist spa aesthetic, white seamless backdrop, flat empty surface' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Mármol blanco premium (estilo La Mer)',
@@ -201,7 +201,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'makeup') {
     return {
       prompt:
-        'dramatic matte black studio backdrop, soft rim lighting from the side creating rich shadow falloff, subtle spotlight on empty pedestal area, luxury cosmetics editorial photography backdrop only, high contrast minimal scene, NO products, NO store, NO shelves, NO objects, completely empty matte black studio space' + HD + NO_DUP,
+        'dramatic matte black seamless studio floor and backdrop, soft rim lighting from the side, rich shadow falloff, high contrast minimal, flat empty surface' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Negro mate dramático (estilo MAC)',
