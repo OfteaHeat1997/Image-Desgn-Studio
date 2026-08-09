@@ -744,6 +744,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // producto flotando 3D sobre blanco, preservando la tela visible (no es un editor
     // generativo libre). Es el método recomendado tras la investigación. Si la key no
     // está, o Photoroom filtra la lencería, tira error → el caller cae al siguiente.
+    let photoroomError = '';
     const tryPhotoroom = async (sandbox = false): Promise<boolean> => {
       // Sin key configurada no hay nada que intentar: evitamos el round-trip y
       // arrancamos directo por el recorte real, que sí funciona con las keys de
@@ -847,6 +848,15 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
           console.warn('[bg-remove:removeSubject] Photoroom rechazó por plan/credenciales — desactivado para el resto del proceso');
         }
         console.warn(`[bg-remove:removeSubject] Photoroom falló (${msg})`);
+        // EL ERROR REAL SE PERDIA ACA. La funcion solo devolvia false y el caller
+        // imprimia un texto ADIVINADO ("causa tipica: cuota agotada o la key no
+        // tiene Ghost Mannequin"). Verificado el 2026-08-09 contra produccion:
+        // esas dos causas eran FALSAS —la cuota estaba bien y la key si tiene
+        // Ghost Mannequin— asi que el mensaje mandaba a buscar el problema al
+        // lugar equivocado y tapaba el motivo verdadero. Es el mismo patron de
+        // sustitucion silenciosa que ya nos costo semanas en el Paso 2: un texto
+        // inventado leido como si fuera un diagnostico.
+        photoroomError = msg;
         return false;
       }
     };
@@ -871,10 +881,12 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
       if (!(await tryPhotoroom(sandbox))) {
         return NextResponse.json({
           success: false,
+          // El error REAL primero, sin adornos. Las "causas tipicas" que habia
+          // aca eran una conjetura y resultaron falsas al verificarlas.
           error:
-            `Photoroom${sandbox ? ' (modo prueba)' : ''} no pudo procesar esta foto. ` +
-            `Causa tipica: se agoto la cuota del plan, o la key no tiene Ghost Mannequin (es del plan Plus). ` +
-            `Elegi "Recorte real" en el selector de Metodo — es gratis y no depende de Photoroom.`,
+            `Photoroom${sandbox ? ' (modo prueba)' : ''} no pudo procesar esta foto` +
+            `${photoroomError ? `: ${photoroomError}` : '.'} ` +
+            `Podés elegir "Recorte real" en el selector de Método — es gratis y no depende de Photoroom.`,
         });
       }
     } else if (method === 'grounded-sam') {
