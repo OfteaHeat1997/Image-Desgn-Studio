@@ -75,6 +75,22 @@ export async function extractOutputUrl(output: any): Promise<string> {
     }
   }
 
+  // RED DE SEGURIDAD: si nada de lo anterior saco la URL, buscamos CUALQUIER
+  // http(s) URL dentro del output serializado (JSON o toString). Esto cubre las
+  // formas raras del SDK de Replicate que tumbaban adaptive/hero con "Unable to
+  // extract URL". Solo lanzamos error si de verdad NO hay ninguna URL.
+  if (!url && output != null) {
+    let str = '';
+    try {
+      str = typeof output === 'string' ? output : JSON.stringify(output);
+    } catch {
+      str = String(output);
+    }
+    if (!str || str === '{}' || str === '[object Object]') str = String(output);
+    const match = str.match(/https?:\/\/[^\s"'\\)]+/);
+    if (match) url = match[0];
+  }
+
   if (!url) throw new Error('Unable to extract URL from Replicate model output');
 
   // api.replicate.com/v1/files/ URLs require auth and have no CORS headers.

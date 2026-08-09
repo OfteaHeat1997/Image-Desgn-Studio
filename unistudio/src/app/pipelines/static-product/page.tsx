@@ -1220,6 +1220,10 @@ export default function StaticProductPipelinePage() {
               duration: 5,
               aspectRatio: "9:16",
               prompt: videoPrompt,
+              // wan-2.2-fast DUPLICABA el producto (frasco fantasma detrás). El
+              // negative_prompt es la palanca documentada para evitarlo.
+              negativePrompt:
+                "duplicate product, second bottle, two bottles, extra bottle, cloned product, multiple products, reflection of product, mirror copy, deformed product, warped bottle, text artifacts, watermark",
             }),
           });
           const vData = await safeJson(vRes);
