@@ -3961,10 +3961,34 @@ export default function LingeriePipelinePage() {
       // ficha técnica no se puede regenerar — queda undefined silenciosamente.
       setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, analysisStatus: "analyzing" } : j));
       try {
-        const spec = await analyzeProductPhotos(
-          [{ file: job.file, role: "frontal" }],
-          productType,
-        );
+        // ANALIZAR TODAS LAS FOTOS DEL PRODUCTO, NO SOLO LA FRONTAL.
+        //
+        // Este era el motivo de fondo de que el pipeline "olvide detalles".
+        // analyzeProductPhotos siempre acepto varias vistas, pero se le mandaba
+        // UNA: la frontal. Y en un bra, la mitad de la construccion vive atras —
+        // la malla, el cruce de tirantes, el ancho real de la banda. Claude Vision
+        // nunca las veia, asi que nunca entraban en la ficha; y lo que no esta
+        // DESCRITO, Uwear no lo puede reproducir.
+        //
+        // Ahora se juntan todas las fotos del MISMO producto (mismo REF) con su
+        // rol real. La ficha pasa a describir la prenda completa, y eso alimenta
+        // por igual la Foto Frontal, la Lateral, la Espalda y la de Detalle.
+        const relatedPhotos: { file: File; role: "frontal" | "back" | "detail" | "flat" }[] = [
+          { file: job.file, role: "frontal" },
+        ];
+        for (const other of jobsSnapshot) {
+          if (other.id === job.id || !other.file) continue;
+          // Mismo producto: comparten REF (o ninguno de los dos lo tiene).
+          const sameRef = other.referenceKey === job.referenceKey;
+          if (!sameRef) continue;
+          if (other.photoAngle === "espalda") relatedPhotos.push({ file: other.file, role: "back" });
+          else if (other.photoAngle === "detalle") relatedPhotos.push({ file: other.file, role: "detail" });
+          else if (other.photoAngle === "flat") relatedPhotos.push({ file: other.file, role: "flat" });
+        }
+        if (relatedPhotos.length > 1) {
+          console.log(`[lingerie] ficha del producto usando ${relatedPhotos.length} vistas (${relatedPhotos.map((r) => r.role).join(", ")})`);
+        }
+        const spec = await analyzeProductPhotos(relatedPhotos, productType);
         setJobs((prev) => prev.map((j) =>
           j.id === jobId ? { ...j, productSpec: spec, analysisStatus: "done" } : j,
         ));
