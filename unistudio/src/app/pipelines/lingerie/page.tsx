@@ -943,10 +943,10 @@ function StatusBadge({ status }: { status: StepStatus }) {
     idle:       { label: "Pendiente",    className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
     pending:    { label: "En cola",      className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: Clock         },
     processing: { label: "En vivo",      className: "bg-[var(--accent-dim)] text-[var(--accent-light)] border-[var(--accent)]/25", icon: Loader2 },
-    done:       { label: "Listo",        className: "bg-[var(--accent-dim)] text-[var(--accent)] border-[var(--border-accent)]",          icon: CheckCircle2 },
+    done:       { label: "Listo",        className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
     error:      { label: "Error",        className: "bg-red-500/15 text-red-300 border-red-500/25",                      icon: AlertCircle   },
     skipped:    { label: "Saltado",      className: "bg-white/5 text-[var(--text-secondary)] border-white/10",                          icon: SkipForward   },
-    accepted:   { label: "Aceptado",     className: "bg-[var(--accent-dim)] text-[var(--accent)] border-[var(--border-accent)]",          icon: CheckCircle2 },
+    accepted:   { label: "Aceptado",     className: "bg-[var(--success-dim)] text-[var(--success)] border-[var(--success)]/30",           icon: CheckCircle2 },
   }[status];
 
   const Icon = config.icon;
@@ -1833,8 +1833,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                     className="h-40 w-full"
                   />
                   {(step.status === "accepted") && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[var(--accent-dim)] pointer-events-none">
-                      <CheckCircle2 className="h-8 w-8 text-[var(--accent)]" />
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[var(--success-dim)] pointer-events-none">
+                      <CheckCircle2 className="h-8 w-8 text-[var(--success)]" />
                     </div>
                   )}
                   {step.resultUrl && (
