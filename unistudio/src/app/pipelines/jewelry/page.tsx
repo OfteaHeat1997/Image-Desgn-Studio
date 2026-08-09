@@ -160,19 +160,9 @@ async function safeJson(res: Response): Promise<{ success: boolean; data?: any; 
   }
 }
 
-const STATUS_LABEL: Record<JobStatus, string> = {
-  idle: "Listo",
-  uploading: "Subiendo...",
-  isolating: "Quitando fondo...",
-  upscaling: "Upscale 2x...",
-  "generating-estante": "Generando estante...",
-  "generating-model": "Generando foto en modelo...",
-  "generating-video": "Generando video 360°...",
-  done: "Listo",
-  error: "Error",
-};
-
 function StatusPill({ status }: { status: JobStatus }) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
   const isError = status === "error";
   const isDone = status === "done";
   const isActive = !["idle", "done", "error"].includes(status);
@@ -189,7 +179,7 @@ function StatusPill({ status }: { status: JobStatus }) {
       {isActive && <Loader2 className="h-3 w-3 animate-spin" />}
       {isDone && <CheckCircle2 className="h-3 w-3" />}
       {isError && <AlertCircle className="h-3 w-3" />}
-      {STATUS_LABEL[status]}
+      {jt.statusLabels[status]}
     </span>
   );
 }
@@ -199,6 +189,8 @@ function StatusPill({ status }: { status: JobStatus }) {
 /* ------------------------------------------------------------------ */
 
 function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -229,8 +221,8 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
     >
       <Upload className="h-6 w-6 text-gray-400" />
       <div>
-        <p className="text-sm font-medium text-gray-200">Arrastra fotos de joyería aquí o haz click</p>
-        <p className="mt-1 text-xs text-gray-500">Aretes, cadenas, anillos, pulseras, topos, candongas, sets</p>
+        <p className="text-sm font-medium text-gray-200">{jt.upload.cta}</p>
+        <p className="mt-1 text-xs text-gray-500">{jt.upload.hint}</p>
       </div>
       <input
         ref={inputRef}
@@ -250,6 +242,7 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 
 export default function JewelryPipelinePage() {
   const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [defaultSubType, setDefaultSubType] = useState<JewelrySubType>("earrings");
@@ -346,7 +339,7 @@ export default function JewelryPipelinePage() {
       });
       const bgData = await safeJson(bgRes);
       if (!bgData.success) {
-        updateStep(job.id, "isolate", { status: "error", error: bgData.error || "Falló quitar fondo" });
+        updateStep(job.id, "isolate", { status: "error", error: bgData.error || jt.messages.isolateFailed });
         throw new Error(bgData.error || "Background removal failed");
       }
       workingUrl = bgData.data.url || bgData.data.imageUrl;
@@ -375,8 +368,8 @@ export default function JewelryPipelinePage() {
       } else {
         // HARD FAIL — upscale is critical for jewelry detail (gem/metal clarity).
         // Without it the estante comes out blurry. Better to fail loud than ship bad output.
-        updateStep(job.id, "upscale", { status: "error", error: upsData.error || "Falló el upscale" });
-        throw new Error(upsData.error || "Upscale falló — joyería necesita detalle nítido para verse profesional");
+        updateStep(job.id, "upscale", { status: "error", error: upsData.error || jt.messages.upscaleFailed });
+        throw new Error(upsData.error || jt.messages.upscaleFailedDetail);
       }
 
       const isolatedUrl = workingUrl;
@@ -412,7 +405,7 @@ export default function JewelryPipelinePage() {
       });
       const estanteData = await safeJson(estanteRes);
       if (!estanteData.success) {
-        updateStep(job.id, "estante", { status: "error", error: estanteData.error || "Falló estante" });
+        updateStep(job.id, "estante", { status: "error", error: estanteData.error || jt.messages.estanteFailed });
         throw new Error(estanteData.error || "Estante generation failed");
       }
       const estanteUrl: string = estanteData.data.url || estanteData.data.imageUrl;
@@ -438,7 +431,7 @@ export default function JewelryPipelinePage() {
           if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
             const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
             updateStep(job.id, "estante", {
-              warning: `⚠ La joya cambió: ${changes || d.data.reason}`,
+              warning: jt.messages.jewelryChanged(changes || d.data.reason),
             });
           }
         })
@@ -509,7 +502,7 @@ export default function JewelryPipelinePage() {
                   if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
                     const changes = (d.data.changes ?? []).slice(0, 2).join("; ");
                     updateStep(job.id, "modelo", {
-                      warning: `⚠ La joya cambió en la modelo: ${changes || d.data.reason}`,
+                      warning: jt.messages.jewelryChangedModel(changes || d.data.reason),
                     });
                   }
                 })
@@ -523,13 +516,13 @@ export default function JewelryPipelinePage() {
             });
           } else {
             console.warn("[jewelry] tryon soft-failed:", tryonData.error);
-            toast.error(`Modelo para ${job.file.name} falló — estante OK.`);
+            toast.error(jt.messages.modelSoftFail(job.file.name));
             updateStep(job.id, "modelo", { status: "error", error: tryonData.error, cost: modelCreateCost });
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn("[jewelry] model step soft-failed:", msg);
-          toast.error(`Modelo para ${job.file.name}: ${msg}`);
+          toast.error(jt.messages.modelError(job.file.name, msg));
           updateStep(job.id, "modelo", { status: "error", error: msg });
         }
       }
@@ -610,7 +603,7 @@ export default function JewelryPipelinePage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       updateJob(job.id, { status: "error", error: message });
-      toast.error(`Error en ${job.file.name}: ${message}`);
+      toast.error(jt.messages.jobError(job.file.name, message));
     }
   };
 
@@ -618,7 +611,7 @@ export default function JewelryPipelinePage() {
     if (isRunning) return;
     const pending = jobs.filter((j) => j.status === "idle" || j.status === "error");
     if (pending.length === 0) {
-      toast.info("No hay fotos pendientes de procesar.");
+      toast.info(jt.messages.noPending);
       return;
     }
     setIsRunning(true);
@@ -626,7 +619,7 @@ export default function JewelryPipelinePage() {
       for (const job of pending) {
         await processJob(job);
       }
-      toast.success(`${pending.length} pieza(s) procesada(s).`);
+      toast.success(jt.messages.processed(pending.length));
     } finally {
       setIsRunning(false);
     }
@@ -669,12 +662,12 @@ export default function JewelryPipelinePage() {
         {/* Defaults + toggles + upload */}
         <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-            1 · Configura y sube
+            {jt.config.heading}
           </h2>
 
           <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-xs text-gray-400">Tipo por defecto</label>
+              <label className="mb-1 block text-xs text-gray-400">{jt.config.defaultType}</label>
               <select
                 value={defaultSubType}
                 onChange={(e) => setDefaultSubType(e.target.value as JewelrySubType)}
@@ -696,7 +689,7 @@ export default function JewelryPipelinePage() {
               />
               <label htmlFor="includeModel" className="flex items-center gap-1.5 text-sm text-gray-200 cursor-pointer">
                 <User className="h-4 w-4 text-amber-400" />
-                Incluir foto en modelo
+                {jt.config.includeModel}
                 <span className="text-[11px] text-gray-500">(+$0.10)</span>
               </label>
             </div>
@@ -711,8 +704,8 @@ export default function JewelryPipelinePage() {
               />
               <label htmlFor="includeVideo" className="flex items-center gap-1.5 text-sm text-gray-200 cursor-pointer">
                 <Film className="h-4 w-4 text-amber-400" />
-                Incluir video 360°
-                <span className="text-[11px] text-gray-500">(gratis)</span>
+                {jt.config.includeVideo}
+                <span className="text-[11px] text-gray-500">{jt.config.includeVideoHint}</span>
               </label>
             </div>
           </div>
@@ -724,11 +717,11 @@ export default function JewelryPipelinePage() {
           <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-                2 · Revisa y procesa ({jobs.length} pieza{jobs.length !== 1 && "s"})
+                {jt.review.heading(jobs.length)}
               </h2>
               <div className="flex items-center gap-3 text-xs text-gray-400">
-                <span>${totalCost.toFixed(3)} acumulado</span>
-                <span>{doneCount}/{jobs.length} listas</span>
+                <span>${totalCost.toFixed(3)} {jt.review.accumulated}</span>
+                <span>{doneCount}/{jobs.length} {jt.review.ready}</span>
               </div>
             </div>
 
@@ -760,7 +753,7 @@ export default function JewelryPipelinePage() {
                             onClick={() => removeJob(job.id)}
                             disabled={isRunning}
                             className="text-gray-500 hover:text-red-400 disabled:opacity-30"
-                            title="Quitar"
+                            title={jt.buttons.remove}
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -792,7 +785,7 @@ export default function JewelryPipelinePage() {
                         {job.productFeatures && (
                           <div className="rounded border border-emerald-500/20 bg-emerald-500/[0.04] px-2 py-1.5">
                             <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
-                              ✨ Lo que la IA ve en tu foto
+                              ✨ {jt.features.heading}
                             </p>
                             <div className="flex flex-wrap gap-1">
                               <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
@@ -805,14 +798,14 @@ export default function JewelryPipelinePage() {
                               )}
                               {job.productFeatures.piedras && job.productFeatures.num_piedras > 0 && (
                                 <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
-                                  {job.productFeatures.num_piedras} piedra{job.productFeatures.num_piedras > 1 ? "s" : ""}
+                                  {jt.features.stones(job.productFeatures.num_piedras)}
                                   {job.productFeatures.color_piedras.length > 0 &&
                                     ` (${job.productFeatures.color_piedras.join(", ")})`}
                                 </span>
                               )}
                               {job.productFeatures.grabados && (
                                 <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-200">
-                                  con grabados
+                                  {jt.features.engraved}
                                 </span>
                               )}
                             </div>
@@ -827,6 +820,7 @@ export default function JewelryPipelinePage() {
                         {(Object.keys(STEP_META) as StepKey[]).map((key) => {
                           const step = job.steps[key];
                           const meta = STEP_META[key];
+                          const copy = jt.steps.items[key];
                           const isOptional = (key === "modelo" && !includeModel) || (key === "video" && !includeVideo);
                           if (isOptional && step.status === "idle") return null;
                           const activeClass =
@@ -839,36 +833,36 @@ export default function JewelryPipelinePage() {
                             <div
                               key={key}
                               className={cn("flex flex-col rounded border p-2 text-[10px]", activeClass)}
-                              title={step.error ?? meta.label}
+                              title={step.error ?? copy.label}
                             >
                               <div className="flex items-center gap-1">
                                 <span className="text-sm">{meta.icon}</span>
-                                <span className="truncate font-medium text-gray-200">{meta.label}</span>
-                                {meta.what && (
+                                <span className="truncate font-medium text-gray-200">{copy.label}</span>
+                                {copy.what && (
                                   <details className="relative">
                                     <summary
                                       className="cursor-pointer list-none rounded bg-white/5 px-1 text-[9px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
-                                      title="¿Qué hace este paso?"
+                                      title={jt.steps.infoTitle}
                                     >
                                       ⓘ
                                     </summary>
                                     <div className="absolute left-0 top-5 z-10 w-60 rounded-lg border border-white/10 bg-zinc-900 p-2.5 shadow-xl">
-                                      <p className="mb-1 text-[10px] leading-tight text-gray-200">{meta.what}</p>
-                                      {meta.provider && (
+                                      <p className="mb-1 text-[10px] leading-tight text-gray-200">{copy.what}</p>
+                                      {copy.provider && (
                                         <p className="mt-1.5 text-[9px] text-gray-400">
-                                          <span className="font-semibold text-amber-300">Proveedor:</span> {meta.provider}
+                                          <span className="font-semibold text-amber-300">{jt.steps.providerLabel}</span> {copy.provider}
                                         </p>
                                       )}
-                                      {meta.duration && (
+                                      {copy.duration && (
                                         <p className="text-[9px] text-gray-400">
-                                          <span className="font-semibold text-amber-300">Tiempo:</span> {meta.duration}
+                                          <span className="font-semibold text-amber-300">{jt.steps.durationLabel}</span> {copy.duration}
                                         </p>
                                       )}
-                                      {meta.tips && meta.tips.length > 0 && (
+                                      {copy.tips && copy.tips.length > 0 && (
                                         <div className="mt-1.5 border-t border-white/10 pt-1.5">
-                                          <p className="text-[9px] font-semibold text-amber-300">Tips:</p>
+                                          <p className="text-[9px] font-semibold text-amber-300">{jt.steps.tipsLabel}</p>
                                           <ul className="mt-0.5 list-disc pl-3 text-[9px] text-gray-300">
-                                            {meta.tips.map((t, i) => (
+                                            {copy.tips.map((t, i) => (
                                               <li key={i} className="leading-tight">{t}</li>
                                             ))}
                                           </ul>
@@ -882,7 +876,7 @@ export default function JewelryPipelinePage() {
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
                                   src={step.resultUrl}
-                                  alt={meta.label}
+                                  alt={copy.label}
                                   className="mt-1 h-14 w-full rounded bg-black object-contain"
                                 />
                               ) : (
@@ -891,7 +885,7 @@ export default function JewelryPipelinePage() {
                                     <Loader2 className="h-3 w-3 animate-spin" />
                                   ) : step.status === "error" ? (
                                     <span className="line-clamp-3 text-center text-[8px] leading-tight text-red-300" title={step.error}>
-                                      {step.error || "Error"}
+                                      {step.error || jt.messages.error}
                                     </span>
                                   ) : (
                                     "—"
@@ -902,9 +896,9 @@ export default function JewelryPipelinePage() {
                                 <span>
                                   {step.status === "done" && <CheckCircle2 className="inline h-2.5 w-2.5 text-emerald-400" />}
                                   {step.status === "error" && <AlertCircle className="inline h-2.5 w-2.5 text-red-400" />}
-                                  {step.status === "skipped" && "saltado"}
+                                  {step.status === "skipped" && jt.steps.skipped}
                                   {step.status === "running" && "..."}
-                                  {step.status === "idle" && meta.costHint}
+                                  {step.status === "idle" && copy.costHint}
                                 </span>
                                 {step.status === "done" && step.cost > 0 && (
                                   <span className="font-mono text-[9px] text-amber-300">${step.cost.toFixed(3)}</span>
@@ -928,17 +922,17 @@ export default function JewelryPipelinePage() {
                     {job.status === "done" && (
                       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {job.estanteUrl && (
-                          <ResultCard label="Estante" url={job.estanteUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}-estante.jpg`} />
+                          <ResultCard label={jt.results.estante} url={job.estanteUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}-estante.jpg`} />
                         )}
                         {job.modelUrl ? (
-                          <ResultCard label="En modelo" url={job.modelUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}-modelo.jpg`} />
+                          <ResultCard label={jt.results.model} url={job.modelUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}-modelo.jpg`} />
                         ) : includeModel ? (
-                          <MissingOutput label="En modelo" reason="La IA no pudo poner la pieza en la modelo. Probá otra foto más nítida o desactivá esta opción." />
+                          <MissingOutput label={jt.results.model} reason={jt.results.modelMissing} />
                         ) : null}
                         {job.videoUrl ? (
-                          <ResultCard label="Video 360°" url={job.videoUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}.mp4`} isVideo />
+                          <ResultCard label={jt.results.video} url={job.videoUrl} filename={`${job.file.name.replace(/\.[^.]+$/, "")}.mp4`} isVideo />
                         ) : includeVideo ? (
-                          <MissingOutput label="Video 360°" reason="No se pudo generar el video. Abrí la consola para ver el error o reintentá." />
+                          <MissingOutput label={jt.results.video} reason={jt.results.videoMissing} />
                         ) : null}
                       </div>
                     )}
@@ -957,7 +951,7 @@ export default function JewelryPipelinePage() {
               className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-amber-500/50"
             >
               {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {isRunning ? "Procesando..." : "Procesar todas"}
+              {isRunning ? jt.buttons.processing : jt.buttons.processAll}
             </button>
             <button
               onClick={() => {
@@ -969,7 +963,7 @@ export default function JewelryPipelinePage() {
               className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-white/20 hover:text-white disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />
-              Limpiar todo
+              {jt.buttons.clearAll}
             </button>
           </div>
         )}
@@ -979,16 +973,20 @@ export default function JewelryPipelinePage() {
 }
 
 function MissingOutput({ label, reason }: { label: string; reason: string }) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
   return (
     <div className="flex h-full min-h-[8rem] flex-col items-center justify-center gap-2 rounded border border-red-500/30 bg-red-500/10 p-3 text-center">
       <AlertCircle className="h-5 w-5 text-red-400" />
-      <p className="text-[11px] font-semibold text-red-300">{label} falló</p>
+      <p className="text-[11px] font-semibold text-red-300">{label} {jt.results.failedSuffix}</p>
       <p className="text-[10px] leading-tight text-red-200/80">{reason}</p>
     </div>
   );
 }
 
 function ResultCard({ label, url, filename, isVideo }: { label: string; url: string; filename: string; isVideo?: boolean }) {
+  const { t } = useI18n();
+  const jt = t.pipelines.jewelry;
   return (
     <div className="relative overflow-hidden rounded border border-white/10 bg-black">
       {isVideo ? (
@@ -1003,7 +1001,7 @@ function ResultCard({ label, url, filename, isVideo }: { label: string; url: str
           href={url}
           download={filename}
           className="rounded p-0.5 text-gray-300 transition hover:text-white"
-          title={`Descargar ${label}`}
+          title={`${jt.results.download} ${label}`}
         >
           <Download className="h-3 w-3" />
         </a>

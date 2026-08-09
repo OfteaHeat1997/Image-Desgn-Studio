@@ -17,6 +17,11 @@
 // =============================================================================
 
 import { type PagesCopy, PAGES_ES, PAGES_EN } from './pages';
+import {
+  type JewelryPipelineCopy,
+  JEWELRY_PIPELINE_ES,
+  JEWELRY_PIPELINE_EN,
+} from './pipelines/jewelry';
 
 export type Locale = 'es' | 'en';
 
@@ -494,12 +499,34 @@ const en: HomeCopy = {
  * rompe: sus claves siguen en el nivel superior (`t.dashboard`, `t.pipelines`…)
  * y lo nuevo cuelga de `t.pages.*`.
  */
-export interface AppCopy extends HomeCopy {
+export interface AppCopy extends Omit<HomeCopy, 'pipelines'> {
   pages: PagesCopy;
+  /**
+   * La home usa `pipelines.<x>` (PipelineCopy: title/cta/...). El pipeline de
+   * joyería suma su copy de página bajo la MISMA clave `jewelry` — claves
+   * disjuntas, así ambos consumidores conviven sin romperse.
+   */
+  pipelines: Omit<HomeCopy['pipelines'], 'jewelry'> & {
+    jewelry: PipelineCopy & JewelryPipelineCopy;
+  };
 }
 
-const esFull: AppCopy = { ...es, pages: PAGES_ES };
-const enFull: AppCopy = { ...en, pages: PAGES_EN };
+const esFull: AppCopy = {
+  ...es,
+  pages: PAGES_ES,
+  pipelines: {
+    ...es.pipelines,
+    jewelry: { ...es.pipelines.jewelry, ...JEWELRY_PIPELINE_ES },
+  },
+};
+const enFull: AppCopy = {
+  ...en,
+  pages: PAGES_EN,
+  pipelines: {
+    ...en.pipelines,
+    jewelry: { ...en.pipelines.jewelry, ...JEWELRY_PIPELINE_EN },
+  },
+};
 
 export const TRANSLATIONS: Record<Locale, AppCopy> = { es: esFull, en: enFull };
 
