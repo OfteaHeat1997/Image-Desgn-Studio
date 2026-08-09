@@ -489,6 +489,21 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
   },
   steps: {
     items: {
+      photoSide: {
+        label: 'Foto Lateral (perfil)',
+        description:
+          'Vista de perfil a 90°: muestra el contorno de la copa, el ancho de la banda y cómo cae el tirante.',
+      },
+      photoDetail: {
+        label: 'Foto Detalle (diagonal)',
+        description:
+          'Toma cercana en diagonal para que se vea la textura real de la tela: brillo, tejido y costuras.',
+      },
+      heroVideo: {
+        label: 'Video Hero (giro para el carrusel)',
+        description:
+          'Giro suave de 360° en vertical, pensado para repetirse en loop en la portada de tu tienda.',
+      },
       isolate: {
         label: 'Aislar Producto',
         description: 'Quitar la modelo y fondo, dejar solo la prenda flotando estilo ghost 3D',
@@ -529,6 +544,48 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
     },
   },
   stepDocs: {
+  photoSide: {
+    what: 'Vista de perfil a 90 grados de la prenda puesta. Muestra el CONTORNO: cuánto proyecta la copa, el ancho real de la banda y cómo cae el tirante en el hombro. Es distinta de la Foto Detalle: esa acerca la cámara para mostrar la textura, esta se aleja para mostrar la forma.',
+    provider: 'El mismo del Paso 2 (Uwear por default), con la cámara de perfil.',
+    duration: '30-60 s',
+    costDetail: '$0.20 con Uwear — mismo costo que un try-on normal.',
+    canFail: [
+      'Necesita el producto aislado del Paso 1. Sin él, se salta.',
+      'Con prendas muy planas el perfil aporta poco; en ese caso podés desactivar el paso.',
+    ],
+    tips: [
+      'Responde una pregunta de compra que la frontal no puede: cómo se ve de lado.',
+      'Útil sobre todo en bras con copa estructurada o banda ancha.',
+    ],
+  },
+  photoDetail: {
+    what: 'Toma cercana en diagonal (3/4) del producto puesto, pensada para que se vea la TEXTURA real: el brillo del satén, el tejido de la malla y las costuras. Es la foto que convence de la calidad.',
+    provider: 'El mismo del Paso 2 (Uwear por default), con la cámara en diagonal y encuadre cerrado.',
+    duration: '30-60 s',
+    costDetail: '$0.20 con Uwear — mismo costo que un try-on normal.',
+    canFail: [
+      'Necesita el producto aislado del Paso 1. Sin él, se salta.',
+      'Si la ficha del producto no se pudo leer, la textura puede salir genérica.',
+    ],
+    tips: [
+      'Es la foto que más vende en lencería: se ve la calidad de la tela de cerca.',
+      'Si el detalle no se aprecia, revisá que la ficha del producto tenga el material identificado.',
+    ],
+  },
+  heroVideo: {
+    what: 'Giro suave de 360 grados de la modelo con la prenda, en vertical y pensado para repetirse en loop. Es el video de la PORTADA de tu tienda, no del catálogo: tiene que enganchar en los primeros segundos mientras alguien scrollea.',
+    provider: 'Kling 2.6 Pro (fal) — el mismo motor del video de catálogo, con instrucción de giro continuo.',
+    duration: '60-180 s',
+    costDetail: '$0.35 por video de 5 s.',
+    canFail: [
+      'Necesita una foto de la modelo con la prenda (cuerpo completo o try-on). Sin eso, se salta.',
+      'Si el giro sale brusco, reintentá: el motor varía entre corridas.',
+    ],
+    tips: [
+      'Desactivado por default: es material de portada, no hace falta uno por cada color.',
+      'Con uno o dos por REF alcanza para el carrusel.',
+    ],
+  },
     isolate: {
       what: 'Quita la modelo y el fondo de tu foto, dejando solo la prenda flotando como si fuera un producto 3D (estilo ghost mannequin).',
       provider: 'grounded_sam + SeedDream edit (o Flux Kontext para no-lencería). Fallback: WithoutBG.',
@@ -1104,6 +1161,21 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
   },
   steps: {
     items: {
+      photoSide: {
+        label: 'Side Photo (profile)',
+        description:
+          'A 90° profile view: shows the cup silhouette, the real band width and how the strap falls.',
+      },
+      photoDetail: {
+        label: 'Detail Photo (diagonal)',
+        description:
+          'A close diagonal shot so the real fabric texture reads: sheen, weave and seams.',
+      },
+      heroVideo: {
+        label: 'Hero Video (spin for the carousel)',
+        description:
+          'A smooth vertical 360° spin, made to loop on your storefront hero.',
+      },
       isolate: {
         label: 'Isolate Product',
         description: 'Remove the model and background, leaving just the garment floating, 3D ghost style',
@@ -1144,6 +1216,48 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
     },
   },
   stepDocs: {
+  photoSide: {
+    what: 'A 90-degree profile view of the garment being worn. It shows the SILHOUETTE: how far the cup projects, the real band width and how the strap sits on the shoulder. Different from the Detail Photo: that one moves the camera closer to show texture, this one pulls back to show shape.',
+    provider: 'Same as Step 2 (Uwear by default), with a profile camera.',
+    duration: '30-60 s',
+    costDetail: '$0.20 with Uwear — same cost as a normal try-on.',
+    canFail: [
+      'It needs the isolated product from Step 1. Without it, the step is skipped.',
+      'On very flat garments the profile adds little; you can turn the step off there.',
+    ],
+    tips: [
+      'It answers a buying question the front photo cannot: what it looks like from the side.',
+      'Most useful on bras with a structured cup or a wide band.',
+    ],
+  },
+  photoDetail: {
+    what: 'A close diagonal (3/4) shot of the product being worn, built so the real TEXTURE reads: the sheen of the satin, the mesh weave and the seams. This is the photo that proves quality.',
+    provider: 'Same as Step 2 (Uwear by default), with a diagonal camera and a tight frame.',
+    duration: '30-60 s',
+    costDetail: '$0.20 with Uwear — same cost as a normal try-on.',
+    canFail: [
+      'It needs the isolated product from Step 1. Without it, the step is skipped.',
+      'If the product spec could not be read, the texture may come out generic.',
+    ],
+    tips: [
+      'It is the best-selling photo in lingerie: the fabric quality reads up close.',
+      'If the detail does not show, check that the product spec identified the material.',
+    ],
+  },
+  heroVideo: {
+    what: 'A smooth 360-degree spin of the model wearing the garment, vertical and made to loop. This is your storefront HERO video, not the catalog one: it has to hook in the first seconds while someone scrolls.',
+    provider: 'Kling 2.6 Pro (fal) — the same engine as the catalog video, instructed to spin continuously.',
+    duration: '60-180 s',
+    costDetail: '$0.35 per 5 s video.',
+    canFail: [
+      'It needs a photo of the model wearing the garment (full body or try-on). Without that, it is skipped.',
+      'If the spin comes out abrupt, redo it: the engine varies between runs.',
+    ],
+    tips: [
+      'Off by default: it is hero material, you do not need one per colour.',
+      'One or two per REF is enough for the carousel.',
+    ],
+  },
     isolate: {
       what: 'Removes the model and background from your photo, leaving just the garment floating as if it were a 3D product (ghost mannequin style).',
       provider: 'grounded_sam + SeedDream edit (or Flux Kontext for non-lingerie). Fallback: WithoutBG.',
