@@ -5,8 +5,19 @@
 // Gracefully no-ops when DATABASE_URL is not configured.
 // =============================================================================
 
-import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
+
+/**
+ * Equivalente estructural a Prisma.InputJsonValue.
+ *
+ * No se importa el namespace `Prisma` de '@prisma/client' porque ese tipo solo
+ * existe cuando el cliente esta GENERADO. En este repo la base de datos es
+ * OPCIONAL —cada llamada a prisma.* esta null-guardeada— asi que el build no
+ * puede depender de haber corrido `prisma generate`: sin cliente generado,
+ * `next build` fallaba con "Module '@prisma/client' has no exported member
+ * 'Prisma'".
+ */
+type JsonInput = string | number | boolean | null | JsonInput[] | { [k: string]: JsonInput };
 
 // -----------------------------------------------------------------------------
 // Default project (cached in-memory)
@@ -28,8 +39,10 @@ export async function getDefaultProjectId(): Promise<string> {
     });
   }
 
+  // Se devuelve project.id y no cachedProjectId: la variable es `string | null`
+  // y TypeScript no deduce que la asignacion de la linea anterior la dejo no-nula.
   cachedProjectId = project.id;
-  return cachedProjectId;
+  return project.id;
 }
 
 // -----------------------------------------------------------------------------
@@ -115,7 +128,7 @@ export async function saveJob(data: {
         provider: data.provider,
         model: data.model ?? null,
         status: 'completed',
-        inputParams: data.inputParams as Prisma.InputJsonValue,
+        inputParams: data.inputParams as JsonInput,
         outputUrl: data.outputUrl,
         cost: data.cost,
         processingTime: data.processingTimeMs ? data.processingTimeMs / 1000 : null,
