@@ -1204,10 +1204,10 @@ export default function StaticProductPipelinePage() {
         updateStep(job.id, "lifestyleVideo", { status: "running" });
         try {
           const action = LIFESTYLE_VIDEO_ACTIONS.find((a) => a.value === (job.videoAction ?? "auto")) ?? LIFESTYLE_VIDEO_ACTIONS[0];
-          const productDesc = job.productFeatures
-            ? staticProductDescriptor(job.productFeatures)
-            : "elegant fragrance bottle";
-          const videoPrompt = `${action.promptHint}. Featured product: ${productDesc}. Premium fragrance commercial video aesthetic, vertical 9:16 format, professional lighting`;
+          // FIX (video fallaba "prompt no puede superar 1000 caracteres"): NO meter
+          // el descriptor largo del producto — el video anima el frame adaptativo
+          // que YA tiene el producto. Prompt corto + cap de seguridad a 1000.
+          const videoPrompt = `${action.promptHint}. Premium fragrance commercial video, elegant cinematic motion, vertical 9:16 format, professional studio lighting.`.slice(0, 1000);
           const vRes = await fetch("/api/video", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
