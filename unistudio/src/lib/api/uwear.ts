@@ -315,8 +315,9 @@ export async function createUwearGeneration(params: {
     num_images: params.numImages ?? 1,
     avatar_id: params.avatarId ?? null,
   };
-  // La resolucion viaja dentro de generation_setting, no suelta.
-  body.generation_setting = { resolution: params.resolution ?? '1024X1280' };
+  // `generation_setting` es campo de RESPUESTA, no de envio: mandarlo da
+  // extra_forbidden. La resolucion va suelta.
+  body.resolution = params.resolution ?? '1024X1280';
   if (params.artDirectionId !== undefined && params.artDirectionId !== null) body.art_direction_id = params.artDirectionId;
 
   const res = await fetch(`${UWEAR_BASE_URL}/generation`, {
