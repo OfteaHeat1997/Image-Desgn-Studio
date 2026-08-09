@@ -258,9 +258,9 @@ const TRYON_PROVIDER_OPTIONS: { value: TryonProvider; label: string; hint: strin
   // FASHN bloquea ropa interior, Kolors e IDM-VTON inventan prendas genericas.
   // Tenerlas en la lista solo hacia perder tiempo y creditos probando caminos
   // que ya sabemos que fallan.
-  { value: "auto",     label: "Recomendado (Leffa)",  hint: "La opcion segura. Warpea los pixeles REALES de tu prenda en vez de redibujarla: respeta silueta, cierre y paneles. Tarda ~4 min." },
+  { value: "auto",     label: "Recomendado (Uwear)",  hint: "La opcion segura. Recibe la ficha del producto que Claude Vision saca de tu foto, asi que conserva el cierre y los paneles aunque sean del mismo color que la tela — clave en beige, blanco y nude. ~35 s." },
   { value: "uwear",    label: "Uwear — rapido",       hint: "Plataforma de moda: modelo mas realista y solo ~35 s. Usa SU propio avatar (siempre el mismo), no la modelo IA del paso anterior. ~$0.20." },
-  { value: "leffa",    label: "Leffa — maxima fidelidad", hint: "Igual que Recomendado, elegido a mano. Viste TU modelo IA, asi que la misma mujer aparece en todos los pasos. ~4 min · $0.04." },
+  { value: "leffa",    label: "Leffa — misma modelo IA", hint: "Viste TU modelo IA (la misma mujer en todos los pasos) y conserva la textura exacta de la tela. PERO no lee la ficha del producto: en prendas claras pierde los detalles del mismo color que la tela. ~4 min · $0.04." },
   { value: "seedream", label: "SeedDream — solo para probar rapido", hint: "25 s, pero REDIBUJA el producto: cambia el escote y el cierre. Sirve para ver el encuadre rapido, NO para el catalogo. $0.03." },
 ];
 
@@ -2789,9 +2789,24 @@ async function runStep(
     // Es mas lento (~4 min vs ~25s), pero el default debe ser el que devuelve TU
     // producto, no el que responde rapido con otro. Quien quiera velocidad puede
     // elegir SeedDream a mano en el selector.
-    const useLeffa =
-      providerOverride === "leffa" ||
-      (isLingerieFlow && (!providerOverride || providerOverride === "auto"));
+    // EL DEFAULT DEBE SER UN PROVEEDOR QUE LEA LA FICHA DEL PRODUCTO.
+    //
+    // Este es el problema DE FONDO, no un ajuste por color. Leffa solo warpea
+    // pixeles: no acepta texto, asi que solo puede conservar lo que se VE en la
+    // foto del producto. En un bra negro los ganchos son metal sobre saten y
+    // resaltan; en beige, blanco o nude la botonadura es del mismo color que la
+    // tela y practicamente no tiene contraste — Leffa la alisa y desaparece.
+    // Con ~490 variantes y muchos colores claros, eso falla producto tras
+    // producto.
+    //
+    // Uwear SI recibe garmentDescription, que Claude Vision genera leyendo CADA
+    // foto automaticamente (cierre, copas, tirantes, paneles). O sea: el detalle
+    // se preserva porque esta DESCRITO, no porque se alcance a ver. Verificado
+    // con el bra beige 011473: Leffa perdio los ganchos, Uwear los reprodujo.
+    //
+    // Leffa sigue disponible eligiendolo a mano: gana cuando la prioridad es la
+    // textura exacta de la tela y el producto tiene buen contraste.
+    const useLeffa = providerOverride === "leffa";
     if (useLeffa) {
       return await tryOnLeffaAsync(sharedModelUrl, inputUrl, category, abortSignal);
     }
