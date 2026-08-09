@@ -1622,7 +1622,13 @@ export default function JewelryPipelinePage() {
             const res = await fetch("/api/social-kit", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ imageUrls: urls.slice(0, 10), includeReel: true }),
+              // EL REEL NO BLOQUEA EL CARRUSEL. Renderizar 1080x1920 con ffmpeg
+              // (zoompan + xfade, libx264) en una funcion serverless se pasa de
+              // cualquier limite razonable: el paso moria por timeout y no
+              // entregaba NADA, ni siquiera el carrusel, que se arma en 2s.
+              // Ahora el paso devuelve el carrusel siempre; el reel queda para
+              // pedirlo aparte cuando haga falta.
+              body: JSON.stringify({ imageUrls: urls.slice(0, 10), includeReel: false }),
               signal,
             });
             const data = await safeJson(res);

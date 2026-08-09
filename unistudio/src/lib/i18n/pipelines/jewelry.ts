@@ -805,7 +805,7 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     carouselHint: '1080x1350 (4:5). Every slide shares the ratio, 50 px safe margin.',
     reel: 'Reel',
     reelHint: '1080x1920 (9:16), looping.',
-    reelUnavailable: 'The reel could not be generated in this environment. The carousel is ready.',
+    reelUnavailable: 'The carousel is ready. The reel runs separately: rendering vertical video takes too long to fit inside this step.',
     slide: (n) => `Slide ${n}`,
     downloadKit: 'Download all',
   },
