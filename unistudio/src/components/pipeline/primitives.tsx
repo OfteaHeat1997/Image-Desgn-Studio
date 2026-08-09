@@ -428,13 +428,21 @@ export function ImageLightbox({
     return () => window.removeEventListener("keydown", handler);
   }, [images.length, onClose, compareWith, isVideo]);
 
+  // BLOQUEO DE SCROLL SEGURO.
+  // Antes se ponía `overflow:hidden` en el body al montar, sin condición, y se
+  // restauraba solo al desmontar. Si el visor montaba sin imagen usable, se
+  // quedaba con el scroll bloqueado y sin nada visible que cerrar: la página
+  // entera dejaba de moverse y no había forma de recuperarla salvo recargar.
+  // Ahora el bloqueo depende de que HAYA algo que mostrar, y se restaura al
+  // valor previo en cuanto deja de haberlo.
   useEffect(() => {
+    if (!url) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [url]);
 
   if (!url) return null;
 

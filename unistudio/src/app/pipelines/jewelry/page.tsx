@@ -121,6 +121,22 @@ const STEP_COST: Record<StepKey, number> = {
   social: 0,
 };
 
+/**
+ * Motor que corre cada paso, para mostrarlo en la tarjeta. La usuaria pidio
+ * explicitamente saber "cual proveedor" genero cada foto: hasta ahora solo
+ * estaba escrito dentro del panel de documentacion, cerrado por defecto.
+ */
+const STEP_ENGINE: Record<StepKey, string> = {
+  clean: "Kontext Pro",
+  isolate: "BiRefNet",
+  packshot: "Kontext Pro",
+  luxury: "Kontext Pro",
+  macro: "sharp · sin IA",
+  model: "SeedDream + Kontext",
+  scale: "SeedDream + Kontext",
+  social: "sharp + ffmpeg",
+};
+
 /** Pasos que se pueden apagar antes de correr. El resto van siempre. */
 const OPTIONAL_STEPS: StepKey[] = ["model", "scale"];
 
@@ -579,22 +595,6 @@ function StepCard({
   // VISTA GRANDE AL PASAR EL MOUSE, sin clic. Escalar la tarjeta un 3% no
   // alcanza para juzgar el acabado de una joya. El retardo de 180 ms es
   // hover-intent: sin él, el preview se dispara al pasar de largo scrolleando.
-  const [peek, setPeek] = useState(false);
-  const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openPeek = () => {
-    if (peekTimer.current) clearTimeout(peekTimer.current);
-    peekTimer.current = setTimeout(() => setPeek(true), 180);
-  };
-  const closePeek = () => {
-    if (peekTimer.current) clearTimeout(peekTimer.current);
-    setPeek(false);
-  };
-  useEffect(
-    () => () => {
-      if (peekTimer.current) clearTimeout(peekTimer.current);
-    },
-    [],
-  );
 
   const elapsed = useElapsedSeconds(step.status === "processing");
   const isSocial = stepKey === "social";
@@ -680,6 +680,12 @@ function StepCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          {/* Que motor corre este paso, siempre a la vista. Estaba solo en el
+              panel de docs, detras del icono "i", asi que no habia forma de
+              saber quien genero cada foto sin abrirlo. */}
+          <span className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)] lg:inline">
+            {STEP_ENGINE[stepKey]}
+          </span>
           <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
             {(step.status === "done" || step.status === "accepted") && step.cost > 0
               ? `$${step.cost.toFixed(3)}`
@@ -771,7 +777,7 @@ function StepCard({
         ) : isSocial ? (
           <SocialResult step={step} filenamePrefix={filenamePrefix} onOpen={setLightboxIdx} />
         ) : (
-          <div onMouseEnter={step.resultUrl ? openPeek : undefined} onMouseLeave={closePeek}>
+          <div>
             {/* Antes de correr se explica QUE hace, sin obligar a abrir el panel.
                 El reclamo fue "faltan explicaciones": la doc estaba escondida
                 detrás del icono "i" y nadie la abría antes de gastar. */}
@@ -791,7 +797,7 @@ function StepCard({
                 before={step.inputUrl}
                 after={step.resultUrl}
                 label={copy.label}
-                className="h-56 w-full"
+                className="h-[26rem] w-full"
                 labels={{ ...jt.beforeAfter, ...jt.thumb }}
               />
             </button>
@@ -914,47 +920,10 @@ function StepCard({
 
       )}
 
-      {/* Vista grande al pasar el mouse */}
-      {peek && step.resultUrl && !isSocial && (
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm">
-          <div className="flex max-h-full w-full max-w-5xl items-center gap-3">
-            {step.inputUrl && !isVideoUrl(step.resultUrl) && (
-              <div className="relative flex-1">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={step.inputUrl}
-                  alt={jt.lightbox.original}
-                  className="max-h-[70vh] w-full rounded-xl object-contain"
-                />
-                <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                  {jt.beforeAfter.before}
-                </span>
-              </div>
-            )}
-            <div className="relative flex-1">
-              {isVideoUrl(step.resultUrl) ? (
-                <video
-                  src={step.resultUrl}
-                  autoPlay
-                  loop
-                  muted
-                  className="max-h-[70vh] w-full rounded-xl"
-                />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={step.resultUrl}
-                  alt={copy.label}
-                  className="max-h-[70vh] w-full rounded-xl object-contain"
-                />
-              )}
-              <span className="absolute right-2 top-2 rounded bg-[var(--accent)]/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-                {jt.beforeAfter.after}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* El peek a pantalla completa se ELIMINO. Era un overlay `fixed inset-0`
+          que al pasar el mouse tapaba las tarjetas de alrededor y el resto de la
+          pagina — en las capturas se veia el panel flotando encima del paso
+          siguiente. Para ver grande esta el clic, que abre el visor. */}
 
       {lightboxIdx !== null && lightboxImages.length > 0 && (
         <ImageLightbox
