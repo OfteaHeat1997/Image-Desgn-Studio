@@ -3108,6 +3108,42 @@ async function runStep(
   }
 
   if (stepId === "photoDetail") {
+    // UNA FOTO DE DETALLE ES UN RECORTE, NO UNA GENERACION.
+    //
+    // Se le pedia a Uwear un "extreme close-up" por prompt y devolvia un plano
+    // medio — el mismo del Paso 2. Y aunque saliera bien, estaria GENERANDO otra
+    // vez la tela: cada generacion es una interpretacion nueva, asi que el
+    // detalle podia no coincidir con la foto que la usuaria ya acepto.
+    //
+    // El detalle correcto es un recorte macro de la frontal ya aprobada:
+    // conserva exactamente esos pixeles, no inventa nada, sale en segundos y
+    // cuesta $0. Es lo que hace un fotografo de catalogo — no repite la toma,
+    // amplia la que tiene.
+    //
+    // Si el recorte falla se sigue con el camino generativo de abajo.
+    if (!providerOverride || providerOverride === "auto") {
+      try {
+        const cropRes = await fetch("/api/macro-crop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: abortSignal,
+          body: JSON.stringify({
+            imageUrl: inputUrl,
+            zoom: 2.2,
+            aspectRatio: "4:5",
+            outputSize: 1400,
+          }),
+        });
+        const cropJson = await cropRes.json();
+        if (cropJson.success && cropJson.data?.url) {
+          return { resultUrl: cropJson.data.url, cost: 0, usedProvider: "macro-crop" };
+        }
+        console.warn("[lingerie] photoDetail: el recorte macro fallo, sigo con el generativo:", cropJson.error);
+      } catch (e) {
+        console.warn("[lingerie] photoDetail: fallo el recorte macro:", e instanceof Error ? e.message : e);
+      }
+    }
+
     if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
       throw new Error("La Foto Detalle necesita la modelo IA con este proveedor. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
     }
