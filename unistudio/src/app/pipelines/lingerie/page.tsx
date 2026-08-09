@@ -2029,8 +2029,21 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           </div>
 
           {/* Action buttons — only shown when done and in manual mode */}
+            {/* JERARQUIA DE ACCIONES.
+                La usuaria: "los botones estan bien, pero necesitan un proposito
+                mejor, mejor estructurados".
+                Antes los cuatro estaban apilados a la derecha con casi el mismo
+                peso: "Saltar" (descartar el paso) se veia parecido a "Aceptar y
+                continuar" (avanzar), y eso invita a errores caros — saltar un paso
+                que ya se pago.
+                Ahora hay tres niveles y una separacion fisica:
+                  · Saltar    -> descarte, aparte y a la izquierda
+                  · Descargar / Rehacer -> secundarios, agrupados
+                  · Aceptar   -> primario, dorado y solo, a la derecha
+                Regla: la accion que hace avanzar el flujo tiene que ser la mas
+                visible y la mas lejos de la que lo descarta. */}
           {canInteract && (
-            <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-white/6 pt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/6 pt-4">
               {/* Selector para re-testear con otro proveedor (el badge del
                   proveedor que corrió está en la cabecera, siempre visible).
                   Cambiá el proveedor acá y dale Rehacer para comparar Kolors
@@ -2040,7 +2053,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                   cual mandaba. */}
               <button
                 onClick={onSkip}
-                className="lz-lift flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-white/5 hover:text-white"
+                className="lz-lift mr-auto flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-secondary)]"
+                title="Descartar este paso y seguir sin su resultado"
               >
                 <SkipForward className="h-3.5 w-3.5" />
                 {lg.stepCard.skip}
@@ -2072,7 +2086,7 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
               </button>
               <button
                 onClick={onAccept}
-                className="lz-lift flex items-center gap-1.5 rounded-lg border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)]/90 to-[var(--accent-muted)] px-4 py-2 text-xs font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(80,200,120,0.5)] hover:brightness-105"
+                className="lz-lift flex items-center gap-2 rounded-lg border border-[var(--border-accent)] bg-gradient-to-b from-[var(--accent)] to-[var(--accent-muted)] px-5 py-2.5 text-sm font-semibold text-[#0C0C0E] shadow-[0_4px_14px_-4px_rgba(212,180,138,0.55)] hover:brightness-110"
               >
                 <Check className="h-3.5 w-3.5" />
                 {lg.stepCard.accept}
