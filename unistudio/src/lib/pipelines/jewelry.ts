@@ -126,8 +126,13 @@ const PRESERVE =
 // Base común de todo packshot de marketplace. Las guías de catálogo (Mercado
 // Libre, Shopify, Amazon) piden lo mismo: fondo blanco liso, la pieza centrada,
 // sombra de contacto suave para que no parezca recortada, y nada más en cuadro.
+// Marfil / crema muy claro, NO blanco puro. Lo pide la direccion visual de
+// Unistyles (docs/pipelines/jewelry-brand.md): sobre blanco puro los bordes del
+// metal plateado desaparecen, y ademas el blanco de marketplace generico rompe
+// la familia visual de la categoria.
 const PACKSHOT_BASE =
-  'pure seamless white background, product perfectly centered with generous margin, ' +
+  'clean seamless ivory to very light cream background, warm neutral tone, not pure white, ' +
+  'product perfectly centered with generous margin, ' +
   'soft realistic contact shadow directly beneath the piece to ground it, ' +
   'even shadowless studio lighting from a large softbox, no props, no text, no watermark, ' +
   'ecommerce marketplace catalog packshot' + HD;
