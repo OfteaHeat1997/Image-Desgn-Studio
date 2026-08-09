@@ -31,10 +31,13 @@ const BODY = {
 // con Bearer, y exige assets[]. Los enums no estan documentados, pero la cuenta ya
 // tiene prendas creadas desde la web de Uwear: leer una devuelve sus assets con los
 // valores REALES de asset_kind/asset_view.
+// /clothing-item YA FUNCIONA (assets con asset_kind:'full'). Ahora /generation
+// rechaza clothing_item_id con "extra_forbidden": tambien le cambiaron el body.
+// Misma tecnica que funciono antes: leer una generacion YA hecha desde la web de
+// Uwear y copiar la forma real de su request.
 const READ_PATHS = [
-  'https://api.uwear.ai/clothing-items?items_per_page=1',
-  'https://api.uwear.ai/clothing-item/325429',
-  'https://api.uwear.ai/clothing-items/325429',
+  'https://api.uwear.ai/generations?items_per_page=2',
+  'https://api.uwear.ai/generation?items_per_page=2',
 ];
 
 export async function GET() {
