@@ -11,6 +11,7 @@ import sharp from 'sharp';
 import { saveUploadedImage } from '@/lib/db/persist';
 import { ensureHttpUrl } from '@/lib/api/replicate';
 import { uploadToFalStorage } from '@/lib/api/fal';
+import { uploadToBlob } from '@/lib/api/blob';
 
 const ALLOWED_TYPES = new Set([
   'image/png',
@@ -119,10 +120,19 @@ export async function POST(request: NextRequest) {
       console.warn('[upload] fal.ai storage upload failed:', err);
     }
 
+    // Upload to Vercel Blob — durable public storage. The returned URL is a few
+    // bytes, so we persist THAT (not the base64 data URL) to avoid filling the DB.
+    const blobUrl = await uploadToBlob(buffer, outputMime, file.name);
+
+    // URL durable para GUARDAR en la DB. Preferimos Blob (permanente); si no está
+    // configurado o falla, usamos las URLs públicas de fal/replicate; solo como
+    // último recurso cae al data URL base64 (evita romper si todo lo demás falló).
+    const durableUrl = blobUrl ?? falUrl ?? replicateUrl ?? dataUrl;
+
     // Save to database
     const imageId = await saveUploadedImage({
       filename: file.name,
-      originalUrl: dataUrl,
+      originalUrl: durableUrl,
       width,
       height,
       fileSize: buffer.length,
@@ -141,6 +151,8 @@ export async function POST(request: NextRequest) {
         replicateUrl,
         // fal.ai URL: public CDN URL that fal.ai models can always access
         falUrl,
+        // Vercel Blob URL: durable public storage (null si Blob no está configurado)
+        blobUrl,
         filename: file.name,
         width,
         height,

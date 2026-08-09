@@ -66,6 +66,33 @@ export async function saveUploadedImage(data: {
 }
 
 // -----------------------------------------------------------------------------
+// Sanitizador: quita payloads pesados (base64 / data URLs) de los inputParams
+// antes de guardarlos. Guardar la imagen completa en base64 dentro del JSON era
+// lo que llenaba la base de datos (una sola fila llegaba a 3MB). Reemplazamos
+// esas cadenas por un marcador liviano; el resto de los parámetros se conserva.
+// -----------------------------------------------------------------------------
+
+const MAX_STRING_LEN = 2000;
+
+function stripHeavyValues(value: unknown): unknown {
+  if (typeof value === 'string') {
+    if (value.startsWith('data:') || value.length > MAX_STRING_LEN) {
+      return `[omitido: ${value.length} chars]`;
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(stripHeavyValues);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = stripHeavyValues(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+// -----------------------------------------------------------------------------
 // Save a processing job
 // -----------------------------------------------------------------------------
 
