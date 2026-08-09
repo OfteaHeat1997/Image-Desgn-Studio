@@ -1089,20 +1089,22 @@ export default function StaticProductPipelinePage() {
         ". Keep the scene completely EMPTY — absolutely no bottles, jars or products anywhere in the background; only the empty pedestal and backdrop. Soft background lighting that harmonizes elegantly with the product placed on top.";
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
-      // PASO HD (primero): subir el PRODUCTO a alta resolución/nitidez ANTES de
-      // generar los fondos, así TODOS los outputs (blanco, adaptativo, hero,
-      // vertical) salen en alta calidad y no partiendo de la foto mediocre del
-      // proveedor. Clarity (resemblance 0.85, creativity 0.25) mantiene el frasco
-      // fiel. softFail: si el upscale falla, seguimos con el producto normalizado
-      // — nunca rompe el flujo.
+      // PASO HD (primero): RESTAURAR el PRODUCTO a alta resolución/nitidez ANTES
+      // de generar los fondos, así TODOS los outputs (blanco, adaptativo, hero,
+      // vertical) salen en alta calidad y no partiendo de la foto mediocre de la
+      // vendedora. SUPIR (v0Q en Replicate) reconstruye detalle real en fotos
+      // degradadas/pixeladas/ilegibles — lo que real-esrgan (super-resolución
+      // fiel pero que NO recupera detalle perdido) y clarity (que deforma) no
+      // logran. Si SUPIR falla, la ruta cae sola a real-esrgan; y softFail
+      // devuelve el producto normalizado — nunca rompe el flujo.
       try {
         const hdRes = await fetch("/api/upscale", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // real-esrgan = super-resolución FIEL (no inventa ni deforma el frasco).
-          // Clarity es generativo (creativity) y deformaba el producto. Aquí, como
-          // el producto se compone pixel-perfect, el HD debe ser fiel.
-          body: JSON.stringify({ imageUrl: currentUrl, provider: "real-esrgan", scale: 2, softFail: true }),
+          // SUPIR = restauración real de fotos malas. Reconstruye la etiqueta y
+          // la nitidez del frasco que la foto original perdió. Fallback interno a
+          // real-esrgan en la propia ruta si SUPIR se cae.
+          body: JSON.stringify({ imageUrl: currentUrl, provider: "supir", scale: 2, softFail: true }),
         });
         const hdData = await safeJson(hdRes);
         if (hdData.success && hdData.data?.url) {

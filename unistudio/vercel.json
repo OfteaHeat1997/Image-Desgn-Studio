@@ -16,7 +16,7 @@
       "maxDuration": 300
     },
     "src/app/api/upscale/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 300
     },
     "src/app/api/ad-create/route.ts": {
       "maxDuration": 300

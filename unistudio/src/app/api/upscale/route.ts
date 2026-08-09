@@ -39,6 +39,7 @@ const PROVIDER_COSTS: Record<string, number> = {
   'real-esrgan': 0.02,
   clarity: 0.05,
   'aura-sr': 0.03,
+  supir: 0.10, // SUPIR-v0Q en L40S — restauración real de fotos degradadas
 };
 
 /**
@@ -127,6 +128,44 @@ async function runClarity(imageUrl: string, scale: 2 | 4, prompt?: string): Prom
   return await extractOutputUrl(output);
 }
 
+/**
+ * SUPIR-v0Q — restauración real de fotos MUY degradadas (pixeladas, borrosas,
+ * baja resolución). A diferencia de real-esrgan (super-resolución fiel pero que
+ * no recupera detalle perdido) y clarity (que deforma el producto), SUPIR
+ * reconstruye textura y nitidez de forma semántica, ideal para el paso 1 del
+ * pipeline de estáticos cuando la foto original de la vendedora es mala.
+ *
+ * Usa la variante v0Q (sin LLaVA) que corre en L40S ~39s — cabe en el
+ * maxDuration de 120s de esta ruta. Prompts orientados a producto para que
+ * respete la etiqueta y no invente objetos.
+ *
+ * El input se limita al presupuesto de pixeles como los demás para no reventar
+ * la GPU. SUPIR es el más caro (~$0.10) por eso es opt-in, no el default.
+ */
+async function runSupir(imageUrl: string, scale: 2 | 4): Promise<string> {
+  const safeUrl = await fitToPixelBudget(
+    imageUrl,
+    Math.floor(MAX_OUTPUT_PIXELS / (scale * scale)),
+  );
+  const output = await runModel(
+    'cjwbw/supir-v0q:ede69f6a5ae7d09f769d683347325b08d2f83a93d136ed89747941205e0a71da',
+    {
+      image: safeUrl,
+      upscale: scale,
+      // Prompts de producto: pedimos nitidez y etiqueta legible, prohibimos que
+      // invente objetos o deforme el frasco.
+      a_prompt:
+        'high quality professional product photography, sharp focus, crystal clear readable label text, clean detailed packaging, studio lighting, photo-realistic',
+      n_prompt:
+        'blurry, low quality, low resolution, distorted, deformed product, warped bottle, extra objects, duplicate product, text artifacts, watermark, cartoon, painting, oversmoothed',
+      // Conservador para no alucinar: menos creatividad, más fidelidad al input.
+      s_cfg: 4.0,
+      s_stage2: 1.0,
+    },
+  );
+  return await extractOutputUrl(output);
+}
+
 export async function POST(request: NextRequest) {
   // Hoisted so the catch block can honour softFail and echo the original image.
   let softFail = false;
@@ -142,7 +181,7 @@ export async function POST(request: NextRequest) {
       prompt,
     } = body as {
       imageUrl: string;
-      provider: 'real-esrgan' | 'clarity' | 'aura-sr';
+      provider: 'real-esrgan' | 'clarity' | 'aura-sr' | 'supir';
       scale?: 2 | 4;
       faceEnhance?: boolean;
       prompt?: string;
@@ -168,7 +207,7 @@ export async function POST(request: NextRequest) {
 
     if (!provider) {
       return NextResponse.json(
-        { success: false, error: 'Missing required field "provider". Use "real-esrgan", "clarity", or "aura-sr".' },
+        { success: false, error: 'Missing required field "provider". Use "real-esrgan", "clarity", "aura-sr", or "supir".' },
         { status: 400 },
       );
     }
@@ -215,11 +254,25 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'supir': {
+        // Restauración fuerte. Si SUPIR falla (GPU llena, timeout), caemos a
+        // real-esrgan que es fiel y rápido, para no dejar el paso sin HD.
+        try {
+          resultUrl = await runSupir(imageUrl, scale);
+        } catch (err) {
+          console.warn('[API /upscale] supir falló, cayendo a real-esrgan:', err);
+          resultUrl = await runRealEsrgan(imageUrl, scale, faceEnhance);
+          usedProvider = 'real-esrgan';
+          cost = PROVIDER_COSTS['real-esrgan'];
+        }
+        break;
+      }
+
       default:
         return NextResponse.json(
           {
             success: false,
-            error: `Unsupported provider "${provider}". Use "real-esrgan", "clarity", or "aura-sr".`,
+            error: `Unsupported provider "${provider}". Use "real-esrgan", "clarity", "aura-sr", or "supir".`,
           },
           { status: 400 },
         );
