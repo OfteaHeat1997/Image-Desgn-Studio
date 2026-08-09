@@ -143,6 +143,21 @@ export interface JewelryPipelineCopy {
     clasp: string;
     engraved: string;
     changeType: string;
+    subtitle: string;
+    reanalyze: string;
+    reanalyzing: string;
+    fieldType: string;
+    fieldMaterial: string;
+    fieldFinish: string;
+    fieldChain: string;
+    fieldClasp: string;
+    fieldEngraved: string;
+    fieldStones: string;
+    fieldDetails: string;
+    detailsHint: string;
+    sectionIdentity: string;
+    sectionConstruction: string;
+    sectionDetails: string;
   };
   social: {
     carousel: string;
@@ -449,6 +464,21 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     clasp: 'Cierre',
     engraved: 'Grabado',
     changeType: 'Cambiar tipo',
+    subtitle: 'Leída por Claude Vision — podés editar cualquier campo antes de que corra el resto.',
+    reanalyze: 'Volver a analizar',
+    reanalyzing: 'Analizando...',
+    fieldType: 'Tipo de pieza',
+    fieldMaterial: 'Material',
+    fieldFinish: 'Acabado',
+    fieldChain: 'Tipo de cadena',
+    fieldClasp: 'Cierre',
+    fieldEngraved: 'Texto grabado',
+    fieldStones: 'Piedras',
+    fieldDetails: 'Detalles visibles',
+    detailsHint: 'Uno por línea. Es lo que más pesa en los prompts.',
+    sectionIdentity: 'Identidad',
+    sectionConstruction: 'Construcción',
+    sectionDetails: 'Detalles',
   },
   social: {
     carousel: 'Carrusel',
@@ -754,6 +784,21 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     clasp: 'Clasp',
     engraved: 'Engraved',
     changeType: 'Change type',
+    subtitle: 'Read by Claude Vision — you can edit any field before the rest runs.',
+    reanalyze: 'Analyse again',
+    reanalyzing: 'Analysing...',
+    fieldType: 'Piece type',
+    fieldMaterial: 'Material',
+    fieldFinish: 'Finish',
+    fieldChain: 'Chain type',
+    fieldClasp: 'Clasp',
+    fieldEngraved: 'Engraved text',
+    fieldStones: 'Stones',
+    fieldDetails: 'Visible details',
+    detailsHint: 'One per line. This is what weighs most in the prompts.',
+    sectionIdentity: 'Identity',
+    sectionConstruction: 'Construction',
+    sectionDetails: 'Details',
   },
   social: {
     carousel: 'Carousel',
