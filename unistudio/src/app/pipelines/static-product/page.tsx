@@ -1083,6 +1083,28 @@ export default function StaticProductPipelinePage() {
         : "";
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
+      // PASO HD (primero): subir el PRODUCTO a alta resolución/nitidez ANTES de
+      // generar los fondos, así TODOS los outputs (blanco, adaptativo, hero,
+      // vertical) salen en alta calidad y no partiendo de la foto mediocre del
+      // proveedor. Clarity (resemblance 0.85, creativity 0.25) mantiene el frasco
+      // fiel. softFail: si el upscale falla, seguimos con el producto normalizado
+      // — nunca rompe el flujo.
+      try {
+        const hdRes = await fetch("/api/upscale", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: currentUrl, provider: "clarity", scale: 2, softFail: true }),
+        });
+        const hdData = await safeJson(hdRes);
+        if (hdData.success && hdData.data?.url) {
+          currentUrl = hdData.data.url;
+          totalCost += hdData.cost ?? 0.05;
+          updateStep(job.id, "normalize", { resultUrl: currentUrl });
+        }
+      } catch (hdErr) {
+        console.warn("[static-product] HD upscale del producto falló, sigo con normalizado:", hdErr);
+      }
+
       const sharedInput = currentUrl;
       const [whiteRes, adaptiveRes, heroRes, verticalRes] = await Promise.all([
         runOutputStep(job.id, "white", sharedInput, enrichedConfig, undefined, job.usePhotoroom),
