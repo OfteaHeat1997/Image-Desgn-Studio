@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Fraunces } from "next/font/google";
 import { ToastContainer } from "@/components/ui/toast";
+import { GlobalI18n } from "@/components/ui/GlobalI18n";
 import "./globals.css";
 
 const inter = Inter({
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${fraunces.variable} bg-surface text-white antialiased font-sans`}
       >
+        <GlobalI18n />
         <main className="min-h-screen">{children}</main>
         <ToastContainer />
       </body>

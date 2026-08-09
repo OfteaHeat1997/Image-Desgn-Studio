@@ -29,7 +29,8 @@ import { useGalleryStore, type GalleryImage } from "@/stores/gallery-store";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
-import { AudioButton } from "@/components/ui/AudioButton";
+import { useI18n } from "@/hooks/useI18n";
+import { GALLERY_BODY_ES, GALLERY_BODY_EN } from "@/lib/i18n/pages-body/gallery";
 
 /* ------------------------------------------------------------------ */
 /*  Filter constants                                                    */
@@ -62,6 +63,8 @@ const PROJECT_OPTIONS = [
 /* ------------------------------------------------------------------ */
 
 export default function GalleryPage() {
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? GALLERY_BODY_EN : GALLERY_BODY_ES;
   const router = useRouter();
   const images = useGalleryStore((s) => s.images);
   const addImage = useGalleryStore((s) => s.addImage);
@@ -170,7 +173,7 @@ export default function GalleryPage() {
   const downloadSelectedAsZip = useCallback(async () => {
     const selected = filteredImages.filter((img) => selectedIds.has(img.id));
     if (selected.length === 0) return;
-    toast.info(`Empaquetando ${selected.length} imágenes en ZIP…`);
+    toast.info(b.packagingToast(selected.length));
     const zip = new JSZip();
     let added = 0;
     for (const img of selected) {
@@ -196,13 +199,13 @@ export default function GalleryPage() {
       }
     }
     if (added === 0) {
-      toast.error("No se pudo descargar ninguna imagen.");
+      toast.error(b.noDownloadError);
       return;
     }
     const content = await zip.generateAsync({ type: "blob" });
     const fileName = `unistudio-galeria-${new Date().toISOString().slice(0, 10)}-${added}imgs.zip`;
     saveAs(content, fileName);
-    toast.success(`ZIP listo: ${added} imágenes (${(content.size / 1024 / 1024).toFixed(1)} MB)`);
+    toast.success(b.zipReadyToast(added, (content.size / 1024 / 1024).toFixed(1)));
   }, [filteredImages, selectedIds]);
 
   /* ---- Delete ---- */
@@ -226,6 +229,15 @@ export default function GalleryPage() {
     [previewImage, filteredImages],
   );
 
+  const operationOptions = OPERATION_OPTIONS.map((o) => ({
+    ...o,
+    label: b.operationOptions[o.value],
+  }));
+  const projectOptions = PROJECT_OPTIONS.map((o) => ({
+    ...o,
+    label: b.projectOptions[o.value],
+  }));
+
   return (
     <div className="min-h-screen bg-surface text-heading overflow-x-hidden">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
@@ -243,39 +255,33 @@ export default function GalleryPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Tu galería de imágenes</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.gallery.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Todas tus fotos procesadas, listas para reusar o descargar.{" "}
-            <span className="text-muted">{images.length} en total</span>
+            {t.pages.gallery.subtitle}{" "}
+            <span className="text-muted">{images.length} {t.pages.gallery.totalSuffix}</span>
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text={`Galería. Tienes ${images.length} imágenes procesadas. Selecciónalas y descarga todo en un solo ZIP, o reusa imágenes individuales.`}
-            />
-          </div>
         </div>
 
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="default">{selectedIds.size} seleccionados</Badge>
+            <Badge variant="default">{b.selectedCount(selectedIds.size)}</Badge>
             <Button
               variant="outline"
               size="sm"
               leftIcon={<Download className="h-3.5 w-3.5" />}
               onClick={downloadSelected}
-              title="Descargar una por una (lento si son muchas)"
+              title={b.downloadIndividualTitle}
             >
-              Descargar individual
+              {b.downloadIndividual}
             </Button>
             <Button
               variant="primary"
               size="sm"
               leftIcon={<Archive className="h-3.5 w-3.5" />}
               onClick={downloadSelectedAsZip}
-              title="Empaquetar todas en un solo ZIP — recomendado para 10+ fotos"
+              title={b.downloadZipTitle}
             >
-              Descargar ZIP ({selectedIds.size})
+              {b.downloadZip(selectedIds.size)}
             </Button>
             <Button
               variant="ghost"
@@ -284,7 +290,7 @@ export default function GalleryPage() {
               onClick={deleteSelected}
               className="text-red-400 hover:text-red-300"
             >
-              Eliminar
+              {b.delete}
             </Button>
             <Button
               variant="ghost"
@@ -292,7 +298,7 @@ export default function GalleryPage() {
               leftIcon={<X className="h-3.5 w-3.5" />}
               onClick={() => setSelectedIds(new Set())}
             >
-              Limpiar
+              {b.clear}
             </Button>
           </div>
         )}
@@ -305,7 +311,7 @@ export default function GalleryPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
-            placeholder="Buscar por nombre..."
+            placeholder={b.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-10 w-full rounded-lg border border-surface-lighter bg-surface-light pl-10 pr-3 text-sm text-gray-200 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition-colors"
@@ -317,7 +323,7 @@ export default function GalleryPage() {
           <Select
             value={operationFilter}
             onValueChange={setOperationFilter}
-            options={OPERATION_OPTIONS}
+            options={operationOptions}
           />
         </div>
 
@@ -326,7 +332,7 @@ export default function GalleryPage() {
           <Select
             value={projectFilter}
             onValueChange={setProjectFilter}
-            options={PROJECT_OPTIONS}
+            options={projectOptions}
           />
         </div>
 
@@ -338,7 +344,7 @@ export default function GalleryPage() {
             ) : (
               <Square className="mr-1.5 h-3.5 w-3.5" />
             )}
-            {selectedIds.size === filteredImages.length ? "Deseleccionar Todo" : "Seleccionar Todo"}
+            {selectedIds.size === filteredImages.length ? b.deselectAll : b.selectAll}
           </Button>
         )}
       </div>
@@ -349,15 +355,15 @@ export default function GalleryPage() {
           {images.length === 0 ? (
             <>
               <ImageOff className="mb-3 h-8 w-8 text-gray-600" />
-              <p className="text-sm text-gray-500">Aun no hay imagenes procesadas.</p>
+              <p className="text-sm text-gray-500">{b.emptyTitle}</p>
               <p className="mt-1 text-xs text-gray-600">
-                Procesa imagenes en el Editor o en Batch para verlas aqui.
+                {b.emptyHint}
               </p>
             </>
           ) : (
             <>
               <Filter className="mb-3 h-8 w-8 text-gray-600" />
-              <p className="text-sm text-gray-500">Ninguna imagen coincide con los filtros.</p>
+              <p className="text-sm text-gray-500">{b.noMatch}</p>
             </>
           )}
         </div>
@@ -391,7 +397,7 @@ export default function GalleryPage() {
                       type="button"
                       onClick={() => setPreviewImage(img)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-white transition-colors"
-                      title="Ver"
+                      title={b.viewTitle}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -399,7 +405,7 @@ export default function GalleryPage() {
                       type="button"
                       onClick={() => router.push(`/editor?imageUrl=${encodeURIComponent(img.resultUrl)}`)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-accent-light transition-colors"
-                      title="Abrir en Editor"
+                      title={b.openInEditorTitle}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
@@ -407,7 +413,7 @@ export default function GalleryPage() {
                       type="button"
                       onClick={() => downloadImage(img)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-white transition-colors"
-                      title="Descargar"
+                      title={b.downloadTitle}
                     >
                       <Download className="h-4 w-4" />
                     </button>
@@ -415,7 +421,7 @@ export default function GalleryPage() {
                       type="button"
                       onClick={() => removeImage(img.id)}
                       className="rounded-lg bg-surface-light p-2 text-gray-300 hover:text-red-400 transition-colors"
-                      title="Eliminar"
+                      title={b.deleteTitle}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -470,7 +476,7 @@ export default function GalleryPage() {
         onOpenChange={(open) => {
           if (!open) setPreviewImage(null);
         }}
-        title={previewImage?.filename ?? "Vista Previa"}
+        title={previewImage?.filename ?? b.previewFallbackTitle}
         size="lg"
       >
         {previewImage && (
@@ -480,8 +486,8 @@ export default function GalleryPage() {
               <ImageCompare
                 beforeSrc={previewImage.originalUrl}
                 afterSrc={previewImage.resultUrl}
-                beforeLabel="Original"
-                afterLabel="Procesada"
+                beforeLabel={b.originalLabel}
+                afterLabel={b.processedLabel}
                 className="w-full"
               />
             ) : (
@@ -510,7 +516,7 @@ export default function GalleryPage() {
                 leftIcon={<ChevronLeft className="h-4 w-4" />}
                 onClick={() => navigatePreview("prev")}
               >
-                Anterior
+                {b.previous}
               </Button>
               <Button
                 variant="primary"
@@ -518,7 +524,7 @@ export default function GalleryPage() {
                 leftIcon={<Download className="h-4 w-4" />}
                 onClick={() => downloadImage(previewImage)}
               >
-                Descargar
+                {b.download}
               </Button>
               <Button
                 variant="ghost"
@@ -526,7 +532,7 @@ export default function GalleryPage() {
                 rightIcon={<ChevronRight className="h-4 w-4" />}
                 onClick={() => navigatePreview("next")}
               >
-                Siguiente
+                {b.next}
               </Button>
             </div>
           </div>

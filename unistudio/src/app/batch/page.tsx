@@ -24,7 +24,6 @@ import {
   Layers,
   Image as ImageIcon,
 } from "lucide-react";
-import { AudioButton } from "@/components/ui/AudioButton";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils/cn";
 import { useGalleryStore } from "@/stores/gallery-store";
 import { toast } from "@/hooks/use-toast";
+import { useI18n } from "@/hooks/useI18n";
+import { BATCH_BODY_ES, BATCH_BODY_EN } from "@/lib/i18n/pages-body/batch";
 
 /* ------------------------------------------------------------------ */
 /*  Safe JSON helper — handles "Request Entity Too Large" text errors   */
@@ -221,14 +222,6 @@ function StatusIcon({ status }: { status: UploadedImage["status"] }) {
   }
 }
 
-function formatEta(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "calculando...";
-  if (seconds < 60) return `~${Math.round(seconds)}s restantes`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return s === 0 ? `~${m} min restantes` : `~${m} min ${s}s restantes`;
-}
-
 /* ------------------------------------------------------------------ */
 /*  Persisted results (recover from refresh / accidental close)         */
 /* ------------------------------------------------------------------ */
@@ -323,6 +316,8 @@ async function downloadAsZip(
 /* ------------------------------------------------------------------ */
 
 export default function BatchPage() {
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? BATCH_BODY_EN : BATCH_BODY_ES;
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [steps, setSteps] = useState<PipelineStep[]>([]);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -346,12 +341,12 @@ export default function BatchPage() {
     if (!isRunning) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = "Hay un batch en progreso. Si salís perdés las imágenes en cola.";
+      e.returnValue = b.leaveWarning;
       return e.returnValue;
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [isRunning]);
+  }, [isRunning, b]);
 
   // Track all preview blob URLs so we can revoke them on clear and unmount
   const previewUrlsRef = useRef<string[]>([]);
@@ -391,18 +386,19 @@ export default function BatchPage() {
           setInventory(data.data.categories);
           setInventoryTotal(data.data.totalImages);
         } else {
-          setInventoryError(data.error ?? "El scan del inventario falló.");
+          setInventoryError(data.error ?? b.scanError.scanFailed);
         }
       })
       .catch((err) => {
-        const msg = err instanceof Error ? err.message : "Error desconocido";
+        const msg = err instanceof Error ? err.message : b.scanError.unknown;
         setInventoryError(
           msg.includes("TimeoutError") || msg.includes("aborted")
-            ? "El scan tardó demasiado. Revisá la conexión y recargá."
-            : `No se pudo escanear el inventario (${msg}).`,
+            ? b.scanError.timeout
+            : b.scanError.generic(msg),
         );
       })
       .finally(() => setScanningInventory(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only scan; must not re-run on locale change
   }, []);
 
   /* ---- Image upload ---- */
@@ -471,13 +467,13 @@ export default function BatchPage() {
     if (preset) {
       setSteps(preset.steps.map((s) => ({ ...s, id: `step-${Date.now()}-${Math.random()}` })));
       setActivePresetId(presetId);
-      toast.success(`Pipeline "${preset.name}" cargado — ${preset.steps.length} pasos`);
+      toast.success(b.toast.presetLoaded(b.presets[preset.id]?.name ?? preset.name, preset.steps.length));
       // Auto-scroll to pipeline steps section
       setTimeout(() => {
         document.getElementById("pipeline-steps")?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 100);
     }
-  }, []);
+  }, [b]);
 
   /* ---- Download all results as a single ZIP (no popup blocker issues) ---- */
 
@@ -516,17 +512,17 @@ export default function BatchPage() {
         prev.map((img) => (downloadedIds.has(img.id) ? { ...img, downloaded: true } : img)),
       );
       if (failed > 0) {
-        toast.error(`ZIP creado con ${added} imágenes — ${failed} fallaron al descargar.`);
+        toast.error(b.toast.zipCreatedWithFailures(added, failed));
       } else {
-        toast.success(`ZIP listo (${added} imágenes).`);
+        toast.success(b.toast.zipReady(added));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error generando ZIP";
-      toast.error(`No pude crear el ZIP: ${msg}`);
+      const msg = err instanceof Error ? err.message : b.toast.zipError;
+      toast.error(b.toast.zipFailed(msg));
     } finally {
       setIsZipping(false);
     }
-  }, [images]);
+  }, [images, b]);
 
   /* ---- Run batch (real API calls) ---- */
 
@@ -537,7 +533,7 @@ export default function BatchPage() {
     onStep?: (stepIdx: number, label: string) => void,
   ): Promise<{ resultUrl: string; uploadedOriginalUrl: string }> => {
     // Step 0: Upload image
-    onStep?.(-1, "Subiendo imagen...");
+    onStep?.(-1, b.progress.uploadingImage);
     const formData = new FormData();
     formData.append("file", img.file);
     const uploadRes = await fetch("/api/upload", { method: "POST", body: formData, signal });
@@ -552,7 +548,7 @@ export default function BatchPage() {
       if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
       const step = pipelineSteps[stepIdx];
       const opMeta = OPERATIONS.find((o) => o.value === step.operation);
-      onStep?.(stepIdx, opMeta?.label ?? step.operation);
+      onStep?.(stepIdx, b.operations[step.operation]?.label ?? opMeta?.label ?? step.operation);
       switch (step.operation) {
         case "bg-remove": {
           // Batch always uses server-side replicate (browser provider needs client-side canvas)
@@ -795,7 +791,7 @@ export default function BatchPage() {
     }
 
     return { resultUrl: currentImageUrl, uploadedOriginalUrl };
-  }, []);
+  }, [b]);
 
   /* ---- Auto Mode: Load category + pipeline + process ---- */
   const startAutoMode = useCallback(async (cat: InventoryCategory) => {
@@ -828,7 +824,7 @@ export default function BatchPage() {
     // always returns undefined — the defensive branch below catches it.
     const preset = AGENT_PRESETS.find((p) => p.id === cat.agentPreset);
     if (!preset) {
-      toast.error(`La categoría "${cat.name}" no tiene pipeline configurado — revisá inventory/scan.`);
+      toast.error(b.toast.categoryNoPipeline(cat.name));
       setAutoProcessing(null);
       setLoadingCategory(null);
       return;
@@ -911,13 +907,13 @@ export default function BatchPage() {
     setOverallProgress(100);
     setAutoProcessing(null);
     setLoadingCategory(null);
-  }, [isRunning, autoProcessing, processOneImage, addToGallery]);
+  }, [isRunning, autoProcessing, processOneImage, addToGallery, b]);
 
   const stopBatch = useCallback(() => {
     setStopRequested(true);
     abortControllerRef.current?.abort();
-    toast("Deteniendo batch... la imagen actual se cancelará.");
-  }, []);
+    toast(b.toast.stopping);
+  }, [b]);
 
   const startBatch = useCallback(async (imagesToProcess?: UploadedImage[]) => {
     const queue = imagesToProcess ?? images.filter((img) => img.status !== "done");
@@ -1071,16 +1067,16 @@ export default function BatchPage() {
             : img,
         ),
       );
-      toast.success(`Batch detenido — ${processed}/${total} procesadas.`);
+      toast.success(b.toast.batchStopped(processed, total));
     } else {
       const errs = queue.filter((q) => images.find((i) => i.id === q.id)?.status === "error").length;
-      toast.success(`Batch terminado — ${processed}/${total} procesadas${errs ? `, ${errs} con error` : ""}.`);
+      toast.success(b.toast.batchDone(processed, total, errs));
     }
 
     setIsRunning(false);
     setCurrentImageIdx(null);
     abortControllerRef.current = null;
-  }, [images, steps, processOneImage, addToGallery, autoDownload]);
+  }, [images, steps, processOneImage, addToGallery, autoDownload, b]);
 
   const retryFailed = useCallback(() => {
     const failed = images.filter((img) => img.status === "error" || img.status === "cancelled");
@@ -1096,28 +1092,22 @@ export default function BatchPage() {
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.85)] px-4 md:px-6 py-3 backdrop-blur">
         <Link href="/" className="flex items-center gap-2 text-sm font-medium text-muted transition-default hover:text-[var(--accent)]">
           <ChevronLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Inicio</span>
+          <span className="hidden sm:inline">{b.nav.home}</span>
         </Link>
         <span className="text-[var(--border-default)]">/</span>
         <div className="flex items-center gap-2 min-w-0">
           <Layers className="h-4 w-4 text-[var(--accent)] shrink-0" />
-          <span className="text-sm font-semibold text-heading truncate">Procesamiento Masivo</span>
+          <span className="text-sm font-semibold text-heading truncate">{b.nav.title}</span>
         </div>
       </header>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Procesa muchas fotos a la vez</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.batch.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Sube hasta 50 imágenes y aplica el mismo pipeline a todas — perfecto para catálogo de temporada.
+            {t.pages.batch.subtitle}
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Procesamiento masivo. Sube hasta 50 fotos y aplica el mismo pipeline a todas. Ideal para catálogo de temporada cuando tienes muchos productos del mismo tipo."
-            />
-          </div>
         </div>
         <div className="flex items-center gap-2">
           {isRunning && (
@@ -1128,7 +1118,7 @@ export default function BatchPage() {
               disabled={stopRequested}
               className="border-red-500/40 text-red-300 hover:bg-red-500/10"
             >
-              {stopRequested ? "Deteniendo..." : "Detener"}
+              {stopRequested ? b.actions.stopping : b.actions.stop}
             </Button>
           )}
           <Button
@@ -1138,7 +1128,7 @@ export default function BatchPage() {
             loading={isRunning}
             onClick={() => startBatch()}
           >
-            Iniciar Lote
+            {b.actions.startBatch}
           </Button>
         </div>
       </div>
@@ -1152,14 +1142,14 @@ export default function BatchPage() {
             <Bot className="h-5 w-5 text-accent-light" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">AI Agent — Modo Automatico</h2>
+            <h2 className="text-lg font-bold text-white">{b.auto.title}</h2>
             <p className="text-xs text-gray-400">
-              Selecciona una categoria y el agente carga las imagenes, elige el pipeline, y procesa todo automaticamente.
+              {b.auto.subtitle}
             </p>
           </div>
           {inventoryTotal > 0 && (
             <Badge variant="default" size="sm" className="ml-auto">
-              {inventoryTotal} imagenes totales
+              {b.auto.totalImages(inventoryTotal)}
             </Badge>
           )}
         </div>
@@ -1167,25 +1157,25 @@ export default function BatchPage() {
         {scanningInventory ? (
           <div className="flex items-center gap-2 py-4">
             <Loader2 className="h-4 w-4 animate-spin text-accent-light" />
-            <span className="text-sm text-gray-400">Escaneando inventario...</span>
+            <span className="text-sm text-gray-400">{b.auto.scanning}</span>
           </div>
         ) : inventoryError ? (
           <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
             <XCircle className="h-4 w-4 flex-shrink-0 text-red-400" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-red-300">Error al escanear</p>
+              <p className="text-sm font-medium text-red-300">{b.auto.scanErrorTitle}</p>
               <p className="mt-1 text-xs text-red-200/80">{inventoryError}</p>
             </div>
             <button
               onClick={() => window.location.reload()}
               className="rounded border border-red-400/40 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20"
             >
-              Reintentar
+              {b.auto.retry}
             </button>
           </div>
         ) : inventory.length === 0 ? (
           <p className="py-4 text-sm text-gray-500">
-            No se encontraron carpetas de inventario. Verifica que las imagenes estan en el escritorio.
+            {b.auto.noFolders}
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -1218,14 +1208,14 @@ export default function BatchPage() {
 
                   <div className="mt-2 flex items-center gap-2">
                     <ImageIcon className="h-3 w-3 text-gray-500" />
-                    <span className="text-xs text-gray-400">{cat.imageCount} imagenes</span>
+                    <span className="text-xs text-gray-400">{b.auto.imagesCount(cat.imageCount)}</span>
                   </div>
 
                   {isProcessing && (
                     <div className="mt-3">
                       <Progress value={overallProgress} size="sm" />
                       <p className="mt-1 text-[10px] text-accent-light">
-                        {autoBatchIndex} / {autoBatchTotal} procesadas...
+                        {b.auto.processedOf(autoBatchIndex, autoBatchTotal)}
                       </p>
                     </div>
                   )}
@@ -1233,7 +1223,7 @@ export default function BatchPage() {
                   {!isProcessing && cat.imageCount > 0 && (
                     <div className="mt-3 flex items-center gap-1 text-[10px] text-gray-500 group-hover:text-accent-light transition-colors">
                       <Play className="h-3 w-3" />
-                      <span>Click para procesar todo</span>
+                      <span>{b.auto.clickToProcess}</span>
                     </div>
                   )}
                 </button>
@@ -1249,14 +1239,14 @@ export default function BatchPage() {
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin text-accent-light" />
                 <span className="text-sm font-medium text-gray-200">
-                  Procesando {inventory.find((c) => c.id === autoProcessing)?.name}...
+                  {b.auto.processingCategory(inventory.find((c) => c.id === autoProcessing)?.name ?? "")}
                 </span>
               </div>
               <span className="text-sm tabular-nums text-accent-light">{overallProgress}%</span>
             </div>
             <Progress value={overallProgress} size="sm" className="mt-2" />
             <p className="mt-1 text-[10px] text-gray-500">
-              {autoBatchIndex} de {autoBatchTotal} imagenes — los resultados aparecen abajo
+              {b.auto.autoProgress(autoBatchIndex, autoBatchTotal)}
             </p>
           </div>
         )}
@@ -1268,7 +1258,7 @@ export default function BatchPage() {
           {/* Upload area */}
           <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-200">Subir Imagenes</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.upload.title}</h2>
               <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition-colors">
                 <input
                   type="checkbox"
@@ -1277,15 +1267,15 @@ export default function BatchPage() {
                   className="h-3.5 w-3.5 rounded border-gray-600 bg-surface text-accent focus:ring-accent"
                 />
                 <Download className="h-3.5 w-3.5" />
-                Auto-descarga
-                <span className="text-[10px] text-gray-500">(recomendado)</span>
+                {b.upload.autoDownload}
+                <span className="text-[10px] text-gray-500">{b.upload.recommended}</span>
               </label>
             </div>
             <Dropzone
               onDrop={handleDrop}
               multiple
-              label="Arrastra y suelta imagenes de producto aqui"
-              hint="PNG, JPG, WebP — hasta 100 imagenes"
+              label={b.upload.dropLabel}
+              hint={b.upload.dropHint}
               className="min-h-[120px]"
             />
 
@@ -1336,7 +1326,7 @@ export default function BatchPage() {
 
             {images.length > 0 && (
               <p className="mt-2 text-xs text-gray-500">
-                {images.length} imagen{images.length !== 1 ? "es" : ""} subida{images.length !== 1 ? "s" : ""}
+                {b.upload.uploadedCount(images.length)}
               </p>
             )}
           </div>
@@ -1357,17 +1347,17 @@ export default function BatchPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-accent-light" />
-                    <h2 className="text-sm font-semibold text-gray-200">Procesando...</h2>
+                    <h2 className="text-sm font-semibold text-gray-200">{b.progress.processing}</h2>
                   </div>
                   <span className="text-sm tabular-nums text-accent-light">{overallProgress}%</span>
                 </div>
                 <Progress value={overallProgress} size="sm" />
                 <div className="mt-2 flex items-center justify-between text-[11px] text-gray-400">
                   <span>
-                    {processedCount} / {totalQueued} procesadas
-                    {errCount > 0 && <span className="text-red-300"> · {errCount} error{errCount !== 1 ? "es" : ""}</span>}
+                    {b.progress.processedCount(processedCount, totalQueued)}
+                    {errCount > 0 && <span className="text-red-300">{b.progress.errorSuffix(errCount)}</span>}
                   </span>
-                  <span className="text-gray-500">{formatEta(remaining)}</span>
+                  <span className="text-gray-500">{b.eta(remaining)}</span>
                 </div>
 
                 {/* Current image preview + step */}
@@ -1380,7 +1370,7 @@ export default function BatchPage() {
                       <p className="truncate text-xs font-medium text-gray-200">{currentImg.file.name}</p>
                       <p className="mt-0.5 flex items-center gap-1 text-[11px] text-accent-light">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        {currentImg.currentStepLabel || "Iniciando..."}
+                        {currentImg.currentStepLabel || b.progress.starting}
                         {currentImg.currentStepIdx !== undefined && currentImg.currentStepIdx >= 0 && (
                           <span className="text-gray-500">
                             ({currentImg.currentStepIdx + 1}/{steps.length})
@@ -1399,7 +1389,7 @@ export default function BatchPage() {
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-red-400">
-                  {images.filter((i) => i.status === "error").length > 0 ? "Errores" : "Cancelados"}
+                  {images.filter((i) => i.status === "error").length > 0 ? b.errors.errorsTitle : b.errors.cancelledTitle}
                 </h2>
                 {!isRunning && (
                   <Button
@@ -1409,7 +1399,7 @@ export default function BatchPage() {
                     onClick={retryFailed}
                     className="border-red-500/40 text-red-300 hover:bg-red-500/10"
                   >
-                    Reintentar fallidos
+                    {b.errors.retryFailed}
                   </Button>
                 )}
               </div>
@@ -1420,7 +1410,7 @@ export default function BatchPage() {
                     <div key={img.id} className="flex items-center gap-2 text-xs text-gray-400">
                       <StatusIcon status={img.status} />
                       <span className="font-medium text-gray-300">{img.file.name}:</span>
-                      <span>{img.status === "cancelled" ? "Cancelada" : img.error}</span>
+                      <span>{img.status === "cancelled" ? b.errors.cancelled : img.error}</span>
                     </div>
                   ))}
               </div>
@@ -1433,10 +1423,10 @@ export default function BatchPage() {
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-emerald-300">
-                    Resultados recuperados ({persistedResults.length})
+                    {b.recovered.title(persistedResults.length)}
                   </h2>
                   <p className="mt-0.5 text-[11px] text-gray-400">
-                    Procesadas en una sesión anterior — los URLs siguen vivos.
+                    {b.recovered.subtitle}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1461,20 +1451,20 @@ export default function BatchPage() {
                           (done, total) => setZipProgress({ done, total }),
                         );
                         if (failed > 0) {
-                          toast.error(`ZIP creado con ${added} imágenes — ${failed} URLs ya no responden (pueden haber expirado).`);
+                          toast.error(b.toast.recoveredZipWithFailures(added, failed));
                         } else {
-                          toast.success(`ZIP listo (${added} imágenes recuperadas).`);
+                          toast.success(b.toast.recoveredZipReady(added));
                         }
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : "Error generando ZIP");
+                        toast.error(err instanceof Error ? err.message : b.toast.zipError);
                       } finally {
                         setIsZipping(false);
                       }
                     }}
                   >
                     {isZipping
-                      ? `Empaquetando ${zipProgress.done}/${zipProgress.total}...`
-                      : `Descargar ZIP (${persistedResults.length})`}
+                      ? b.recovered.packaging(zipProgress.done, zipProgress.total)
+                      : b.recovered.downloadZip(persistedResults.length)}
                   </Button>
                   <button
                     type="button"
@@ -1483,9 +1473,9 @@ export default function BatchPage() {
                       savePersistedResults([]);
                     }}
                     className="rounded border border-gray-600 px-2 py-1 text-[10px] text-gray-400 hover:bg-surface"
-                    title="Limpiar la lista (no borra los archivos descargados)"
+                    title={b.recovered.clearTitle}
                   >
-                    Limpiar
+                    {b.recovered.clear}
                   </button>
                 </div>
               </div>
@@ -1511,7 +1501,7 @@ export default function BatchPage() {
               </div>
               {persistedResults.length > 24 && (
                 <p className="mt-2 text-center text-[10px] text-gray-500">
-                  Mostrando las 24 más recientes de {persistedResults.length}.
+                  {b.recovered.showingRecent(persistedResults.length)}
                 </p>
               )}
             </div>
@@ -1526,10 +1516,10 @@ export default function BatchPage() {
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-sm font-semibold text-gray-200">
-                      Resultados <span className="text-xs text-gray-500">({doneCount})</span>
+                      {b.results.title} <span className="text-xs text-gray-500">{b.results.count(doneCount)}</span>
                     </h2>
                     <p className="mt-0.5 text-[11px] text-gray-500">
-                      {downloadedCount}/{doneCount} descargadas · localStorage SAFE — refresh OK
+                      {b.results.downloadedInfo(downloadedCount, doneCount)}
                     </p>
                   </div>
                   <Button
@@ -1541,8 +1531,8 @@ export default function BatchPage() {
                     loading={isZipping}
                   >
                     {isZipping
-                      ? `Empaquetando ${zipProgress.done}/${zipProgress.total}...`
-                      : doneCount === 1 ? "Descargar" : `Descargar ZIP (${doneCount})`}
+                      ? b.results.packaging(zipProgress.done, zipProgress.total)
+                      : doneCount === 1 ? b.results.download : b.results.downloadZip(doneCount)}
                   </Button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1561,23 +1551,23 @@ export default function BatchPage() {
                           <div className="relative aspect-square">
                             <img
                               src={img.originalUrl || img.preview}
-                              alt="Original"
+                              alt={b.results.originalAlt}
                               className="h-full w-full object-cover"
                             />
-                            <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-gray-300 uppercase">Antes</span>
+                            <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-gray-300 uppercase">{b.results.before}</span>
                           </div>
                           <div className="relative aspect-square">
                             <img
                               src={img.resultUrl || img.preview}
-                              alt="Resultado"
+                              alt={b.results.resultAlt}
                               className="h-full w-full object-cover"
                             />
-                            <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">Despues</span>
+                            <span className="absolute top-1 left-1 rounded bg-accent/80 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase">{b.results.after}</span>
                           </div>
                           {img.downloaded && (
                             <div className="absolute right-1 top-1 z-10 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[9px] font-bold text-white shadow-lg">
                               <CheckCircle className="h-2.5 w-2.5" />
-                              DESCARGADA
+                              {b.results.downloaded}
                             </div>
                           )}
                         </div>
@@ -1594,7 +1584,7 @@ export default function BatchPage() {
                             }}
                             className="flex items-center gap-1 rounded bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent-light hover:bg-accent/30 transition-colors"
                           >
-                            <Download className="h-3 w-3" /> Descargar
+                            <Download className="h-3 w-3" /> {b.results.download}
                           </button>
                         </div>
                       </div>
@@ -1614,7 +1604,7 @@ export default function BatchPage() {
 
           {/* Standard Presets */}
           <div className="rounded-xl border border-surface-lighter bg-surface-light p-5">
-            <h2 className="mb-3 text-sm font-semibold text-gray-200">Presets de Pipeline</h2>
+            <h2 className="mb-3 text-sm font-semibold text-gray-200">{b.pipeline.presetsTitle}</h2>
             <div className="grid grid-cols-2 gap-2">
               {PIPELINE_PRESETS.map((preset) => (
                 <button
@@ -1631,10 +1621,10 @@ export default function BatchPage() {
                   <div className="flex items-center gap-2">
                     <Zap className="h-3.5 w-3.5 text-accent-light" />
                     <span className="text-xs font-semibold text-gray-200">
-                      {preset.name}
+                      {b.presets[preset.id]?.name ?? preset.name}
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] text-gray-500">{preset.description}</p>
+                  <p className="mt-1 text-[10px] text-gray-500">{b.presets[preset.id]?.description ?? preset.description}</p>
                 </button>
               ))}
             </div>
@@ -1643,21 +1633,21 @@ export default function BatchPage() {
           {/* Steps */}
           <div id="pipeline-steps" className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-200">Pasos del Pipeline</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.pipeline.stepsTitle}</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 leftIcon={<Plus className="h-3.5 w-3.5" />}
                 onClick={addStep}
               >
-                Agregar Paso
+                {b.pipeline.addStep}
               </Button>
             </div>
 
             {steps.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-surface-lighter p-8 text-center">
                 <p className="text-sm text-gray-500">
-                  Sin pasos. Agrega un paso o carga un preset.
+                  {b.pipeline.noSteps}
                 </p>
               </div>
             ) : (
@@ -1677,13 +1667,13 @@ export default function BatchPage() {
                       <Select
                         value={step.operation}
                         onValueChange={(val) => updateStepOp(step.id, val)}
-                        options={OPERATIONS}
+                        options={OPERATIONS.map((o) => ({ value: o.value, label: b.operations[o.value]?.label ?? o.label }))}
                         placeholder="Operation"
                       />
                       {(() => {
-                        const op = OPERATIONS.find((o) => o.value === step.operation);
-                        return op?.description ? (
-                          <p className="mt-0.5 text-[10px] text-gray-500">{op.description}</p>
+                        const desc = b.operations[step.operation]?.description;
+                        return desc ? (
+                          <p className="mt-0.5 text-[10px] text-gray-500">{desc}</p>
                         ) : null;
                       })()}
                     </div>
@@ -1693,7 +1683,7 @@ export default function BatchPage() {
                       <Select
                         value={step.provider}
                         onValueChange={(val) => updateStepProvider(step.id, val)}
-                        options={PROVIDERS}
+                        options={PROVIDERS.map((p) => ({ value: p.value, label: b.providers[p.value] ?? p.label }))}
                         placeholder="Provider"
                       />
                     </div>
@@ -1735,7 +1725,7 @@ export default function BatchPage() {
             {steps.some((s) => s.operation === "bg-remove") && images.length >= 5 && (
               <div className="mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
                 <p className="text-[11px] text-yellow-300">
-                  💡 Si tus fotos tienen una modelo usando la ropa, usa &quot;Prueba Virtual&quot; en vez de &quot;Quitar Fondo&quot;. El módulo de quitar fondo no puede separar la prenda del cuerpo.
+                  {b.pipeline.lingerieWarning}
                 </p>
               </div>
             )}
@@ -1743,17 +1733,17 @@ export default function BatchPage() {
             {steps.length > 0 && (
               <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                 <span>
-                  {steps.length} paso{steps.length !== 1 ? "s" : ""}
+                  {b.pipeline.stepsCount(steps.length)}
                 </span>
                 <span>
-                  Est. costo:{" "}
+                  {b.pipeline.estCost}{" "}
                   <span className="text-emerald-400">
                     ~${(steps.reduce((sum, s) => {
                       const costs: Record<string, number> = { "bg-remove": 0.01, enhance: 0, shadows: 0.04, upscale: 0.02, outpaint: 0.05, resize: 0.05, compliance: 0, watermark: 0, "bg-generate": 0.03, "model-create": 0.055, tryon: 0.02, video: 0.05, "jewelry-tryon": 0.02 };
                       return sum + (costs[s.operation] ?? 0.02);
                     }, 0) * Math.max(images.length, 1)).toFixed(2)}
                   </span>{" "}
-                  para {images.length} imagen{images.length !== 1 ? "es" : ""}
+                  {b.pipeline.forImages(images.length)}
                 </span>
               </div>
             )}

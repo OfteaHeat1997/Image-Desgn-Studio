@@ -4,7 +4,6 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { toast } from "@/hooks/use-toast";
 import { ChevronLeft, Palette } from "lucide-react";
-import { AudioButton } from "@/components/ui/AudioButton";
 import {
   Save,
   RotateCcw,
@@ -22,6 +21,8 @@ import { ColorPicker } from "@/components/ui/color-picker";
 import { Dropzone } from "@/components/ui/dropzone";
 import { cn } from "@/lib/utils/cn";
 import { useBrandStore } from "@/stores/brand-store";
+import { useI18n } from "@/hooks/useI18n";
+import { BRAND_KIT_BODY_ES, BRAND_KIT_BODY_EN } from "@/lib/i18n/pages-body/brand-kit";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -144,6 +145,8 @@ const INITIAL_STATE: BrandKitState = {
 /* ------------------------------------------------------------------ */
 
 export default function BrandKitPage() {
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? BRAND_KIT_BODY_EN : BRAND_KIT_BODY_ES;
   const [state, setState] = useState<BrandKitState>(INITIAL_STATE);
   const [isSaving, setIsSaving] = useState(false);
   const hasInitialized = useRef(false);
@@ -270,15 +273,15 @@ export default function BrandKitPage() {
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success("Kit de marca guardado correctamente");
+      toast.success(b.toasts.saved);
     } catch (e) {
       console.error("Failed to save brand kit to API:", e);
       // Saved to localStorage via Zustand — notify user of partial save
-      toast.success("Kit de marca guardado localmente (base de datos no disponible)");
+      toast.success(b.toasts.savedLocal);
     } finally {
       setIsSaving(false);
     }
-  }, [state, updateBrandKit]);
+  }, [state, updateBrandKit, b]);
 
   const handleReset = useCallback(async () => {
     setState(INITIAL_STATE);
@@ -315,12 +318,12 @@ export default function BrandKitPage() {
           default_shadow_type: INITIAL_STATE.defaultShadowType,
         }),
       });
-      toast.success("Kit de marca restablecido");
+      toast.success(b.toasts.reset);
     } catch (e) {
       console.error("Failed to reset brand kit in API:", e);
-      toast.success("Kit de marca restablecido localmente");
+      toast.success(b.toasts.resetLocal);
     }
-  }, [updateBrandKit]);
+  }, [updateBrandKit, b]);
 
   return (
     <div className="min-h-screen bg-surface text-heading overflow-x-hidden">
@@ -339,34 +342,28 @@ export default function BrandKitPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Tu Kit de Marca</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.brandKit.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Define la identidad de tu marca: logo, colores y marca de agua. Se aplica automáticamente en todas las fotos.
+            {t.pages.brandKit.subtitle}
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Kit de marca. Define tu logo, colores principales y marca de agua. Se aplican automáticamente en todas las fotos que proceses."
-            />
-          </div>
           {isApiLoading && (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Cargando configuracion guardada…
+              {b.status.loading}
             </p>
           )}
           {!isApiLoading && !isApiAvailable && (
             <p className="mt-1 text-xs text-amber-500">
-              Base de datos no disponible — los cambios se guardan localmente.
+              {b.status.dbUnavailable}
             </p>
           )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" leftIcon={<RotateCcw className="h-3.5 w-3.5" />} onClick={handleReset}>
-            Restablecer
+            {b.actions.reset}
           </Button>
           <Button variant="primary" size="sm" leftIcon={<Save className="h-3.5 w-3.5" />} loading={isSaving} onClick={handleSave}>
-            Guardar
+            {b.actions.save}
           </Button>
         </div>
       </div>
@@ -378,26 +375,26 @@ export default function BrandKitPage() {
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <PaletteIcon className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Colores de Marca</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.colors.heading}</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ColorPicker
-                label="Primario"
+                label={b.colors.primary}
                 value={state.colors.primary}
                 onChange={(v) => updateColor("primary", v)}
               />
               <ColorPicker
-                label="Secundario"
+                label={b.colors.secondary}
                 value={state.colors.secondary}
                 onChange={(v) => updateColor("secondary", v)}
               />
               <ColorPicker
-                label="Acento"
+                label={b.colors.accent}
                 value={state.colors.accent}
                 onChange={(v) => updateColor("accent", v)}
               />
               <ColorPicker
-                label="Fondo"
+                label={b.colors.background}
                 value={state.colors.background}
                 onChange={(v) => updateColor("background", v)}
               />
@@ -408,14 +405,14 @@ export default function BrandKitPage() {
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <ImageIcon className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Logotipo</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.logo.heading}</h2>
             </div>
             {state.logoUrl ? (
               <div className="flex items-center gap-4">
                 <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-surface-lighter bg-surface">
                   <img
                     src={state.logoUrl}
-                    alt="Logotipo de marca"
+                    alt={b.logo.alt}
                     className="max-h-full max-w-full object-contain"
                   />
                 </div>
@@ -424,15 +421,15 @@ export default function BrandKitPage() {
                   size="sm"
                   onClick={() => setState((prev) => ({ ...prev, logoUrl: null }))}
                 >
-                  Eliminar
+                  {b.logo.remove}
                 </Button>
               </div>
             ) : (
               <Dropzone
                 onDrop={handleLogoUpload}
                 multiple={false}
-                label="Sube tu logotipo"
-                hint="PNG o SVG, se recomienda fondo transparente"
+                label={b.logo.uploadLabel}
+                hint={b.logo.uploadHint}
                 className="min-h-[100px]"
               />
             )}
@@ -442,17 +439,17 @@ export default function BrandKitPage() {
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <Type className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Tipografia</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.fonts.heading}</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Select
-                label="Fuente Principal"
+                label={b.fonts.primary}
                 value={state.fonts.primary}
                 onValueChange={(v) => updateFont("primary", v)}
                 options={FONT_OPTIONS}
               />
               <Select
-                label="Fuente Secundaria"
+                label={b.fonts.secondary}
                 value={state.fonts.secondary}
                 onValueChange={(v) => updateFont("secondary", v)}
                 options={FONT_OPTIONS}
@@ -463,11 +460,11 @@ export default function BrandKitPage() {
           {/* Watermark */}
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-200">Marca de Agua</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.watermark.heading}</h2>
               <Switch
                 checked={state.watermark.enabled}
                 onCheckedChange={(checked) => updateWatermark({ enabled: checked })}
-                label={state.watermark.enabled ? "Habilitada" : "Deshabilitada"}
+                label={state.watermark.enabled ? b.watermark.enabled : b.watermark.disabled}
                 labelPosition="left"
               />
             </div>
@@ -477,7 +474,7 @@ export default function BrandKitPage() {
                 {/* Position grid */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-300">
-                    Posicion
+                    {b.watermark.position}
                   </label>
                   <div className="grid grid-cols-3 gap-1.5 w-fit">
                     {WATERMARK_POSITIONS.map((pos) => (
@@ -500,7 +497,7 @@ export default function BrandKitPage() {
 
                 {/* Opacity */}
                 <Slider
-                  label="Opacidad"
+                  label={b.watermark.opacity}
                   value={[state.watermark.opacity]}
                   onValueChange={([v]) => updateWatermark({ opacity: v })}
                   min={5}
@@ -511,7 +508,7 @@ export default function BrandKitPage() {
 
                 {/* Size */}
                 <Slider
-                  label="Tamaño"
+                  label={b.watermark.size}
                   value={[state.watermark.size]}
                   onValueChange={([v]) => updateWatermark({ size: v })}
                   min={5}
@@ -526,23 +523,23 @@ export default function BrandKitPage() {
           {/* Default Style Presets */}
           <section className="rounded-xl border border-surface-lighter bg-surface-light p-5">
             <h2 className="mb-4 text-sm font-semibold text-gray-200">
-              Presets de Estilo por Defecto
+              {b.presets.heading}
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Select
-                label="Estilo de Fondo"
+                label={b.presets.bgStyle}
                 value={state.defaultBgStyle}
                 onValueChange={(v) => setState((prev) => ({ ...prev, defaultBgStyle: v }))}
                 options={BG_STYLE_OPTIONS}
               />
               <Select
-                label="Preset de Mejora"
+                label={b.presets.enhancePreset}
                 value={state.defaultEnhancePreset}
                 onValueChange={(v) => setState((prev) => ({ ...prev, defaultEnhancePreset: v }))}
                 options={ENHANCE_PRESET_OPTIONS}
               />
               <Select
-                label="Tipo de Sombra"
+                label={b.presets.shadowType}
                 value={state.defaultShadowType}
                 onValueChange={(v) => setState((prev) => ({ ...prev, defaultShadowType: v }))}
                 options={SHADOW_TYPE_OPTIONS}
@@ -556,7 +553,7 @@ export default function BrandKitPage() {
           <div className="sticky top-8 rounded-xl border border-surface-lighter bg-surface-light p-5">
             <div className="mb-4 flex items-center gap-2">
               <Eye className="h-4 w-4 text-accent-light" />
-              <h2 className="text-sm font-semibold text-gray-200">Vista Previa</h2>
+              <h2 className="text-sm font-semibold text-gray-200">{b.preview.heading}</h2>
             </div>
 
             {/* Preview card */}
@@ -625,7 +622,7 @@ export default function BrandKitPage() {
                 {state.fonts.primary}
               </p>
               <p className="text-xs text-gray-400" style={{ fontFamily: state.fonts.secondary }}>
-                {state.fonts.secondary} - texto secundario
+                {b.preview.secondaryFont(state.fonts.secondary)}
               </p>
             </div>
           </div>

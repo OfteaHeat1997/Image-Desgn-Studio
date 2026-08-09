@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AudioButton } from "@/components/ui/AudioButton";
 import {
   ArrowLeft,
   Upload,
@@ -17,6 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/hooks/use-toast";
+import { useI18n } from "@/hooks/useI18n";
+import { AGENT_BODY_EN, AGENT_BODY_ES } from "@/lib/i18n/pages-body/agent";
 
 /**
  * AI Agent — pipeline router.
@@ -199,6 +200,8 @@ function FallbackLoader() {
 }
 
 function AgentRouterContent() {
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? AGENT_BODY_EN : AGENT_BODY_ES;
   const searchParams = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -252,13 +255,13 @@ function AgentRouterContent() {
         if (matchedId) {
           setAutoDetected(matchedId);
           setSelectedId(matchedId);
-          toast.success(`Detectado: ${CATEGORY_OPTIONS.find((c) => c.id === matchedId)?.label}`);
+          toast.success(b.toasts.detected(b.categories[matchedId].label));
         }
       }
     } catch (err) {
       // Timeout or network fail — tell user to pick manually
       if (err instanceof Error && err.name === "TimeoutError") {
-        toast.info("La detección automática tardó demasiado — elegí la categoría manualmente abajo.");
+        toast.info(b.toasts.detectionTimeout);
       }
       // Silent for other errors (e.g. no ANTHROPIC_API_KEY) — manual select still works
     } finally {
@@ -268,7 +271,7 @@ function AgentRouterContent() {
 
   const handleContinue = () => {
     if (!selectedId) {
-      toast.error("Elegí una categoría primero.");
+      toast.error(b.toasts.pickCategoryFirst);
       return;
     }
     const option = CATEGORY_OPTIONS.find((c) => c.id === selectedId);
@@ -294,28 +297,22 @@ function AgentRouterContent() {
 
       <div className="mx-auto max-w-5xl px-4 md:px-6 py-6 md:py-8">
         <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">¿Qué querés procesar?</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.agent.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Subí una foto (auto-detecto la categoría) o elegí abajo. Te mando al pipeline correcto con la configuración para ese tipo de producto.
+            {t.pages.agent.subtitle}
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Agente IA. Sube una foto y la inteligencia artificial detecta automáticamente si es lencería, perfume o joyería, y te lleva al pipeline correcto."
-            />
-          </div>
         </div>
 
         {/* Optional upload — auto-detects lingerie garments */}
         <section className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-              Subir foto (opcional — auto-detecta lencería)
+              {b.upload.heading}
             </h2>
             {autoDetected && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
                 <CheckCircle2 className="h-3 w-3" />
-                Detectado
+                {b.upload.detectedBadge}
               </span>
             )}
           </div>
@@ -325,7 +322,7 @@ function AgentRouterContent() {
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={previewUrl}
-                alt="Subida"
+                alt={b.upload.imageAlt}
                 className="h-32 w-32 flex-shrink-0 rounded-lg border border-white/10 bg-black object-contain"
               />
             ) : (
@@ -334,7 +331,7 @@ function AgentRouterContent() {
                 className="flex h-32 w-32 flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-white/10 bg-white/[0.02] text-center transition hover:border-white/20"
               >
                 <Upload className="h-5 w-5 text-gray-400" />
-                <span className="text-[11px] text-gray-500">Subir</span>
+                <span className="text-[11px] text-gray-500">{b.upload.uploadButton}</span>
               </div>
             )}
 
@@ -345,12 +342,12 @@ function AgentRouterContent() {
               {isDetecting && (
                 <p className="inline-flex items-center gap-2 text-xs text-amber-300">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  Analizando la foto...
+                  {b.upload.analyzing}
                 </p>
               )}
               {!uploadedFile && (
                 <p className="text-xs text-gray-500">
-                  Si subís una foto con prenda de lencería, la detecto automáticamente. Para perfumes, cremas o joyería, elegí la categoría manualmente abajo.
+                  {b.upload.hint}
                 </p>
               )}
             </div>
@@ -371,12 +368,11 @@ function AgentRouterContent() {
         {/* Category grid */}
         <section className="mb-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-            O elegí la categoría
+            {b.grid.heading}
           </h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
             {CATEGORY_OPTIONS.map((opt) => {
               const Icon = opt.icon;
-              const meta = FAMILY_META[opt.family];
               const isSelected = selectedId === opt.id;
               const isAuto = autoDetected === opt.id;
               return (
@@ -393,14 +389,14 @@ function AgentRouterContent() {
                   <div className="flex w-full items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Icon className={cn("h-4 w-4", isSelected ? "text-violet-400" : "text-gray-400")} />
-                      <span className="text-sm font-medium text-gray-200">{opt.label}</span>
+                      <span className="text-sm font-medium text-gray-200">{b.categories[opt.id].label}</span>
                     </div>
                     {isAuto && (
-                      <span className="text-[10px] font-medium text-emerald-400">AUTO</span>
+                      <span className="text-[10px] font-medium text-emerald-400">{b.grid.autoTag}</span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-500">{opt.description}</p>
-                  <span className="mt-1 text-[10px] text-gray-600">→ {meta.label}</span>
+                  <p className="text-[11px] text-gray-500">{b.categories[opt.id].description}</p>
+                  <span className="mt-1 text-[10px] text-gray-600">{b.grid.familyArrow(b.families[opt.family])}</span>
                 </button>
               );
             })}
@@ -414,7 +410,7 @@ function AgentRouterContent() {
             disabled={!selectedId}
             className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:bg-violet-500/30"
           >
-            Ir al pipeline
+            {b.cta.button}
             <ArrowRight className="h-4 w-4" />
           </button>
           {selectedId && (

@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { AudioButton } from "@/components/ui/AudioButton";
+import { useI18n } from "@/hooks/useI18n";
+import { DOCS_BODY_ES, DOCS_BODY_EN } from "@/lib/i18n/pages-body/docs";
 import {
   ArrowLeft,
   Folder,
@@ -703,6 +704,9 @@ const QUICK_REFERENCE: QuickRef[] = [
 // =============================================================================
 
 function FileTreeItem({ entry, depth = 0 }: { entry: FileEntry; depth?: number }) {
+  const { locale } = useI18n();
+  const b = locale === "en" ? DOCS_BODY_EN : DOCS_BODY_ES;
+  const node = b.tree[entry.path];
   const [isOpen, setIsOpen] = useState(depth < 1);
   const Icon = entry.icon || (entry.type === "folder" ? Folder : FileCode);
   const color = entry.color || (entry.type === "folder" ? "#C5A47E" : "#8A8A90");
@@ -751,16 +755,16 @@ function FileTreeItem({ entry, depth = 0 }: { entry: FileEntry; depth?: number }
                 className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: `${color}20`, color, border: `1px solid ${color}30` }}
               >
-                Abrir
+                {b.ui.open}
               </Link>
             )}
           </div>
           <p className="text-[10px] text-[#8A8A90] leading-relaxed mt-0.5">
-            {entry.description}
+            {node?.description ?? entry.description}
           </p>
           {entry.editHint && (
             <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "#F5A623" }}>
-              Editar: {entry.editHint}
+              {b.ui.editPrefix} {node?.editHint ?? entry.editHint}
             </p>
           )}
         </div>
@@ -783,6 +787,8 @@ function FileTreeItem({ entry, depth = 0 }: { entry: FileEntry; depth?: number }
 // =============================================================================
 
 export default function DocsPage() {
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? DOCS_BODY_EN : DOCS_BODY_ES;
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"tree" | "reference">("tree");
 
@@ -821,26 +827,20 @@ export default function DocsPage() {
       </header>
       <div className="mx-auto max-w-[1100px] px-4 md:px-6 py-6 md:py-10">
         <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-heading">Mapa del Proyecto</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-heading">{t.pages.docs.title}</h1>
           <p className="mt-1 text-sm text-body">
-            Cada archivo, cada carpeta, qué hace y dónde ir para cambiarlo
+            {t.pages.docs.subtitle}
           </p>
-          <div className="mt-3">
-            <AudioButton
-              variant="inline"
-              text="Documentación. Mapa del proyecto. Cada archivo y carpeta de UniStudio explicado, qué hace y dónde tocar para modificarlo."
-            />
-          </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-5 gap-3 mb-8">
           {[
-            { label: "Paginas", value: "7", color: "#5B9CF6" },
-            { label: "API Routes", value: "28", color: "#FF6B6B" },
-            { label: "Modulos", value: "17", color: "#C5A47E" },
-            { label: "Componentes", value: "53", color: "#E879F9" },
-            { label: "Archivos TS", value: "161", color: "#F5A623" },
+            { label: b.stats.pages, value: "7", color: "#5B9CF6" },
+            { label: b.stats.apiRoutes, value: "28", color: "#FF6B6B" },
+            { label: b.stats.modules, value: "17", color: "#C5A47E" },
+            { label: b.stats.components, value: "53", color: "#E879F9" },
+            { label: b.stats.tsFiles, value: "161", color: "#F5A623" },
           ].map((s) => (
             <div
               key={s.label}
@@ -871,7 +871,7 @@ export default function DocsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar archivo, carpeta o pregunta..."
+              placeholder={b.ui.searchPlaceholder}
               className="flex-1 bg-transparent text-[13px] text-[#F5F5F5] placeholder:text-[#3A3A3E] outline-none"
             />
           </div>
@@ -887,7 +887,7 @@ export default function DocsPage() {
                   color: activeTab === tab ? "#C5A47E" : "#55555A",
                 }}
               >
-                {tab === "tree" ? "Archivos" : "Donde voy para...?"}
+                {tab === "tree" ? b.ui.tabFiles : b.ui.tabReference}
               </button>
             ))}
           </div>
@@ -909,6 +909,7 @@ export default function DocsPage() {
           <div className="space-y-3">
             {filteredRef.map((ref) => {
               const RefIcon = ref.icon;
+              const refCopy = b.quickRef[QUICK_REFERENCE.indexOf(ref)];
               return (
                 <div
                   key={ref.question}
@@ -930,10 +931,10 @@ export default function DocsPage() {
                     </div>
                     <div className="flex-1">
                       <h3 className="text-[14px] font-semibold text-[#F5F5F5] mb-2">
-                        {ref.question}
+                        {refCopy?.question ?? ref.question}
                       </h3>
                       <p className="text-[12px] text-[#8A8A90] leading-relaxed mb-3">
-                        {ref.answer}
+                        {refCopy?.answer ?? ref.answer}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {ref.files.map((f) => (

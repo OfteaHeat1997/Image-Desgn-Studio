@@ -2,6 +2,11 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/hooks/useI18n";
+import {
+  ARCHITECTURE_BODY_EN,
+  ARCHITECTURE_BODY_ES,
+} from "@/lib/i18n/pages-body/architecture";
 import {
   ArrowLeft,
   ArrowRight,
@@ -201,6 +206,8 @@ function SectionTitle({ children, id }: { children: React.ReactNode; id: string 
 }
 
 function FlowDiagram() {
+  const { locale } = useI18n();
+  const b = locale === "en" ? ARCHITECTURE_BODY_EN : ARCHITECTURE_BODY_ES;
   return (
     <div className="space-y-3">
       {FLOW_STEPS.map((step, i) => (
@@ -219,8 +226,8 @@ function FlowDiagram() {
           </div>
           {/* Content */}
           <div className="flex-1 pb-2">
-            <p className="text-sm font-semibold text-white">{step.title}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{step.description}</p>
+            <p className="text-sm font-semibold text-white">{b.flow.steps[step.number].title}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{b.flow.steps[step.number].description}</p>
             <code className="text-[10px] text-accent/70 mt-0.5 block">{step.file}</code>
           </div>
         </div>
@@ -230,6 +237,8 @@ function FlowDiagram() {
 }
 
 function ArchitectureLayers() {
+  const { locale } = useI18n();
+  const b = locale === "en" ? ARCHITECTURE_BODY_EN : ARCHITECTURE_BODY_ES;
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   return (
@@ -237,6 +246,7 @@ function ArchitectureLayers() {
       {LAYERS.map((layer) => {
         const isOpen = expanded[layer.name] ?? true;
         const Icon = layer.icon;
+        const layerCopy = b.layers[layer.name];
         return (
           <div key={layer.name} className="rounded-lg border border-surface-lighter overflow-hidden">
             <button
@@ -245,14 +255,14 @@ function ArchitectureLayers() {
               className="flex items-center gap-2 w-full px-3 py-2.5 text-left hover:bg-surface-light transition-colors"
             >
               <Icon className="h-4 w-4 shrink-0" style={{ color: layer.color }} />
-              <span className="text-sm font-semibold text-white flex-1">{layer.name}</span>
+              <span className="text-sm font-semibold text-white flex-1">{layerCopy.name}</span>
               {isOpen ? <ChevronDown className="h-3 w-3 text-gray-500" /> : <ChevronRight className="h-3 w-3 text-gray-500" />}
             </button>
             {isOpen && (
               <div className="px-3 pb-3 border-t border-surface-lighter bg-surface-light/30">
-                <p className="text-xs text-gray-400 mt-2 mb-2">{layer.description}</p>
+                <p className="text-xs text-gray-400 mt-2 mb-2">{layerCopy.description}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {layer.items.map((item) => (
+                  {layerCopy.items.map((item) => (
                     <span key={item} className="text-[10px] px-2 py-0.5 rounded-full border border-surface-lighter text-gray-300 bg-surface">
                       {item}
                     </span>
@@ -268,6 +278,8 @@ function ArchitectureLayers() {
 }
 
 function ModuleTable() {
+  const { locale } = useI18n();
+  const b = locale === "en" ? ARCHITECTURE_BODY_EN : ARCHITECTURE_BODY_ES;
   const [filter, setFilter] = useState<"all" | "free" | "paid">("all");
 
   const filtered = MODULES.filter((m) => {
@@ -290,7 +302,7 @@ function ModuleTable() {
                 : "border-surface-lighter text-gray-400 hover:text-gray-200"
             }`}
           >
-            {f === "all" ? "Todos (18)" : f === "free" ? "Gratis" : "De Pago"}
+            {f === "all" ? b.moduleFilters.all : f === "free" ? b.moduleFilters.free : b.moduleFilters.paid}
           </button>
         ))}
       </div>
@@ -300,30 +312,30 @@ function ModuleTable() {
           <details key={mod.id} className="group rounded-lg border border-surface-lighter overflow-hidden">
             <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-light transition-colors list-none">
               <span className={`w-2 h-2 rounded-full shrink-0 ${mod.free ? "bg-emerald-500" : "bg-amber-500"}`} />
-              <span className="text-sm font-medium text-white flex-1">{mod.name}</span>
+              <span className="text-sm font-medium text-white flex-1">{b.modules[mod.id].name}</span>
               <span className={`text-[10px] font-semibold ${mod.free ? "text-emerald-500" : "text-gray-400"}`}>
-                {mod.cost}
+                {b.modules[mod.id].cost}
               </span>
               <ChevronRight className="h-3 w-3 text-gray-500 group-open:rotate-90 transition-transform" />
             </summary>
             <div className="px-3 pb-3 border-t border-surface-lighter bg-surface-light/30 space-y-2">
-              <p className="text-xs text-gray-400 mt-2">{mod.description}</p>
+              <p className="text-xs text-gray-400 mt-2">{b.modules[mod.id].description}</p>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div>
-                  <span className="text-gray-500">API Route:</span>{" "}
+                  <span className="text-gray-500">{b.moduleFieldLabels.apiRoute}</span>{" "}
                   <code className="text-accent/80">{mod.apiRoute}</code>
                 </div>
                 <div>
-                  <span className="text-gray-500">Panel:</span>{" "}
+                  <span className="text-gray-500">{b.moduleFieldLabels.panel}</span>{" "}
                   <code className="text-blue-400">{mod.panel}</code>
                 </div>
                 <div>
-                  <span className="text-gray-500">Procesamiento:</span>{" "}
+                  <span className="text-gray-500">{b.moduleFieldLabels.processing}</span>{" "}
                   <code className="text-yellow-400">{mod.processing}</code>
                 </div>
                 <div>
-                  <span className="text-gray-500">Proveedor:</span>{" "}
-                  <span className="text-gray-300">{mod.provider}</span>
+                  <span className="text-gray-500">{b.moduleFieldLabels.provider}</span>{" "}
+                  <span className="text-gray-300">{b.modules[mod.id].provider}</span>
                 </div>
               </div>
             </div>
@@ -335,6 +347,8 @@ function ModuleTable() {
 }
 
 function TestChecklist() {
+  const { locale } = useI18n();
+  const b = locale === "en" ? ARCHITECTURE_BODY_EN : ARCHITECTURE_BODY_ES;
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   const toggle = (test: string) => {
@@ -348,7 +362,7 @@ function TestChecklist() {
         return (
           <div key={cat.category}>
             <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-sm font-semibold text-white">{cat.category}</h3>
+              <h3 className="text-sm font-semibold text-white">{b.testing.categories[cat.category]}</h3>
               <span className="text-[10px] text-gray-500">
                 {done}/{cat.items.length}
               </span>
@@ -369,7 +383,7 @@ function TestChecklist() {
                     {checked[item.test] && <CheckCircle className="h-3 w-3 text-black" />}
                   </div>
                   <span className={`text-xs flex-1 ${checked[item.test] ? "text-gray-500 line-through" : "text-gray-300"}`}>
-                    {item.test}
+                    {b.testing.tests[item.test]}
                   </span>
                   {item.needsApi && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -405,6 +419,8 @@ const NAV_ITEMS = [
 /* ================================================================== */
 
 export default function ArchitecturePage() {
+  const { t, locale } = useI18n();
+  const b = locale === "en" ? ARCHITECTURE_BODY_EN : ARCHITECTURE_BODY_ES;
   return (
     <div className="min-h-screen bg-surface text-heading">
       {/* Header coherente con dashboard + pipelines */}
@@ -434,31 +450,30 @@ export default function ArchitecturePage() {
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Hero */}
         <div className="rounded-xl border border-surface-lighter bg-surface p-6 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-2">Como Funciona UniStudio</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">{t.pages.architecture.title}</h2>
           <p className="text-sm text-gray-400 max-w-2xl">
-            Guia interactiva para entender la arquitectura, el flujo de datos, cada modulo, y como probar
-            que todo funcione. Diseñada para estudiantes que necesitan tomar decisiones sobre el proyecto.
+            {t.pages.architecture.subtitle}
           </p>
           <div className="flex flex-wrap gap-3 mt-4">
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <Layout className="h-3.5 w-3.5 text-blue-400" />
-              <span>9 paginas</span>
+              <span>{b.hero.stats.pages}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <Server className="h-3.5 w-3.5 text-emerald-400" />
-              <span>29 API routes</span>
+              <span>{b.hero.stats.apiRoutes}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <Layers className="h-3.5 w-3.5 text-accent" />
-              <span>19 paneles</span>
+              <span>{b.hero.stats.panels}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <Database className="h-3.5 w-3.5 text-purple-400" />
-              <span>6 stores</span>
+              <span>{b.hero.stats.stores}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <Globe className="h-3.5 w-3.5 text-pink-400" />
-              <span>4 APIs externas</span>
+              <span>{b.hero.stats.externalApis}</span>
             </div>
           </div>
         </div>
@@ -467,27 +482,27 @@ export default function ArchitecturePage() {
           {/* LEFT COLUMN */}
           <div>
             {/* Flow Diagram */}
-            <SectionTitle id="flujo">Flujo de una Foto (paso a paso)</SectionTitle>
+            <SectionTitle id="flujo">{b.sections.flujo}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4">
               <p className="text-xs text-gray-400 mb-4">
-                Este es el camino que sigue CADA foto que procesas. Todos los 18 modulos siguen este mismo flujo.
+                {b.flow.intro}
               </p>
               <FlowDiagram />
             </div>
 
             {/* Agent Flow */}
-            <SectionTitle id="agente">Flujo del Agente IA</SectionTitle>
+            <SectionTitle id="agente">{b.sections.agente}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4 space-y-3">
               <p className="text-xs text-gray-400">
-                El agente automatiza todo el flujo anterior. Tu solo dices que quieres y el decide los pasos.
+                {b.agent.intro}
               </p>
 
               {[
-                { phase: "1. ANALISIS", desc: "Sube foto → /api/analyze-image detecta marca de agua, iluminacion, resolucion, tipo de fondo", color: "#5B9CF6" },
-                { phase: "2. PLANIFICACION", desc: "Claude IA ve el analisis y decide los pasos necesarios (o usa templates si no hay API key)", color: "#C5A47E" },
-                { phase: "3. CONFIRMACION", desc: "Te muestra el plan con costos. Tu decides si ejecutar o ajustar presupuesto.", color: "#F59E0B" },
-                { phase: "4. EJECUCION", desc: "useAgentPipeline.ts ejecuta cada paso secuencialmente. El resultado de un paso es input del siguiente.", color: "#34D399" },
-                { phase: "5. RESULTADOS", desc: "Preview de cada paso intermedio + resultado final. Puedes descargar o usar en el editor.", color: "#A78BFA" },
+                { phase: b.agent.phases[0].phase, desc: b.agent.phases[0].desc, color: "#5B9CF6" },
+                { phase: b.agent.phases[1].phase, desc: b.agent.phases[1].desc, color: "#C5A47E" },
+                { phase: b.agent.phases[2].phase, desc: b.agent.phases[2].desc, color: "#F59E0B" },
+                { phase: b.agent.phases[3].phase, desc: b.agent.phases[3].desc, color: "#34D399" },
+                { phase: b.agent.phases[4].phase, desc: b.agent.phases[4].desc, color: "#A78BFA" },
               ].map((p) => (
                 <div key={p.phase} className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: p.color }} />
@@ -502,11 +517,11 @@ export default function ArchitecturePage() {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-medium text-amber-300">3 Tipos de Agente</p>
+                    <p className="text-xs font-medium text-amber-300">{b.agent.typesTitle}</p>
                     <p className="text-[10px] text-amber-400/80 mt-1">
-                      <strong>E-Commerce</strong>: foto cruda → foto profesional de catalogo<br />
-                      <strong>Modelo</strong>: prenda → modelo IA vistiendo la prenda<br />
-                      <strong>Social</strong>: producto → videos, banners y anuncios
+                      <strong>{b.agent.types.ecommerce.label}</strong>{b.agent.types.ecommerce.rest}<br />
+                      <strong>{b.agent.types.model.label}</strong>{b.agent.types.model.rest}<br />
+                      <strong>{b.agent.types.social.label}</strong>{b.agent.types.social.rest}
                     </p>
                   </div>
                 </div>
@@ -514,10 +529,10 @@ export default function ArchitecturePage() {
             </div>
 
             {/* Testing */}
-            <SectionTitle id="testing">Testing — Que Probar</SectionTitle>
+            <SectionTitle id="testing">{b.sections.testing}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4">
               <p className="text-xs text-gray-400 mb-3">
-                Marca cada test que pase. Los tests sin &quot;API Key&quot; funcionan sin configuracion.
+                {b.testing.note}
               </p>
               <TestChecklist />
             </div>
@@ -526,80 +541,64 @@ export default function ArchitecturePage() {
           {/* RIGHT COLUMN */}
           <div>
             {/* Architecture Layers */}
-            <SectionTitle id="arquitectura">Capas de la Arquitectura</SectionTitle>
+            <SectionTitle id="arquitectura">{b.sections.arquitectura}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4">
               <p className="text-xs text-gray-400 mb-3">
-                La app tiene 7 capas. Los datos fluyen de arriba hacia abajo (usuario → IA) y regresan de abajo hacia arriba (resultado → pantalla).
+                {b.layersIntro}
               </p>
               <ArchitectureLayers />
             </div>
 
             {/* Modules Table */}
-            <SectionTitle id="modulos">Los 18 Modulos (detalle)</SectionTitle>
+            <SectionTitle id="modulos">{b.sections.modulos}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4">
               <p className="text-xs text-gray-400 mb-3">
-                Click en cualquier modulo para ver sus archivos, proveedor y costo real.
+                {b.modulesIntro}
               </p>
               <ModuleTable />
             </div>
 
             {/* Cost Summary */}
-            <SectionTitle id="costos">Resumen de Costos</SectionTitle>
+            <SectionTitle id="costos">{b.sections.costos}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4 space-y-3">
               <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3">
                 <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
-                  <DollarSign className="h-3 w-3" /> Flujo E-Commerce Tipico
+                  <DollarSign className="h-3 w-3" /> {b.costs.ecommerce.title}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  BG Remove ($0.01) + BG Generate ($0.05) + Shadows ($0) = <strong className="text-emerald-400">$0.06/foto</strong>
+                  {b.costs.ecommerce.formula}<strong className="text-emerald-400">{b.costs.ecommerce.total}</strong>
                 </p>
               </div>
               <div className="rounded-lg bg-blue-500/5 border border-blue-500/20 p-3">
                 <p className="text-xs font-semibold text-blue-400 flex items-center gap-1.5">
-                  <DollarSign className="h-3 w-3" /> Flujo Modelo Tipico
+                  <DollarSign className="h-3 w-3" /> {b.costs.model.title}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  BG Remove ($0.01) + Model Create ($0.055) + Try-On ($0.02) = <strong className="text-blue-400">$0.085/foto</strong>
+                  {b.costs.model.formula}<strong className="text-blue-400">{b.costs.model.total}</strong>
                 </p>
               </div>
               <div className="rounded-lg bg-purple-500/5 border border-purple-500/20 p-3">
                 <p className="text-xs font-semibold text-purple-400 flex items-center gap-1.5">
-                  <DollarSign className="h-3 w-3" /> Flujo Social Tipico
+                  <DollarSign className="h-3 w-3" /> {b.costs.social.title}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  E-Commerce flow ($0.06) + Video ($0.05) = <strong className="text-purple-400">$0.11/foto</strong>
+                  {b.costs.social.formula}<strong className="text-purple-400">{b.costs.social.total}</strong>
                 </p>
               </div>
               <div className="rounded-lg bg-surface-light p-3">
                 <p className="text-xs text-gray-400">
-                  <strong className="text-white">Comparacion</strong>: Photoroom cobra $9.99/mes (100 fotos) = $0.10/foto.
-                  UniStudio cuesta $0.06/foto para el mismo resultado.
+                  <strong className="text-white">{b.costs.comparison.label}</strong>{b.costs.comparison.text}
                 </p>
               </div>
             </div>
 
             {/* Decisions */}
-            <SectionTitle id="decisiones">Decisiones para Mejorar</SectionTitle>
+            <SectionTitle id="decisiones">{b.sections.decisiones}</SectionTitle>
             <div className="rounded-xl border border-surface-lighter bg-surface p-4 space-y-3">
               {[
-                { level: "Facil", color: "emerald", items: [
-                  "Agregar presets de color en BG Remove",
-                  "Agregar filtros en Enhance",
-                  "Mejorar textos del dashboard",
-                  "Personalizar tema de colores (globals.css)",
-                ] },
-                { level: "Medio", color: "amber", items: [
-                  "Agregar nuevo proveedor de video",
-                  "Mejorar galeria (busqueda, filtros)",
-                  "Agregar formatos de marketplace",
-                  "Crear presets de outpaint",
-                ] },
-                { level: "Avanzado", color: "red", items: [
-                  "Agregar autenticacion (NextAuth)",
-                  "Implementar rate limiting",
-                  "Crear modulo completamente nuevo",
-                  "Agregar webhooks de notificacion",
-                ] },
+                { level: b.decisions.easy.level, color: "emerald", items: b.decisions.easy.items },
+                { level: b.decisions.medium.level, color: "amber", items: b.decisions.medium.items },
+                { level: b.decisions.hard.level, color: "red", items: b.decisions.hard.items },
               ].map((group) => (
                 <div key={group.level}>
                   <p className={`text-xs font-semibold text-${group.color}-400 mb-1`}>{group.level}</p>
@@ -620,17 +619,17 @@ export default function ArchitecturePage() {
         {/* Footer */}
         <div className="mt-10 mb-6 text-center">
           <p className="text-xs text-gray-600">
-            UniStudio — Guia de Arquitectura Interactiva
+            {b.footer.tagline}
           </p>
           <div className="flex justify-center gap-3 mt-2">
             <Link href="/docs" className="text-[10px] text-accent/60 hover:text-accent transition-colors">
-              Explorador de Archivos →
+              {b.footer.links.docs}
             </Link>
             <Link href="/workflows" className="text-[10px] text-accent/60 hover:text-accent transition-colors">
-              Guia de Flujos →
+              {b.footer.links.workflows}
             </Link>
             <Link href="/editor" className="text-[10px] text-accent/60 hover:text-accent transition-colors">
-              Abrir Editor →
+              {b.footer.links.editor}
             </Link>
           </div>
         </div>
