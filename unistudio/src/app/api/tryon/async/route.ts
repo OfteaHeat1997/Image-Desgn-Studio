@@ -36,12 +36,25 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     category?: string;
     /** true = Foto Espalda: usar la vista trasera real del avatar como modelo. */
     backView?: boolean;
+    /** true = Foto Lateral: usar la vista de perfil real del avatar como modelo. */
+    sideView?: boolean;
   };
+  // La lateral usa el MISMO mecanismo que la espalda. El prompt no alcanza:
+  // pedirle a Uwear "girate 90 grados" devolvia siempre una foto de frente,
+  // porque un try-on no puede rotar a nadie — si la modelo de entrada esta de
+  // frente, la salida esta de frente. El avatar de Uwear ya trae el perfil real
+  // (asset_role "full_body_side"), asi que se usa esa foto como entrada y el
+  // giro deja de depender de convencer al modelo.
+  const avatarRole = body.backView
+    ? ('full_body_back' as const)
+    : body.sideView
+      ? ('full_body_side' as const)
+      : null;
   // Con backView la modelo la pone el servidor (asset full_body_back del avatar
   // de Uwear), asi que modelImage no solo es opcional: es que la que mande el
   // cliente se DESCARTA. Exigirla obligaba a la pagina a generar una modelo de
   // $0.055 y ~40s para tirarla a la basura en la linea siguiente.
-  const required = body.backView ? ['garmentImage'] : ['modelImage', 'garmentImage'];
+  const required = avatarRole ? ['garmentImage'] : ['modelImage', 'garmentImage'];
   const missing = requireFields(body as Record<string, unknown>, required);
   if (missing) return missing;
 
@@ -58,9 +71,9 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
   // la foto REAL de la espalda del producto que sube la usuaria, el try-on por fin
   // tiene las dos entradas correctas.
   let modelImage = body.modelImage ?? '';
-  if (body.backView) {
+  if (avatarRole) {
     const avatarId = Number(process.env.UWEAR_AVATAR_ID?.trim() || 21663);
-    const backUrl = await getUwearAvatarAsset(avatarId, 'full_body_back');
+    const backUrl = await getUwearAvatarAsset(avatarId, avatarRole);
     if (backUrl) {
       // El avatar SOLO tiene la espalda en 'full_body_back' (no existe un
       // 'upper_body_back'), asi que la modelo salia de cuerpo entero y lejos: el
