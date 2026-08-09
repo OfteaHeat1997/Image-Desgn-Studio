@@ -1596,8 +1596,8 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
                 </button>
               )}
             </div>
-            <span className="block truncate text-[15px] font-semibold text-white">{lg.steps.items[step.id].label}</span>
-            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{lg.steps.items[step.id].description}</p>
+            <span className="block truncate text-[15px] font-semibold text-white">{lg.steps.items[step.id]?.label ?? step.label}</span>
+            <p className="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{lg.steps.items[step.id]?.description ?? step.description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -3745,7 +3745,7 @@ export default function LingeriePipelinePage() {
         }
         // No hay foto real para esta vista → fallback a runStep default con warning.
         if (step.id !== "isolate" && step.id !== "model" && step.id !== "productVideo" && step.id !== "modelVideo") {
-          toast.info(lg.messages.noRealPhoto(lg.steps.items[step.id].label));
+          toast.info(lg.messages.noRealPhoto(lg.steps.items[step.id]?.label ?? step.label));
         }
       }
 
@@ -4254,7 +4254,7 @@ export default function LingeriePipelinePage() {
           if (fallback?.uploadedUrl) {
             console.warn(`[lingerie] ${stepDef.id} falló: usando foto real "${fallback.filename}" como resultado.`);
             toast.warning(
-              lg.messages.stepFellBack(lg.steps.items[stepDef.id].label, fallback.filename),
+              lg.messages.stepFellBack(lg.steps.items[stepDef.id]?.label ?? stepDef.label, fallback.filename),
             );
             updateStep(jobId, stepDef.id, {
               status: "done",
@@ -4311,7 +4311,7 @@ export default function LingeriePipelinePage() {
           }
         } else {
           // Auto mode: skip errored step and continue
-          toast.error(lg.messages.stepError(lg.steps.items[stepDef.id].label, errorMsg));
+          toast.error(lg.messages.stepError(lg.steps.items[stepDef.id]?.label ?? stepDef.label, errorMsg));
         }
       }
       return false;
@@ -4998,8 +4998,8 @@ export default function LingeriePipelinePage() {
                         </div>
                         <Icon className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white">{lg.steps.items[step.id].label}</p>
-                          <p className="text-xs text-[var(--text-secondary)]">{lg.steps.items[step.id].description}</p>
+                          <p className="text-sm font-medium text-white">{lg.steps.items[step.id]?.label ?? step.label}</p>
+                          <p className="text-xs text-[var(--text-secondary)]">{lg.steps.items[step.id]?.description ?? step.description}</p>
                         </div>
                         <span className={cn(
                           "shrink-0 text-xs font-semibold",
