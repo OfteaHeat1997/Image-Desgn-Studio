@@ -1966,7 +1966,7 @@ export default function StaticProductPipelinePage() {
                         </div>
 
                         {/* Outputs — big thumbnails with download + zoom + re-run */}
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           {outputStepsFor(job).map((key) => {
                             const step = job.steps[key];
                             const meta = STEP_META[key];
@@ -2064,14 +2064,14 @@ export default function StaticProductPipelinePage() {
                                   isVideo ? (
                                     <video
                                       src={step.resultUrl}
-                                      className="h-40 w-full rounded bg-black object-contain"
+                                      className="h-72 w-full rounded bg-black object-contain"
                                       controls
                                       loop
                                       muted
                                       playsInline
                                     />
                                   ) : (
-                                  <div className="group relative h-40 w-full">
+                                  <div className="group relative h-72 w-full">
                                     {/* Comparador antes/después: original vs output.
                                         No va dentro de un <button> porque el slider
                                         tiene su propio <input range> (conflicto de
@@ -2080,7 +2080,7 @@ export default function StaticProductPipelinePage() {
                                       before={job.previewUrl}
                                       after={step.resultUrl}
                                       label={spMeta.label}
-                                      className="h-40 w-full"
+                                      className="h-72 w-full"
                                     />
                                     <button
                                       type="button"
@@ -2102,7 +2102,7 @@ export default function StaticProductPipelinePage() {
                                   </div>
                                   )
                                 ) : (
-                                  <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded bg-black/40 px-2 text-gray-600">
+                                  <div className="flex h-72 w-full flex-col items-center justify-center gap-1.5 rounded bg-black/40 px-2 text-gray-600">
                                     {step.status === "running" ? (
                                       <>
                                         <Loader2 className="h-6 w-6 animate-spin text-amber-300" />
