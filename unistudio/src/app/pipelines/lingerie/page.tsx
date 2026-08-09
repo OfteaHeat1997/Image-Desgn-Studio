@@ -3749,13 +3749,43 @@ export default function LingeriePipelinePage() {
           j.id === jobId ? { ...j, productSpec: spec, analysisStatus: "done" } : j,
         ));
       } catch (analyzeErr) {
-        const msg = analyzeErr instanceof Error ? analyzeErr.message : lg.messages.analysisFailed;
-        console.warn(`[lingerie] analyze-product failed for ${job.filename}:`, msg);
-        setJobs((prev) => prev.map((j) =>
-          j.id === jobId ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg } : j,
-        ));
-        // No bloquea el pipeline — solo warnea y seguimos como antes.
-        toast.warning(lg.messages.specReadFailed(job.filename));
+        // LA FICHA YA NO ES UN EXTRA: ES LO QUE SOSTIENE LA FIDELIDAD.
+        //
+        // Antes esto solo warneaba y seguia ("seguimos como antes"), porque la
+        // ficha era opcional. Dejo de serlo cuando el Paso 2 paso a Uwear: lo que
+        // permite conservar un cierre beige sobre tela beige es que este DESCRITO,
+        // no que se alcance a ver. Sin ficha, el proveedor no tiene a que anclarse
+        // y vuelve a alisar los detalles — justo el fallo que aparecia producto
+        // tras producto en los colores claros.
+        //
+        // Por eso: un reintento automatico (la mayoria de estos fallos son
+        // transitorios — timeout o cola de la API), y si igual falla, un aviso que
+        // dice QUE se pierde, no un "no se pudo leer" generico.
+        let spec2: ProductSpec | null = null;
+        try {
+          console.warn(`[lingerie] analyze-product fallo para ${job.filename}, reintentando una vez...`);
+          spec2 = await analyzeProductPhotos([{ file: job.file, role: "frontal" }], productType);
+        } catch { /* el segundo fallo se reporta abajo */ }
+
+        if (spec2) {
+          setJobs((prev) => prev.map((j) =>
+            j.id === jobId ? { ...j, productSpec: spec2, analysisStatus: "done", analysisError: undefined } : j,
+          ));
+          console.log(`[lingerie] ficha obtenida en el reintento para ${job.filename}`);
+        } else {
+          const msg = analyzeErr instanceof Error ? analyzeErr.message : lg.messages.analysisFailed;
+          console.warn(`[lingerie] analyze-product failed for ${job.filename}:`, msg);
+          setJobs((prev) => prev.map((j) =>
+            j.id === jobId ? { ...j, productSpec: null, analysisStatus: "error", analysisError: msg } : j,
+          ));
+          toast.warning(
+            `${job.filename}: no se pudo leer la ficha del producto (2 intentos). ` +
+            `El try-on va a correr SIN la descripcion, asi que puede perder detalles ` +
+            `del mismo color que la tela (cierres, costuras, paneles). ` +
+            `Reintentá el análisis desde la ficha antes de aceptar el resultado.`,
+            12000,
+          );
+        }
       }
     }
 
