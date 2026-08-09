@@ -2949,7 +2949,15 @@ async function runStep(
               provider: "replicate",
               removeSubject: true,
               garmentType: garmentTypeForApi,
-              isolateMethod: "auto",
+              // NUNCA "auto" ACA. En auto el aislado corre el ghost de Photoroom
+              // primero, y ese prompt dice 'STRAIGHT FRONT VIEW ONLY' y
+              // 'do NOT render the back' (bg-remove/route.ts). O sea: convertia
+              // la foto de ESPALDA en un frente redibujado, y despues Leffa
+              // warpeaba ese frente sobre una modelo de espaldas. Por eso el
+              // resultado no tenia los tirantes ni el broche reales.
+              // grounded-sam recorta pixeles de verdad y no reinterpreta la
+              // vista, que es justo lo que necesita una espalda.
+              isolateMethod: "grounded-sam",
               garmentDescription,
             }),
           });
