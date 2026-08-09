@@ -183,10 +183,18 @@ export async function POST(request: NextRequest) {
         } else if (providerKey === 'wan-2.2-fast') {
           // Wan 2.2 Fast — 16fps, minimum 81 frames (~5s)
           const numFrames = Math.max(81, Math.round(duration * 16));
+          // El caller (pipeline estáticos) manda un negative_prompt REFORZADO
+          // anti-duplicado. Antes se ignoraba y se usaba solo el fijo → wan
+          // duplicaba/deformaba el producto (2º frasco fantasma). Ahora lo
+          // fusionamos: base fija + el del caller, sin repetir.
+          const baseNeg = 'duplicate product, second bottle, two bottles, extra bottle, cloned product, multiple products, split screen, double image, mirror copy, reflection of product, morphing, distorted, deformed product, warped bottle, blurry, low quality, watermark, text overlay, text artifacts, extra objects in foreground';
+          const mergedNeg = (negativePrompt && negativePrompt.trim().length > 0)
+            ? `${baseNeg}, ${negativePrompt.trim()}`
+            : baseNeg;
           const output = await runModel(provider.model, {
             image: httpImageUrl,
             prompt: fullPrompt,
-            negative_prompt: 'duplicate, split screen, double image, morphing, distorted, blurry, low quality, watermark, text overlay, deformed',
+            negative_prompt: mergedNeg,
             num_frames: numFrames,
             guidance_scale: 3.0,
           });

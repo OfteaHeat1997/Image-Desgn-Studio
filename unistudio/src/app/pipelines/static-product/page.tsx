@@ -1129,8 +1129,10 @@ export default function StaticProductPipelinePage() {
       // REFORZAMOS la escena vacía; la fidelidad del producto la garantiza el
       // composite, no el texto. (features se sigue usando para marca y video.)
       void features;
-      const featureSuffix =
-        ". Keep the scene completely EMPTY — absolutely no bottles, jars or products anywhere in the background; only the empty pedestal and backdrop. Soft background lighting that harmonizes elegantly with the product placed on top.";
+      // CORTO a propósito: el prompt total no debe superar ~400 chars o Flux
+      // Schnell revienta con "Unable to extract URL" (verificado). El "escena
+      // vacía" ya viene reforzado en NO_DUP del config.
+      const featureSuffix = ". Empty background, no extra products.";
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
       // El HD ya se hizo en el PASO 1 (restore/SUPIR, antes de quitar fondo), así

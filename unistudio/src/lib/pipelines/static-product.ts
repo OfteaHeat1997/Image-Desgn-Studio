@@ -87,16 +87,14 @@ export function getAdaptiveBgConfig(
   productType: StaticProductType,
   brand: StaticBrand,
 ): AdaptiveBgConfig {
-  // Suffijo de calidad agregado a TODOS los prompts — fuerza Flux Pro a producir
-  // imágenes nítidas sin artefactos, ampliación-ready para catálogo e-commerce.
-  const HD = ', ultra high resolution, 8K, sharp focus, crystal clear details, professional commercial product photography, studio quality lighting, no blur, no artifacts, photo-realistic, magazine quality';
-  // ANTI-DUP REFORZADO. Antes el suffix decía "no duplicate bottles" pero los
-  // prompts decían "luxury perfume bottle on marble" lo que pedía a Schnell
-  // generar un frasco. Ahora todos los prompts dicen "EMPTY surface" y el
-  // suffix es más agresivo. Bug reportado por usuaria: ve un frasco blurry
-  // detrás del frasco compositeado real.
-  const NO_DUP =
-    ', completely EMPTY scene with NO PRODUCTS visible, no perfume bottles in background, no extra bottles, no shelves with products, no shopping displays, no perfume samples in scene, just the empty surface ready for product placement, NO PRODUCT decoration in background, plain empty area';
+  // Suffijos CORTOS. Antes eran de ~400 chars combinados y hacían que el prompt
+  // total superara ~1000 chars — Flux Schnell se atragantaba y devolvía un output
+  // que reventaba extractOutputUrl con "Unable to extract URL". Verificado:
+  // prompt de 258 chars funciona, el de 1047 falla. Mantener esto CORTO.
+  const HD = ', high resolution, sharp focus, photo-realistic, professional product photography';
+  // ANTI-DUP corto: la clave es "empty, no products, no bottles". El producto
+  // real se compone encima (pixel-perfect), así que el fondo debe ir VACÍO.
+  const NO_DUP = ', completely empty scene, no products, no bottles, no shelves, plain empty surface';
   const seed = brandSeed(productType, brand);
 
   // --- Perfumes ---
@@ -104,7 +102,7 @@ export function getAdaptiveBgConfig(
     if (PREMIUM_BRANDS.includes(brand)) {
       return {
         prompt:
-          'editorial luxury fragrance photography, perfume bottle centered on a warm cream travertine pedestal, flowing beige silk fabric backdrop with soft elegant folds, dried pampas grass and delicate dried botanicals arranged to one side, dramatic soft directional sunlight from the side casting long elegant shadows, warm golden-cream color palette, shallow depth of field, high-end magazine editorial aesthetic like Sephora and Aesop campaigns, refined minimal and sophisticated, NO store interior, NO shelves, NO retail environment, NO extra products' + HD + NO_DUP,
+          'empty cream travertine pedestal, beige silk backdrop with soft folds, dried pampas grass to one side, warm golden sunlight and long soft shadows, luxury studio, bare empty pedestal' + HD + NO_DUP,
         shadowType: 'reflection',
         bgMode: 'precise',
         label: 'Gradient premium con reflejo (estilo Sephora)',

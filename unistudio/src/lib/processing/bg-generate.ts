@@ -572,8 +572,12 @@ export async function generateBgFast(
       bgUrl = await extractOutputUrl(output);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // Incluye "unable to extract url": un prompt demasiado largo hace que
+      // Schnell devuelva un output que revienta extractOutputUrl. El reintento
+      // con prompt corto (primera parte de la escena) lo recupera en vez de
+      // fallar la tarjeta con "Unable to extract URL".
       const isRetryable =
-        /flagged|content_policy|sensitive|422|nsfw|content_filter/i.test(msg);
+        /flagged|content_policy|sensitive|422|nsfw|content_filter|unable to extract|extract url/i.test(msg);
       if (!isRetryable) throw err;
 
       // Strip the heaviest words (HD/NO_DUP suffixes are ~50 words). Keep only
