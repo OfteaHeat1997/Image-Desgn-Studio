@@ -92,6 +92,7 @@ export interface JewelryPipelineCopy {
     docsTips: string;
     zoomHint: string;
     peekTitle: string;
+    buildTitle: string;
   };
   thumb: {
     waiting: string;
@@ -212,6 +213,7 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     docsTips: 'Qué podés hacer',
     zoomHint: 'Pasá el mouse para verlo grande',
     peekTitle: 'Vista previa',
+    buildTitle: 'Version del codigo que este deploy esta sirviendo. Si no coincide con tu ultimo push, estas viendo un build viejo.',
   },
   thumb: {
     waiting: 'Esperando este paso',
@@ -463,6 +465,7 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     docsTips: 'What you can do',
     zoomHint: 'Hover to see it large',
     peekTitle: 'Preview',
+    buildTitle: 'Code version this deploy is serving. If it does not match your latest push, you are looking at an old build.',
   },
   thumb: {
     waiting: 'Waiting for this step',

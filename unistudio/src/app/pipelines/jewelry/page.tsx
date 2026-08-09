@@ -1124,6 +1124,15 @@ export default function JewelryPipelinePage() {
           <Gem className="h-4 w-4 shrink-0 text-[var(--accent)]" />
           <span className="truncate text-sm font-semibold text-heading">Joyería</span>
         </div>
+        {/* Sello de build: muestra el commit que está VIVO en este deploy. Si no
+            coincide con el último push, estás viendo un build viejo (cache o
+            deploy todavía corriendo). Mismo sello que lleva lencería. */}
+        <span
+          className="shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]"
+          title={jt.stepCard.buildTitle}
+        >
+          build {process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev"}
+        </span>
         {jobs.length > 0 && (
           <div className="ml-auto flex items-center gap-3 text-xs text-[var(--text-secondary)]">
             <span>
