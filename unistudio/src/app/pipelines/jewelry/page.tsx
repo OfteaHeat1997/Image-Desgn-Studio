@@ -1321,10 +1321,19 @@ export default function JewelryPipelinePage() {
         .then((d) => {
           if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
             const changes = (d.data.changes ?? []).slice(0, 2).join("; ") || d.data.reason;
+            // NO se marca como "Listo". La doctrina de Unistyles es explicita:
+            // "si falla cualquiera de los primeros cuatro puntos, la imagen debe
+            // corregirse antes de publicarse", y el punto 1 es "¿la joya sigue
+            // siendo exactamente la original?". Antes el paso quedaba en verde
+            // con el producto cambiado — el on-model llego a convertir una
+            // pulsera de cuentas en un RELOJ y aun asi decia Listo. Ahora queda
+            // en rojo, con el motivo y los botones de rehacer a la vista.
             patchStep(jobId, stepKey, {
-              warning: onModel
+              status: "error",
+              error: onModel
                 ? jt.messages.jewelryChangedModel(changes)
                 : jt.messages.jewelryChanged(changes),
+              warning: undefined,
             });
           }
         })
