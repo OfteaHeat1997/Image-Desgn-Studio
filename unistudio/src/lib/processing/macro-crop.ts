@@ -30,6 +30,16 @@ export interface MacroCropOptions {
   background?: MacroBackground;
   /** Longest output edge in pixels. */
   outputSize?: number;
+  /**
+   * Región a acercar, normalizada 0-1 sobre la imagen recibida. Cuando viene,
+   * MANDA sobre la heurística de densidad.
+   *
+   * La heurística solo sabe dónde hay más masa de píxeles, no qué parte de ESTA
+   * pieza vale la pena mostrar: por eso el zoom salía raro. Claude Vision mira
+   * el producto y decide (el engaste, el cierre, la medalla, la unión de
+   * eslabones), y esa decisión llega acá como coordenadas.
+   */
+  region?: { x: number; y: number; w: number; h: number };
 }
 
 const ASPECT: Record<NonNullable<MacroCropOptions['aspectRatio']>, [number, number]> = {
@@ -182,6 +192,48 @@ export async function macroCrop(
   // Locate the crop on the densest part of the subject.
   let originX = (srcW - cropW) / 2 / Math.max(srcW - cropW, 1);
   let originY = (srcH - cropH) / 2 / Math.max(srcH - cropH, 1);
+
+  // Región elegida por Vision: se usa tal cual y se saltea la heurística.
+  const r = options.region;
+  if (r && r.w > 0 && r.h > 0) {
+    // IMPORTANTE: la región se aplica sobre la imagen SIN recortar el margen.
+    // Vision midió las coordenadas sobre la imagen completa que se le mandó; si
+    // se aplicaran sobre `working` (ya trimmeada) quedarían desplazadas y el
+    // zoom cae al lado — exactamente lo que pasaba: eligió el crucifijo y
+    // recortó la cadena.
+    const untrimmed = await sharp(sourceBuffer).png().toBuffer();
+    const um = await sharp(untrimmed).metadata();
+    const uW = um.width ?? srcW;
+    const uH = um.height ?? srcH;
+    const rx = Math.max(0, Math.min(r.x, 1));
+    const ry = Math.max(0, Math.min(r.y, 1));
+    const rw = Math.max(0.05, Math.min(r.w, 1 - rx));
+    const rh = Math.max(0.05, Math.min(r.h, 1 - ry));
+    const box = {
+      left: Math.round(rx * uW),
+      top: Math.round(ry * uH),
+      width: Math.max(32, Math.min(Math.round(rw * uW), uW - Math.round(rx * uW))),
+      height: Math.max(32, Math.min(Math.round(rh * uH), uH - Math.round(ry * uH))),
+    };
+    const outWr = arW >= arH ? outputSize : Math.round((outputSize * arW) / arH);
+    const outHr = arH > arW ? outputSize : Math.round((outputSize * arH) / arW);
+    const renderedR = await sharp(untrimmed)
+      .extract(box)
+      .resize(outWr, outHr, { fit: 'cover', position: 'centre', kernel: 'lanczos3' })
+      .sharpen({ sigma: 0.6 })
+      .png()
+      .toBuffer();
+    if (background === 'transparent') {
+      return { dataUrl: `data:image/png;base64,${renderedR.toString('base64')}`, crop: box };
+    }
+    const flatR = await sharp({
+      create: { width: outWr, height: outHr, channels: 3, background: BACKGROUNDS[background] },
+    })
+      .composite([{ input: renderedR, left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+    return { dataUrl: `data:image/png;base64,${flatR.toString('base64')}`, crop: box };
+  }
 
   if (meta.hasAlpha) {
     const alphaRaw = await sharp(working)

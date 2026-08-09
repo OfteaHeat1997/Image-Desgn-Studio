@@ -1352,11 +1352,29 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
+            // Vision mira la pieza aislada y elige QUE acercar. Sin esto el
+            // recorte es mecanico (la zona con mas masa de pixeles) y el zoom
+            // sale raro: a veces un tramo vacio de cadena, a veces media pieza.
+            let region: { x: number; y: number; w: number; h: number } | undefined;
+            try {
+              const rr = await fetch("/api/jewelry-prompts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ imageUrl: input, mode: "macro-region" }),
+                signal,
+              });
+              const rd = await rr.json();
+              if (rd?.success && rd.data?.region) region = rd.data.region;
+            } catch {
+              /* sin region, el recortador vuelve a su heuristica */
+            }
+
             const res = await fetch("/api/macro-crop", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 imageUrl: input,
+                region,
                 zoom: config.macro.zoom,
                 background: config.macro.background,
                 aspectRatio: "1:1",
