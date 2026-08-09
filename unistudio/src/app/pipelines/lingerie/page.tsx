@@ -4165,9 +4165,24 @@ export default function LingeriePipelinePage() {
           cost_actual: result.cost,
           candidates: result.candidates,
           usedProvider: result.usedProvider,
-          // Foto Frontal: mostrar la MODELO nueva como "Original/antes" (en vez del
-          // garment) → la tarjeta queda como antes/después: modelo → modelo con el bra.
-          ...(stepDef.id === "tryon" && newSharedModel ? { originalUrl: newSharedModel } : {}),
+          // EL "ANTES" DEBE SER LA ENTRADA REAL DE ESTE PROVEEDOR.
+          //
+          // La Foto Frontal mostraba SIEMPRE la modelo IA como "antes", porque con
+          // Leffa eso es exacto: Leffa viste a ESA modelo, y la tarjeta se lee como
+          // modelo -> modelo con el bra.
+          //
+          // Con Uwear es falso. Uwear DESCARTA la modelo que le pasamos y genera la
+          // suya a partir de su avatar. Al mostrar igual la modelo IA a la
+          // izquierda, la tarjeta comparaba dos mujeres distintas y sugeria una
+          // transformacion que nunca ocurrio. La usuaria lo detecto: "cuando me
+          // pregunten por que hay dos modelos diferentes ahi, que les digo".
+          //
+          // Ahora el "antes" es la entrada real: la modelo IA solo cuando el
+          // proveedor efectivamente la usa; en el resto, el producto aislado, que
+          // es lo que de verdad entro al paso.
+          ...(stepDef.id === "tryon" && newSharedModel && result.usedProvider !== "uwear"
+            ? { originalUrl: newSharedModel }
+            : {}),
         });
 
         // Populate local map para que el próximo step pueda leer este resultUrl
