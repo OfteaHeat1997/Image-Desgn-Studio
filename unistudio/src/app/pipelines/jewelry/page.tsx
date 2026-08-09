@@ -129,7 +129,7 @@ const STEP_ENGINE: Record<StepKey, string> = {
   clean: "Kontext Pro",
   isolate: "BiRefNet",
   packshot: "Kontext Pro",
-  luxury: "Kontext Pro",
+  luxury: "Flux Schnell + sharp",
   macro: "sharp · sin IA",
   model: "SeedDream + Kontext",
   scale: "SeedDream + Kontext",
@@ -283,120 +283,230 @@ function UploadZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 /*  Ficha de Vision                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Campo de texto de la ficha. Editable: lo que Vision leyo se puede corregir. */
+function SpecField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">{label}</span>
+      <input
+        type="text"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--accent)]/50 disabled:opacity-50"
+      />
+    </label>
+  );
+}
+
+/**
+ * Ficha tecnica de la pieza — EDITABLE.
+ *
+ * Antes era una fila de chips de solo lectura: si Vision leia mal el material o
+ * el tipo de cadena, no habia forma de corregirlo y el error se propagaba a
+ * TODOS los prompts, porque packshot, escena, macro y on-model parten de
+ * `jewelryDescriptor(features)`.
+ *
+ * Lenceria resuelve esto con campos editables (`ProductSpecPanel`), y era el
+ * pedido repetido: poder arreglar lo que la IA entendio mal ANTES de gastar.
+ */
 function VisionPanel({
   job,
   disabled,
   onChangeType,
+  onEditFeatures,
+  onReanalyze,
 }: {
   job: Job;
   disabled: boolean;
   onChangeType: (s: JewelrySubType) => void;
+  onEditFeatures: (patch: Partial<JewelryFeatures>) => void;
+  onReanalyze: () => void;
 }) {
   const { t } = useI18n();
   const jt = t.pipelines.jewelry;
+  const [open, setOpen] = useState(true);
   const f = job.features;
 
   return (
-    <div className="mb-5 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-          {jt.vision.heading}
-        </p>
-        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
-          {jt.vision.changeType}
-          <select
-            value={job.subType}
-            onChange={(e) => onChangeType(e.target.value as JewelrySubType)}
-            disabled={disabled}
-            className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white disabled:opacity-50"
-          >
-            {Object.entries(SUB_TYPE_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
+    <div className="mb-5 rounded-xl border border-white/8 bg-white/[0.02]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-w-0 items-center gap-2 text-left"
+        >
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-[var(--text-secondary)] transition-transform",
+              open ? "rotate-180" : "",
+            )}
+          />
+          <span className="min-w-0">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+              {jt.vision.heading}
+            </span>
+            <span className="block text-[11px] text-[var(--text-secondary)]">
+              {jt.vision.subtitle}
+            </span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onReanalyze}
+          disabled={disabled || job.analysisStatus === "analyzing"}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-gray-200 transition-colors hover:border-white/25 disabled:opacity-40"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          {job.analysisStatus === "analyzing" ? jt.vision.reanalyzing : jt.vision.reanalyze}
+        </button>
       </div>
 
-      {job.analysisStatus === "analyzing" && (
-        <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          {jt.vision.analyzing}
-        </p>
-      )}
-      {job.analysisStatus === "error" && (
-        <p className="text-xs text-[var(--text-secondary)]">{jt.vision.failed}</p>
-      )}
+      {open && (
+        <div className="border-t border-white/6 px-4 py-4">
+          {job.analysisStatus === "analyzing" && (
+            <p className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {jt.vision.analyzing}
+            </p>
+          )}
+          {job.analysisStatus === "error" && !f && (
+            <p className="text-xs text-[var(--text-secondary)]">{jt.vision.failed}</p>
+          )}
 
-      {f && (
-        <>
-          {/* Avisos que hay que ver ANTES de gastar */}
-          {!job.subTypeConfident && (
-            <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
-              <p className="text-[11px] leading-snug text-amber-200">
-                <span className="font-semibold">{jt.vision.guessed}.</span> {jt.vision.guessedHint}
-              </p>
+          {f && (
+            <div className="space-y-4">
+              {!job.subTypeConfident && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+                  <p className="text-[11px] leading-snug text-amber-200">
+                    <span className="font-semibold">{jt.vision.guessed}.</span> {jt.vision.guessedHint}
+                  </p>
+                </div>
+              )}
+              {f.num_productos > 1 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
+                  <p className="text-[11px] leading-snug text-amber-200">
+                    <span className="font-semibold">{jt.vision.multiProduct(f.num_productos)}.</span>{" "}
+                    {jt.vision.multiProductHint}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  {jt.vision.sectionIdentity}
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">
+                      {jt.vision.fieldType}
+                    </span>
+                    <select
+                      value={job.subType}
+                      onChange={(e) => onChangeType(e.target.value as JewelrySubType)}
+                      disabled={disabled}
+                      className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white disabled:opacity-50"
+                    >
+                      {Object.entries(SUB_TYPE_LABELS).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <SpecField
+                    label={jt.vision.fieldMaterial}
+                    value={f.material}
+                    disabled={disabled}
+                    onChange={(v) => onEditFeatures({ material: v as JewelryFeatures["material"] })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  {jt.vision.sectionConstruction}
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <SpecField
+                    label={jt.vision.fieldFinish}
+                    value={f.acabado ?? ""}
+                    disabled={disabled}
+                    onChange={(v) => onEditFeatures({ acabado: (v || null) as JewelryFeatures["acabado"] })}
+                  />
+                  <SpecField
+                    label={jt.vision.fieldChain}
+                    value={f.tipo_cadena ?? ""}
+                    disabled={disabled}
+                    onChange={(v) => onEditFeatures({ tipo_cadena: v || null })}
+                  />
+                  <SpecField
+                    label={jt.vision.fieldClasp}
+                    value={f.cierre ?? ""}
+                    disabled={disabled}
+                    onChange={(v) => onEditFeatures({ cierre: v || null })}
+                  />
+                  <SpecField
+                    label={jt.vision.fieldEngraved}
+                    value={f.texto_grabado ?? ""}
+                    disabled={disabled}
+                    onChange={(v) => onEditFeatures({ texto_grabado: v || null })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  {jt.vision.sectionDetails}
+                </p>
+                <SpecField
+                  label={jt.vision.fieldStones}
+                  value={f.piedras && f.num_piedras > 0 ? String(f.num_piedras) : ""}
+                  disabled={disabled}
+                  onChange={(v) => {
+                    const n = parseInt(v, 10);
+                    const ok = Number.isFinite(n) && n > 0;
+                    onEditFeatures({ num_piedras: ok ? n : 0, piedras: ok });
+                  }}
+                />
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">
+                    {jt.vision.fieldDetails}
+                  </span>
+                  <textarea
+                    value={f.detalles_visibles.join("\n")}
+                    disabled={disabled}
+                    rows={4}
+                    onChange={(e) =>
+                      onEditFeatures({
+                        detalles_visibles: e.target.value
+                          .split("\n")
+                          .map((x) => x.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                    className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm leading-relaxed text-white outline-none transition-colors focus:border-[var(--accent)]/50 disabled:opacity-50"
+                  />
+                  <span className="mt-1 block text-[10px] text-[var(--text-muted)]">
+                    {jt.vision.detailsHint}
+                  </span>
+                </label>
+              </div>
             </div>
           )}
-          {f.num_productos > 1 && (
-            <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" />
-              <p className="text-[11px] leading-snug text-amber-200">
-                <span className="font-semibold">{jt.vision.multiProduct(f.num_productos)}.</span>{" "}
-                {jt.vision.multiProductHint}
-              </p>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-1.5">
-            <span className="rounded bg-[var(--accent-dim)] px-2 py-0.5 text-[11px] font-medium text-[var(--accent)]">
-              {jt.vision.detectedAs(f.tipo)}
-            </span>
-            <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-              {f.material}
-              {f.acabado ? ` · ${f.acabado}` : ""}
-            </span>
-            {f.tipo_cadena && (
-              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                {jt.vision.chain}: {f.tipo_cadena}
-              </span>
-            )}
-            {f.cierre && (
-              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                {jt.vision.clasp}: {f.cierre}
-              </span>
-            )}
-            {f.texto_grabado && (
-              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                {jt.vision.engraved}: “{f.texto_grabado}”
-              </span>
-            )}
-            {f.piedras && f.num_piedras > 0 && (
-              <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-gray-200">
-                {jt.features.stones(f.num_piedras)}
-                {f.color_piedras.length > 0 ? ` (${f.color_piedras.join(", ")})` : ""}
-              </span>
-            )}
-          </div>
-
-          {/* detalles_visibles es el campo MÁS rico que devuelve Vision — nombra
-              el tipo de eslabón, el cierre y los grabados. La versión anterior
-              lo descartaba y por eso la ficha se veía vacía. */}
-          {f.detalles_visibles.length > 0 && (
-            <ul className="mt-2 flex flex-wrap gap-1">
-              {f.detalles_visibles.map((d, i) => (
-                <li
-                  key={i}
-                  className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
-                >
-                  {d}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -682,7 +792,7 @@ function StepCard({
           {/* Que motor corre este paso, siempre a la vista. Estaba solo en el
               panel de docs, detras del icono "i", asi que no habia forma de
               saber quien genero cada foto sin abrirlo. */}
-          <span className="hidden rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)] lg:inline">
+          <span className="rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]">
             {STEP_ENGINE[stepKey]}
           </span>
           <span className="hidden text-xs font-medium text-[var(--text-secondary)] sm:inline">
@@ -887,6 +997,32 @@ function StepCard({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* PASO QUE TODAVIA NO CORRIO. Antes no tenia NINGUN boton: los de
+            Aceptar/Rehacer/Saltar solo salen despues de correr, asi que si la
+            tanda se detenia la usuaria quedaba sin nada que oprimir. Reportado
+            textual: "no puedo oprimir ningun boton". */}
+        {!busy && (step.status === "idle" || step.status === "pending") && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onRerun}
+              title={jt.buttons.runStepTitle}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-[var(--bg-primary)] transition-colors hover:brightness-110"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {jt.buttons.runStep}
+            </button>
+            <button
+              type="button"
+              onClick={onSkip}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.02] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-gray-200"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              {jt.buttons.skip}
+            </button>
           </div>
         )}
 
@@ -1663,6 +1799,30 @@ export default function JewelryPipelinePage() {
     });
   };
 
+  /** Vuelve a leer la foto con Vision, descartando lo que habia. */
+  const handleReanalyze = async (jobId: string) => {
+    const job = jobsRef.current.find((j) => j.id === jobId);
+    if (!job?.uploadedUrl) return;
+    patchJob(jobId, { analysisStatus: "analyzing" });
+    try {
+      const res = await fetch("/api/product-features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: job.uploadedUrl, category: "jewelry" }),
+      });
+      const data = await res.json();
+      const features: JewelryFeatures | null = data?.success ? data.data : null;
+      if (features) {
+        const { subType, confident } = featuresToSubType(features.tipo, features.detalles_visibles);
+        patchJob(jobId, { features, analysisStatus: "done", subType, subTypeConfident: confident });
+      } else {
+        patchJob(jobId, { analysisStatus: "error" });
+      }
+    } catch {
+      patchJob(jobId, { analysisStatus: "error" });
+    }
+  };
+
   const handleRerun = async (jobId: string, key: StepKey) => {
     if (busy) return;
     setBusy(true);
@@ -1885,6 +2045,13 @@ export default function JewelryPipelinePage() {
               onChangeType={(s) =>
                 patchJob(activeJob.id, { subType: s, subTypeConfident: true })
               }
+              // Lo que se corrige aca alimenta TODOS los prompts, porque parten
+              // de jewelryDescriptor(features).
+              onEditFeatures={(patch) =>
+                activeJob.features &&
+                patchJob(activeJob.id, { features: { ...activeJob.features, ...patch } })
+              }
+              onReanalyze={() => void handleReanalyze(activeJob.id)}
             />
 
             {/* Etapas */}

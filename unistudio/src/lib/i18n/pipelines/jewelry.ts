@@ -78,6 +78,8 @@ export interface JewelryPipelineCopy {
     variants: (n: number) => string;
     useVariant: (n: number) => string;
     whatIsThis: string;
+    runStep: string;
+    runStepTitle: string;
   };
   statusBadge: {
     idle: string;
@@ -141,6 +143,21 @@ export interface JewelryPipelineCopy {
     clasp: string;
     engraved: string;
     changeType: string;
+    subtitle: string;
+    reanalyze: string;
+    reanalyzing: string;
+    fieldType: string;
+    fieldMaterial: string;
+    fieldFinish: string;
+    fieldChain: string;
+    fieldClasp: string;
+    fieldEngraved: string;
+    fieldStones: string;
+    fieldDetails: string;
+    detailsHint: string;
+    sectionIdentity: string;
+    sectionConstruction: string;
+    sectionDetails: string;
   };
   social: {
     carousel: string;
@@ -228,6 +245,8 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     variants: (n) => `${n} versiones generadas`,
     useVariant: (n) => `Usar la versión ${n}`,
     whatIsThis: '¿Qué hace este paso?',
+    runStep: 'Generar este paso',
+    runStepTitle: 'Correr solo este paso, sin esperar a los demás',
   },
   statusBadge: {
     idle: 'En espera',
@@ -249,7 +268,7 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     docsCost: 'Costo',
     docsCanFail: 'Qué puede fallar',
     docsTips: 'Qué podés hacer',
-    zoomHint: 'Pasá el mouse para verlo grande',
+    zoomHint: 'Click para ver en grande, con el original al lado',
     peekTitle: 'Vista previa',
     buildTitle: 'Version del codigo que este deploy esta sirviendo. Si no coincide con tu ultimo push, estas viendo un build viejo.',
   },
@@ -445,6 +464,21 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     clasp: 'Cierre',
     engraved: 'Grabado',
     changeType: 'Cambiar tipo',
+    subtitle: 'Leída por Claude Vision — podés editar cualquier campo antes de que corra el resto.',
+    reanalyze: 'Volver a analizar',
+    reanalyzing: 'Analizando...',
+    fieldType: 'Tipo de pieza',
+    fieldMaterial: 'Material',
+    fieldFinish: 'Acabado',
+    fieldChain: 'Tipo de cadena',
+    fieldClasp: 'Cierre',
+    fieldEngraved: 'Texto grabado',
+    fieldStones: 'Piedras',
+    fieldDetails: 'Detalles visibles',
+    detailsHint: 'Uno por línea. Es lo que más pesa en los prompts.',
+    sectionIdentity: 'Identidad',
+    sectionConstruction: 'Construcción',
+    sectionDetails: 'Detalles',
   },
   social: {
     carousel: 'Carrusel',
@@ -531,6 +565,8 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     variants: (n) => `${n} versions generated`,
     useVariant: (n) => `Use version ${n}`,
     whatIsThis: 'What does this step do?',
+    runStep: 'Run this step',
+    runStepTitle: 'Run just this step, without waiting for the others',
   },
   statusBadge: {
     idle: 'Waiting',
@@ -552,7 +588,7 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     docsCost: 'Cost',
     docsCanFail: 'What can go wrong',
     docsTips: 'What you can do',
-    zoomHint: 'Hover to see it large',
+    zoomHint: 'Click to see it large, next to the original',
     peekTitle: 'Preview',
     buildTitle: 'Code version this deploy is serving. If it does not match your latest push, you are looking at an old build.',
   },
@@ -748,6 +784,21 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     clasp: 'Clasp',
     engraved: 'Engraved',
     changeType: 'Change type',
+    subtitle: 'Read by Claude Vision — you can edit any field before the rest runs.',
+    reanalyze: 'Analyse again',
+    reanalyzing: 'Analysing...',
+    fieldType: 'Piece type',
+    fieldMaterial: 'Material',
+    fieldFinish: 'Finish',
+    fieldChain: 'Chain type',
+    fieldClasp: 'Clasp',
+    fieldEngraved: 'Engraved text',
+    fieldStones: 'Stones',
+    fieldDetails: 'Visible details',
+    detailsHint: 'One per line. This is what weighs most in the prompts.',
+    sectionIdentity: 'Identity',
+    sectionConstruction: 'Construction',
+    sectionDetails: 'Details',
   },
   social: {
     carousel: 'Carousel',

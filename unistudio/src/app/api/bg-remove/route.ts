@@ -178,7 +178,10 @@ async function ghostMatchesProduct(
  * claramente NO es la prenda (piel expuesta, cara, pelo, brazos, hombros, cuello,
  * fondo). NO restamos torso/body/waist porque contienen la prenda.
  */
-function garmentNegativePrompt(garmentType: string | null): string {
+function garmentNegativePrompt(garmentType: string | null, override?: string): string {
+  // Utileria nombrada por Vision (cilindro, pedestal, bandeja...). Se suma a la
+  // base para que la mascara la reste.
+  if (override && override.trim()) return `background,${override.trim()}`;
   // MÍNIMO a propósito: antes restábamos skin/shoulder/neck/arm — pero en un bra
   // deportivo los tirantes van sobre los hombros y el escote toca el cuello, así que
   // esas restas EROSIONABAN la máscara hasta dejarla vacía → "no se pudo recortar".
@@ -206,7 +209,10 @@ function garmentNegativePrompt(garmentType: string | null): string {
  * Map our internal garmentType values to the exact text prompt that
  * grounded_sam (Grounding DINO under the hood) responds to best.
  */
-function garmentTypeToPrompt(garmentType: string | null): string {
+function garmentTypeToPrompt(garmentType: string | null, override?: string): string {
+  // Vocabulario dirigido por Vision. Gana sobre la tabla fija: la tabla solo
+  // sabe de tipos, Vision mira ESTA foto y nombra las partes reales.
+  if (override && override.trim()) return override.trim();
   switch (garmentType) {
     case 'bra':
       // Grounding DINO responds better to a richer vocabulary — catches
@@ -277,6 +283,12 @@ async function isolateGarment(
   imageUrl: string,
   garmentType: string | null,
   returnMaskOnly = false,
+  // Vocabulario dirigido por Claude Vision para ESTA foto. Sin esto la
+  // segmentacion usa la tabla fija por tipo, que no sabe distinguir el producto
+  // de la utileria del taller: con una pulsera apoyada en un cilindro blanco se
+  // queda con los dos.
+  subjectPrompt?: string,
+  propPrompt?: string,
 ): Promise<string> {
   // Load the image as a buffer so we can both ship it to the segmentation
   // model (needs an HTTP URL) and keep the pixel data locally for masking.
@@ -303,8 +315,8 @@ async function isolateGarment(
   const height = meta.height ?? 0;
   if (!width || !height) throw new Error('Could not read image dimensions');
 
-  const maskPrompt = garmentTypeToPrompt(garmentType);
-  const negPrompt = garmentNegativePrompt(garmentType);
+  const maskPrompt = garmentTypeToPrompt(garmentType, subjectPrompt);
+  const negPrompt = garmentNegativePrompt(garmentType, propPrompt);
   console.log(`[bg-remove:isolate] running grounded_sam prompt="${maskPrompt}" neg="${negPrompt}" size=${width}x${height}`);
 
   // Upload the prepared JPEG so Replicate can fetch it by URL
@@ -328,7 +340,7 @@ async function isolateGarment(
       {
         image: httpInput,
         mask_prompt: maskPrompt,
-        negative_mask_prompt: garmentNegativePrompt(garmentType),
+        negative_mask_prompt: negPrompt,
         adjustment_factor: 0,
       },
     );
@@ -586,7 +598,7 @@ async function isolateGarment(
 
 export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest) => {
   const body = await request.json();
-  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, options } = body as {
+  const { imageUrl, provider, removeSubject, garmentType, returnMaskOnly, garmentDescription, isolateMethod, subjectPrompt, propPrompt, options } = body as {
     imageUrl: string;
     provider: 'browser' | 'replicate' | 'withoutbg' | 'birefnet';
     removeSubject?: boolean;
@@ -601,6 +613,10 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // Método de recorte: 'grounded-sam' (recorte real fiel, DEFAULT) | 'ghost'
     // (SeedDream 3D regenera) | 'auto' (real → ghost → rembg).
     isolateMethod?: 'photoroom' | 'photoroom-sandbox' | 'grounded-sam' | 'ghost' | 'auto';
+    /** Palabras que nombran el producto (Vision). Sobrescriben la tabla por tipo. */
+    subjectPrompt?: string;
+    /** Palabras que nombran la utileria a restar (Vision). */
+    propPrompt?: string;
     options?: Record<string, unknown>;
   };
 
@@ -637,7 +653,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     // compuesta, no una máscara, así que no aplican. Si grounded_sam falla,
     // fallamos hacia arriba con error claro.
     if (returnMaskOnly) {
-      const maskUrl = await isolateGarment(imageUrl, garmentType ?? null, true);
+      const maskUrl = await isolateGarment(imageUrl, garmentType ?? null, true, subjectPrompt, propPrompt);
       await saveJob({
         operation: 'bg-remove',
         provider: 'grounded-sam-mask',
@@ -682,7 +698,7 @@ export const POST = withApiErrorHandler('bg-remove', async (request: NextRequest
     const tryGroundedSam = async (): Promise<boolean> => {
       for (let attempt = 1; attempt <= MAX_SAM_ATTEMPTS; attempt++) {
         try {
-          resultUrl = await isolateGarment(imageUrl, garmentType ?? null);
+          resultUrl = await isolateGarment(imageUrl, garmentType ?? null, false, subjectPrompt, propPrompt);
           usedProvider = 'grounded-sam-isolate';
           if (attempt > 1) console.log(`[bg-remove:removeSubject] grounded_sam OK en el intento ${attempt}`);
           return true;

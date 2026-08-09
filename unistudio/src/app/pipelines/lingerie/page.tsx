@@ -1520,7 +1520,12 @@ interface StepCardProps {
 // Su selector de pose tampoco hacia nada: la pose la fija el asset del avatar.
 // photoSide sale por el mismo motivo que photoBack: ahora usa el asset
 // "full_body_side" del avatar, asi que el proveedor y la pose son fijos.
-const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoDetail", "photoFullBody"];
+const MODEL_PHOTO_STEPS: StepId[] = ["tryon", "photoSide", "photoDetail", "photoFullBody"];
+
+// Pasos sin selector: parten del asset real del avatar (perfil / espalda) y le
+// deforman la prenda encima. No se elige proveedor porque no hay alternativa
+// que devuelva esa vista — pero la tarjeta igual dice cual corre y por que.
+const FIXED_PROVIDER_STEPS: StepId[] = ["photoBack"];
 
 function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onSkip, onRerun, autoMode, onStop, onSelectCandidate, onChangeProvider, onChangePose, onChangeAction, onChangeIsolateMethod }: StepCardProps) {
   const { t } = useI18n();
@@ -1751,6 +1756,28 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
           generación para recién poder elegir con qué proveedor generarla — justo
           al revés de lo útil. Pose y Acción siempre se pudieron elegir antes;
           Proveedor era la excepción. Ahora los tres se comportan igual. */}
+      {/* PASOS DE PROVEEDOR FIJO. La Lateral y la Espalda no llevan selector
+          porque solo hay un camino que produce esa vista: partir del asset real
+          del avatar (perfil / espalda) y deformarle la prenda encima. Pero
+          quitar el selector sin poner nada dejaba la tarjeta muda — no se sabia
+          que estaba corriendo. Se declara el proveedor y, sobre todo, POR QUE no
+          se elige. */}
+      {FIXED_PROVIDER_STEPS.includes(step.id) && (
+        <div className="px-5 py-3 border-t border-white/[0.04]">
+          <div className="flex items-start gap-2">
+            <span className="text-[12px] uppercase tracking-wider text-[var(--text-secondary)] shrink-0">
+              {lg.stepCard.providerLabel}
+            </span>
+            <span className="text-[13px] text-white">
+              {lg.stepCard.fixedProvider}
+              <span className="mt-0.5 block text-[12px] text-[var(--text-secondary)]">
+                {lg.stepCard.fixedProviderWhy}
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {MODEL_PHOTO_STEPS.includes(step.id) && onChangeProvider && (
         <div className="px-5 py-3 border-t border-white/[0.04]">
           <div className="flex items-center gap-2">
@@ -2898,9 +2925,48 @@ async function runStep(
           12000,
         );
       }
+      // AISLAR LA ESPALDA ANTES DE DEFORMARLA.
+      //
+      // Aca se le pasaba a Leffa la foto de espalda TAL CUAL la subio la usuaria
+      // — o sea, la foto de catalogo CON la modelo puesta. Leffa deforma pixeles:
+      // si recibe una persona, tiene que adivinar donde termina la prenda, se
+      // queda con la banda del centro y pierde los tirantes. Por eso el racerback
+      // desaparecia y el resultado salia como un bandeau con los hombros
+      // desnudos.
+      //
+      // Aislando primero, Leffa recibe SOLO la prenda sobre fondo limpio y puede
+      // mapear los tirantes. Si el aislado falla seguimos con la foto original:
+      // un resultado imperfecto es mejor que ninguno.
+      let backGarmentForLeffa = backGarmentUrl ?? garmentForTryon;
+      if (backGarmentUrl) {
+        try {
+          const isoRes = await fetch("/api/bg-remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: abortSignal,
+            body: JSON.stringify({
+              imageUrl: backGarmentUrl,
+              provider: "replicate",
+              removeSubject: true,
+              garmentType: garmentTypeForApi,
+              isolateMethod: "auto",
+              garmentDescription,
+            }),
+          });
+          const isoJson = await isoRes.json();
+          if (isoJson.success && isoJson.data?.url) {
+            backGarmentForLeffa = isoJson.data.url;
+            console.log("[lingerie] photoBack: espalda AISLADA antes del warp");
+          } else {
+            console.warn("[lingerie] photoBack: no se pudo aislar la espalda, uso la foto tal cual:", isoJson.error);
+          }
+        } catch (e) {
+          console.warn("[lingerie] photoBack: fallo el aislado de la espalda:", e instanceof Error ? e.message : e);
+        }
+      }
       const leffa = await tryOnLeffaAsync(
         newModelImage,
-        backGarmentUrl ?? garmentForTryon,
+        backGarmentForLeffa,
         category,
         abortSignal,
         true,
@@ -2980,19 +3046,86 @@ async function runStep(
     // esa foto como entrada y el giro deja de negociarse con un modelo
     // generativo. Deterministico: misma mujer que en los demas pasos, perfil
     // real, sin generar personas.
-    const sideGarment = backGarmentUrl ?? inputUrl;
-    const leffaSide = await tryOnLeffaAsync(
-      "", // la modelo la pone el servidor desde el avatar
-      sideGarment,
-      category,
-      abortSignal,
-      false, // backView
-      true,  // sideView
-    );
-    return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
+    // LA PRENDA DE REFERENCIA ES LA DEL FRENTE, NO LA DE ESPALDA.
+    // Primero se mandaba `backGarmentUrl ?? inputUrl` copiando lo que hace la
+    // Foto Espalda, pero ahi la espalda es correcta porque la vista PEDIDA es la
+    // espalda. En un perfil no: Leffa deforma los pixeles de la foto que recibe,
+    // y con la espalda como referencia devolvia un top negro liso — perdia el
+    // racerback, la malla y los ganchos, que estan en la cara frontal. El
+    // aislado del frente es la unica referencia que los contiene.
+    const sideGarment = inputUrl;
+
+    // EL DEFAULT ES EL AVATAR, PERO LA ELECCION ES DE LA USUARIA.
+    // Con "Automatico" corre el camino del avatar, que es el unico verificado
+    // que devuelve un perfil de verdad. Si elige otro proveedor a mano, se
+    // respeta: es su producto y puede querer comparar. Bloquear el selector era
+    // decidir por ella; lo correcto es que el default sea el bueno y que el
+    // resto este disponible con su advertencia.
+    if (!providerOverride || providerOverride === "auto") {
+      const leffaSide = await tryOnLeffaAsync(
+        "", // la modelo la pone el servidor desde el avatar
+        sideGarment,
+        category,
+        abortSignal,
+        false, // backView
+        true,  // sideView
+      );
+      return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
+    }
+
+    // Proveedor elegido a mano. Estos generan su propia modelo y, medido dos
+    // veces, devuelven una foto DE FRENTE aunque el prompt pida el giro — un
+    // try-on no rota a nadie. Se corre igual porque la usuaria lo pidio, con el
+    // prompt de perfil por si algun proveedor futuro si lo respeta.
+    if (providerNeedsModelImage(providerOverride) && !sharedModelUrl) {
+      throw new Error("Este proveedor viste TU modelo IA, así que necesita ese paso. Corré 'Crear Modelo IA', o dejá 'Automático' para usar el perfil real del avatar.");
+    }
+    const sideScene =
+      "TRUE SIDE PROFILE, 90 degrees. The model's body and face point to the side of the frame, NOT at the camera: " +
+      "only ONE eye, ONE ear, ONE shoulder and ONE arm are visible, and the bust is seen edge-on as an outline against " +
+      "the background. The visible arm is raised with the hand behind the head so the armpit, the side panel and the " +
+      "side band are exposed. Show how far the cup projects, the real band width and how the strap sits on the shoulder. " +
+      "Waist-up framing, clean seamless studio background. A front-facing photo is a FAILED result for this image.";
+    const res = await fetch("/api/tryon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        modelImage: sharedModelUrl,
+        garmentImage: sideGarment,
+        garmentBackUrl: providerOverride === "uwear" ? backGarmentUrl : undefined,
+        category,
+        garmentType: garmentTypeForApi,
+        provider: providerOverride,
+        forceProvider: true,
+        garmentDescription,
+        scenePrompt: sideScene,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Foto Lateral falló");
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
   }
 
   if (stepId === "photoDetail") {
+    // GENERAR EN DIAGONAL CON LAS DOS FOTOS, Y DESPUES ACERCAR.
+    //
+    // Dos intentos fallidos antes de este:
+    //   1. Pedirle a Uwear un "extreme close-up" por prompt -> devolvia un plano
+    //      medio, indistinguible del Paso 2. Se pagaba $0.20 por un duplicado.
+    //   2. Recortar la frontal ya aprobada -> el acercamiento era real, pero la
+    //      toma seguia siendo FRONTAL y usaba UNA sola foto. La usuaria pidio una
+    //      diagonal que use el frente Y la espalda, como las de Leonisa.
+    //
+    // Los dos fallaban por querer resolverlo con una sola herramienta. El detalle
+    // necesita las dos cosas y ninguna las hace sola:
+    //   - Uwear GENERA con frente + espalda + la ficha de Claude Vision, asi que
+    //     la diagonal muestra la construccion real (malla, ganchos, costuras).
+    //     Pero encuadra siempre en plano medio.
+    //   - macro-crop ACERCA de verdad sobre pixeles reales, pero no rota nada.
+    // Encadenados si sale: Uwear pone el angulo y la fidelidad, el recorte pone
+    // el acercamiento. Si el recorte falla se entrega igual la diagonal generada.
+
     if (!sharedModelUrl && providerNeedsModelImage(providerOverride)) {
       throw new Error("La Foto Detalle necesita la modelo IA con este proveedor. Corré 'Crear Modelo IA', o elegí Uwear (trae su propia modelo).");
     }
@@ -3036,6 +3169,31 @@ async function runStep(
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || "Foto Detalle falló");
+
+    // SEGUNDA MITAD: acercar de verdad. Uwear ya puso el angulo y la fidelidad
+    // (genero con frente + espalda + ficha), pero encuadra en plano medio. El
+    // recorte macro sobre ESE resultado es lo que lo convierte en un detalle:
+    // no reinterpreta nada, amplia los pixeles que Uwear acaba de producir.
+    try {
+      const cropRes = await fetch("/api/macro-crop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortSignal,
+        body: JSON.stringify({
+          imageUrl: json.data.url,
+          zoom: 2.4,
+          aspectRatio: "4:5",
+          outputSize: 1400,
+        }),
+      });
+      const cropJson = await cropRes.json();
+      if (cropJson.success && cropJson.data?.url) {
+        return { resultUrl: cropJson.data.url, cost: json.cost ?? 0.2, usedProvider: `${json.data.provider}+macro` };
+      }
+      console.warn("[lingerie] photoDetail: el acercamiento fallo, entrego la diagonal sin recortar:", cropJson.error);
+    } catch (e) {
+      console.warn("[lingerie] photoDetail: fallo el acercamiento:", e instanceof Error ? e.message : e);
+    }
     return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
   }
 
@@ -4375,6 +4533,19 @@ export default function LingeriePipelinePage() {
           // es lo que de verdad entro al paso.
           ...(stepDef.id === "tryon" && newSharedModel && result.usedProvider !== "uwear"
             ? { originalUrl: newSharedModel }
+            : {}),
+          // FOTO ESPALDA: el "antes" tiene que ser TU foto de espalda.
+          // La tarjeta mostraba el resultado del paso anterior (la modelo de
+          // frente), asi que parecia que el paso ignoraba la foto trasera —
+          // cuando en realidad es la que usa como referencia de prenda. Lo que
+          // se ve tiene que ser lo que de verdad entra al paso; si no, no hay
+          // forma de auditar si el broche y la banda salieron bien.
+          ...(stepDef.id === "photoBack"
+            ? (() => {
+                const b = findMatchingPhoto({ ...job, uploadedUrl, falUrl } as ImageJob, jobsSnapshot, ["espalda"]);
+                const u = b?.falUrl ?? b?.uploadedUrl;
+                return u ? { originalUrl: u } : {};
+              })()
             : {}),
         });
 

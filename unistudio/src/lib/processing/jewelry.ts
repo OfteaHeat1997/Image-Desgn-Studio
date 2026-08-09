@@ -374,7 +374,18 @@ export async function applyJewelry(
   // Kontext a veces "responde" con otro lado a lado: devolvía una foto partida
   // en dos paneles (plano general + close-up) en vez de una sola. Verificado con
   // el rosario el 2026-08-09. Sin esta frase el resultado no sirve para catálogo.
+  // UNA SOLA PIEZA. Verificado con el rosario (2026-08-09): Kontext le agrego a
+  // la modelo un SEGUNDO collar corto con medalla, ademas del rosario. Viola la
+  // regla 1 de la direccion visual de Unistyles ("no inventar piezas
+  // adicionales"): el cliente recibe una pieza, no dos.
+  const onlyThisPiece =
+    ' The person must wear EXACTLY ONE piece of jewelry: the one shown on the RIGHT side. ' +
+    'Do NOT add any additional necklace, chain, pendant, medal, choker or layered second piece. ' +
+    'If the person in the LEFT image is already wearing jewelry, remove it. ' +
+    'No layering, no stacking, no extra accessories of any kind.';
+
   const singleImage =
+    onlyThisPiece +
     ' Output ONE single photograph as the final image. Do NOT return a collage, a diptych, ' +
     'a split screen, a before/after comparison or two panels side by side. ' +
     'The two halves of the input are a REFERENCE for you, not a layout to reproduce.';
