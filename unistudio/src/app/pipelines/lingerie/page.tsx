@@ -139,7 +139,7 @@ async function urlToDataUrl(url: string): Promise<string> {
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoBack" | "photoDetail" | "photoFullBody" | "productVideo" | "modelVideo";
+type StepId = "isolate" | "model" | "tryon" | "texturePreserve" | "photoSide" | "photoBack" | "photoDetail" | "photoFullBody" | "productVideo" | "modelVideo";
 type StepStatus = "idle" | "pending" | "processing" | "done" | "error" | "skipped" | "accepted";
 type Phase = "setup" | "pipeline";
 
@@ -662,6 +662,13 @@ const STEP_DEFS: Omit<PipelineStep, "status" | "inputUrl" | "resultUrl" | "error
   { id: "model",           label: "Crear Modelo IA",         description: "Generar modelo con licencia libre (se reutiliza entre colores de la misma REF)", icon: User,      cost: "$0.055", enabled: true  },
   { id: "tryon",           label: "Foto Frontal (opcional)", description: "Vestir la modelo IA con TU prenda, vista frontal 3/4. Si falla, el pipeline sigue con el resto.", icon: Shirt,     cost: "$0.02",  enabled: true  },
   { id: "texturePreserve", label: "Restaurar Textura",       description: "Inpaint sobre la zona del bra para recuperar la textura real de la prenda (Kolors la deja satinada/plástica). EXPERIMENTAL — desactivado por default mientras lo estabilizamos.", icon: Sparkles,  cost: "$0.05",  enabled: false },
+  // FOTO LATERAL (perfil). La usuaria: "lateral no es lo mismo que de lado".
+  // El diagonal (Foto Detalle) acerca la camara para mostrar TEXTURA; la lateral
+  // se para a 90 grados y muestra el CONTORNO: cuanto proyecta la copa, el ancho
+  // real de la banda y como cae el tirante en el hombro. Son dos fotos distintas
+  // que responden preguntas distintas de compra. Va entre Frontal y Espalda, que
+  // es el orden en que un catalogo recorre la prenda.
+  { id: "photoSide",       label: "Foto Lateral (perfil)",   description: "Vista de perfil a 90°: muestra el contorno de la copa, el ancho de la banda y cómo cae el tirante. Responde '¿cómo se ve de lado?', que la frontal no puede contestar.", icon: User, cost: "$0.20", enabled: true },
   { id: "photoBack",       label: "Foto Espalda",            description: "Misma modelo de espaldas, mostrando el broche y la banda del bra (mismo seed, misma identidad)", icon: User,      cost: "$0.075", enabled: true  },
   // FOTO DE DETALLE (diagonal). Pedido de la usuaria: en Leonisa hay tomas
   // cercanas en diagonal donde se ve la TEXTURA de la tela — el brillo del saten,
@@ -770,6 +777,20 @@ const STEP_DOCS: Record<StepId, StepDoc> = {
       "Si el resultado no sirve, saltá este paso — el pipeline sigue con los otros.",
     ],
   },
+  photoSide: {
+    what: "Vista de perfil a 90 grados de la prenda puesta. Muestra el CONTORNO: cuanto proyecta la copa, el ancho real de la banda y como cae el tirante en el hombro. Es distinta de la Foto Detalle: esa acerca la camara para mostrar la textura, esta se aleja para mostrar la forma.",
+    provider: "El mismo del Paso 2 (Uwear por default), con la camara de perfil.",
+    duration: "30-60 s",
+    costDetail: "$0.20 con Uwear — mismo costo que un try-on normal.",
+    canFail: [
+      "Necesita el producto aislado del Paso 1. Sin el, se salta.",
+      "Con prendas muy planas el perfil aporta poco; en ese caso podes desactivar el paso.",
+    ],
+    tips: [
+      "Responde una pregunta de compra que la frontal no puede: como se ve de lado.",
+      "Util sobre todo en bras con copa estructurada o banda ancha.",
+    ],
+  },
   photoDetail: {
     what: "Toma cercana en diagonal (3/4) del producto puesto, pensada para que se vea la TEXTURA real: el brillo del saten, el tejido de la malla y las costuras. Es la foto que convence de la calidad — ni la frontal ni la de espalda la muestran, porque la frontal es plana y la de espalda esta lejos.",
     provider: "El mismo del Paso 2 (Uwear por default), con la camara en diagonal y encuadre cerrado.",
@@ -870,6 +891,7 @@ function humanizeStepError(stepId: StepId, rawError?: string): string {
     tryon: "No pudimos vestir la modelo con tu prenda. Reintentá — si sigue fallando podés saltar este paso y los videos se generan igual.",
     texturePreserve: "No pudimos restaurar la textura del bra. Si el resultado del try-on ya se ve bien, podés saltar este paso.",
     photoBack: "No pudimos generar la foto de espalda. El resto del pipeline sigue sin problema.",
+    photoSide: "No pudimos generar la foto lateral. El resto del pipeline sigue sin problema.",
     photoDetail: "No pudimos generar la foto de detalle. El resto del pipeline sigue sin problema.",
     photoFullBody: "No pudimos generar la foto de cuerpo completo. El resto del pipeline sigue sin problema.",
     productVideo: "No pudimos generar el video 360°. Reintentá.",
@@ -889,6 +911,7 @@ function estimateCost(steps: PipelineStep[], imageCount: number): number {
     tryon: 0.02,
     texturePreserve: 0.06,  // máscara (~$0.01) + flux-fill-pro inpaint ($0.05)
     photoBack: 0.075,    // model-create (0.055) + tryon (0.02) — nueva modelo con mismo seed + distinta pose
+    photoSide: 0.20,     // Uwear con camara de perfil — mismo costo que un try-on
     photoDetail: 0.20,   // Uwear con camara cercana en diagonal — mismo costo que un try-on
     photoFullBody: 0.05,    // outpaint flux-fill-pro sobre tryon — NO regenera modelo+tryon
     productVideo: 0.05,  // wan-2.2-fast — calidad standard, ok para producto sin humano
@@ -2786,6 +2809,41 @@ async function runStep(
   // proveedor del Paso 2 (Uwear por default) porque es el que recibe la ficha del
   // producto: sin esa descripcion, el brillo del saten y el tejido de la malla
   // salen genericos, que es justo lo que esta foto tiene que mostrar.
+  // FOTO LATERAL (perfil). Misma mecanica que la de Detalle, pero la camara se
+  // ALEJA y se para a 90 grados: aca interesa el CONTORNO (proyeccion de la copa,
+  // ancho de banda, caida del tirante), no la textura de cerca.
+  if (stepId === "photoSide") {
+    if (!sharedModelUrl) {
+      throw new Error("La Foto Lateral necesita la modelo IA. Corré antes el paso 'Crear Modelo IA'.");
+    }
+    const category =
+      productType === "panty" ? "bottoms"
+      : productType === "set" ? "one-pieces"
+      : "tops";
+    const sideScene =
+      "Strict side profile product shot: the model turned 90 degrees to the camera, full side view of the garment. " +
+      "Show the silhouette clearly — how far the cup projects, the real width of the band and how the strap sits on " +
+      "the shoulder. Waist-up framing, clean seamless studio background, even light with a soft rim on the contour.";
+    const res = await fetch("/api/tryon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,
+      body: JSON.stringify({
+        modelImage: sharedModelUrl,
+        garmentImage: inputUrl,
+        category,
+        garmentType: garmentTypeForApi,
+        provider: providerOverride && providerOverride !== "auto" ? providerOverride : "uwear",
+        forceProvider: true,
+        garmentDescription,
+        scenePrompt: sideScene,
+      }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "Foto Lateral falló");
+    return { resultUrl: json.data.url, cost: json.cost ?? 0.2, usedProvider: json.data.provider };
+  }
+
   if (stepId === "photoDetail") {
     if (!sharedModelUrl) {
       throw new Error("La Foto Detalle necesita la modelo IA. Corré antes el paso 'Crear Modelo IA'.");
@@ -3944,14 +4002,14 @@ export default function LingeriePipelinePage() {
           return false;
         }
         inputForStep = baseUrl;
-      } else if (stepDef.id === "photoDetail") {
+      } else if (stepDef.id === "photoSide" || stepDef.id === "photoDetail") {
         // Igual que el try-on: necesita el producto AISLADO, no la foto original
         // (que trae la modelo con copyright). Sin aislado, se salta con aviso.
         const base = stepResults.isolate;
         if (!base) {
           updateStep(jobId, stepDef.id, {
             status: "skipped",
-            error: "La Foto Detalle necesita la prenda aislada. Corré el Paso 1 primero.",
+            error: "Esta foto necesita la prenda aislada. Corré el Paso 1 primero.",
           });
           return false;
         }
