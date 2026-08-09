@@ -2689,7 +2689,14 @@ async function runStep(
         // así que le damos la FOTO REAL del producto (falUrl) en vez del aislado — que
         // para prendas difíciles se regenera y sale falso. Otros proveedores
         // (SeedDream/Kolors/IDM) sí necesitan el garment aislado limpio.
-        garmentImage: providerOverride === "uwear" ? (falUrl ?? inputUrl) : inputUrl,
+        // SIEMPRE el producto AISLADO, tambien para Uwear. Antes a Uwear se le
+        // mandaba falUrl —la foto ORIGINAL, con la modelo de Leonisa puesta—
+        // asumiendo que Uwear extraia la prenda por su cuenta. NO lo hace:
+        // registra la foto tal cual como "prenda", con persona incluida, y
+        // devuelve a esa misma persona. La usuaria lo detecto: el resultado era
+        // literalmente su foto de catalogo original, que ademas es material con
+        // copyright que no puede publicar.
+        garmentImage: inputUrl,
         // Foto real de espalda del MISMO REF → Uwear genera desde frente+espalda.
         garmentBackUrl: providerOverride === "uwear" ? backGarmentUrl : undefined,
         category,
