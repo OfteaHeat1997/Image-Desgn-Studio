@@ -2668,6 +2668,20 @@ async function runStep(
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
   // Brief creativo elegido. Fallback al primer preset si el id no matchea.
   const artDir = ART_DIRECTIONS.find((a) => a.id === artDirectionId) ?? ART_DIRECTIONS[0];
+
+  // ART DIRECTION DE UWEAR: FIJARLA EN LA LIMPIA.
+  //
+  // La ruta acepta artDirectionId (el preset propio de Uwear) pero la pagina
+  // nunca lo mandaba, asi que Uwear elegia el suyo por default. De sus 5 presets
+  // dos son de streetwear —"High-Street Color Cast Studio" y "Low-Angle Concrete
+  // Flash Studio"— y esos no solo cambian la luz: ESTILIZAN a la modelo. De ahi
+  // que apareciera con una gorra blanca en una foto de catalogo de lenceria.
+  //
+  // Para ecommerce siempre queremos el preset 1, "Basic white photoshoot": fondo
+  // limpio y sin accesorios inventados. Nuestras ART_DIRECTIONS locales siguen
+  // controlando la luz via scenePrompt; esto solo evita que Uwear vista a la
+  // modelo por su cuenta.
+  const UWEAR_CLEAN_ART_DIRECTION = 1;
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
@@ -3003,6 +3017,7 @@ async function runStep(
         garmentDescription,
         // Art Direction: brief del look inyectado al prompt del try-on (seedream/uwear).
         scenePrompt: artDir.scenePrompt,
+        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const tryonJson = await tryonRes.json();
@@ -3108,6 +3123,7 @@ async function runStep(
         forceProvider: true,
         garmentDescription,
         scenePrompt: sideScene,
+        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const json = await res.json();
@@ -3173,6 +3189,7 @@ async function runStep(
         forceProvider: true,
         garmentDescription,
         scenePrompt: detailScene,
+        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const json = await res.json();
@@ -3298,6 +3315,7 @@ async function runStep(
         garmentDescription,
         // Art Direction: brief del look inyectado al prompt del try-on (seedream/uwear).
         scenePrompt: artDir.scenePrompt,
+        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const json = await res.json();
