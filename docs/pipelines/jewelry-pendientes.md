@@ -8,7 +8,7 @@
 > **Regla:** antes de tocar código de joyería, leer esto y trabajar de arriba
 > hacia abajo. Al terminar algo, tacharlo acá en el MISMO commit.
 
-Última actualización: 2026-08-09 · commit `0312eea`
+Última actualización: 2026-08-10 · commit `09f4f6e`
 
 ---
 
@@ -76,12 +76,6 @@ de prompt son **no deterministas**: al tapar uno se abre otro.
 **Arreglo real:** detección mecánica — comparar las dos mitades y recortar una si
 son casi idénticas.
 
-### 8. Recuadro gris en la escena
-
-El recorte llega sin canal alfa (el proxy lo reencodea) y se pega el rectángulo.
-Hay una reconstrucción de alfa por color de esquina con tolerancia 26, pero **no
-alcanzó** en la pulsera. Subir tolerancia y muestrear las cuatro esquinas.
-
 ### 9. Sets y combinaciones — punto 6 de la doctrina
 
 Sin implementar.
@@ -90,11 +84,13 @@ Sin implementar.
 
 Sin implementar. **El logo de Unistyles no se toca jamás.**
 
-### 11. Verificar el reel
+### 8. Paso 3 (packshot): sigue generándose con IA
 
-Nunca se corrió. El `ffmpeg-static` de `node_modules` es binario **Linux**: anda en
-Vercel, no en el Windows de desarrollo. Para probarlo en local hace falta
-`npm rebuild ffmpeg-static` (~80 MB).
+`composeJewelryScene` ya acepta `solidBackground` — pinta un lienzo marfil y
+compone encima los píxeles reales, sin IA, en $0. **Falta cablear el paso
+`packshot` de la página para que lo use** en vez de `/api/bg-generate`. Mientras
+tanto Kontext redibuja la pieza: con un dije chico y lejano "mejora" la foto
+engrosando la cadena y agrandando el colgante.
 
 ---
 
@@ -109,6 +105,15 @@ Vercel, no en el Windows de desarrollo. Para probarlo en local hace falta
 - **Ficha de Vision editable + volver a analizar**
 - Botón "Generar este paso", barra de pasos, tarjetas plegables, dos paneles
 - Timeouts de Vercel para los 4 módulos nuevos
+- **Detalle macro (paso 5) y en modelo (paso 6)** — verificados con el collar del
+  dije: el macro encuadra el colgante y el on-model conserva la pieza real
+- **Recuadro gris de la escena de lujo** — era la sombra de contacto. Se
+  comprobaba si el canal alfa EXISTE, pero el proxy devuelve un alfa presente y
+  totalmente opaco; con esa máscara la sombra salía rectangular. Ahora se mide si
+  el alfa se USA (mínimo del canal < 250) y si no, se reconstruye
+- **Reel de Instagram** — el binario de ffmpeg no llegaba al deploy: el
+  file-tracing de Next no lo veía porque la ruta se resuelve en runtime. Va
+  declarado en `outputFileTracingIncludes`
 
 ## Reglas aprendidas a los golpes
 
