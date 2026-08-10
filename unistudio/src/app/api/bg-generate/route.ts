@@ -17,6 +17,17 @@ import { saveJob } from '@/lib/db/persist';
 import { proxyReplicateUrl, bufferToDataUrl } from '@/lib/utils/image';
 import { editStaticProductPhotoroom, type PhotoroomStaticShadow } from '@/lib/api/photoroom';
 
+/**
+ * Limite de la funcion, declarado ACA y no solo en vercel.json.
+ *
+ * En vercel.json la primera entrada del bloque `functions` es el comodin
+ * `src/app/api/**\/*.ts` con maxDuration 60, y ese patron tambien matchea esta
+ * ruta. La entrada especifica que le da 300 esta mas abajo. El export a nivel de
+ * ruta es la forma no ambigua de fijarlo en App Router y no depende del orden
+ * del JSON.
+ */
+export const maxDuration = 300;
+
 // Cost estimates in dollars per generation
 const MODE_COSTS: Record<string, number> = {
   precise: 0.05, // Kontext Pro

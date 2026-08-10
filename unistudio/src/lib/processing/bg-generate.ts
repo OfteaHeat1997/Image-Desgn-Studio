@@ -23,6 +23,65 @@ function makeCacheKey(prompt: string, aspectRatio: string, seed?: number): BgCac
   return `${normPrompt}|${aspectRatio}|${seed ?? 'no-seed'}`;
 }
 
+// ---------------------------------------------------------------------------
+// Descarga del producto, SIN volver a quitarle el fondo si ya no lo tiene
+// ---------------------------------------------------------------------------
+
+/**
+ * Devuelve el producto como buffer con fondo transparente.
+ *
+ * POR QUE EXISTE: el pipeline de estaticos ya corre `/api/bg-remove` (paso 2) y
+ * `/api/enhance` (paso 3, normalizar a 2000x2000) ANTES de pedir los outputs.
+ * O sea, la imagen que llega aca YA viene recortada sobre transparente. Aun asi,
+ * cada uno de los 4 outputs (blanco, adaptativo, hero, vertical) volvia a llamar
+ * a `removeBgReplicate` sobre esa misma imagen: 4 llamadas de red extra a
+ * Replicate por producto, cada una con su cola y su arranque en frio.
+ *
+ * Ese era el FUNCTION_INVOCATION_TIMEOUT del output vertical: no fallaba el
+ * fondo, fallaba el recorte redundante que corre ANTES del fondo. El arreglo
+ * anterior (correr los 4 outputs en secuencia en vez de en paralelo) evito el
+ * 429 de Replicate pero dejo intactas las 4 llamadas; por eso volvia a aparecer
+ * cuando Replicate estaba lento.
+ *
+ * COMO SE DETECTA: no alcanza con preguntar si el canal alfa EXISTE. Un PNG
+ * puede traer alfa presente y completamente opaco (es lo que devuelve el proxy
+ * de imagenes), y con esa mascara "todo opaco" el recorte no sirve de nada. Se
+ * mide si el alfa se USA — igual que en el arreglo del recuadro gris de joyeria.
+ */
+async function loadTransparentProduct(imageUrl: string): Promise<Buffer> {
+  const { replicateHeaders } = await import('@/lib/utils/image');
+
+  const download = async (url: string): Promise<Buffer> => {
+    if (url.startsWith('data:')) {
+      return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+    }
+    const res = await fetch(url, { headers: replicateHeaders(url) });
+    if (!res.ok) throw new Error(`Failed to download product image: ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  };
+
+  const original = await download(imageUrl);
+
+  try {
+    const meta = await sharp(original).metadata();
+    if (meta.hasAlpha) {
+      const stats = await sharp(original).stats();
+      const alpha = stats.channels[stats.channels.length - 1];
+      // min < 250 => hay pixeles realmente transparentes, no un alfa opaco de adorno.
+      if (alpha && alpha.min < 250) {
+        console.log('[bg-generate] Producto YA viene recortado — me salto el bg-remove redundante');
+        return original;
+      }
+    }
+  } catch (err) {
+    // Si sharp no puede leer la imagen, seguimos por el camino seguro (recortar).
+    console.warn('[bg-generate] No pude inspeccionar el alfa, recorto igual:', err);
+  }
+
+  const transparentUrl = await removeBgReplicate(imageUrl);
+  return download(transparentUrl);
+}
+
 export function getBgCacheStats() {
   return {
     entries: bgCache.size,
@@ -602,19 +661,17 @@ export async function generateBgFast(
   // Composite approach: remove bg from product, then composite onto new background
   // This guarantees the product is NEVER altered — we use the original product pixels
   try {
-    const transparentUrl = await removeBgReplicate(imageUrl);
     const { replicateHeaders } = await import('@/lib/utils/image');
 
-    const [transparentRes, bgRes] = await Promise.all([
-      fetch(transparentUrl, { headers: replicateHeaders(transparentUrl) }),
-      fetch(bgUrl, { headers: replicateHeaders(bgUrl) }),
-    ]);
-    if (!transparentRes.ok) throw new Error(`Failed to download transparent product: ${transparentRes.status}`);
-    if (!bgRes.ok) throw new Error(`Failed to download generated background: ${bgRes.status}`);
-
+    // El recorte y la descarga del fondo van EN PARALELO: son independientes, y
+    // en serie sumaban su latencia dentro del mismo limite de la funcion.
     const [transparentBuffer, bgBuffer] = await Promise.all([
-      transparentRes.arrayBuffer().then(Buffer.from),
-      bgRes.arrayBuffer().then(Buffer.from),
+      loadTransparentProduct(imageUrl),
+      (async () => {
+        const bgRes = await fetch(bgUrl, { headers: replicateHeaders(bgUrl) });
+        if (!bgRes.ok) throw new Error(`Failed to download generated background: ${bgRes.status}`);
+        return Buffer.from(await bgRes.arrayBuffer());
+      })(),
     ]);
 
     // Lienzo a 2000px (antes 1024) para que el PRODUCTO salga en HD en el output
@@ -688,12 +745,10 @@ export async function compositeOnSolidColor(
   aspectRatio: string = '1:1',
   baseSize: number = 2000,
 ): Promise<string> {
-  // Step 1: bg-remove the product (Replicate rembg, no content filter).
-  const transparentUrl = await removeBgReplicate(imageUrl);
-  const { replicateHeaders } = await import('@/lib/utils/image');
-  const transparentRes = await fetch(transparentUrl, { headers: replicateHeaders(transparentUrl) });
-  if (!transparentRes.ok) throw new Error(`Failed to download transparent image: ${transparentRes.status}`);
-  const transparentBuffer = Buffer.from(await transparentRes.arrayBuffer());
+  // Step 1: conseguir el producto sobre transparente. Si la imagen que llega YA
+  // viene recortada (es el caso del pipeline de estaticos, que corre bg-remove
+  // en el paso 2), no se vuelve a llamar a Replicate. Ver loadTransparentProduct.
+  const transparentBuffer = await loadTransparentProduct(imageUrl);
 
   // Step 2: canvas + product sizing (80% width, 85% height — same ratios as
   // existing fallback so all 3 outputs of the static-product pipeline keep the

@@ -922,10 +922,12 @@ export default function StaticProductPipelinePage() {
     overridePrompt?: string,
     usePhotoroom?: boolean,
   ): Promise<{ url: string; cost: number }> => {
-    // 90s timeout client-side — Vercel route caps at 60s, but giving us 30s
-    // grace prevents the "infinite spinner" bug when a request hangs (e.g.
-    // Replicate throttling on low budget) instead of returning a clean error.
-    const timeoutSignal = AbortSignal.timeout(90_000);
+    // Timeout del lado del cliente, para no dejar un spinner infinito si la
+    // request se cuelga. Va POR ENCIMA del limite de la funcion (300s, declarado
+    // en bg-generate/route.ts) mas un margen: si el cliente corta primero, se
+    // pierde un resultado que el servidor si iba a devolver. Antes estaba en 90s
+    // con el comentario "la ruta corta a los 60s", que ya no es cierto.
+    const timeoutSignal = AbortSignal.timeout(310_000);
 
     if (key === "white") {
       // Blanco e-commerce SIEMPRE con Sharp puro (#FFFFFF exacto, gratis, sin
