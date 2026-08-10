@@ -20,6 +20,7 @@
  * ========================================================================== */
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   Check,
@@ -444,7 +445,17 @@ export function ImageLightbox({
     };
   }, [url]);
 
-  if (!url) return null;
+  // PORTAL A document.body.
+  // Un `position: fixed` NO se posiciona contra el viewport si algun ancestro
+  // tiene transform, filter, backdrop-filter o will-change: ese ancestro pasa a
+  // ser el bloque contenedor. Las tarjetas de paso tienen `lz-glow` (transform)
+  // y el encabezado `backdrop-blur`, asi que el visor se abria DENTRO de la
+  // tarjeta: aplastado, pegado y encima del paso siguiente, en vez de a pantalla
+  // completa. Lenceria ya lo resuelve asi.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!url || !mounted) return null;
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
@@ -452,10 +463,10 @@ export function ImageLightbox({
 
   const filename = `${filenamePrefix ?? "unistudio"}-${idx + 1}.${isVideo ? "mp4" : "jpg"}`;
 
-  return (
+  return createPortal(
     <div
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
     >
       <div className="absolute left-0 right-0 top-0 flex items-center justify-between gap-2 p-3 sm:p-4">
         <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
@@ -579,7 +590,8 @@ export function ImageLightbox({
           </button>
         </>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -606,12 +606,12 @@ function StepRail({
 
   return (
     <div className="sticky top-[57px] z-20 -mx-4 mb-5 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.92)] px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap items-center gap-1.5">
         {STAGES.map((stage) => {
           const visible = stage.steps.filter((k) => steps[k].enabled);
           if (visible.length === 0) return null;
           return (
-            <div key={stage.key} className="flex shrink-0 items-center gap-1.5">
+            <div key={stage.key} className="flex flex-wrap items-center gap-1.5">
               <span className="px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                 {jt.stages[stage.key].label}
               </span>
