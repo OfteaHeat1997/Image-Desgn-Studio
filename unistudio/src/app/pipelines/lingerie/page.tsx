@@ -2982,10 +2982,21 @@ async function runStep(
             backGarmentForLeffa = isoJson.data.url;
             console.log("[lingerie] photoBack: espalda AISLADA antes del warp");
           } else {
-            console.warn("[lingerie] photoBack: no se pudo aislar la espalda, uso la foto tal cual:", isoJson.error);
+            // NUNCA SEGUIR CON LA FOTO SIN AISLAR.
+            // Antes, si el aislado fallaba, se le pasaba al warp la foto de
+            // catalogo COMPLETA — con la modelo adentro. El warp entonces
+            // deformaba una PERSONA sobre la espalda del avatar y devolvia una
+            // cara pegada en la espalda. Ademas es material con copyright.
+            // Fallar con un mensaje claro es infinitamente mejor.
+            throw new Error(
+              `No se pudo aislar tu foto de espalda, y sin aislarla el resultado sale deformado (la modelo de la foto se pega sobre la espalda). Detalle: ${isoJson.error ?? "el recorte no devolvio imagen"}`,
+            );
           }
         } catch (e) {
-          console.warn("[lingerie] photoBack: fallo el aislado de la espalda:", e instanceof Error ? e.message : e);
+          if (e instanceof Error && e.message.startsWith("No se pudo aislar")) throw e;
+          throw new Error(
+            `Fallo el aislado de la foto de espalda: ${e instanceof Error ? e.message : String(e)}. Sin aislar no se puede continuar — el warp deformaria a la modelo de tu foto.`,
+          );
         }
       }
       const leffa = await tryOnLeffaAsync(
