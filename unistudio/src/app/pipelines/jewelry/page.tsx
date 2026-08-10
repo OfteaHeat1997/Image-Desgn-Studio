@@ -109,10 +109,19 @@ const STEP_ICONS: Record<StepKey, React.ElementType> = {
 };
 
 /** Costo estimado por paso, en dólares. */
+/**
+ * Fondo del packshot: marfil, NO blanco puro.
+ *
+ * Lo fija la doctrina de marca de Unistyles. El blanco puro apaga el dorado del
+ * PVD 18K y ademas delata el recorte, porque el borde del producto queda contra
+ * un fondo sin ninguna temperatura.
+ */
+const PACKSHOT_BG = "#F6F4F0";
+
 const STEP_COST: Record<StepKey, number> = {
   clean: 0.04,
   isolate: 0.01,
-  packshot: 0.05,
+  packshot: 0,
   luxury: 0.05,
   macro: 0,
   model: 0.1,
@@ -128,7 +137,7 @@ const STEP_COST: Record<StepKey, number> = {
 const STEP_ENGINE: Record<StepKey, string> = {
   clean: "Kontext Pro",
   isolate: "BiRefNet",
-  packshot: "Kontext Pro",
+  packshot: "sharp · sin IA",
   luxury: "Flux Schnell + sharp",
   macro: "sharp · sin IA",
   model: "SeedDream + Kontext",
@@ -1502,35 +1511,37 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
-            // El prompt de Vision gana sobre la plantilla: nombra la cadena, el
-            // tamaño de las cuentas y el colgante reales de ESTA pieza.
-            const directed = job.prompts?.packshot;
-            const base = directed ?? config.packshotPrompt;
-            // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
-            // plantilla genérica del sub-tipo.
-            const suffix = descriptor ? `. Featuring this exact piece: ${descriptor}.` : "";
-            const res = await fetch("/api/bg-generate", {
+            // PACKSHOT POR COMPOSICION, NO POR GENERACION.
+            //
+            // Antes esto pasaba por Kontext con un prompt de "fondo limpio". El
+            // problema no era el prompt: es que un generador REDIBUJA. Con un
+            // collar de dije chico y lejano, el modelo "mejora" la foto —
+            // engrosa la cadena, satura el oro y llega a inventarle una piedra
+            // roja al colgante. El resultado ya no es el producto que la clienta
+            // vende, y para un packshot de catalogo eso lo invalida entero.
+            //
+            // Un packshot no necesita IA: es la pieza recortada sobre un fondo
+            // limpio con su sombra. Componiendo pixeles reales la joya es
+            // IMPOSIBLE de alterar, sale en menos de un segundo y cuesta $0.
+            //
+            // Marfil, no blanco puro: lo pide la doctrina de marca (el blanco
+            // puro apaga el dorado del PVD y delata el fondo recortado).
+            const res = await fetch("/api/jewelry-scene", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                imageUrl: input,
-                mode: "precise",
-                style: "custom",
-                customPrompt:
-                  withJewelryPreserve(directed ? base : base + suffix) +
-                  " Do NOT include any text, price tag, label or watermark in the output." +
-                  (job.prompts?.negative ? ` Do NOT include: ${job.prompts.negative}.` : ""),
-                // 4:5 en vez de 1:1 — es el formato de Instagram y deja más
-                // espacio negativo vertical, que es lo que hace editorial la toma.
+                productUrl: input,
+                solidBackground: PACKSHOT_BG,
                 aspectRatio: "1:1",
+                productScale: 0.78,
+                shadow: true,
               }),
               signal,
             });
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            done(url, data.cost ?? STEP_COST[key]);
-            runIdentityCheck(jobId, key, input, url, false);
+            done(url, data.cost ?? 0);
             return true;
           }
 
