@@ -178,13 +178,18 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
         // "copa blanca" con borde de encaje sobre el omoplato — el borde del top
         // del avatar, no una alucinacion.
         //
-        // En false, FASHN segmenta y QUITA la prenda del avatar antes de vestirla.
-        // Se habia puesto en true por el problema del tirante bajo el pelo, pero
-        // ese problema era de la mascara de Leffa (AutoMasker de CatVTON), y Leffa
-        // ya no corre en este paso. El segmentador propio de FASHN es otro modelo.
-        // Si el tirante volviera a perderse bajo el pelo, revertir a true y atacar
-        // por el otro lado (recortar el cutout al bounding box de la prenda).
-        segmentation_free: false,
+        // SE PROBO false Y EL PASO DEJO DE DAR RESULTADO — REVERTIDO.
+        // En false FASHN segmenta y QUITA la prenda del avatar antes de vestirla,
+        // que en teoria es lo correcto. En la practica el paso dejo de devolver
+        // imagen (2026-08-10, reportado por la usuaria minutos despues del deploy),
+        // asi que volvemos a true: la mancha blanca es un defecto visible, pero un
+        // paso que no entrega nada es peor.
+        //
+        // Queda escrito el hallazgo para no volver a diagnosticarlo de cero: la
+        // mancha NO es una alucinacion, es el top del avatar. El arreglo correcto
+        // NO pasa por esta bandera, sino por que la silueta de entrada calce:
+        // recortar el cutout al bounding box de la prenda antes del warp.
+        segmentation_free: true,
         moderation_level: 'permissive',
         garment_photo_type: 'flat-lay',
       })
