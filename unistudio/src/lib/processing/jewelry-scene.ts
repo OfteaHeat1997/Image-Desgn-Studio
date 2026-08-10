@@ -124,6 +124,57 @@ export async function composeJewelryScene(
  * charco de luz y una vineta. Eso se dibuja. Sale igual siempre, en
  * milisegundos y sin costo, y no puede aparecer nada que no hayamos puesto.
  */
+/**
+ * ¿El decorado trae una cartulina?
+ *
+ * El mismo detector con el que se probo el modulo: recorre columnas y cuenta que
+ * fraccion de la columna cambia de golpe. Un degradado, un marmol o un
+ * terciopelo nunca producen un borde recto que cruce casi toda la altura; una
+ * tarjeta o un pedestal rectangular si.
+ *
+ * Sirve para lo que un prompt no puede garantizar. Se le puede PEDIR a Flux que
+ * no dibuje cartulinas, y se le pide, pero un prompt es una sugerencia. Esto es
+ * una comprobacion: el decorado bonito se usa solo si pasa, y si no, se cae a la
+ * superficie construida. Asi la escena es interesante cuando se puede y correcta
+ * siempre.
+ */
+/**
+ * Decorado por defecto cuando Vision no dicto uno.
+ *
+ * Superficie continua a proposito, y los props lejos del centro: es donde se
+ * compone la pieza.
+ */
+const DEFAULT_LUXURY_BACKDROP =
+  'Luxury jewelry photography backdrop: one continuous surface of warm cream ' +
+  'marble with soft golden side light and a gentle shadow gradient, seamless, ' +
+  'edge to edge, elegant and minimal, shot from directly above';
+
+/** Pide el decorado a Flux Schnell. Barato y rapido: no preserva nada, solo pinta luz. */
+async function generateBackdrop(prompt: string, W: number, H: number): Promise<Buffer> {
+  const out = await runModel('black-forest-labs/flux-schnell', {
+    prompt,
+    aspect_ratio: H > W ? '4:5' : '1:1',
+    num_outputs: 1,
+  });
+  return urlToBuffer(await extractOutputUrl(out));
+}
+
+async function hasHardRectangle(buf: Buffer): Promise<boolean> {
+  const { data, info } = await sharp(buf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const y0 = Math.floor(h * 0.08);
+  const y1 = Math.floor(h * 0.92);
+  const span = Math.max(1, y1 - y0);
+  for (let x = 4; x < w - 4; x++) {
+    let jumps = 0;
+    for (let y = y0; y < y1; y++) {
+      if (Math.abs(data[y * w + x + 3] - data[y * w + x - 3]) > 16) jumps++;
+    }
+    if (jumps / span > 0.45) return true;
+  }
+  return false;
+}
+
 async function buildLuxurySurface(W: number, H: number): Promise<Buffer> {
   // Marfil hacia champagne: la paleta de la marca. Nunca blanco puro, que apaga
   // el dorado del PVD.
@@ -155,8 +206,30 @@ async function buildLuxurySurface(W: number, H: number): Promise<Buffer> {
 
   // Fondo plano: sin IA, sin costo, 100% determinista. Es lo que usa el packshot.
   let bgBuf: Buffer;
+  let generatedBackdrop = false;
   if (options.surface === 'luxury') {
-    bgBuf = await buildLuxurySurface(W, H);
+    // Primero se intenta el decorado bonito. Un marmol o un terciopelo con luz
+    // rasante venden mucho mas que un degradado, y para redes eso es el punto.
+    // Pero se ACEPTA solo si pasa el detector de cartulinas.
+    try {
+      const generated = await generateBackdrop(
+        options.backdropPrompt || DEFAULT_LUXURY_BACKDROP,
+        W,
+        H,
+      );
+      if (await hasHardRectangle(generated)) {
+        console.warn('[jewelry-scene] decorado descartado: trae un borde rectangular');
+        bgBuf = await buildLuxurySurface(W, H);
+      } else {
+        bgBuf = generated;
+        generatedBackdrop = true;
+      }
+    } catch (e) {
+      // Si el proveedor falla o tarda, la escena sale igual. Este paso no puede
+      // quedar en rojo por un decorado.
+      console.warn('[jewelry-scene] decorado no disponible, se construye:', e);
+      bgBuf = await buildLuxurySurface(W, H);
+    }
   } else if (options.solidBackground) {
     const hex = options.solidBackground.replace('#', '');
     bgBuf = await sharp({
@@ -345,6 +418,6 @@ async function buildLuxurySurface(W: number, H: number): Promise<Buffer> {
 
   return {
     dataUrl: `data:image/jpeg;base64,${composed.toString('base64')}`,
-    cost: options.solidBackground || options.surface === 'luxury' ? 0 : JEWELRY_SCENE_COST,
+    cost: options.solidBackground ? 0 : generatedBackdrop ? JEWELRY_SCENE_COST : 0,
   };
 }

@@ -1705,42 +1705,63 @@ export default function JewelryPipelinePage() {
 
             patchStep(jobId, key, { status: "processing", inputUrl: urls[0], error: undefined });
             focusCard();
+            // EL REEL VA APARTE, EN SEGUNDA LLAMADA.
+            //
+            // Pedirlo junto al carrusel hacia fallar el paso ENTERO por timeout:
+            // el encodeo de 1080x1920 con ffmpeg se come el tiempo de la
+            // peticion y se lleva puesto el carrusel, que se arma en dos
+            // segundos con sharp y ya estaba listo en memoria. El paso quedaba
+            // en rojo sin entregar nada.
+            //
+            // Primero sale el carrusel y el paso queda LISTO. Despues se pide el
+            // reel por separado y, si llega, se agrega a la tarjeta. Si no
+            // llega, el paso sigue en verde con el carrusel — que es el
+            // entregable principal. Un extra no puede tumbar lo que ya
+            // funciona.
             const res = await fetch("/api/social-kit", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              // EL REEL NO BLOQUEA EL CARRUSEL. Renderizar 1080x1920 con ffmpeg
-              // (zoompan + xfade, libx264) en una funcion serverless se pasa de
-              // cualquier limite razonable: el paso moria por timeout y no
-              // entregaba NADA, ni siquiera el carrusel, que se arma en 2s.
-              // Ahora el paso devuelve el carrusel siempre; el reel queda para
-              // pedirlo aparte cuando haga falta.
-              // El reel VA. Estuvo en `false` un tiempo para cortar un timeout y
-              // quedo asi, con lo cual el paso 8 entregaba solo el carrusel y
-              // avisaba "no se pudo generar en este entorno" — un mensaje que ni
-              // siquiera correspondia, porque el reel no se intentaba.
-              //
-              // Se limita a 4 slides: el reel es un loop de vitrina, no el
-              // catalogo entero, y cada slide suma tiempo de encodeo contra el
-              // maxDuration de la ruta (que fue el timeout original).
-              body: JSON.stringify({
-                imageUrls: urls.slice(0, 10),
-                includeReel: true,
-                reelImageUrls: urls.slice(0, 3),
-              }),
+              body: JSON.stringify({ imageUrls: urls.slice(0, 10), includeReel: false }),
               signal,
             });
             const data = await safeJson(res);
             if (!data.success) return fail(data.error);
             const carousel = (data.data?.carousel as string[]) ?? [];
-            const reel = data.data?.reel as string | null;
             patchStep(jobId, key, {
               status: "done",
               carousel,
               resultUrl: carousel[0],
-              reelUrl: reel ?? undefined,
-              reelError: (data.data?.reelError as string) ?? undefined,
               cost: 0,
+              reelError: jt.social.reelBuilding,
             });
+
+            // Segunda llamada, ya con el paso en verde. Deliberadamente SIN
+            // `await`: el reel puede tardar y no debe demorar el resto del
+            // recorrido. Cuando llega, se agrega a la tarjeta; si falla, queda
+            // el motivo escrito y el carrusel intacto.
+            void (async () => {
+              try {
+                const rr = await fetch("/api/social-kit", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  // Tres slides: el reel es un loop de vitrina, no el catalogo
+                  // entero, y cada slide suma tiempo de encodeo.
+                  body: JSON.stringify({
+                    imageUrls: urls.slice(0, 3),
+                    includeReel: true,
+                  }),
+                });
+                const rd = await safeJson(rr);
+                patchStep(jobId, key, {
+                  reelUrl: (rd.data?.reel as string) ?? undefined,
+                  reelError: (rd.data?.reelError as string) ?? (rd.success ? undefined : rd.error),
+                });
+              } catch (e) {
+                patchStep(jobId, key, {
+                  reelError: e instanceof Error ? e.message : String(e),
+                });
+              }
+            })();
             return true;
           }
         }

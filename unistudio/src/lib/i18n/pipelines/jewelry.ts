@@ -164,6 +164,7 @@ export interface JewelryPipelineCopy {
     carouselHint: string;
     reel: string;
     reelHint: string;
+    reelBuilding: string;
     reelUnavailable: string;
     slide: (n: number) => string;
     downloadKit: string;
@@ -485,6 +486,7 @@ export const JEWELRY_PIPELINE_ES: JewelryPipelineCopy = {
     carouselHint: '1080x1350 (4:5). Todas las slides con la misma proporcion, margen seguro de 50 px.',
     reel: 'Reel',
     reelHint: '1080x1920 (9:16), en loop.',
+    reelBuilding: 'Armando el reel… el carrusel ya está listo.',
     reelUnavailable: 'El reel no se pudo generar en este entorno. El carrusel esta listo.',
     slide: (n) => `Slide ${n}`,
     downloadKit: 'Descargar todo',
@@ -805,6 +807,7 @@ export const JEWELRY_PIPELINE_EN: JewelryPipelineCopy = {
     carouselHint: '1080x1350 (4:5). Every slide shares the ratio, 50 px safe margin.',
     reel: 'Reel',
     reelHint: '1080x1920 (9:16), looping.',
+    reelBuilding: 'Building the reel… the carousel is already done.',
     reelUnavailable: 'The carousel is ready. The reel runs separately: rendering vertical video takes too long to fit inside this step.',
     slide: (n) => `Slide ${n}`,
     downloadKit: 'Download all',

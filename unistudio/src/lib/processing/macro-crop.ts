@@ -215,6 +215,35 @@ export async function macroCrop(
       width: Math.max(32, Math.min(Math.round(rw * uW), uW - Math.round(rx * uW))),
       height: Math.max(32, Math.min(Math.round(rh * uH), uH - Math.round(ry * uH))),
     };
+    // COMPUERTA DE CONTENIDO. Vision acierta casi siempre, pero cuando falla
+    // devuelve una region de fondo vacio y el paso entregaba un rectangulo
+    // blanco con una esquinita de cadena. Un "detalle macro" sin producto
+    // adentro no es un resultado, es un error con cara de exito.
+    //
+    // Se mide antes de aceptar la region. Si la pieza tiene alfa se usa la media
+    // del canal (cuanto del recorte es producto). Si llego aplanada — el proxy
+    // reencodea y se pierde la transparencia — se usa la desviacion estandar del
+    // gris: una zona vacia es plana, con desviacion casi cero, mientras que
+    // cualquier trozo de joya tiene contraste. Asi la compuerta funciona en los
+    // dos casos.
+    const probe = sharp(untrimmed).extract(box);
+    const pMeta = await sharp(untrimmed).metadata();
+    let hasContent: boolean;
+    if (pMeta.hasAlpha) {
+      const st = await probe.clone().stats();
+      const alphaMean = (st.channels[st.channels.length - 1]?.mean ?? 255) / 255;
+      hasContent = alphaMean >= 0.04;
+    } else {
+      const st = await probe.clone().greyscale().stats();
+      hasContent = (st.channels[0]?.stdev ?? 0) >= 6;
+    }
+    // Si no hay pieza adentro se DESCARTA la region y sigue la heuristica de
+    // abajo, que busca mecanicamente la zona con mas masa de producto. Peor
+    // encuadre que un acierto de Vision, pero nunca un recorte vacio.
+    if (!hasContent) {
+      console.warn('[macro-crop] región de Vision descartada: sin producto dentro');
+    }
+    if (hasContent) {
     const outWr = arW >= arH ? outputSize : Math.round((outputSize * arW) / arH);
     const outHr = arH > arW ? outputSize : Math.round((outputSize * arH) / arW);
     const renderedR = await sharp(untrimmed)
@@ -233,6 +262,7 @@ export async function macroCrop(
       .png()
       .toBuffer();
     return { dataUrl: `data:image/png;base64,${flatR.toString('base64')}`, crop: box };
+    }
   }
 
   if (meta.hasAlpha) {
