@@ -264,13 +264,19 @@ async function tryOnUwear(
 
   // Register the garment as a Uwear clothing item. The garment image must be an
   // http URL Uwear can fetch (ensured by the route before calling).
-  // We intentionally do NOT pass our own description: with remove_background,
-  // Uwear runs its OWN AI vision on the real photo (which clearly shows the
-  // hook-and-eye closure). Sending a Claude-Vision description risked biasing it
-  // (e.g. mislabeling the closure as a zipper) and damaging fidelity.
+  // LA FICHA DE CLAUDE VISION SI VA. Antes se omitia a proposito, con el
+  // argumento de que Uwear corre su propia vision sobre la foto y que mandarle
+  // texto podia sesgarlo. El problema: el pipeline justifica usar Uwear por
+  // default diciendo literalmente que "SI recibe garmentDescription" — o sea, la
+  // pagina calculaba la ficha con Claude Vision (leyendo frontal + espalda +
+  // flat) y la ruta la tiraba. Los detalles que solo se DESCRIBEN —cierre de
+  // ganchos vs cremallera, paneles de malla, racerback— son justo los que se
+  // perdian producto tras producto.
+  // El cliente ya soportaba description/description_back sin que nadie los usara.
   const clothingItemId = await createUwearClothingItem({
     name: `${noun} ${Date.now()}`,
     frontUrl: garmentImage,
+    description: garmentDescription?.trim() || undefined,
     // Real back photo of the same REF (if the user tagged one) → Uwear nails the
     // closure, band and racerback from the actual product, not a guess.
     backUrl: garmentBackUrl,
