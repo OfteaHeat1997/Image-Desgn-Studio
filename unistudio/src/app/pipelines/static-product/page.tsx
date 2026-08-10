@@ -198,11 +198,11 @@ const STEP_META: Record<StepKey, StepMeta> = {
     icon: "✨",
     costHint: "$0.10",
     description: "Reconstruye la foto original a alta resolución y nitidez.",
-    what: "PASO 1 — arregla la resolución de tu foto original ANTES de todo. SUPIR reconstruye detalle, nitidez y etiqueta legible en fotos pixeladas. Si el paso 1 sale bien, TODO lo demás sale bien.",
-    provider: "SUPIR-v0Q (Replicate). Fallback: Real-ESRGAN.",
-    duration: "20–60 s",
-    canFail: ["Si SUPIR se cae, la ruta usa Real-ESRGAN; si todo falla, sigue con la foto original."],
-    tips: ["Es el paso más importante: si la foto entra mala, todo sale mal.", "SUPIR reconstruye detalle real, no solo agranda."],
+    what: "PASO 1 — sube la resolución de tu foto original ANTES de todo. Real-ESRGAN agranda de forma FIEL (mantiene tu texto real, NO inventa letras). Si el paso 1 sale bien, todo lo demás parte de una imagen más grande.",
+    provider: "Real-ESRGAN (Replicate) — fiel, no inventa.",
+    duration: "10–30 s",
+    canFail: ["Si la foto original es diminuta (ej. 200px), el resultado se ve suave — el límite es la foto de origen, no el modelo.", "Si falla, sigue con la foto original."],
+    tips: ["Es el paso más importante: si la foto entra mala, todo sale mal.", "Sube fotos de al menos 1000px para resultados nítidos — de una foto de 200px NINGÚN modelo saca HD real sin inventar."],
   },
   isolate: {
     label: "Quitar fondo",
@@ -1012,20 +1012,24 @@ export default function StaticProductPipelinePage() {
         .then((d) => (d?.success ? (d.data as StaticProductFeatures) : null))
         .catch(() => null);
 
-      // PASO 1 — RESTAURAR A HD (lo PRIMERO de todo). Arreglamos la resolución de
-      // la foto CRUDA antes de quitar fondo o generar nada. Si la foto entra mala,
-      // TODO sale mal — por eso va de primero. SUPIR trabaja sobre la foto normal
-      // (con fondo), que es su input natural, y reconstruye detalle real
-      // (etiqueta legible, frasco nítido). Recién DESPUÉS quitamos el fondo, así
-      // el recorte sale de una imagen ya en alta calidad. Si SUPIR se cae, la
-      // ruta usa Real-ESRGAN; y softFail devuelve la foto original — nunca rompe.
+      // PASO 1 — SUBIR A HD (lo PRIMERO de todo). Arreglamos la resolución de la
+      // foto CRUDA antes de quitar fondo o generar nada. Si la foto entra mala,
+      // TODO sale mal — por eso va de primero.
+      //
+      // PROVEEDOR: real-esrgan (FIEL), NO SUPIR. SUPIR reconstruye/INVENTA detalle
+      // — en productos con etiqueta minúscula (fotos de 204px de la vendedora)
+      // inventaba TEXTO FALSO en el envase (bug reportado: "no invente"). Real-
+      // ESRGAN agranda de forma fiel: mantiene el texto REAL, solo lo escala. Es
+      // menos "mágicamente nítido" pero NUNCA inventa letras falsas. scale:4 para
+      // sacar el máximo de las fotos diminutas. softFail: si falla, sigue con la
+      // original — nunca rompe.
       updateJob(job.id, { status: "isolating" });
       updateStep(job.id, "restore", { status: "running" });
       try {
         const hdRes = await fetch("/api/upscale", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: currentUrl, provider: "supir", scale: 2, softFail: true }),
+          body: JSON.stringify({ imageUrl: currentUrl, provider: "real-esrgan", scale: 4, softFail: true }),
         });
         const hdData = await safeJson(hdRes);
         if (hdData.success && hdData.data?.url) {

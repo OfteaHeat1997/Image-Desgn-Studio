@@ -344,12 +344,12 @@ export const STATIC_PRODUCT_PIPELINE_ES: StaticProductPipelineCopy = {
         label: 'Restaurar a HD',
         costHint: '$0.10',
         description: 'Reconstruye la foto original a alta resolución y nitidez.',
-        what: 'PASO 1 — arregla la resolución de tu foto original ANTES de todo lo demás. SUPIR reconstruye detalle, nitidez y etiqueta legible en fotos pixeladas o borrosas. Si el paso 1 sale bien, TODAS las demás imágenes salen bien.',
-        provider: 'SUPIR-v0Q (Replicate). Fallback: Real-ESRGAN.',
-        duration: '20–60 s',
+        what: 'PASO 1 — sube la resolución de tu foto original ANTES de todo. Real-ESRGAN agranda de forma FIEL: mantiene tu texto real, NO inventa letras falsas. Si el paso 1 sale bien, todo lo demás parte de una imagen más grande.',
+        provider: 'Real-ESRGAN (Replicate) — fiel, no inventa.',
+        duration: '10–30 s',
         tips: [
           'Es el paso más importante: si la foto entra mala, todo sale mal.',
-          'SUPIR reconstruye detalle real, no solo agranda. Ideal para fotos de vendedora.',
+          'Sube fotos de al menos 1000px. De una foto de 200px ningún modelo saca HD real sin inventar el texto.',
         ],
       },
       isolate: {
