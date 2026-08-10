@@ -1711,7 +1711,7 @@ export default function JewelryPipelinePage() {
               body: JSON.stringify({
                 imageUrls: urls.slice(0, 10),
                 includeReel: true,
-                reelImageUrls: urls.slice(0, 4),
+                reelImageUrls: urls.slice(0, 3),
               }),
               signal,
             });

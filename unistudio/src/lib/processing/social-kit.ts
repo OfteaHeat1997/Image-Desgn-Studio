@@ -31,6 +31,14 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { urlToBuffer } from '@/lib/utils/image';
 
+/**
+ * Cuanto se le presta al reel antes de soltarlo.
+ *
+ * Holgado contra el maxDuration de la ruta (300s) para que el carrusel y su
+ * respuesta tengan margen de sobra despues de que el reel se rinda.
+ */
+const REEL_BUDGET_MS = 100_000;
+
 export const CAROUSEL_W = 1080;
 export const CAROUSEL_H = 1350;
 export const REEL_W = 1080;
@@ -369,10 +377,26 @@ export async function buildSocialKit(
   let reelError: string | undefined;
   if (options.includeReel !== false) {
     try {
+      // PRESUPUESTO DE TIEMPO. Encender el reel hizo que el paso 8 entero
+      // fallara con "el proveedor tardó demasiado": el encodeo se comia el
+      // tiempo de la peticion y se llevaba puesto el CARRUSEL, que ya estaba
+      // listo en memoria. Inaceptable — el carrusel es el entregable
+      // principal y el reel es un extra.
+      //
+      // Ahora el reel corre contra un reloj. Si no llega, se descarta y el
+      // carrusel sale igual con el motivo escrito. Nunca al reves.
       const reelSource = options.reelImageUrls?.length
         ? await Promise.all(options.reelImageUrls.map((u) => urlToBuffer(u)))
         : buffers;
-      reel = await buildReel(reelSource, { secondsPerSlide, transitionSeconds, background });
+      reel = await Promise.race([
+        buildReel(reelSource, { secondsPerSlide, transitionSeconds, background }),
+        new Promise<never>((_, rej) =>
+          setTimeout(
+            () => rej(new Error(`el reel superó su presupuesto de ${REEL_BUDGET_MS / 1000}s`)),
+            REEL_BUDGET_MS,
+          ),
+        ),
+      ]);
     } catch (err) {
       // El carrusel es el entregable principal; si ffmpeg falla en este entorno
       // se devuelve igual, con el motivo, en vez de tumbar todo el paso.

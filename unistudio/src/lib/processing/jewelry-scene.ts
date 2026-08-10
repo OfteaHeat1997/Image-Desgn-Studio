@@ -38,6 +38,11 @@ export interface JewelrySceneOptions {
   /** Prompt del DECORADO (sin la joya). Ignorado si viene `solidBackground`. */
   backdropPrompt: string;
   /**
+   * 'luxury' dibuja el barrido de estudio en vez de generarlo. Es el modo por
+   * defecto del paso 4 desde que Flux devolvia cartulinas grises.
+   */
+  surface?: 'luxury';
+  /**
    * Color plano de fondo en hex. Cuando viene, NO se genera nada con IA: se pinta
    * el lienzo de ese color y se compone el producto encima.
    *
@@ -103,9 +108,56 @@ export async function composeJewelryScene(
     `Empty scene, no jewelry, no product, no accessories, ` +
     `professional product photography backdrop, no text, no watermark`;
 
+/**
+ * Superficie de lujo CONSTRUIDA, no generada.
+ *
+ * POR QUE NO LA PINTA FLUX
+ * ------------------------
+ * Pedirle a un generador "una superficie elegante" devuelve, una de cada tantas
+ * veces, una CARTULINA gris rectangular en el centro del cuadro — con su propia
+ * sombra, y con los props apoyados encima. Como la joya se compone justo ahi,
+ * el resultado es la pieza sobre un recuadro gris que parece un error de
+ * recorte. Se puede prohibir por prompt, y se prohibio, pero un prompt es una
+ * sugerencia: vuelve cuando quiere, y "cuando quiere" incluye el peor momento.
+ *
+ * Un barrido de estudio no necesita inventiva: es un degradado calido con un
+ * charco de luz y una vineta. Eso se dibuja. Sale igual siempre, en
+ * milisegundos y sin costo, y no puede aparecer nada que no hayamos puesto.
+ */
+async function buildLuxurySurface(W: number, H: number): Promise<Buffer> {
+  // Marfil hacia champagne: la paleta de la marca. Nunca blanco puro, que apaga
+  // el dorado del PVD.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <defs>
+      <linearGradient id="sweep" x1="0" y1="0" x2="0.35" y2="1">
+        <stop offset="0%" stop-color="#F7F3EC"/>
+        <stop offset="55%" stop-color="#EDE4D6"/>
+        <stop offset="100%" stop-color="#DFD2BE"/>
+      </linearGradient>
+      <radialGradient id="pool" cx="50%" cy="42%" r="62%">
+        <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.55"/>
+        <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0.10"/>
+        <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="vig" cx="50%" cy="48%" r="76%">
+        <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#3A2E1E" stop-opacity="0.26"/>
+      </radialGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#sweep)"/>
+    <rect width="100%" height="100%" fill="url(#pool)"/>
+    <rect width="100%" height="100%" fill="url(#vig)"/>
+  </svg>`;
+  // El ruido finisimo evita el banding del degradado, que en pantalla grande se
+  // ve como escalones y delata que el fondo es sintetico.
+  return sharp(Buffer.from(svg)).png().blur(0.4).toBuffer();
+}
+
   // Fondo plano: sin IA, sin costo, 100% determinista. Es lo que usa el packshot.
   let bgBuf: Buffer;
-  if (options.solidBackground) {
+  if (options.surface === 'luxury') {
+    bgBuf = await buildLuxurySurface(W, H);
+  } else if (options.solidBackground) {
     const hex = options.solidBackground.replace('#', '');
     bgBuf = await sharp({
       create: {
@@ -243,6 +295,6 @@ export async function composeJewelryScene(
 
   return {
     dataUrl: `data:image/jpeg;base64,${composed.toString('base64')}`,
-    cost: options.solidBackground ? 0 : JEWELRY_SCENE_COST,
+    cost: options.solidBackground || options.surface === 'luxury' ? 0 : JEWELRY_SCENE_COST,
   };
 }
