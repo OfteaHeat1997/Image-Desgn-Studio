@@ -78,10 +78,30 @@ export async function composeJewelryScene(
   // 1. Decorado SIN producto. Flux Schnell alcanza y es barato: no tiene que
   //    preservar nada, solo pintar una superficie con luz. Se refuerza el
   //    "sin joya" porque el modelo tiende a rellenar el centro vacío.
+  //
+  //    Dos cosas hay que prohibir a mano, medidas contra resultados reales:
+  //
+  //    a) LA CARTULINA. Pedir "una superficie con props" hace que Flux pinte una
+  //       TARJETA GRIS rectangular en el centro, con su propia sombra. Como la
+  //       joya se pega justo ahi, el resultado es la pieza sobre un recuadro
+  //       gris — indistinguible de un error de recorte. Prohibir "pedestal" no
+  //       alcanzaba: una cartulina plana no es un pedestal. Hay que exigir UNA
+  //       superficie continua y nombrar las formas que se cuelan.
+  //
+  //    b) EL PROP QUE CRUZA. "Nothing in the center" es demasiado debil: en la
+  //       prueba de la espiga, Flux la puso atravesando el cuadro justo donde va
+  //       el collar. Los props van confinados a los bordes; el tercio central
+  //       queda vacio, que es donde se compone la pieza.
   const backdropPrompt =
-    `${options.backdropPrompt}. Empty scene, no jewelry, no product, no accessories, ` +
-    `nothing in the center of the frame, professional product photography backdrop, ` +
-    `no text, no watermark`;
+    `${options.backdropPrompt}. ` +
+    `ONE single continuous uniform surface filling the entire frame, seamless, edge to edge. ` +
+    `NO card, NO sheet of paper, NO board, NO mat, NO placard, NO panel, NO tile, NO slab, ` +
+    `NO rectangle or square of a different colour laid on the surface, NO frame, NO border, ` +
+    `NO pedestal, NO podium, NO riser, NO plinth, NO tray, NO stand, NO display block. ` +
+    `Any prop stays at the outer edges and corners only; the middle third of the frame is ` +
+    `completely empty surface — nothing crosses it, nothing overlaps it. ` +
+    `Empty scene, no jewelry, no product, no accessories, ` +
+    `professional product photography backdrop, no text, no watermark`;
 
   // Fondo plano: sin IA, sin costo, 100% determinista. Es lo que usa el packshot.
   let bgBuf: Buffer;
