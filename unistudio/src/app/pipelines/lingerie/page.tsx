@@ -2554,9 +2554,9 @@ async function tryOnLeffaAsync(
   const { statusUrl, responseUrl } = submitJson.data as { statusUrl: string; responseUrl: string };
 
   // Consulta cada 6s. Leffa ronda los 4 minutos; 60 intentos = 6 min de margen.
-  for (let attempt = 0; attempt < 60; attempt++) {
+  for (let attempt = 0; attempt < 144; attempt++) {
     if (abortSignal?.aborted) throw new DOMException("Aborted", "AbortError");
-    await new Promise((r) => setTimeout(r, 6000));
+    await new Promise((r) => setTimeout(r, 2500));
     const q = `statusUrl=${encodeURIComponent(statusUrl)}&responseUrl=${encodeURIComponent(responseUrl)}`;
     const pollRes = await fetch(`/api/tryon/async?${q}`, { signal: abortSignal });
     const pollJson = await pollRes.json();

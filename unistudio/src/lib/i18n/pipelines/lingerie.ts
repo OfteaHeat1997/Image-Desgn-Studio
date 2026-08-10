@@ -830,7 +830,7 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
   tryonProviders: {
     auto: {
       label: 'Recomendado (Leffa)',
-      hint: 'La opcion segura. Warpea los pixeles REALES de tu prenda en vez de redibujarla: respeta silueta, cierre y paneles. Tarda ~4 min.',
+      hint: 'La opcion segura. Warpea los pixeles REALES de tu prenda en vez de redibujarla: respeta silueta, cierre y paneles. Tarda ~2 min.',
     },
     uwear: {
       label: 'Uwear — rapido',
@@ -838,7 +838,7 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
     },
     leffa: {
       label: 'Leffa — maxima fidelidad',
-      hint: 'Igual que Recomendado, elegido a mano. Viste TU modelo IA, asi que la misma mujer aparece en todos los pasos. ~4 min · $0.04.',
+      hint: 'Igual que Recomendado, elegido a mano. Viste TU modelo IA, asi que la misma mujer aparece en todos los pasos. ~2 min · $0.04.',
     },
     seedream: {
       label: 'SeedDream — solo para probar rapido',
@@ -1513,7 +1513,7 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
   tryonProviders: {
     auto: {
       label: 'Recommended (Leffa)',
-      hint: 'The safe option. It warps the REAL pixels of your garment instead of redrawing it: it respects the silhouette, closure and panels. Takes ~4 min.',
+      hint: 'The safe option. It warps the REAL pixels of your garment instead of redrawing it: it respects the silhouette, closure and panels. Takes ~2 min.',
     },
     uwear: {
       label: 'Uwear — fast',
@@ -1521,7 +1521,7 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
     },
     leffa: {
       label: 'Leffa — maximum fidelity',
-      hint: 'Same as Recommended, picked by hand. It dresses YOUR AI model, so the same woman appears in every step. ~4 min · $0.04.',
+      hint: 'Same as Recommended, picked by hand. It dresses YOUR AI model, so the same woman appears in every step. ~2 min · $0.04.',
     },
     seedream: {
       label: 'SeedDream — just for a quick test',
