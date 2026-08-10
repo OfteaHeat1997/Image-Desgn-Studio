@@ -3027,7 +3027,6 @@ async function runStep(
         garmentDescription,
         // Art Direction: brief del look inyectado al prompt del try-on (seedream/uwear).
         scenePrompt: artDir.scenePrompt,
-        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const tryonJson = await tryonRes.json();
@@ -3133,7 +3132,6 @@ async function runStep(
         forceProvider: true,
         garmentDescription,
         scenePrompt: sideScene,
-        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const json = await res.json();
@@ -3199,7 +3197,6 @@ async function runStep(
         forceProvider: true,
         garmentDescription,
         scenePrompt: detailScene,
-        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const json = await res.json();
@@ -3325,7 +3322,6 @@ async function runStep(
         garmentDescription,
         // Art Direction: brief del look inyectado al prompt del try-on (seedream/uwear).
         scenePrompt: artDir.scenePrompt,
-        artDirectionId: UWEAR_CLEAN_ART_DIRECTION,
       }),
     });
     const json = await res.json();
