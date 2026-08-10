@@ -514,6 +514,18 @@ async function isolateGarment(
 
   console.log(`[bg-remove:isolate] using mask coverage=${bestCoverage.toFixed(3)}`);
 
+  // COMPUERTA DE CALIDAD. Grounded SAM devuelve HTTP 200 aunque la mascara sea
+  // basura: probado el 2026-08-09 con una pulsera, entrego un contorno casi
+  // vacio con `success: true`, asi que el respaldo por error nunca se activaba y
+  // el paso 2 quedaba roto. Una mascara que cubre menos del 1% del cuadro no es
+  // un recorte: es un fallo silencioso. Se lanza para que el caller caiga a su
+  // respaldo (BiRefNet en joyeria, rembg en lenceria).
+  if (!returnMaskOnly && bestCoverage < 0.01) {
+    throw new Error(
+      `El recorte real no encontro la pieza (mascara al ${(bestCoverage * 100).toFixed(1)}% del cuadro).`,
+    );
+  }
+
   // returnMaskOnly: usado por texturePreserve (lingerie pipeline). En vez de
   // componer la prenda aislada, devolvemos la máscara B/W cruda como PNG
   // grayscale — necesaria para inpaintear con flux-fill-pro la zona del bra

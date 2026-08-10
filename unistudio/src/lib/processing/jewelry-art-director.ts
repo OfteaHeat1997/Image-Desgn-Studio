@@ -104,8 +104,19 @@ profundidad de campo.
 
 ESCENA EDITORIAL — VERSIÓN DECORADO: la MISMA escena pero SIN la joya. Solo la
 superficie, los props, la luz y la composición, dejando libre la zona central.
-Terminá siempre con "no jewelry, no product, empty center". Este prompt genera el
-fondo solo, y el producto real se compone encima.
+
+CRÍTICO — SUPERFICIE PLANA, SIN SOPORTES. El decorado se genera a ciegas y la
+pieza se pega después en el centro, en una posición fija: no hay forma de
+apoyarla sobre nada. Si describís un pedestal, una tarima, una bandeja, un busto
+o un cilindro, la joya queda FLOTANDO encima y la foto se arruina. Describí SOLO
+una superficie plana continua (losa de piedra, mármol, seda extendida, madera,
+terciopelo liso) vista desde arriba o en ángulo suave, con los props DESPLAZADOS
+a los costados o al fondo, nunca en el centro.
+PROHIBIDO nombrar: pedestal, podium, riser, plinth, stand, display, tray, bust
+form, cylinder, box, step, platform.
+Terminá siempre con "flat continuous surface, no pedestal, no stand, no riser,
+no jewelry, no product, empty center". Este prompt genera el fondo solo, y el
+producto real se compone encima.
 
 MACRO: qué parte concreta de ESTA pieza demuestra calidad — textura, piedras,
 cierre, eslabones, terminaciones, grabados. NO inventar detalles que no estén.
@@ -145,8 +156,8 @@ Mirá la foto y respondé SOLO con JSON válido, sin markdown:
   "macroFocus": "prompt en inglés que nombre qué parte de ESTA pieza hay que acercar",
   "model": "prompt en inglés para la colocación sobre la modelo",
   "negative": "lista en inglés, separada por comas, de lo que NO debe aparecer ni cambiar",
-  "productWords": "palabras en inglés separadas por comas que nombran SOLO la pieza de joyería y sus partes (ej 'beaded bracelet, gold beads, turtle charm, elastic band'). NO incluyas soportes ni fondos.",
-  "propWords": "palabras en inglés separadas por comas que nombran la UTILERIA visible que NO es el producto: exhibidor, cilindro, pedestal, bandeja, tarjeta, base, soporte. Cadena vacia si no hay."
+  "productWords": "MAXIMO 3 palabras o frases cortas en inglés, separadas por comas, que nombren la pieza. Ej: 'beaded bracelet, turtle charm'. Van a un segmentador que rinde PEOR con enumeraciones largas: elegí lo más genérico y reconocible, NO la lista de todas las partes. NO incluyas soportes ni fondos.",
+  "propWords": "MAXIMO 3 frases cortas en inglés que nombren la UTILERIA visible que NO es el producto (exhibidor, cilindro, pedestal, bandeja, base). Ej: 'white cylinder display, hexagonal riser'. Cadena vacia si no hay."
 }`;
 }
 
@@ -287,9 +298,14 @@ export async function findMacroRegion(
                 type: 'text',
                 text:
                   'Esta es una pieza de joyería recortada sobre fondo transparente. ' +
-                  'Elegí la ZONA que mejor demuestra la calidad de fabricación en una foto macro: ' +
-                  'el engaste de una piedra, el cierre, la medalla o dije, la unión de eslabones, ' +
-                  'un grabado o una textura. Evitá tramos vacíos de cadena y evitá encuadrar la pieza entera. ' +
+                  'Elegí la ZONA que mejor demuestra la calidad de fabricación en una foto macro. ' +
+                  'JERARQUÍA, en este orden estricto: (1) el dije, colgante, charm o medalla si la pieza ' +
+                  'tiene uno — es SIEMPRE lo más importante y lo que la compradora mira; (2) el engaste ' +
+                  'de las piedras; (3) el cierre o broche; (4) un grabado o textura particular; ' +
+                  '(5) solo si nada de lo anterior existe, la unión de eslabones. ' +
+                  'NUNCA elijas un tramo de cadena o de cuentas repetidas si la pieza tiene un dije: ' +
+                  'la cadena se repite y no demuestra nada, el dije es lo único irrepetible. ' +
+                  'Evitá encuadrar la pieza entera. ' +
                   'La zona debe ocupar entre el 15% y el 45% del ancho de la imagen. ' +
                   'Respondé SOLO con JSON, sin markdown: ' +
                   '{"x":0.0,"y":0.0,"w":0.0,"h":0.0,"reason":"qué parte elegiste y por qué, en español"}. ' +

@@ -2540,12 +2540,14 @@ async function tryOnLeffaAsync(
   backView = false,
   /** Foto Lateral: el servidor usa el perfil real del avatar de Uwear. */
   sideView = false,
+  /** Motor: 'fashn' (maskless, para la espalda) o Leffa por defecto. */
+  engine: "leffa" | "fashn" = "leffa",
 ): Promise<{ resultUrl: string; cost: number; usedProvider: string }> {
   const submitRes = await fetch("/api/tryon/async", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: abortSignal,
-    body: JSON.stringify({ modelImage, garmentImage, category, backView, sideView }),
+    body: JSON.stringify({ modelImage, garmentImage, category, backView, sideView, engine }),
   });
   const submitJson = await submitRes.json();
   if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
@@ -2668,6 +2670,20 @@ async function runStep(
 ): Promise<{ resultUrl: string; cost: number; newModelUrl?: string; newSeed?: number; usedProvider?: string }> {
   // Brief creativo elegido. Fallback al primer preset si el id no matchea.
   const artDir = ART_DIRECTIONS.find((a) => a.id === artDirectionId) ?? ART_DIRECTIONS[0];
+
+  // ART DIRECTION DE UWEAR: FIJARLA EN LA LIMPIA.
+  //
+  // La ruta acepta artDirectionId (el preset propio de Uwear) pero la pagina
+  // nunca lo mandaba, asi que Uwear elegia el suyo por default. De sus 5 presets
+  // dos son de streetwear —"High-Street Color Cast Studio" y "Low-Angle Concrete
+  // Flash Studio"— y esos no solo cambian la luz: ESTILIZAN a la modelo. De ahi
+  // que apareciera con una gorra blanca en una foto de catalogo de lenceria.
+  //
+  // Para ecommerce siempre queremos el preset 1, "Basic white photoshoot": fondo
+  // limpio y sin accesorios inventados. Nuestras ART_DIRECTIONS locales siguen
+  // controlando la luz via scenePrompt; esto solo evita que Uwear vista a la
+  // modelo por su cuenta.
+  const UWEAR_CLEAN_ART_DIRECTION = 1;
   // Map productType to the garmentType the AI Agent routes expect. This unlocks:
   // - bg-remove's grounded_sam segmentation (needs garmentType + removeSubject)
   // - model-create's SeedDream routing with the no-moderation prompt
@@ -2977,7 +2993,15 @@ async function runStep(
         backGarmentForLeffa,
         category,
         abortSignal,
-        true,
+        true,   // backView
+        false,  // sideView
+        // FASHN MASKLESS, NO LEFFA. Leffa perdia los tirantes por una razon
+        // estructural: su mascara protege el PELO, y en una modelo de espaldas
+        // el pelo cae justo sobre el cruce de tirantes, asi que esa zona nunca
+        // podia recibir tela. No es un parametro mal puesto — el endpoint de fal
+        // no expone nada que toque la mascara. FASHN v1.6 con segmentation_free
+        // trabaja sin mascara, asi que la causa desaparece.
+        "fashn",
       );
       return { resultUrl: leffa.resultUrl, cost: modelCost + leffa.cost, usedProvider: leffa.usedProvider };
     }

@@ -109,10 +109,33 @@ const STEP_ICONS: Record<StepKey, React.ElementType> = {
 };
 
 /** Costo estimado por paso, en dólares. */
+/**
+ * Fondo del packshot: marfil, NO blanco puro.
+ *
+ * Lo fija la doctrina de marca de Unistyles. El blanco puro apaga el dorado del
+ * PVD 18K y ademas delata el recorte, porque el borde del producto queda contra
+ * un fondo sin ninguna temperatura.
+ */
+const PACKSHOT_BG = "#F6F4F0";
+
+/**
+ * Foto de escala: la pieza SOSTENIDA, no puesta.
+ *
+ * Es la toma que responde "¿de qué tamaño es?" — la duda que más devoluciones
+ * genera. Una mano al lado da la referencia sin que la compradora tenga que
+ * interpretar nada, y funciona igual para collar, pulsera o anillo, que es
+ * justamente lo que forzar `type: "ring"` rompia.
+ */
+const SCALE_DIRECTION =
+  "IGNORE the wearing instruction above. The piece is NOT worn: an elegant hand " +
+  "holds it up between thumb and index finger, at true real-world scale next to " +
+  "the fingers, so its size is unmistakable. Show the hand and the piece only, " +
+  "plain neutral background, soft studio light, sharp focus on the piece.";
+
 const STEP_COST: Record<StepKey, number> = {
   clean: 0.04,
   isolate: 0.01,
-  packshot: 0.05,
+  packshot: 0,
   luxury: 0.05,
   macro: 0,
   model: 0.1,
@@ -128,7 +151,7 @@ const STEP_COST: Record<StepKey, number> = {
 const STEP_ENGINE: Record<StepKey, string> = {
   clean: "Kontext Pro",
   isolate: "BiRefNet",
-  packshot: "Kontext Pro",
+  packshot: "sharp · sin IA",
   luxury: "Flux Schnell + sharp",
   macro: "sharp · sin IA",
   model: "SeedDream + Kontext",
@@ -191,6 +214,8 @@ interface Job {
     macroFocus: string;
     model: string;
     negative: string;
+    productWords: string;
+    propWords: string;
   } | null;
 }
 
@@ -604,12 +629,12 @@ function StepRail({
 
   return (
     <div className="sticky top-[57px] z-20 -mx-4 mb-5 border-b border-[var(--border-default)] bg-[rgba(12,12,14,0.92)] px-4 py-2 backdrop-blur md:-mx-6 md:px-6">
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-wrap items-center gap-1.5">
         {STAGES.map((stage) => {
           const visible = stage.steps.filter((k) => steps[k].enabled);
           if (visible.length === 0) return null;
           return (
-            <div key={stage.key} className="flex shrink-0 items-center gap-1.5">
+            <div key={stage.key} className="flex flex-wrap items-center gap-1.5">
               <span className="px-1 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                 {jt.stages[stage.key].label}
               </span>
@@ -1321,10 +1346,19 @@ export default function JewelryPipelinePage() {
         .then((d) => {
           if (d?.success && d.data && !d.data.same && d.data.confidence > 0.6) {
             const changes = (d.data.changes ?? []).slice(0, 2).join("; ") || d.data.reason;
+            // NO se marca como "Listo". La doctrina de Unistyles es explicita:
+            // "si falla cualquiera de los primeros cuatro puntos, la imagen debe
+            // corregirse antes de publicarse", y el punto 1 es "¿la joya sigue
+            // siendo exactamente la original?". Antes el paso quedaba en verde
+            // con el producto cambiado — el on-model llego a convertir una
+            // pulsera de cuentas en un RELOJ y aun asi decia Listo. Ahora queda
+            // en rojo, con el motivo y los botones de rehacer a la vista.
             patchStep(jobId, stepKey, {
-              warning: onModel
+              status: "error",
+              error: onModel
                 ? jt.messages.jewelryChangedModel(changes)
                 : jt.messages.jewelryChanged(changes),
+              warning: undefined,
             });
           }
         })
@@ -1400,17 +1434,57 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
-            const res = await fetch("/api/bg-remove", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              // BiRefNet: ganó la comparativa contra rembg, WithoutBG,
-              // Bria RMBG 2.0, Grounded SAM y remove.bg sobre joyería real.
-              body: JSON.stringify({ imageUrl: input, provider: "birefnet" }),
-              signal,
-            });
-            const data = await safeJson(res);
-            const url = pickUrl(data.data);
-            if (!data.success || !url) return fail(data.error);
+            // RECORTE DIRIGIDO. BiRefNet es un segmentador de objeto SALIENTE:
+            // no sabe qué es el producto, así que con una pieza apoyada en un
+            // exhibidor se queda con los dos — y los pasos 3 a 6 heredan ese
+            // recorte. Por eso el packshot redibuja la joya: tiene que inventar
+            // cómo se ve sin el cilindro.
+            // Ahora Vision nombra producto y utilería, y grounded_sam segmenta
+            // con esas palabras. Si la máscara sale pobre, /api/bg-remove lanza
+            // (compuerta de cobertura) y caemos a BiRefNet, que es el
+            // comportamiento anterior: esto no puede quedar peor que antes.
+            let data: Awaited<ReturnType<typeof safeJson>> | null = null;
+            let url: string | undefined;
+
+            if (job.prompts?.productWords) {
+              try {
+                const guided = await fetch("/api/bg-remove", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    imageUrl: input,
+                    provider: "replicate",
+                    removeSubject: true,
+                    isolateMethod: "grounded-sam",
+                    garmentType: job.subType,
+                    subjectPrompt: job.prompts.productWords,
+                    propPrompt: job.prompts.propWords,
+                  }),
+                  signal,
+                });
+                const gd = await safeJson(guided);
+                const gu = pickUrl(gd.data);
+                if (gd.success && gu) {
+                  data = gd;
+                  url = gu;
+                }
+              } catch {
+                /* el respaldo se encarga */
+              }
+            }
+
+            if (!url) {
+              const res = await fetch("/api/bg-remove", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ imageUrl: input, provider: "birefnet" }),
+                signal,
+              });
+              data = await safeJson(res);
+              url = pickUrl(data.data);
+            }
+
+            if (!data?.success || !url) return fail(data?.error);
             done(url, data.cost ?? STEP_COST.isolate);
             return true;
           }
@@ -1451,35 +1525,37 @@ export default function JewelryPipelinePage() {
             if (!input) return fail(jt.messages.needsIsolate);
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
-            // El prompt de Vision gana sobre la plantilla: nombra la cadena, el
-            // tamaño de las cuentas y el colgante reales de ESTA pieza.
-            const directed = job.prompts?.packshot;
-            const base = directed ?? config.packshotPrompt;
-            // La ficha de Vision ancla el prompt a ESTA pieza en vez de a la
-            // plantilla genérica del sub-tipo.
-            const suffix = descriptor ? `. Featuring this exact piece: ${descriptor}.` : "";
-            const res = await fetch("/api/bg-generate", {
+            // PACKSHOT POR COMPOSICION, NO POR GENERACION.
+            //
+            // Antes esto pasaba por Kontext con un prompt de "fondo limpio". El
+            // problema no era el prompt: es que un generador REDIBUJA. Con un
+            // collar de dije chico y lejano, el modelo "mejora" la foto —
+            // engrosa la cadena, satura el oro y llega a inventarle una piedra
+            // roja al colgante. El resultado ya no es el producto que la clienta
+            // vende, y para un packshot de catalogo eso lo invalida entero.
+            //
+            // Un packshot no necesita IA: es la pieza recortada sobre un fondo
+            // limpio con su sombra. Componiendo pixeles reales la joya es
+            // IMPOSIBLE de alterar, sale en menos de un segundo y cuesta $0.
+            //
+            // Marfil, no blanco puro: lo pide la doctrina de marca (el blanco
+            // puro apaga el dorado del PVD y delata el fondo recortado).
+            const res = await fetch("/api/jewelry-scene", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                imageUrl: input,
-                mode: "precise",
-                style: "custom",
-                customPrompt:
-                  withJewelryPreserve(directed ? base : base + suffix) +
-                  " Do NOT include any text, price tag, label or watermark in the output." +
-                  (job.prompts?.negative ? ` Do NOT include: ${job.prompts.negative}.` : ""),
-                // 4:5 en vez de 1:1 — es el formato de Instagram y deja más
-                // espacio negativo vertical, que es lo que hace editorial la toma.
+                productUrl: input,
+                solidBackground: PACKSHOT_BG,
                 aspectRatio: "1:1",
+                productScale: 0.78,
+                shadow: true,
               }),
               signal,
             });
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            done(url, data.cost ?? STEP_COST[key]);
-            runIdentityCheck(jobId, key, input, url, false);
+            done(url, data.cost ?? 0);
             return true;
           }
 
@@ -1568,15 +1644,20 @@ export default function JewelryPipelinePage() {
               body: JSON.stringify({
                 modelImage: modelPhotoUrl,
                 jewelryImage: jewelryUrl,
-                // La escala se compone siempre contra una mano.
-                type: key === "scale" ? "ring" : job.subType,
+                // La foto de escala va contra una mano, pero forzar type:"ring"
+                // era un error: el prompt de "ring" pide ponerla EN EL DEDO, asi
+                // que a un collar le pedia lo imposible y Kontext resolvia
+                // inventando un anillo. La pieza se SOSTIENE, no se calza — eso
+                // va por `placementDirection`, que se agrega al prompt.
+                type: job.subType,
                 mode: "modelo",
                 featureDescriptor: descriptor ?? undefined,
                 // El prompt de colocacion de Vision va al TRY-ON, que es quien
                 // pone la joya sobre el cuerpo. Se estaba mandando a
                 // model-create, o sea describiendo a la modelo en vez de dirigir
                 // la colocacion: la direccion se perdia.
-                placementDirection: key === "model" ? job.prompts?.model : undefined,
+                placementDirection:
+                  key === "scale" ? SCALE_DIRECTION : job.prompts?.model,
                 negative: job.prompts?.negative,
               }),
               signal,
@@ -1613,7 +1694,25 @@ export default function JewelryPipelinePage() {
             const res = await fetch("/api/social-kit", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ imageUrls: urls.slice(0, 10), includeReel: true }),
+              // EL REEL NO BLOQUEA EL CARRUSEL. Renderizar 1080x1920 con ffmpeg
+              // (zoompan + xfade, libx264) en una funcion serverless se pasa de
+              // cualquier limite razonable: el paso moria por timeout y no
+              // entregaba NADA, ni siquiera el carrusel, que se arma en 2s.
+              // Ahora el paso devuelve el carrusel siempre; el reel queda para
+              // pedirlo aparte cuando haga falta.
+              // El reel VA. Estuvo en `false` un tiempo para cortar un timeout y
+              // quedo asi, con lo cual el paso 8 entregaba solo el carrusel y
+              // avisaba "no se pudo generar en este entorno" — un mensaje que ni
+              // siquiera correspondia, porque el reel no se intentaba.
+              //
+              // Se limita a 4 slides: el reel es un loop de vitrina, no el
+              // catalogo entero, y cada slide suma tiempo de encodeo contra el
+              // maxDuration de la ruta (que fue el timeout original).
+              body: JSON.stringify({
+                imageUrls: urls.slice(0, 10),
+                includeReel: true,
+                reelImageUrls: urls.slice(0, 4),
+              }),
               signal,
             });
             const data = await safeJson(res);
