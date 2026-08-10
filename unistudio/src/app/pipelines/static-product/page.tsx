@@ -90,6 +90,10 @@ interface Job {
   id: string;
   file: File;
   previewUrl: string;
+  /** Dimensiones REALES de la foto original — leídas al subir. Sirven para
+   *  DETECTAR calidad y mostrar un tip: foto chica (<800px) => resultado suave. */
+  sourceWidth?: number;
+  sourceHeight?: number;
   productType: StaticProductType;
   brand: StaticBrand;
   status: JobStatus;
@@ -1139,12 +1143,14 @@ export default function StaticProductPipelinePage() {
       // El HD ya se hizo en el PASO 1 (restore/SUPIR, antes de quitar fondo), así
       // que aquí currentUrl ya viene en alta calidad. No se re-escala.
       const sharedInput = currentUrl;
-      const [whiteRes, adaptiveRes, heroRes, verticalRes] = await Promise.all([
-        runOutputStep(job.id, "white", sharedInput, enrichedConfig, undefined, job.usePhotoroom),
-        runOutputStep(job.id, "adaptive", sharedInput, enrichedConfig),
-        runOutputStep(job.id, "hero", sharedInput, enrichedConfig),
-        runOutputStep(job.id, "vertical", sharedInput, enrichedConfig),
-      ]);
+      // SECUENCIAL (no en paralelo): correr los 4 outputs a la vez saturaba
+      // Replicate (429 en bg-remove + Flux al tiempo) y cada llamada se colgaba
+      // hasta el FUNCTION_INVOCATION_TIMEOUT de Vercel. Uno por uno es un poco más
+      // lento pero NO se cae. Este es el fix del "ni siquiera corre".
+      const whiteRes = await runOutputStep(job.id, "white", sharedInput, enrichedConfig, undefined, job.usePhotoroom);
+      const adaptiveRes = await runOutputStep(job.id, "adaptive", sharedInput, enrichedConfig);
+      const heroRes = await runOutputStep(job.id, "hero", sharedInput, enrichedConfig);
+      const verticalRes = await runOutputStep(job.id, "vertical", sharedInput, enrichedConfig);
       totalCost += whiteRes.cost + adaptiveRes.cost + heroRes.cost + verticalRes.cost;
 
       // Los 3 pasos opcionales (upscale, sombra, video) son INDEPENDIENTES entre
