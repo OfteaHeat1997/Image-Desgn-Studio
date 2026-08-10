@@ -262,3 +262,15 @@ body {
   background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
   background-color: var(--bg-overlay);
 }
+
+/* Fix legibilidad de dropdowns nativos en tema oscuro (Windows/Chrome renderiza
+   las <option> sobre fondo blanco del sistema; sin esto, text-white = texto
+   blanco sobre blanco = ilegible). Aplica a TODA la app: estáticos, lencería,
+   joyería. Bug reportado: "no puedo leer el texto de Otra marca". */
+select {
+  color-scheme: dark;
+}
+select option {
+  background-color: #18181b;
+  color: #ffffff;
+}
