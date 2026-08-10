@@ -37,11 +37,21 @@ export const PHOTO_CLEAN_COST = 0.04;
  * broche de langosta).
  */
 const CLEAN_PROMPT =
-  'Remove every text overlay, caption, price tag, letter and watermark from this photo. ' +
-  'Erase the words and reconstruct whatever was behind them so the surface looks continuous and untouched. ' +
+  // QUE SE BORRA: solo lo que alguien SUPERPUSO a la foto para WhatsApp.
+  'Remove ONLY the graphics that were overlaid on top of this photo afterwards: ' +
+  'price captions, product name captions typed over the image, watermarks, ' +
+  '"AI generated" notices, stickers and logos of the seller placed over the background. ' +
+  'Erase them and rebuild whatever was behind them so the surface looks continuous and untouched. ' +
+  // QUE NO SE TOCA NUNCA: el texto que ES el producto.
+  'ABSOLUTELY DO NOT touch any text, lettering, logo, label, engraving or printing that is ' +
+  'PART OF THE PRODUCT ITSELF — the brand name printed on the tube, bottle or box, the ' +
+  'ingredient text, the volume, the barcode, the engraving on a piece of jewelry. ' +
+  'That text belongs to the product and must stay pixel-for-pixel identical, fully legible and sharp. ' +
+  'If you cannot tell whether a text is overlaid or printed on the product, LEAVE IT. ' +
   'CRITICAL: this is a retouching task, not a redesign. Do NOT move, resize, restyle or redraw the product. ' +
-  'Do NOT change the product, the display stands, the lighting, the shadows, the background colour or the framing. ' +
-  'Every pixel that is not text must stay exactly as it is. Output the same photo with the text cleanly gone.';
+  'Do NOT change the product, its label, the display stands, the lighting, the shadows, the background colour or the framing. ' +
+  'Do NOT blur or soften the product. Keep it as sharp as the input. ' +
+  'Every pixel that is not an overlaid graphic must stay exactly as it is.';
 
 export interface PhotoCleanResult {
   url: string;
