@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
   // the binary path resolves correctly at runtime (Vercel Linux environment).
   serverExternalPackages: ['ffmpeg-static'],
 
+  // ...pero mantenerlo fuera del bundle NO basta para que llegue al servidor.
+  // El file-tracing de Next solo copia lo que ve por `import`, y el binario de
+  // ffmpeg se resuelve en RUNTIME (leyendo la ruta que exporta el paquete), asi
+  // que el trazador no lo veia y el archivo nunca se subia a Vercel. Resultado:
+  // el reel de Instagram fallaba en produccion con "no se encontro ffmpeg"
+  // mientras el carrusel salia bien. Hay que pedir el binario a mano.
+  outputFileTracingIncludes: {
+    '/api/social-kit': ['./node_modules/ffmpeg-static/**'],
+  },
+
   // Sello de build: inyecta el SHA del commit que Vercel está sirviendo en el
   // bundle del cliente, para que la usuaria VEA en pantalla qué versión está
   // viva y no haya más confusión de "¿ya deployó o estoy viendo el viejo?".

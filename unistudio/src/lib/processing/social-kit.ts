@@ -239,8 +239,10 @@ async function buildReel(
   const ffmpegPath = await resolveFfmpeg();
   if (!ffmpegPath) {
     throw new Error(
-      'No se encontró un binario de ffmpeg utilizable. En Vercel viene con ffmpeg-static; ' +
-        'en local, instalá ffmpeg o seteá FFMPEG_PATH.',
+      'No se encontró un binario de ffmpeg utilizable. Se probó FFMPEG_PATH, el binario de ' +
+        'ffmpeg-static y el ffmpeg del PATH del sistema, y ninguno respondió. En Vercel el ' +
+        'binario viaja por `outputFileTracingIncludes` en next.config.ts; en local hace falta ' +
+        '`npm rebuild ffmpeg-static` (el binario descargado es de la plataforma del install).',
     );
   }
 
