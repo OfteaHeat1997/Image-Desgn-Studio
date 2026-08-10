@@ -2941,69 +2941,39 @@ async function runStep(
           12000,
         );
       }
-      // AISLAR LA ESPALDA ANTES DE DEFORMARLA.
+      // FOTO ESPALDA = GHOST 3D DE TU FOTO TRASERA.
       //
-      // Aca se le pasaba a Leffa la foto de espalda TAL CUAL la subio la usuaria
-      // — o sea, la foto de catalogo CON la modelo puesta. Leffa deforma pixeles:
-      // si recibe una persona, tiene que adivinar donde termina la prenda, se
-      // queda con la banda del centro y pierde los tirantes. Por eso el racerback
-      // desaparecia y el resultado salia como un bandeau con los hombros
-      // desnudos.
+      // Se intento cuatro veces vestir a una modelo de espaldas y ninguna
+      // funciono, por razones estructurales verificadas:
+      //   - Uwear genera su propia modelo y SIEMPRE de frente. Su API no expone
+      //     ningun parametro de pose (comprobado: solo 5 art-directions de look).
+      //   - Leffa da la espalda correcta pero su mascara protege el PELO, que en
+      //     una espalda cae justo sobre el cruce de tirantes -> nunca los dibuja.
+      //   - FASHN maskless pierde la vista y la identidad del avatar.
+      //   - Sin aislar, el warp deforma a la modelo de la foto y pega una cara.
       //
-      // Aislando primero, Leffa recibe SOLO la prenda sobre fondo limpio y puede
-      // mapear los tirantes. Si el aislado falla seguimos con la foto original:
-      // un resultado imperfecto es mejor que ninguno.
-      let backGarmentForLeffa = backGarmentUrl ?? garmentForTryon;
-      if (backGarmentUrl) {
-        try {
-          const isoRes = await fetch("/api/bg-remove", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: abortSignal,
-            body: JSON.stringify({
-              imageUrl: backGarmentUrl,
-              provider: "replicate",
-              removeSubject: true,
-              garmentType: garmentTypeForApi,
-              // NUNCA "auto" ACA. En auto el aislado corre el ghost de Photoroom
-              // primero, y ese prompt dice 'STRAIGHT FRONT VIEW ONLY' y
-              // 'do NOT render the back' (bg-remove/route.ts). O sea: convertia
-              // la foto de ESPALDA en un frente redibujado, y despues Leffa
-              // warpeaba ese frente sobre una modelo de espaldas. Por eso el
-              // resultado no tenia los tirantes ni el broche reales.
-              // grounded-sam recorta pixeles de verdad y no reinterpreta la
-              // vista, que es justo lo que necesita una espalda.
-              isolateMethod: "grounded-sam",
-              garmentDescription,
-            }),
-          });
-          const isoJson = await isoRes.json();
-          if (isoJson.success && isoJson.data?.url) {
-            backGarmentForLeffa = isoJson.data.url;
-            console.log("[lingerie] photoBack: espalda AISLADA antes del warp");
-          } else {
-            console.warn("[lingerie] photoBack: no se pudo aislar la espalda, uso la foto tal cual:", isoJson.error);
-          }
-        } catch (e) {
-          console.warn("[lingerie] photoBack: fallo el aislado de la espalda:", e instanceof Error ? e.message : e);
-        }
+      // El ghost 3D si resuelve el objetivo REAL del paso —mostrar el broche, la
+      // banda y el racerback— y lo hace desde TU foto, sin inventar nada, sin
+      // persona y sin material con copyright. Es lo que usa la mayoria de los
+      // catalogos de lenceria para la vista trasera. Ademas tarda segundos.
+      const ghostRes = await fetch("/api/bg-remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortSignal,
+        body: JSON.stringify({
+          imageUrl: backGarmentUrl ?? garmentForTryon,
+          provider: "replicate",
+          removeSubject: true,
+          garmentType: garmentTypeForApi,
+          isolateMethod: "photoroom-sandbox",
+          garmentDescription,
+        }),
+      });
+      const ghostJson = await ghostRes.json();
+      if (!ghostJson.success || !ghostJson.data?.url) {
+        throw new Error(ghostJson.error || "No se pudo generar la vista trasera del producto.");
       }
-      const leffa = await tryOnLeffaAsync(
-        newModelImage,
-        backGarmentForLeffa,
-        category,
-        abortSignal,
-        true,   // backView
-        false,  // sideView
-        // FASHN MASKLESS, NO LEFFA. Leffa perdia los tirantes por una razon
-        // estructural: su mascara protege el PELO, y en una modelo de espaldas
-        // el pelo cae justo sobre el cruce de tirantes, asi que esa zona nunca
-        // podia recibir tela. No es un parametro mal puesto — el endpoint de fal
-        // no expone nada que toque la mascara. FASHN v1.6 con segmentation_free
-        // trabaja sin mascara, asi que la causa desaparece.
-        "fashn",
-      );
-      return { resultUrl: leffa.resultUrl, cost: modelCost + leffa.cost, usedProvider: leffa.usedProvider };
+      return { resultUrl: ghostJson.data.url, cost: ghostJson.cost ?? 0.01, usedProvider: "ghost-espalda" };
     }
 
     const tryonRes = await fetch("/api/tryon", {
@@ -3101,12 +3071,11 @@ async function runStep(
         abortSignal,
         false, // backView
         true,  // sideView
-        // FASHN, NO LEFFA. Leffa tarda ~4 min medidos y eso no sirve para una
-        // demo en vivo ni para procesar 490 productos. FASHN maskless resuelve
-        // el mismo caso en ~15 s y ademas no tiene el problema de mascara que
-        // obligo a cambiarlo en la Foto Espalda. La entrada sigue siendo el
-        // perfil real del avatar, asi que el giro sigue siendo deterministico.
-        "fashn",
+        // LEFFA, NO FASHN. Se probo FASHN por velocidad (~15s vs ~4min) y el
+        // resultado fue peor en lo que importa: devolvia una foto DE FRENTE y
+        // con OTRA mujer. FASHN con segmentation_free redibuja demasiado y
+        // pierde tanto la vista como la identidad del avatar. Leffa es lento
+        // pero deforma sobre el perfil real y conserva las dos cosas.
       );
       return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
     }
