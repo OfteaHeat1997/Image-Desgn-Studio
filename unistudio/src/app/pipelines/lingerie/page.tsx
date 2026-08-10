@@ -2540,12 +2540,14 @@ async function tryOnLeffaAsync(
   backView = false,
   /** Foto Lateral: el servidor usa el perfil real del avatar de Uwear. */
   sideView = false,
+  /** Motor: 'fashn' (maskless, para la espalda) o Leffa por defecto. */
+  engine: "leffa" | "fashn" = "leffa",
 ): Promise<{ resultUrl: string; cost: number; usedProvider: string }> {
   const submitRes = await fetch("/api/tryon/async", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: abortSignal,
-    body: JSON.stringify({ modelImage, garmentImage, category, backView, sideView }),
+    body: JSON.stringify({ modelImage, garmentImage, category, backView, sideView, engine }),
   });
   const submitJson = await submitRes.json();
   if (!submitJson.success) throw new Error(submitJson.error || "No se pudo encolar el try-on con Leffa.");
@@ -2991,7 +2993,15 @@ async function runStep(
         backGarmentForLeffa,
         category,
         abortSignal,
-        true,
+        true,   // backView
+        false,  // sideView
+        // FASHN MASKLESS, NO LEFFA. Leffa perdia los tirantes por una razon
+        // estructural: su mascara protege el PELO, y en una modelo de espaldas
+        // el pelo cae justo sobre el cruce de tirantes, asi que esa zona nunca
+        // podia recibir tela. No es un parametro mal puesto — el endpoint de fal
+        // no expone nada que toque la mascara. FASHN v1.6 con segmentation_free
+        // trabaja sin mascara, asi que la causa desaparece.
+        "fashn",
       );
       return { resultUrl: leffa.resultUrl, cost: modelCost + leffa.cost, usedProvider: leffa.usedProvider };
     }

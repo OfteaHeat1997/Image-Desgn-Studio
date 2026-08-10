@@ -38,6 +38,8 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
     backView?: boolean;
     /** true = Foto Lateral: usar la vista de perfil real del avatar como modelo. */
     sideView?: boolean;
+    /** Motor de try-on: 'fashn' (maskless, para la espalda) o Leffa por defecto. */
+    engine?: 'leffa' | 'fashn';
   };
   // La lateral usa el MISMO mecanismo que la espalda. El prompt no alcanza:
   // pedirle a Uwear "girate 90 grados" devolvia siempre una foto de frente,
@@ -140,11 +142,37 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
   const garmentImageUrl = await ensureFalAccessibleUrl(body.garmentImage!);
 
-  const queued = await submitFal('fal-ai/leffa/virtual-tryon', {
-    human_image_url: humanImageUrl,
-    garment_image_url: garmentImageUrl,
-    garment_type: leffaGarmentType(body.category ?? 'tops'),
-  });
+  // MOTOR: FASHN MASKLESS PARA LA ESPALDA.
+  //
+  // Leffa perdia los tirantes por una razon estructural, no por un parametro mal
+  // puesto: su mascara es el AutoMasker de CatVTON, que trata el PELO como region
+  // protegida. En una modelo de espaldas el pelo cae justo sobre el cruce de
+  // tirantes, asi que esa zona nunca puede recibir tela. Ningun parametro del
+  // endpoint de fal toca la mascara — no hay perilla que girar.
+  //
+  // FASHN v1.6 con segmentation_free trabaja en espacio de pixeles SIN mascara,
+  // asi que la causa desaparece de raiz. Ademas moderation_level 'permissive' es
+  // el default y nunca se seteaba: la creencia de que "FASHN bloquea lenceria"
+  // venia de una prueba vieja.
+  //
+  // Solo la espalda cambia de motor. El perfil y el resto siguen con Leffa, que
+  // ahi funciona.
+  const useFashn = body.engine === 'fashn';
+  const queued = useFashn
+    ? await submitFal('fal-ai/fashn/tryon/v1.6', {
+        model_image: humanImageUrl,
+        garment_image: garmentImageUrl,
+        category: body.category === 'bottoms' ? 'bottoms' : body.category === 'one-pieces' ? 'one-pieces' : 'tops',
+        mode: 'quality',
+        segmentation_free: true,
+        moderation_level: 'permissive',
+        garment_photo_type: 'flat-lay',
+      })
+    : await submitFal('fal-ai/leffa/virtual-tryon', {
+        human_image_url: humanImageUrl,
+        garment_image_url: garmentImageUrl,
+        garment_type: leffaGarmentType(body.category ?? 'tops'),
+      });
 
   return NextResponse.json({
     success: true,
