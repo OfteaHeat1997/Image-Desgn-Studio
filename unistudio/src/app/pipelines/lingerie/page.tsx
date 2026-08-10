@@ -3101,12 +3101,11 @@ async function runStep(
         abortSignal,
         false, // backView
         true,  // sideView
-        // FASHN, NO LEFFA. Leffa tarda ~4 min medidos y eso no sirve para una
-        // demo en vivo ni para procesar 490 productos. FASHN maskless resuelve
-        // el mismo caso en ~15 s y ademas no tiene el problema de mascara que
-        // obligo a cambiarlo en la Foto Espalda. La entrada sigue siendo el
-        // perfil real del avatar, asi que el giro sigue siendo deterministico.
-        "fashn",
+        // LEFFA, NO FASHN. Se probo FASHN por velocidad (~15s vs ~4min) y el
+        // resultado fue peor en lo que importa: devolvia una foto DE FRENTE y
+        // con OTRA mujer. FASHN con segmentation_free redibuja demasiado y
+        // pierde tanto la vista como la identidad del avatar. Leffa es lento
+        // pero deforma sobre el perfil real y conserva las dos cosas.
       );
       return { resultUrl: leffaSide.resultUrl, cost: leffaSide.cost, usedProvider: leffaSide.usedProvider };
     }
