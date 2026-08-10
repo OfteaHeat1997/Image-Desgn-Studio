@@ -10,6 +10,7 @@
 # Top-level docs / planning files (not needed at build time)
 docs/
 scripts/
+interview-prep/
 CHANGELOG.md
 UniStudioResearchGuide.docx
 *.docx

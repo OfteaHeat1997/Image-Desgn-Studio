@@ -50,3 +50,6 @@ unistudio/UNISTUDIO-COMPLETE-GUIDE.html
 
 # Analysis docs (local only)
 ANALYSIS-AI-AGENT-IMPROVEMENT.md
+
+# Interview-prep audio (large binaries — delivered directly, not tracked in git)
+interview-prep/*.mp3
