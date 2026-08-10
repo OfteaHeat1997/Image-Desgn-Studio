@@ -35,8 +35,20 @@ import { urlToBuffer } from '@/lib/utils/image';
 export const JEWELRY_SCENE_COST = 0.04;
 
 export interface JewelrySceneOptions {
-  /** Prompt del DECORADO (sin la joya). */
+  /** Prompt del DECORADO (sin la joya). Ignorado si viene `solidBackground`. */
   backdropPrompt: string;
+  /**
+   * Color plano de fondo en hex. Cuando viene, NO se genera nada con IA: se pinta
+   * el lienzo de ese color y se compone el producto encima.
+   *
+   * Es lo que necesita el packshot de catálogo. Generarlo con Kontext hacía que
+   * REDIBUJARA la pieza: con una cadena de dije chico y lejano, el modelo
+   * "mejoraba" la foto engrosando la cadena y agrandando el colgante, porque el
+   * prompt pide que el producto ocupe espacio suficiente. El resultado era otro
+   * producto. Pintando el fondo y componiendo, la pieza es imposible de alterar,
+   * cuesta $0 y sale en menos de un segundo.
+   */
+  solidBackground?: string;
   /** Proporción de salida. 4:5 por defecto — es el formato de Instagram. */
   aspectRatio?: '1:1' | '4:5' | '3:4';
   /** Qué fracción del lienzo ocupa la pieza. 0.62 deja espacio negativo. */
@@ -71,25 +83,57 @@ export async function composeJewelryScene(
     `nothing in the center of the frame, professional product photography backdrop, ` +
     `no text, no watermark`;
 
-  const bgOut = await runModel('black-forest-labs/flux-schnell', {
-    prompt: backdropPrompt,
-    aspect_ratio: options.aspectRatio ?? '4:5',
-    num_outputs: 1,
-  });
-  const bgUrl = await extractOutputUrl(bgOut);
+  // Fondo plano: sin IA, sin costo, 100% determinista. Es lo que usa el packshot.
+  let bgBuf: Buffer;
+  if (options.solidBackground) {
+    const hex = options.solidBackground.replace('#', '');
+    bgBuf = await sharp({
+      create: {
+        width: W,
+        height: H,
+        channels: 3,
+        background: {
+          r: parseInt(hex.slice(0, 2), 16),
+          g: parseInt(hex.slice(2, 4), 16),
+          b: parseInt(hex.slice(4, 6), 16),
+        },
+      },
+    })
+      .png()
+      .toBuffer();
+  } else {
+    const bgOut = await runModel('black-forest-labs/flux-schnell', {
+      prompt: backdropPrompt,
+      aspect_ratio: options.aspectRatio ?? '4:5',
+      num_outputs: 1,
+    });
+    bgBuf = await urlToBuffer(await extractOutputUrl(bgOut));
+  }
 
-  const [bgBuf, productBuf] = await Promise.all([
-    urlToBuffer(bgUrl),
-    urlToBuffer(productUrl),
-  ]);
+  const productBuf = await urlToBuffer(productUrl);
 
   // El recorte TIENE que traer canal alfa. Si llega aplanado (p. ej. si pasó por
   // un proxy que lo reencodeó a JPEG), componerlo pega un rectángulo opaco sobre
   // la escena en vez de la silueta — se ve como un recuadro gris alrededor de la
   // pieza. Se avisa en el log para poder distinguirlo de un problema de prompt.
   const productMeta = await sharp(productBuf).metadata();
+
+  // NO ALCANZA con preguntar si EXISTE canal alfa: el proxy de imagenes
+  // reencodea el PNG y devuelve un alfa presente pero COMPLETAMENTE OPACO. En
+  // ese caso la silueta se pierde igual, y como la sombra se calcula a partir
+  // del alfa, terminaba pintando un RECTANGULO negro al 42% sobre el decorado —
+  // el cuadrado gris que aparecia detras de la pieza. Hay que mirar si el alfa
+  // se USA, no si esta.
+  let alphaIsFlat = !productMeta.hasAlpha;
+  if (productMeta.hasAlpha) {
+    const stats = await sharp(productBuf).stats();
+    const alphaCh = stats.channels[stats.channels.length - 1];
+    // Si el minimo del canal alfa es 255, no hay un solo pixel transparente.
+    alphaIsFlat = (alphaCh?.min ?? 255) >= 250;
+  }
+
   let productSource = productBuf;
-  if (!productMeta.hasAlpha) {
+  if (alphaIsFlat) {
     // El recorte llegó APLANADO (el proxy de imágenes lo reencodea y se come el
     // canal alfa). Sin alfa, componer pega el RECTÁNGULO entero sobre la escena
     // — el recuadro gris alrededor de la pieza que se veía en producción.
@@ -179,6 +223,6 @@ export async function composeJewelryScene(
 
   return {
     dataUrl: `data:image/jpeg;base64,${composed.toString('base64')}`,
-    cost: JEWELRY_SCENE_COST,
+    cost: options.solidBackground ? 0 : JEWELRY_SCENE_COST,
   };
 }

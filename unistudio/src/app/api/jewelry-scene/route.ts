@@ -12,12 +12,13 @@ import { saveJob } from '@/lib/db/persist';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { productUrl, backdropPrompt, aspectRatio, productScale, shadow } = body as {
+    const { productUrl, backdropPrompt, aspectRatio, productScale, shadow, solidBackground } = body as {
       productUrl?: string;
       backdropPrompt?: string;
       aspectRatio?: '1:1' | '4:5' | '3:4';
       productScale?: number;
       shadow?: boolean;
+      solidBackground?: string;
     };
 
     if (!productUrl || typeof productUrl !== 'string') {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (!backdropPrompt || typeof backdropPrompt !== 'string') {
+    if (!solidBackground && (!backdropPrompt || typeof backdropPrompt !== 'string')) {
       return NextResponse.json(
         { success: false, error: 'Missing required field "backdropPrompt".' },
         { status: 400 },
@@ -34,7 +35,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await composeJewelryScene(productUrl, {
-      backdropPrompt,
+      backdropPrompt: backdropPrompt ?? '',
+      solidBackground,
       aspectRatio,
       productScale,
       shadow,
