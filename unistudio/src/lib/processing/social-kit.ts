@@ -53,6 +53,12 @@ export interface SocialKitOptions {
   transitionSeconds?: number;
   /** Generar el reel además del carrusel. */
   includeReel?: boolean;
+  /**
+   * Fotos del reel. Por defecto son las mismas del carrusel, pero el reel es un
+   * loop de vitrina: con 8-10 slides el encodeo se va de tiempo (fue el timeout
+   * que hizo que el reel quedara apagado) y ademas el video se hace largo.
+   */
+  reelImageUrls?: string[];
 }
 
 export interface SocialKitResult {
@@ -166,17 +172,29 @@ async function fitToCanvas(
  * lo que reporte el paquete, los dos nombres posibles dentro del paquete, y por
  * último un ffmpeg del PATH del sistema.
  */
-async function resolveFfmpeg(): Promise<string | null> {
+async function resolveFfmpeg(): Promise<{ path: string | null; diag: string[] }> {
+  // Cada intento deja constancia. Antes cada candidato moria en un `catch {}`
+  // silencioso y lo unico que llegaba a la pantalla era "no se pudo generar en
+  // este entorno", que no dice NADA: no se sabe si el binario falta, si es de
+  // otra plataforma o si no tiene permiso de ejecucion. Sin poder correr esto en
+  // produccion desde aca, el diagnostico ES el arreglo.
+  const diag: string[] = [];
+
   const fromEnv = process.env.FFMPEG_PATH?.trim();
-  if (fromEnv) return fromEnv;
+  if (fromEnv) {
+    diag.push(`FFMPEG_PATH=${fromEnv}`);
+    return { path: fromEnv, diag };
+  }
+  diag.push('FFMPEG_PATH sin definir');
 
   const isWin = process.platform === 'win32';
 
   let pkgPath: string | null = null;
   try {
     pkgPath = ((await import('ffmpeg-static')).default as unknown as string) ?? null;
-  } catch {
-    pkgPath = null;
+    diag.push(`ffmpeg-static apunta a ${pkgPath ?? '(null)'}`);
+  } catch (e) {
+    diag.push(`no se pudo importar ffmpeg-static: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   const candidates: string[] = [];
@@ -186,25 +204,35 @@ async function resolveFfmpeg(): Promise<string | null> {
     const dir = path.dirname(pkgPath);
     candidates.push(path.join(dir, isWin ? 'ffmpeg' : 'ffmpeg.exe'));
   }
+  candidates.push('ffmpeg'); // un ffmpeg del PATH del sistema
 
   for (const c of candidates) {
+    if (c !== 'ffmpeg') {
+      try {
+        await fs.access(c);
+      } catch {
+        diag.push(`${c}: no existe`);
+        continue;
+      }
+      // El file-tracing de Vercel copia el binario pero puede perder el bit de
+      // ejecucion, y entonces spawn falla con EACCES aunque el archivo este.
+      try {
+        await fs.chmod(c, 0o755);
+      } catch {
+        /* si no se puede, el intento de abajo lo dira */
+      }
+    }
     try {
-      await fs.access(c);
-      // Un binario de otra plataforma existe pero no ejecuta; se comprueba de verdad.
+      // Existir no basta: un binario de otra plataforma esta ahi y no corre.
       await runFfmpeg(c, ['-version']);
-      return c;
-    } catch {
-      /* siguiente candidato */
+      diag.push(`${c}: OK`);
+      return { path: c, diag };
+    } catch (e) {
+      diag.push(`${c}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
-  // Último recurso: un ffmpeg instalado en el sistema.
-  try {
-    await runFfmpeg('ffmpeg', ['-version']);
-    return 'ffmpeg';
-  } catch {
-    return null;
-  }
+  return { path: null, diag };
 }
 
 /** Ejecuta ffmpeg y resuelve con su stderr (donde escribe el log). */
@@ -236,13 +264,10 @@ async function buildReel(
   frames: Buffer[],
   opts: Required<Pick<SocialKitOptions, 'secondsPerSlide' | 'transitionSeconds' | 'background'>>,
 ): Promise<string> {
-  const ffmpegPath = await resolveFfmpeg();
+  const { path: ffmpegPath, diag } = await resolveFfmpeg();
   if (!ffmpegPath) {
     throw new Error(
-      'No se encontró un binario de ffmpeg utilizable. Se probó FFMPEG_PATH, el binario de ' +
-        'ffmpeg-static y el ffmpeg del PATH del sistema, y ninguno respondió. En Vercel el ' +
-        'binario viaja por `outputFileTracingIncludes` en next.config.ts; en local hace falta ' +
-        '`npm rebuild ffmpeg-static` (el binario descargado es de la plataforma del install).',
+      `No se encontró un binario de ffmpeg utilizable. Intentos: ${diag.join(' | ')}`,
     );
   }
 
@@ -344,7 +369,10 @@ export async function buildSocialKit(
   let reelError: string | undefined;
   if (options.includeReel !== false) {
     try {
-      reel = await buildReel(buffers, { secondsPerSlide, transitionSeconds, background });
+      const reelSource = options.reelImageUrls?.length
+        ? await Promise.all(options.reelImageUrls.map((u) => urlToBuffer(u)))
+        : buffers;
+      reel = await buildReel(reelSource, { secondsPerSlide, transitionSeconds, background });
     } catch (err) {
       // El carrusel es el entregable principal; si ffmpeg falla en este entorno
       // se devuelve igual, con el motivo, en vez de tumbar todo el paso.

@@ -12,12 +12,13 @@ import { saveJob } from '@/lib/db/persist';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageUrls, background, secondsPerSlide, transitionSeconds, includeReel } = body as {
+    const { imageUrls, background, secondsPerSlide, transitionSeconds, includeReel, reelImageUrls } = body as {
       imageUrls?: unknown;
       background?: 'white' | 'black' | 'warm-gray';
       secondsPerSlide?: number;
       transitionSeconds?: number;
       includeReel?: boolean;
+      reelImageUrls?: string[];
     };
 
     if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       secondsPerSlide,
       transitionSeconds,
       includeReel,
+      reelImageUrls,
     });
 
     await saveJob({

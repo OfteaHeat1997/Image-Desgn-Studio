@@ -12,7 +12,11 @@ const nextConfig: NextConfig = {
   // el reel de Instagram fallaba en produccion con "no se encontro ffmpeg"
   // mientras el carrusel salia bien. Hay que pedir el binario a mano.
   outputFileTracingIncludes: {
+    // Dos claves a proposito: segun la version, el trazador indexa la ruta del
+    // App Router como '/api/social-kit' o como '/api/social-kit/route'. Poner
+    // las dos cuesta nada y evita otro ciclo de deploy a ciegas.
     '/api/social-kit': ['./node_modules/ffmpeg-static/**'],
+    '/api/social-kit/route': ['./node_modules/ffmpeg-static/**'],
   },
 
   // Sello de build: inyecta el SHA del commit que Vercel está sirviendo en el

@@ -1681,7 +1681,19 @@ export default function JewelryPipelinePage() {
               // entregaba NADA, ni siquiera el carrusel, que se arma en 2s.
               // Ahora el paso devuelve el carrusel siempre; el reel queda para
               // pedirlo aparte cuando haga falta.
-              body: JSON.stringify({ imageUrls: urls.slice(0, 10), includeReel: false }),
+              // El reel VA. Estuvo en `false` un tiempo para cortar un timeout y
+              // quedo asi, con lo cual el paso 8 entregaba solo el carrusel y
+              // avisaba "no se pudo generar en este entorno" — un mensaje que ni
+              // siquiera correspondia, porque el reel no se intentaba.
+              //
+              // Se limita a 4 slides: el reel es un loop de vitrina, no el
+              // catalogo entero, y cada slide suma tiempo de encodeo contra el
+              // maxDuration de la ruta (que fue el timeout original).
+              body: JSON.stringify({
+                imageUrls: urls.slice(0, 10),
+                includeReel: true,
+                reelImageUrls: urls.slice(0, 4),
+              }),
               signal,
             });
             const data = await safeJson(res);
