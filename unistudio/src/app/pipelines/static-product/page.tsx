@@ -1137,7 +1137,9 @@ export default function StaticProductPipelinePage() {
       // CORTO a propósito: el prompt total no debe superar ~400 chars o Flux
       // Schnell revienta con "Unable to extract URL" (verificado). El "escena
       // vacía" ya viene reforzado en NO_DUP del config.
-      const featureSuffix = ". Empty background, no extra products.";
+      // NO nombrar "products/bottles" ni con "no" — Flux Schnell los dibuja.
+      // Solo reforzar el vacío abstracto en positivo.
+      const featureSuffix = ". Pure empty abstract backdrop, wide open negative space.";
       const enrichedConfig = { ...config, prompt: config.prompt + featureSuffix };
 
       // El HD ya se hizo en el PASO 1 (restore/SUPIR, antes de quitar fondo), así

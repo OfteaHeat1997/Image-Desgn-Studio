@@ -91,10 +91,13 @@ export function getAdaptiveBgConfig(
   // total superara ~1000 chars — Flux Schnell se atragantaba y devolvía un output
   // que reventaba extractOutputUrl con "Unable to extract URL". Verificado:
   // prompt de 258 chars funciona, el de 1047 falla. Mantener esto CORTO.
-  const HD = ', high resolution, sharp focus, photo-realistic, professional product photography';
-  // ANTI-DUP corto: la clave es "empty, no products, no bottles". El producto
-  // real se compone encima (pixel-perfect), así que el fondo debe ir VACÍO.
-  const NO_DUP = ', completely empty scene, no products, no bottles, no shelves, plain empty surface';
+  const HD = ', high resolution, sharp focus, photo-realistic, soft studio lighting';
+  // ANTI-DUP: NUNCA nombrar "bottle/product/perfume" ni con "no" — Flux Schnell
+  // no soporta negativos y al ver esas palabras las DIBUJA (efecto "no pienses en
+  // un elefante rosa"). Bug: salían frascos fantasma detrás. Ahora SOLO lenguaje
+  // positivo de escena vacía, sin nombrar ningún objeto. El producto real se
+  // compone encima (pixel-perfect), así que el fondo va limpio.
+  const NO_DUP = ', pure abstract studio backdrop only, empty minimalist set design, plain uncluttered wallpaper aesthetic, wide open negative space, backdrop wall and floor only';
   const seed = brandSeed(productType, brand);
 
   // --- Perfumes ---
@@ -112,7 +115,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'cyzone') {
       return {
         prompt:
-          'vibrant coral-to-lilac gradient background with soft pastel bokeh highlights, youthful modern aesthetic with clean geometry, professional fragrance commercial photography, fresh and dynamic' + HD + NO_DUP,
+          'vibrant coral-to-lilac gradient background with soft pastel bokeh highlights, youthful modern aesthetic with clean geometry, soft ambient lighting, fresh and dynamic' + HD + NO_DUP,
         shadowType: 'drop',
         bgMode: 'precise',
         label: 'Fondo pastel juvenil',
@@ -121,7 +124,7 @@ export function getAdaptiveBgConfig(
     }
     return {
       prompt:
-        'clean warm beige studio background with soft natural daylight from the left, subtle linen texture visible, minimal elegant commercial product photography' + HD + NO_DUP,
+        'clean warm beige studio background with soft natural daylight from the left, subtle linen texture visible, minimal elegant soft lighting' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Beige cálido minimalista',
@@ -144,7 +147,7 @@ export function getAdaptiveBgConfig(
     if (brand === 'esika' || brand === 'cyzone') {
       return {
         prompt:
-          'warm beige linen texture background with visible fabric weave, soft diffused lighting from above-left, cozy spa aesthetic, professional skincare commercial photography, natural and organic feel' + HD + NO_DUP,
+          'warm beige linen texture background with visible fabric weave, soft diffused lighting from above-left, cozy spa aesthetic, soft natural lighting, natural and organic feel' + HD + NO_DUP,
         shadowType: 'contact',
         bgMode: 'precise',
         label: 'Beige cálido tipo spa',
@@ -153,7 +156,7 @@ export function getAdaptiveBgConfig(
     }
     return {
       prompt:
-        'neutral warm cream background with subtle linen texture, soft studio lighting, clean commercial skincare product photography, elegant minimalism' + HD + NO_DUP,
+        'neutral warm cream background with subtle linen texture, soft studio lighting, clean soft studio lighting, elegant minimalism' + HD + NO_DUP,
       shadowType: 'contact',
       bgMode: 'precise',
       label: 'Crema neutro',
@@ -165,7 +168,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'sunscreen') {
     return {
       prompt:
-        'empty defocused warm sandy beach background with golden-hour sun flare, soft turquoise ocean blur in the distance, shallow depth of field, summer commercial photography background only, Coppertone campaign empty scene, bright and vibrant, NO sunscreen tubes or bottles in scene' + HD + NO_DUP,
+        'defocused warm sandy beach with golden-hour sun flare, soft turquoise ocean blur in the distance, shallow depth of field, bright airy summer atmosphere, clean and vibrant' + HD + NO_DUP,
       shadowType: 'drop',
       bgMode: 'precise',
       label: 'Playa desenfocada (estilo Coppertone)',
@@ -177,7 +180,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'deodorant') {
     return {
       prompt:
-        'smooth cool gray-to-silver gradient background with soft top lighting, subtle studio vignette, clean commercial product photography with no distractions, modern minimal aesthetic' + HD + NO_DUP,
+        'smooth cool gray-to-silver gradient background with soft top lighting, subtle studio vignette, clean soft studio lighting, modern minimal aesthetic' + HD + NO_DUP,
       shadowType: 'contact',
       bgMode: 'precise',
       label: 'Degradado gris neutro',
@@ -189,7 +192,7 @@ export function getAdaptiveBgConfig(
   if (productType === 'facial') {
     return {
       prompt:
-        'clean white-to-pale-blue spa background with suggestion of water droplets and subtle reflections, fresh clinical skincare aesthetic, La Roche-Posay pharmacy commercial photography, luminous and pure' + HD + NO_DUP,
+        'clean white-to-pale-blue spa background with suggestion of water droplets and subtle reflections, fresh clinical skincare aesthetic, clean clinical lighting, luminous and pure' + HD + NO_DUP,
       shadowType: 'reflection',
       bgMode: 'precise',
       label: 'Spa azul/blanco',
@@ -211,7 +214,7 @@ export function getAdaptiveBgConfig(
 
   // Fallback
   return {
-    prompt: 'clean pure white studio background with subtle gradient, professional commercial product photography, centered product, soft studio lighting' + HD + NO_DUP,
+    prompt: 'clean pure white studio background with subtle gradient, soft studio lighting, soft studio lighting' + HD + NO_DUP,
     shadowType: 'contact',
     bgMode: 'precise',
     label: 'Fondo blanco simple',
