@@ -4,6 +4,7 @@
 
 import { runModel, extractOutputUrl } from '@/lib/api/replicate';
 import { removeBgReplicate } from '@/lib/processing/bg-remove';
+import { uploadToBlob } from '@/lib/api/blob';
 import sharp from 'sharp';
 
 // ---------------------------------------------------------------------------
@@ -651,7 +652,12 @@ export async function generateBgFast(
       .jpeg({ quality: 92 })
       .toBuffer();
 
-    return `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
+    // Subir a Blob → devuelve URL CHICA. El data URL de 2000px (base64) es
+    // enorme y cuando este output se manda a /api/upscale o /api/shadows revienta
+    // el límite de payload de Vercel (FUNCTION_PAYLOAD_TOO_LARGE). Con URL de
+    // Blob el body es de bytes. Cae al data URL solo si Blob no está configurado.
+    const blobUrl = await uploadToBlob(resultBuffer, 'image/jpeg', 'bg-fast.jpg');
+    return blobUrl ?? `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
   } catch (err) {
     // If composite fails, return background-only rather than crashing
     console.warn('[bg-generate] Fast mode composite failed, returning background only:', err);
@@ -734,7 +740,11 @@ export async function compositeOnSolidColor(
     .png()
     .toBuffer();
 
-  return `data:image/png;base64,${resultBuffer.toString('base64')}`;
+  // Subir a Blob → URL chica. El PNG blanco de 2000px como data URL es enorme y
+  // reventaba el payload de Vercel cuando el blanco se manda a /api/shadows
+  // (FUNCTION_PAYLOAD_TOO_LARGE). Cae al data URL si Blob no está configurado.
+  const blobUrl = await uploadToBlob(resultBuffer, 'image/png', 'white-ecommerce.png');
+  return blobUrl ?? `data:image/png;base64,${resultBuffer.toString('base64')}`;
 }
 
 // ---------------------------------------------------------------------------
