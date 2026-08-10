@@ -152,7 +152,7 @@ const STEP_ENGINE: Record<StepKey, string> = {
   clean: "Kontext Pro",
   isolate: "BiRefNet",
   packshot: "sharp · sin IA",
-  luxury: "Flux Schnell + sharp",
+  luxury: "sharp · sin IA",
   macro: "sharp · sin IA",
   model: "SeedDream + Kontext",
   scale: "SeedDream + Kontext",
@@ -1498,25 +1498,39 @@ export default function JewelryPipelinePage() {
           case "luxury": {
             const input = productUrl(job);
             if (!input) return fail(jt.messages.needsIsolate);
-            const backdrop = job.prompts?.luxuryBackdrop;
-            if (!backdrop) {
-              // Sin decorado dirigido no hay compuesto posible: se marca saltado
-              // en vez de caer al camino que reinterpreta la pieza.
-              patchStep(jobId, key, { status: "skipped" });
-              return false;
-            }
             patchStep(jobId, key, { status: "processing", inputUrl: input, error: undefined });
             focusCard();
+            // SUPERFICIE CONSTRUIDA, NO GENERADA.
+            //
+            // El decorado lo pintaba Flux, y una de cada tantas veces metia una
+            // CARTULINA gris rectangular justo en el centro — con su propia
+            // sombra y los props apoyados encima. Como la pieza se compone ahi,
+            // quedaba sobre un recuadro gris que parece un error de recorte.
+            // Prohibirlo por prompt no basta: un prompt es una sugerencia y
+            // vuelve cuando quiere.
+            //
+            // Un barrido de estudio no necesita inventiva — es un degradado
+            // calido con un charco de luz y una vineta — asi que se dibuja. Sale
+            // igual siempre, gratis, y no puede aparecer nada que no pusimos.
+            // Ya no hace falta esperar el decorado de Vision, que era lo que
+            // dejaba este paso en "saltado" cuando el analisis no traia texto.
             const res = await fetch("/api/jewelry-scene", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ productUrl: input, backdropPrompt: backdrop, aspectRatio: "4:5" }),
+              body: JSON.stringify({
+                productUrl: input,
+                surface: "luxury",
+                aspectRatio: "4:5",
+                // Mas chica que en el packshot: el aire alrededor es lo que hace
+                // que la toma se lea editorial y no de catalogo.
+                productScale: 0.52,
+              }),
               signal,
             });
             const data = await safeJson(res);
             const url = pickUrl(data.data);
             if (!data.success || !url) return fail(data.error);
-            done(url, data.cost ?? 0.04);
+            done(url, data.cost ?? 0);
             return true;
           }
 
@@ -1711,7 +1725,7 @@ export default function JewelryPipelinePage() {
               body: JSON.stringify({
                 imageUrls: urls.slice(0, 10),
                 includeReel: true,
-                reelImageUrls: urls.slice(0, 4),
+                reelImageUrls: urls.slice(0, 3),
               }),
               signal,
             });
