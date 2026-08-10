@@ -265,24 +265,74 @@ async function buildLuxurySurface(W: number, H: number): Promise<Buffer> {
 
   // 3. Sombra de contacto. Sin ella el recorte se ve calcado sobre el fondo.
   if (options.shadow !== false) {
-    const shadow = await sharp(product)
-      .extractChannel('alpha')
-      .blur(18)
-      .toBuffer()
-      .then((mask) =>
-        sharp({
-          create: {
-            width: pw,
-            height: ph,
-            channels: 4,
-            background: { r: 0, g: 0, b: 0, alpha: 0.42 },
-          },
-        })
-          .composite([{ input: mask, blend: 'dest-in' }])
-          .png()
-          .toBuffer(),
-      );
-    layers.push({ input: shadow, left, top: top + Math.round(ph * 0.035) });
+    // LA SOMBRA, BIEN HECHA.
+    //
+    // Aca vivia el recuadro gris que arruinaba los pasos 3 y 4, y no era ni
+    // Flux ni el canal alfa del recorte: era esto.
+    //
+    // La version anterior sacaba el alfa de la pieza con `extractChannel` y lo
+    // usaba como mascara con `blend: 'dest-in'`. El detalle fatal es que
+    // `dest-in` recorta segun el ALFA de la mascara, no segun su luminancia — y
+    // `extractChannel('alpha')` devuelve una imagen GRIS, sin canal alfa, o sea
+    // opaca de punta a punta. Resultado: no recortaba nada y la sombra salia
+    // como el RECTANGULO negro completo al 42%, del tamaño exacto de la caja de
+    // la pieza. Medido: 136 de brillo dentro contra 225 afuera.
+    //
+    // La forma correcta es no usar mascara: se construye un lienzo negro y el
+    // alfa difuminado de la pieza SE LE ADJUNTA como canal alfa. Asi la sombra
+    // tiene, por construccion, la silueta de la joya.
+    // El lienzo lleva MARGEN. Sin el, el desenfoque choca contra el borde de la
+    // caja de la pieza y la sombra sale con un corte recto arriba y a los lados
+    // — otra vez un rectangulo, mas sutil pero igual de delator.
+    const PAD = 60;
+    const sw = pw + PAD * 2;
+    const sh = ph + PAD * 2;
+
+    // El margen NO se hace con `extend`: pasarle un color a una imagen de un
+    // solo canal la promueve a tres, y entonces el `joinChannel` de abajo lee el
+    // buffer crudo como si fuera de uno — que fue exactamente lo que dibujo dos
+    // rayas negras verticales en la prueba.
+    //
+    // En su lugar la silueta se pega sobre un lienzo negro ya del tamaño final.
+    // El negro es alfa 0 cuando se convierte en canal alfa, o sea: margen
+    // transparente, que es lo que hace falta para que el desenfoque no choque
+    // contra el borde y salga cortado.
+    const alphaPng = await sharp(product).extractChannel('alpha').png().toBuffer();
+
+    // DOS ETAPAS, a proposito. Encadenar `.blur()` despues de `.composite()` en
+    // la MISMA instancia de sharp no difumina lo compuesto: sharp tiene su
+    // propio orden interno de operaciones y aplica el desenfoque ANTES de pegar
+    // las capas. La sombra salia con borde duro — medido, el perfil pasaba de 0
+    // a 76 y volvia a 0 de golpe, sin penumbra. Difuminando en una etapa
+    // separada el perfil sube y baja gradualmente, que es lo que hace que se lea
+    // como sombra y no como una calcomania gris.
+    const padded = await sharp({
+      create: { width: sw, height: sh, channels: 3, background: 'black' },
+    })
+      .composite([{ input: alphaPng, left: PAD, top: PAD }])
+      .greyscale()
+      .png()
+      .toBuffer();
+
+    const silhouette = await sharp(padded)
+      // Desenfoque generoso: una joya apoyada proyecta sombra difusa.
+      .blur(34)
+      // 0.30 de opacidad maxima: sombra de contacto, no mancha. Sobre marfil,
+      // mas oscuro que esto se lee como suciedad.
+      .linear(0.3, 0)
+      .removeAlpha()
+      .toColourspace('b-w')
+      .raw()
+      .toBuffer();
+
+    const shadow = await sharp({
+      create: { width: sw, height: sh, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .joinChannel(silhouette, { raw: { width: sw, height: sh, channels: 1 } })
+      .png()
+      .toBuffer();
+
+    layers.push({ input: shadow, left: left - PAD, top: top - PAD + Math.round(ph * 0.03) });
   }
 
   layers.push({ input: product, left, top });
