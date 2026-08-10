@@ -164,7 +164,27 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
         garment_image: garmentImageUrl,
         category: body.category === 'bottoms' ? 'bottoms' : body.category === 'one-pieces' ? 'one-pieces' : 'tops',
         mode: 'quality',
-        segmentation_free: true,
+        // LA MANCHA BLANCA ERA LA ROPA DEL AVATAR, NO UN ERROR DE LA IA.
+        //
+        // Con segmentation_free:true FASHN hace exactamente lo que dice su doc:
+        // "ajustar la prenda SIN segmentar la ropa existente, permitiendo capas
+        // encima". O sea: NO le saca al avatar lo que ya tiene puesto. El avatar
+        // full_body_back de Uwear viene vestido — se ve en el resultado: el
+        // pantalon blanco queda intacto porque nadie se lo toco.
+        //
+        // Como la foto de espalda que sube la usuaria suele ser un 3/4 girado y
+        // el avatar esta de espaldas rectas, la silueta no calza: por un costado
+        // el bra negro queda corto y asoma el top BLANCO del avatar. Eso era la
+        // "copa blanca" con borde de encaje sobre el omoplato — el borde del top
+        // del avatar, no una alucinacion.
+        //
+        // En false, FASHN segmenta y QUITA la prenda del avatar antes de vestirla.
+        // Se habia puesto en true por el problema del tirante bajo el pelo, pero
+        // ese problema era de la mascara de Leffa (AutoMasker de CatVTON), y Leffa
+        // ya no corre en este paso. El segmentador propio de FASHN es otro modelo.
+        // Si el tirante volviera a perderse bajo el pelo, revertir a true y atacar
+        // por el otro lado (recortar el cutout al bounding box de la prenda).
+        segmentation_free: false,
         moderation_level: 'permissive',
         garment_photo_type: 'flat-lay',
       })
