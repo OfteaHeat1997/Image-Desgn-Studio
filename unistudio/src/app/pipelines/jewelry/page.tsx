@@ -118,6 +118,20 @@ const STEP_ICONS: Record<StepKey, React.ElementType> = {
  */
 const PACKSHOT_BG = "#F6F4F0";
 
+/**
+ * Foto de escala: la pieza SOSTENIDA, no puesta.
+ *
+ * Es la toma que responde "¿de qué tamaño es?" — la duda que más devoluciones
+ * genera. Una mano al lado da la referencia sin que la compradora tenga que
+ * interpretar nada, y funciona igual para collar, pulsera o anillo, que es
+ * justamente lo que forzar `type: "ring"` rompia.
+ */
+const SCALE_DIRECTION =
+  "IGNORE the wearing instruction above. The piece is NOT worn: an elegant hand " +
+  "holds it up between thumb and index finger, at true real-world scale next to " +
+  "the fingers, so its size is unmistakable. Show the hand and the piece only, " +
+  "plain neutral background, soft studio light, sharp focus on the piece.";
+
 const STEP_COST: Record<StepKey, number> = {
   clean: 0.04,
   isolate: 0.01,
@@ -1630,15 +1644,20 @@ export default function JewelryPipelinePage() {
               body: JSON.stringify({
                 modelImage: modelPhotoUrl,
                 jewelryImage: jewelryUrl,
-                // La escala se compone siempre contra una mano.
-                type: key === "scale" ? "ring" : job.subType,
+                // La foto de escala va contra una mano, pero forzar type:"ring"
+                // era un error: el prompt de "ring" pide ponerla EN EL DEDO, asi
+                // que a un collar le pedia lo imposible y Kontext resolvia
+                // inventando un anillo. La pieza se SOSTIENE, no se calza — eso
+                // va por `placementDirection`, que se agrega al prompt.
+                type: job.subType,
                 mode: "modelo",
                 featureDescriptor: descriptor ?? undefined,
                 // El prompt de colocacion de Vision va al TRY-ON, que es quien
                 // pone la joya sobre el cuerpo. Se estaba mandando a
                 // model-create, o sea describiendo a la modelo en vez de dirigir
                 // la colocacion: la direccion se perdia.
-                placementDirection: key === "model" ? job.prompts?.model : undefined,
+                placementDirection:
+                  key === "scale" ? SCALE_DIRECTION : job.prompts?.model,
                 negative: job.prompts?.negative,
               }),
               signal,
