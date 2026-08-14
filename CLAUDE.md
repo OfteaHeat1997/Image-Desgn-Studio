@@ -143,6 +143,8 @@ Global error boundary lives at `src/app/error.tsx` + `global-error.tsx`. All 13 
 
 ## Provider-Specific Gotchas
 
+**Before changing any provider, read `docs/providers.md`** — it records which provider runs each step, what it costs, and what was already tested and discarded (with the measured reason). Adding a provider means adding a row there in the same commit.
+
 These are non-obvious and have bitten us before — preserve them exactly:
 
 - **Flux Kontext Pro**: uses `input_image` parameter (NOT `image`). Does NOT support `output_format` — do not pass it (jewelry, shadows).
@@ -161,6 +163,7 @@ These are non-obvious and have bitten us before — preserve them exactly:
 
 ## Useful Reference Docs
 
+- `docs/providers.md` — provider per step, verified costs, and the tested/discarded log (read before switching providers)
 - `docs/pipelines/README.md` — index of the 3 canonical pipelines + sync rules
 - `docs/pipelines/lingerie.md` — lingerie pipeline flow, providers, costs, troubleshooting
 - `docs/pipelines/static-product.md` — static product pipeline + adaptive background matrix

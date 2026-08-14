@@ -25,6 +25,7 @@ Image-Desgn-Studio/
 
 | Archivo | Para qué sirve |
 |---------|----------------|
+| `providers.md` | **Qué proveedor de IA usa cada paso, cuánto cuesta, y qué se probó de cada uno** |
 | `architecture.md` | Rutas API + esquema de base de datos + flujo de peticiones |
 | `design-system.md` | Tokens de diseño, colores, tipografía |
 | `UX_UI_GUIDE.md` | Guía de UX/UI de la app |
@@ -49,6 +50,7 @@ Ese folder tiene su propio `README.md` que explica cada subcarpeta.
 
 ## 🔗 Docs relacionados
 
+- Proveedores de IA (qué usar y qué ya se descartó): [`providers.md`](providers.md)
 - Índice de pipelines: [`pipelines/README.md`](pipelines/README.md)
 - Índice de módulos: [`modules/README.md`](modules/README.md)
 - Coordinación entre terminales: [`../COORDINATION.md`](../COORDINATION.md)
