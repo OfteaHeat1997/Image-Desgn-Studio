@@ -42,11 +42,13 @@ When the user asks for multiple things in a session, you MUST:
 ### Three canonical pipelines — no duplicates allowed
 The project has exactly 3 pipelines, each for a disjoint product category from `docs/inventory.md`:
 
-| Pipeline | Products | Folder | Doc |
+| Pipeline | Products | Where it lives | Doc |
 |---|---|---|---|
-| **Lencería** | bras, panties, shapewear, bodysuits, fajas | `src/app/pipelines/lingerie/` + `/api/pipelines/lingerie` | `docs/pipelines/lingerie.md` |
-| **Estáticos** | perfumes, cremas, bloqueador, desodorantes, facial, maquillaje | `src/app/pipelines/static-product/` + `/api/pipelines/static-product` | `docs/pipelines/static-product.md` |
-| **Joyería** | aretes, cadenas, anillos, pulseras, topos, candongas, sets | `src/app/pipelines/jewelry/` + `/api/pipelines/jewelry` | `docs/pipelines/jewelry.md` |
+| **Lencería** | bras, panties, shapewear, bodysuits, fajas | `src/app/pipelines/lingerie/page.tsx` (6210 lines) | `docs/pipelines/lingerie.md` |
+| **Estáticos** | perfumes, cremas, bloqueador, desodorantes, facial, maquillaje | `src/app/pipelines/static-product/page.tsx` + `src/lib/pipelines/static-product.ts` | `docs/pipelines/static-product.md` |
+| **Joyería** | aretes, cadenas, anillos, pulseras, topos, candongas, sets | `src/app/pipelines/jewelry/page.tsx` + `src/lib/pipelines/jewelry.ts` | `docs/pipelines/jewelry.md` |
+
+**There is NO `/api/pipelines/*` route.** Verified 2026-08-23: `src/app/api/pipelines/` does not exist. Pipelines are orchestrated **client-side** — each page chains `fetch` calls to module routes (`/api/tryon`, `/api/bg-remove`, …) and holds the inter-step state itself. Earlier versions of this file documented server routes that were never built; do not go looking for them.
 
 **Rules:**
 - NEVER create a 4th pipeline. If a new product type appears, it fits into one of the 3 or we redesign the 3 — never fork.
@@ -56,12 +58,19 @@ The project has exactly 3 pipelines, each for a disjoint product category from `
 
 ### Pipeline ↔ module sync rule
 If a pipeline changes its provider for a step (e.g. Kolors → FASHN for try-on), in the SAME commit:
-1. Update the pipeline route (`/api/pipelines/<name>/route.ts`).
+1. Update the pipeline orchestration (`src/app/pipelines/<name>/page.tsx`, and `src/lib/pipelines/<name>.ts` where one exists).
 2. Update the underlying module route (`/api/<module>/route.ts`) so it supports the new provider as an option.
 3. Update the pipeline doc (`docs/pipelines/<name>.md`).
 4. Update the modules index (`docs/modules/README.md`).
+5. Update `docs/providers.md` — the §1 table (what runs today), §3 (test log, with date and measured result), §4 (cost), §7 (if something was discarded).
+6. **Write an ADR** in `docs/decisions/` if the change reverses or supersedes an existing decision. Accepted ADRs are never edited or deleted — a new one supersedes the old.
 
 Never split these into separate commits. What you change, you document — in the same commit.
+
+### Documentation follows Diátaxis
+Every doc does exactly ONE job and declares its type on the first line: *Tutorial* (learning), *How-to* (task), *Reference* (lookup), *Explanation* (why). If a doc needs to be two of those, it is two docs. `docs/README.md` is the index and classifies everything.
+
+A claim without a date and a measured result does not go in. `docs/providers.md` labels every claim PROBADO / DESCARTADO / SIN VERIFICAR / HIPÓTESIS — keep that discipline.
 
 ## Commands
 
@@ -163,12 +172,24 @@ These are non-obvious and have bitten us before — preserve them exactly:
 
 ## Useful Reference Docs
 
-- `docs/providers.md` — provider per step, verified costs, and the tested/discarded log (read before switching providers)
-- `docs/pipelines/README.md` — index of the 3 canonical pipelines + sync rules
-- `docs/pipelines/lingerie.md` — lingerie pipeline flow, providers, costs, troubleshooting
-- `docs/pipelines/static-product.md` — static product pipeline + adaptive background matrix
-- `docs/pipelines/jewelry.md` — jewelry pipeline with sub-type routing
-- `docs/modules/README.md` — index of the 18 modules + which pipelines use each
-- `docs/architecture.md` — full API route + DB schema reference
-- `docs/guia-completa.md` — Spanish walkthrough
+**Start at `docs/README.md`** — it is the Diátaxis index and routes you to the right doc.
+
+**Explanation (why it is built this way)**
+- `docs/decisions/` — **11 ADRs.** Read the relevant one BEFORE changing a provider or an architectural boundary. ADR-0004 (segmentation over generation) is the structural decision of the project
+- `docs/architecture.md` — arc42 + C4: quality goals, constraints, container/component views, quality scenarios, and §11 risks & tech debt
+- `docs/process/README.md` — Double Diamond + DOT Framework: how decisions were researched, and which methods were deliberately rejected
+
+**Reference (look something up)**
+- `docs/providers.md` — provider per step, verified costs, and the tested/discarded log (**read before switching providers**)
+- `docs/reference/api-routes.md` — all 51 API routes with method and maxDuration
+- `docs/reference/data-model.md` — 7 Prisma models, 7 Zustand stores, storage layers and their invariants
+- `docs/reference/video-audio.md` — 7 video + 5 avatar + 2 TTS providers
+- `docs/modules/README.md` — index of the 18 modules ⚠️ stale since 2026-04-20; contradicts providers.md on the try-on default. `providers.md` wins
 - `docs/inventory.md` — Unistyles product catalog (486 products)
+
+**How-to (do a task)**
+- `docs/pipelines/README.md` — index of the 3 canonical pipelines + rules
+- `docs/pipelines/lingerie.md` · `static-product.md` · `jewelry.md` — per-pipeline flow, providers, costs, troubleshooting
+
+**Tutorial**
+- `docs/guia-completa.md` — Spanish walkthrough ⚠️ mixes all four Diátaxis types; stale since 2026-04-20

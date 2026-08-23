@@ -1,5 +1,53 @@
 # UniStudio — Changelog
 
+## 2026-08-23 — La documentación pasa a métodos reconocidos: ADR, arc42+C4, Diátaxis, Double Diamond y DOT
+
+**El README mentía en casi todos sus números.** Auditado contra el código: decía 37.114 líneas
+(son **70.831**), 29 rutas API (son **51**), 150 archivos fuente (son **207**), 10 páginas (son
+**12**) y 6 stores (son **7**). Faltaban por completo las tres páginas de pipeline —el corazón
+del producto desde junio—, el i18n ES/EN y Vercel Blob. Sobraban 120 líneas de una guía de QA
+de un branch mergeado en abril y un "Current Status (April 2026)" congelado cuatro meses.
+
+**Hallazgo de fondo: `/api/pipelines/*` no existe.** `CLAUDE.md` y `docs/pipelines/README.md`
+documentaban tres rutas de servidor que nunca se construyeron. Los pipelines se orquestan
+**desde el cliente**: cada `page.tsx` encadena `fetch` a las rutas de módulo y guarda el estado
+entre pasos. Eso explica dos cosas que no estaban escritas en ningún sitio: que cerrar la
+pestaña pierde el progreso, y que `lingerie/page.tsx` tenga **6.210 líneas**. Corregido en
+`CLAUDE.md` y documentado como deuda nº 1 en `architecture.md` §11.
+
+**Once ADR nuevos, ninguno inventado.** `docs/providers.md` ya era un registro de decisiones
+medidas sin el formato: benchmarks con tiempos, matrices de variables, tests de control. Se
+convirtió en `docs/decisions/` con formato MADR — contexto, alternativas, consecuencias y
+evidencia fechada. El de más peso es el **ADR-0004**: tres motores generativos independientes
+fallaron igual sobre el mismo bra atípico (2026-06-13), así que la infidelidad no es un
+problema de calidad sino de técnica, y de ahí sale la jerarquía segmentación → warp →
+composición → generación que ordena la arquitectura entera. La regla que sostiene la carpeta:
+un ADR aceptado no se edita ni se borra; si la decisión cambia, uno nuevo lo reemplaza.
+
+**`architecture.md` se reescribe en arc42 + C4.** Ya no es un árbol de carpetas que se pudre:
+ahora lleva objetivos de calidad **priorizados** (fidelidad por encima de coste, coste por
+encima de rendimiento), restricciones, contexto C4 nivel 1, contenedores y componentes,
+escenarios de calidad y **§11 con los 10 riesgos y deudas ordenados por impacto** — incluidos
+los cuatro que estaban solo en `providers.md` §5: el Paso 1 que genera sin avisar, el badge de
+proveedor hardcodeado a `leffa`, los errores de Uwear que se tragan y la mancha blanca del
+Paso 4. La referencia pura salió a `docs/reference/` (rutas API, modelo de datos, video/audio).
+
+**`docs/process/README.md` documenta el método, no el producto.** Double Diamond con la
+reflexión honesta de que el proyecto entró en *Develop* antes de terminar *Define*, y DOT
+Framework con las cinco estrategias mapeadas a trabajo real: Library (la doc de FASHN desmintió
+la creencia de que bloqueaba lencería), Lab (los cuatro experimentos con fechas), Workshop (los
+reverts como resultados). Incluye lo que **no** se hizo: el Showroom es la brecha grande, no
+hay usability testing formal. Y los métodos descartados a propósito —Scrum, GitFlow,
+microservicios, TDD estricto— con el motivo escrito.
+
+**Diátaxis como índice.** `docs/README.md` clasifica cada documento en tutorial / how-to /
+reference / explanation, y marca sin maquillar los cinco que están mal tipados o desactualizados
+—`guia-completa.md` mezcla los cuatro tipos, `modules/README.md` contradice a `providers.md` en
+el proveedor de try-on. No se movieron archivos: renombrar 17 docs rompería los enlaces y el
+`git blame` de los que sí se mantienen al día.
+
+Sin cambios de código. Solo documentación.
+
 ## 2026-08-09 — Lencería: la modelo IA nunca se creaba, y legibilidad del setup
 
 **"Ningún proveedor funciona" tenía una sola causa.** El auto-salto del paso *Crear

@@ -1,403 +1,119 @@
-# UniStudio — AI Product Photography Platform
+# UniStudio
 
-**For Unistyles** (Lingerie & Beauty E-Commerce, Curacao)
-
-> Turn raw product photos into luxury, professional e-commerce images and videos — automatically.
-
-[![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.2.3-blue)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.x-38bdf8)](https://tailwindcss.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-7.4.1-2D3748)](https://prisma.io/)
+**Fotografía de producto de catálogo, generada automáticamente.**
+Construido para [Unistyles](https://unistyles.com) — lencería y belleza, Curazao.
 
 ---
 
-## What Is This?
+## El problema
 
-UniStudio is a self-hosted Next.js web app that replaces $200+/month in SaaS tools (Photoroom, Claid, Pebblely, FASHN, remove.bg) with **ONE unified platform** costing $3-15/month in API fees.
+Unistyles vende **486 productos**. Cada uno necesita fotos de catálogo: fondo limpio, la prenda puesta sobre una modelo, vistas de detalle, video para redes. Hacerlo con estudio no escala, y hacerlo con SaaS costaba **más de $200 al mes** repartidos entre cinco herramientas que no se hablan entre sí.
 
-### Key Numbers
+UniStudio hace ese trabajo en una sola plataforma por **~$0.15 por producto en fotos** y **~$0.55 si incluye los dos videos** — coste medido end-to-end, no estimado.
 
-| Metric | Count |
-|--------|-------|
-| Lines of code | 37,114 |
-| Source files | 150 (62 TSX + 87 TS + 1 CSS) |
-| Module panels | 19 + 5 video sub-components |
-| API routes | 29 endpoints across 28 directories |
-| Zustand stores | 6 (3 persisted to localStorage) |
-| Prisma models | 7 |
-| Pages | 10 |
+## El requisito que manda sobre todos los demás
+
+> **La foto final tiene que mostrar el producto que el cliente va a recibir.**
+
+Parece obvio y es el problema difícil. Los modelos generativos **no preservan un producto atípico**: lo reemplazan por el promedio de su dataset. Un bra sin aro con cierre frontal sale convertido en un push-up genérico. Se comprobó con tres motores independientes y los tres fallaron igual.
+
+De ahí sale la regla que ordena toda la arquitectura:
+
+**Segmentación → warp → composición → generación.** En ese orden, y bajando de nivel solo cuando no queda alternativa. → [ADR-0004](docs/decisions/0004-segmentacion-sobre-generacion.md)
 
 ---
 
-## Quick Start
+## Empezar
 
 ```bash
 cd unistudio
-cp .env.example .env.local   # Add your API keys
+cp .env.example .env.local   # añade tus API keys
 npm install
 npx prisma generate
-npx prisma db push           # Create database tables
-npm run dev                   # http://localhost:3000
+npm run dev                  # http://localhost:3000
 ```
 
-After starting, visit `http://localhost:3000/api/health` to verify all services are connected.
+`http://localhost:3000/api/health` te dice qué proveedores responden.
+
+**La base de datos es opcional.** Sin `DATABASE_URL` la aplicación funciona; solo se pierde el historial persistente.
+
+**Claves imprescindibles:** `REPLICATE_API_TOKEN` y `FAL_KEY`. Todo lo demás es opcional y degrada limpiamente. La lista completa está en [`unistudio/README.md`](unistudio/README.md).
+
+> ⚠️ **fal.ai no es solo un proveedor de modelos: es también el storage de las imágenes intermedias.** Si esa cuenta se queda sin saldo, *todos* los pasos fallan a la vez y parece un bug de código. No lo es.
 
 ---
 
-## Documentation
+## Los tres pipelines
 
-### Pipelines (3 canonical, covering all 486 products)
-| Pipeline | Products | Doc |
-|---|---|---|
-| **Lencería** | 164 (bras + panties + shapewear) | [docs/pipelines/lingerie.md](./docs/pipelines/lingerie.md) |
-| **Estáticos** | 240 (perfumes + creams + sunscreen + deodorants + facial + makeup) | [docs/pipelines/static-product.md](./docs/pipelines/static-product.md) |
-| **Joyería** | 82 (earrings + necklaces + rings + bracelets + sets) | [docs/pipelines/jewelry.md](./docs/pipelines/jewelry.md) |
+El sistema tiene exactamente tres, y se dividen por **la física de la toma**, no por categoría comercial. Un bra y una faja son categorías distintas y la misma física.
 
-- **[Pipelines Index](./docs/pipelines/README.md)** — rules, auto-routing from folders, consolidation history
-- **[Modules Index](./docs/modules/README.md)** — 18 modules + which pipelines use each
+| Pipeline | Criterio | Productos | Documento |
+|---|---|---:|---|
+| **Lencería** | se lleva **puesto** sobre un cuerpo | 164 | [how-to](docs/pipelines/lingerie.md) |
+| **Estáticos** | es **rígido y se apoya** en una superficie | 240 | [how-to](docs/pipelines/static-product.md) |
+| **Joyería** | es **pequeño y reflectante**, sobre el cuerpo | 82 | [how-to](docs/pipelines/jewelry.md) |
 
-### Reference
-| Document | Purpose |
+486 = 100% del inventario. **Está prohibido crear un cuarto.** Si un producto no encaja en ninguno, es señal de rediseñar los tres. → [ADR-0003](docs/decisions/0003-tres-pipelines-canonicos.md)
+
+Por debajo hay **18 módulos** reutilizables (`/api/<módulo>`) que los pipelines orquestan. La lógica compartida vive en el módulo, nunca duplicada en dos pipelines.
+
+---
+
+## Cómo está construido
+
+Monolito modular en **Next.js 16** (App Router) sobre Vercel. Una sola aplicación, un solo deploy, límites internos en vez de límites de red — porque el cuello de botella son las APIs externas, no nuestro CPU. → [ADR-0001](docs/decisions/0001-monolito-modular.md)
+
+```
+UI  →  hook  →  /api/<módulo>  →  lib/processing/  →  lib/api/<proveedor>  →  API externa
+```
+
+`lib/api/` es la **única** capa que lee credenciales. Ocho adapters: fal.ai, Replicate, Photoroom, Uwear.ai, FASHN, WithoutBG, Vercel Blob y Anthropic.
+
+Stack: React 19 · TypeScript · Tailwind 4 · Zustand · Prisma 7 + PostgreSQL · Sharp · Fabric.js. Las versiones exactas están en `unistudio/package.json`.
+
+**Arquitectura completa:** [`docs/architecture.md`](docs/architecture.md) — en formato arc42 con vistas C4, incluyendo riesgos y deuda técnica sin maquillar.
+
+---
+
+## Métodos de trabajo
+
+El proyecto se documenta con marcos reconocidos, no con notas sueltas. Cada uno resuelve un problema concreto:
+
+| Marco | Para qué se usa aquí |
 |---|---|
-| **[Developer Setup](./unistudio/README.md)** | Quick start, env vars, build & deploy |
-| **[Architecture & API Reference](./docs/architecture.md)** | Project structure, 29 API routes, DB schema, video system, key patterns |
-| **[Guia Completa (ES)](./docs/guia-completa.md)** | Full project explanation in Spanish (beginner-friendly) |
-| **[Product Inventory](./docs/inventory.md)** | Complete Unistyles product catalog (486 products, 9 categories) |
+| **[Double Diamond](docs/process/README.md#1-double-diamond)** | Ordenar *qué problema* se resuelve. Este proyecto saltó a construir antes de definir, y la corrección está documentada |
+| **[DOT Framework](docs/process/README.md#2-dot-framework)** (Fontys) | Generar evidencia por triangulación: Library, Field, Lab, Showroom, Workshop |
+| **[ADR](docs/decisions/)** | 11 decisiones registradas con su evidencia medida. Un proveedor descartado sin explicación se vuelve a probar en tres meses |
+| **[arc42](docs/architecture.md) + [C4](docs/architecture.md#3-contexto--c4-nivel-1)** | Documentar la arquitectura por niveles, sin diagramas que se pudren |
+| **[Diátaxis](docs/README.md)** | Cada documento hace **una** cosa: enseñar, resolver, describir o explicar |
+| **README-Driven Development** | Este archivo. Corto, sin volcado de métricas |
+
+En el día a día: Trunk-Based Development, Conventional Commits, Documentation as Code, feature flags para revertir en producción sin redeploy, health checks y degradación elegante en cada capa.
+
+También hay métodos **descartados a propósito** — Scrum, GitFlow, microservicios, TDD estricto — con el motivo escrito en [`docs/process/README.md`](docs/process/README.md#métodos-considerados-y-descartados). Elegir método es parte del método.
 
 ---
 
-## Tech Stack
+## Documentación
 
-| Layer | Technology | Version |
-|---|---|---|
-| Framework | Next.js (App Router) | 16.1.6 |
-| UI | React + TypeScript | 19.2.3 + 5.x |
-| Styling | Tailwind CSS + Radix UI | 4.x |
-| State | Zustand (6 stores, 3 persisted) | 5.0.11 |
-| Database | Prisma + PostgreSQL | 7.4.1 |
-| Canvas | Fabric.js | 7.2.0 |
-| Image Processing | Sharp | 0.34.5 |
-| AI Image APIs | Replicate (pay-per-use) | 1.4.0 |
-| AI Video APIs | fal.ai (pay-per-use) | 1.2.1 |
-| AI Planning | Claude Haiku (Anthropic API) | — |
-| TTS | node-edge-tts (free) + Google Cloud | 1.2.10 |
-| Workflow Diagrams | @xyflow/react | 12.10.1 |
+Empieza por [**`docs/README.md`**](docs/README.md), que clasifica todo por tipo Diátaxis y te dice qué leer según lo que necesites.
+
+Los tres más consultados:
+
+- [`docs/providers.md`](docs/providers.md) — qué proveedor corre cada paso, cuánto cuesta, **y qué se probó y se descartó con la razón medida**
+- [`docs/decisions/`](docs/decisions/) — las 11 decisiones de arquitectura
+- [`docs/architecture.md`](docs/architecture.md) — arquitectura, riesgos y deuda técnica
 
 ---
 
-## 18 Modules
+## Estado
 
-| # | Module | Cost | What It Does |
-|---|---|---|---|
-| 1 | BG Remove | $0-0.004 | Remove backgrounds (browser WASM / Replicate / Docker) |
-| 2 | BG Generate | $0-0.05 | Generate new backgrounds (27 presets, 3 modes) |
-| 3 | Enhance | $0 | Color/brightness/contrast (10 presets, pure Sharp) |
-| 4 | Shadows | $0-0.05 | Drop/contact/reflection shadows + AI relighting |
-| 5 | Inpaint | $0.03-0.05 | Remove watermarks, tags, stains, change colors |
-| 6 | Outpaint | $0.05 | Extend images for 14 platform formats |
-| 7 | Try-On | $0.015-0.15 | Virtual try-on (IDM-VTON / Kolors / FASHN) |
-| 8 | Model Create | $0.05 | Generate AI fashion models (gender/age/skin/pose) |
-| 9 | Ghost Mannequin | $0.04-0.08 | Remove model (real human) → product 3D ghost / remove mannequin / flat-to-model / model-to-flat. Lingerie-aware (bra, panty, shapewear, bodysuit) via SeedDream edit. |
-| 10 | Jewelry Try-On | $0.05 | Apply earrings, necklaces, rings, bracelets, watches |
-| 11 | Video Studio | $0-0.80 | 7 video + 5 avatar + 2 TTS providers |
-| 12 | Batch Processing | varies | Process multiple images through configurable pipeline |
-| 13 | Brand Kit | $0 | Colors, fonts, logo, watermark, export templates |
-| 14 | Marketplace Compliance | $0 | Check 9 platform requirements + auto-fix |
-| 15 | Smart Editor | $0 | Adjust/transform/text/crop (all client-side via Fabric.js) |
-| 16 | AI Prompt Assistant | $0-0.003 | 4 AI-generated photo concepts per product |
-| 17 | Ad Creator | $0.04-0.35 | 7 social media ad templates (IG, TikTok, FB, YT, Pinterest) |
-| 18 | AI Agent | $0-0.25+ | 3 autonomous agents (E-Commerce, Modelo, Social) |
+En producción en <https://unistudio.vercel.app>. Los tres pipelines funcionan end-to-end y `main` despliega automáticamente.
+
+Lo que **no** está resuelto se lleva contado, no escondido: la orquestación es cliente-side (cerrar la pestaña pierde el progreso), `lingerie/page.tsx` tiene 6.210 líneas y es la mayor deuda del proyecto, algunos errores de proveedor se tragan sin diagnóstico, y falta usability testing formal. La lista completa y priorizada está en [`docs/architecture.md` §11](docs/architecture.md#11-riesgos-y-deuda-técnica).
 
 ---
 
-## AI Agent (Module 18)
+## Licencia
 
-The AI Agent orchestrates all other modules automatically:
-
-- **E-Commerce Agent**: Raw photo -> professional product listing
-- **Modelo Agent**: Garment -> AI model wearing it (copyright-free)
-- **Social Agent**: Product -> videos, banners, ads for social media
-
-### Smart Features (Phase 1+2 Complete)
-
-- **Image Analysis**: Auto-detects watermarks, bad lighting, low resolution, background type (Sharp + Claude Vision)
-- **Watermark Auto-Removal**: Detected watermarks trigger automatic inpaint step before processing
-- **Adaptive Planning**: Claude sees image analysis and builds smarter plans
-- **Plan Editor**: Users can add/remove/reorder steps and adjust parameters before execution
-- **Parallel Execution**: Independent steps (bg-remove + model-create) run simultaneously
-- **Quality Validation**: Each step's output validated before flowing to next step
-- **Visual Results**: Full-width step previews with click-to-zoom during execution
-- **Budget Validation**: Cost confirmation dialog before executing paid steps
-- **3 Budget Tiers**: Gratis ($0), Economico (<$0.20), Premium (best quality)
-
-```
-Pipeline: Upload -> Auto Analysis -> AI Planning (Claude Haiku) -> Plan Editor -> Parallel Execution -> Quality Validation -> Visual Results
-```
-
----
-
-## Pages
-
-| Path | Description |
-|---|---|
-| `/` | Dashboard — module cards, workflow guide, hero section |
-| `/editor` | Main editor — canvas + module panels + layers sidebar |
-| `/agent` | Standalone AI Agent — simplified 3-step workflow |
-| `/batch` | Batch processing — process multiple images at once |
-| `/brand-kit` | Brand identity — colors, fonts, logo, watermark |
-| `/gallery` | Processing history — browse, compare, re-download |
-| `/docs` | Interactive file explorer — project structure documentation |
-| `/workflows` | Visual workflow guide — step-by-step product photography |
-| `/architecture` | Interactive architecture diagram — system overview |
-
----
-
-## Project Structure
-
-```
-unistudio/
-  src/
-    app/
-      api/              # 29 API routes across 28 directories
-        analyze-image/   # Image analysis for agent intelligence
-        ai-agent/plan/   # AI pipeline planning (Claude Haiku)
-        bg-remove/       # Background removal (3 providers)
-        bg-generate/     # Background generation (3 modes)
-        video/           # Video generation (7 providers)
-        avatar/          # Talking-head avatars (5 providers)
-        ... (22 more)
-      page.tsx           # Dashboard
-      editor/page.tsx    # Main editor
-      agent/page.tsx     # Standalone AI agent
-      architecture/      # Architecture diagram page
-    components/
-      modules/           # 19 module panels
-      editor/            # Editor layout (sidebar, toolbar, canvas)
-      ui/                # 20+ shared UI components (toast, modal, etc.)
-      video/             # 6 video sub-components
-      dashboard/         # AgentChat component
-    hooks/               # 7 custom hooks
-      useAgentPipeline.ts  # Agent execution engine (801 lines)
-      use-toast.ts         # Toast notification system (Zustand)
-    lib/
-      api/               # 5 API clients (Replicate, fal.ai, FASHN, withoutBG, route-helpers)
-      processing/        # 16 processing modules
-      video/             # Video providers, presets, TTS, costs (5 files)
-      db/                # Prisma client, queries, persistence (3 files)
-      batch/             # Pipeline + queue (2 files)
-      brand/             # Brand kit + compliance (2 files)
-      utils/             # cn, constants, cost-tracker, image, prompts (6 files)
-    stores/              # 6 Zustand stores
-    types/               # 6 TypeScript type files (api, video, agent, batch, brand, editor)
-  prisma/
-    schema.prisma        # 7 models (Project, Image, ProcessingJob, BrandKit, AiModel, VideoProject, PromptTemplate)
-```
-
----
-
-## 🧪 Testing — Pipeline Fixes (Apr 30, 2026)
-
-Branch `claude/fix-pipeline-tests-aOzQG` (mergeado a `main`) contiene **9 commits** que arreglan el bug crítico "el producto cambia" + UX profesional. Vercel auto-deployó. Testear cada pipeline en orden:
-
-### Setup previo
-1. Verificar deploy Ready en `vercel.com/team_9ds1plRD0aD8vy4Ttmr2EnxU/unistudio/deployments` (commit `306df7d` o más reciente).
-2. Confirmar `ANTHROPIC_API_KEY` está set en Vercel — el análisis Vision y el identity-check lo usan.
-3. Variables opcionales solo si algo regresa:
-   - `LINGERIE_FLATTEN=0` → desactiva el flatten antes de Kolors
-   - `DEBUG_KOLORS=1` → logs detallados de Kolors en function logs
-
-### Test 1 — Lencería (`/pipelines/lingerie`, ref 011841)
-
-Upload: la foto del bra beige que reportaba el bug del tank-top mint.
-
-**Lo que tiene que funcionar:**
-- ✅ El RESULTADO muestra el bra beige (color real), NO un tank-top mint genérico.
-- ✅ El video del modelo se ve **completo de cabeza a cintura**, no recortado al busto.
-- ✅ El bra preserva tirantes y textura del input.
-
-**Si falla:** abrir Vercel function logs, buscar `[tryon:kolors] resolved fal URLs`. Pegar la `garment_image_url` en el browser — debería mostrar el bra beige sobre fondo blanco (no transparente). Si está transparente, el flatten no corrió: revisar que `LINGERIE_FLATTEN !== "0"`.
-
-### Test 2 — Estáticos (`/pipelines/static-product`)
-
-Upload: 2 perfumes con marcas distintas (Yanbal 43°N premium + Cyzone básico).
-
-**Lo que tiene que funcionar:**
-- ✅ Antes de procesar aparecen chips verdes **✨ "Lo que la IA ve en tu foto"** con: `frasco piramidal · vidrio-transparente · color · tapa rosca · marca legible`. Esto confirma que el análisis Vision corrió.
-- ✅ Las 3 tarjetas finales (Blanco $0, Adaptativo $0.003–0.05, Vertical $0.003) quedan verdes.
-- ✅ El frasco final tiene la **misma forma, color y etiqueta** que el input.
-- ✅ Click en el botón **ⓘ** junto al label de cada paso → tooltip con qué hace + proveedor + tiempo + tips.
-
-**Si "Adaptativo catálogo" falla:** la tarjeta debe mostrar el **mensaje del error real**, no solo `(!)`. El retry automático (Schnell con prompt strippeado) debería absorber la mayoría de fallos por filtro NSFW.
-
-**Si el frasco cambió:** debajo del thumbnail aparece chip ⚠ amarillo `"El producto cambió: <cambios específicos>"`. Eso confirma que el identity-check funciona.
-
-### Test 3 — Joyería (`/pipelines/jewelry`)
-
-Upload: un anillo dorado con piedras + (opcional) una cadena en plata.
-
-**Lo que tiene que funcionar:**
-- ✅ Chips verdes **✨** muestran `anillo · oro · brillante · 3 piedras transparentes` (los detalles dependen de tu foto).
-- ✅ El "estante" preserva el material — anillo dorado sale dorado (NO plateado), cadena de plata sale plateada (NO dorada).
-- ✅ **Paso "modelo" (commit `d50d29a`):** la mano/oreja/cuello de la modelo lleva el MISMO anillo/arete/cadena de tu foto, no uno inventado. Antes este paso ignoraba los features extraídos.
-- ✅ Si el material cambió: chip ⚠ amarillo `"La joya cambió: oro → plata"` (en estante o en modelo).
-- ✅ Tooltip **ⓘ** en cada paso (`isolate`, `upscale`, `estante`, `modelo`, `video`) abre panel con info.
-
-### Test 4 — Batch (`/batch`)
-
-Upload: las 4 fotos que daban "Missing field mode" antes (Ainnara cyzone.jpg, All Black cyzone.jpg, alma.jpg, alteus.jpg).
-
-Pipeline: `bg-remove → bg-generate`.
-
-**Lo que tiene que funcionar:**
-- ✅ DevTools Network → `POST /api/bg-generate` request body contiene `"mode":"precise"`.
-- ✅ Sin toast `"Missing required field 'mode'"`.
-- ✅ Si por alguna razón el mode field se pierde: `console.assert` lo grita inmediato en DevTools console (`[batch] bg-generate mode field is missing — regression of f5e57c1`).
-
-### 9 commits desplegados
-
-| Hash | Qué arregla |
-|---|---|
-| `d18f6f0` | Foundation: lib + endpoint `/api/product-features` |
-| `04ec248` | Lencería: white-flatten antes de Kolors (bra→tank-top fix) |
-| `5a3de94` | Estáticos: retry Schnell on content filter / 422 |
-| `1fd21ac` | UX errors visibles + jewelry preserve + video object-contain |
-| `bbac8d4` | Wire features → estáticos + joyería estante (chips ✨) |
-| `602aac2` | Identity-check + warning chips + batch console.assert |
-| `f8b49e4` | STEP_DOCS tooltip ⓘ por paso (paridad con lencería) |
-| `1742d00` | Docs (este testing guide) + prefer-const fix |
-| `d50d29a` | **Joyería paso modelo anclado a features** ⭐ |
-
-### Verificación de código previa al merge
-
-- ✅ `npx tsc --noEmit` — **0 errores TypeScript**
-- ✅ `npx eslint` en archivos tocados — **0 errores ESLint** (warnings preexistentes intactos)
-- ⚠ `npx next build` local fallaba solo por Google Fonts (sandbox sin internet); Vercel sí lo baja, build pasa en deploy
-
-### Endpoints nuevos (referencia rápida)
-- `POST /api/product-features` — `{ imageUrl, category: "lingerie"|"static-product"|"jewelry" }` → `{ success, data: <FeaturesObject>, cost, cached }`
-- `POST /api/identity-check` — `{ inputUrl, outputUrl, category }` → `{ success, data: { same, confidence, reason, changes }, cost }`
-
-### Archivos clave creados
-- `unistudio/src/lib/processing/product-features.ts` (foundation per-photo Vision analysis)
-- `unistudio/src/lib/processing/identity-check.ts` (post-procesamiento validator)
-- `unistudio/src/lib/processing/image-prep.ts` (`flattenToWhite`, `dominantRgb`)
-- `unistudio/src/app/api/product-features/route.ts`
-- `unistudio/src/app/api/identity-check/route.ts`
-
-### Cómo deshacer si algo se rompe en producción
-
-```bash
-git revert d50d29a f8b49e4 602aac2 bbac8d4 1fd21ac 5a3de94 04ec248 d18f6f0
-git push
-```
-
-O para deshacer SOLO el flatten de lencería (más quirúrgico):
-- En Vercel project settings → Environment Variables → agregar `LINGERIE_FLATTEN=0`
-- Redeploy
-
-### Si algo no funciona
-
-Dime exacto:
-1. **Qué pipeline** (lencería / estáticos / joyería / batch)
-2. **Qué hiciste** (subí 1 foto, hice click en X)
-3. **Qué viste** (qué mensaje, qué imagen)
-
-Lo arreglo en `claude/fix-pipeline-tests-aOzQG` y mergeo a main cuando esté.
-
----
-
-## Current Status (April 2026)
-
-### What's Complete
-- All 18 modules implemented with API routes and processing logic
-- All 19 module panels have UI (16 original + UpscalePanel, BatchProcessPanel, BrandKitPanel)
-- AI Agent Phase 1 (11 fixes) + Phase 2 (4 fixes) complete
-- **Stability Audit (Apr 12, 2026)**: 27 bug fixes across 30+ files — see below
-- Toast notifications on all 13 module panels
-- Global error boundary (error.tsx + global-error.tsx)
-- All UI text in Spanish
-- Luxury dark theme (#09090B background, #C5A47E gold accent)
-
-### Stability Audit — 27 Fixes (Apr 12, 2026)
-
-**Infrastructure:**
-- Vercel timeout fix: video/avatar/model-create routes now get 300s (was 60s — videos were failing)
-- API keys `.trim()` on all providers (fal, replicate, fashn) — trailing `\n` from env pull caused 401s
-- Global error boundary added — app no longer crashes on unhandled errors
-- Claude model IDs centralized in constants.ts (CLAUDE_HAIKU, CLAUDE_SONNET)
-
-**API Route Fixes:**
-- Video: added negative_prompt + lowered guidance_scale to prevent product duplication
-- Upscale: fixed Clarity params (resemblance 0.85, creativity 0.25) + use replicateUrl
-- Inpaint: negative_prompt now passed to flux-fill-pro/dev (was computed but never sent)
-- Kontext Pro: removed unsupported `output_format` param from jewelry + shadows
-- Avatar: added input validation (script length, provider, TTS provider checks)
-
-**Frontend Crash Fixes:**
-- Agent page: retry error handling + null guards on execution steps
-- Batch page: optional chaining on resultUrl to prevent crash
-- BgRemovePanel: replaced 9 canvas `getContext("2d")!` with proper null checks
-- Video results now saved to gallery (toPersistentThumbnail was failing on .mp4 URLs)
-
-**State Management Fixes:**
-- brand-store: added partialize to exclude base64 from localStorage
-- gallery-store: fixed addImage/addImages race condition (add sync, thumbnail async)
-- video-store: added QuotaExceededError-safe localStorage wrapper
-- brand-kit page: defaultShadowType now persisted to store
-
-**UX Fixes:**
-- Toast notifications added to all 13 module panels (was only 4)
-- Memory leaks fixed: blob URLs now revoked in useAgentPipeline, UpscalePanel, EnhancePanel
-
-### Known Gaps
-- No dedicated watermark removal module (uses inpaint + Kontext as workaround)
-- No auth/rate limiting (single-user tool by design)
-- No before/after comparison slider in module panels
-- No inpaint mask drawing mode (Fabric.js brush)
-- Brand Kit settings not yet auto-applied to module panels
-
-### Future Roadmap
-- **Phase 3**: Before/after slider, inpaint mask mode, UX polish
-- **Phase 4**: Multi-image batch agent, brand-aware processing
-- **Phase 5**: Timeouts, caching, progress streaming
-
----
-
-## API Keys Needed
-
-| Key | Required | For What | Get It |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection | Local Docker or cloud |
-| `REPLICATE_API_TOKEN` | Yes | All AI image processing | [replicate.com](https://replicate.com) |
-| `FAL_KEY` | Yes | Video generation (LTX, Wan 2.5, Kling, Minimax) | [fal.ai](https://fal.ai) |
-| `ANTHROPIC_API_KEY` | Optional | AI planning (Claude Haiku) + image analysis | [console.anthropic.com](https://console.anthropic.com) |
-| `FASHN_API_KEY` | Optional | Premium virtual try-on (FASHN v1.6) | [fashn.ai](https://fashn.ai) |
-| `HEDRA_API_KEY` | Optional | Premium avatar generation | [hedra.com](https://hedra.com) |
-| `GOOGLE_TTS_KEY` | Optional | Google Cloud TTS | [cloud.google.com](https://cloud.google.com) |
-| `WITHOUTBG_URL` | Optional | Self-hosted BG removal Docker | Self-hosted |
-| `UPSTASH_REDIS_REST_URL` | Optional | Redis caching | [upstash.com](https://upstash.com) |
-| `UPSTASH_REDIS_REST_TOKEN` | Optional | Redis auth token | [upstash.com](https://upstash.com) |
-
----
-
-## Cost Summary
-
-```
-FREE:         enhance, shadows(drop/contact/reflection), ken-burns video, edge-tts,
-              bg-remove(browser/docker), compliance, smart-editor, brand-kit
-
-$0.003-0.01:  bg-remove(replicate), bg-generate(fast), prompt-assist
-$0.02-0.03:   upscale(esrgan/aura), tryon(kolors/idm-vton), inpaint(flux-fill-dev)
-$0.04-0.05:   bg-generate(precise), model-create, tryon(fashn), outpaint,
-              shadows(ai-relight), inpaint(pro/kontext), jewelry, ghost-mannequin,
-              video(ltx/wan), avatar(musetalk)
-$0.05-0.10:   upscale(clarity), avatar(sadtalker/liveportrait)
-$0.35-0.80:   video(kling 5-10s), video(minimax 5-6s)
-```
-
----
-
-## License
-
-Private project for Unistyles, Curacao.
+Proyecto privado para Unistyles, Curazao.
