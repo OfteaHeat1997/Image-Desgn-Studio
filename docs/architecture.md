@@ -245,7 +245,7 @@ Los pasos independientes — bg-remove y model-create, por ejemplo — corren **
 | **Estrategia de ramas** | Trunk-Based: todo a `main` |
 | **Base de datos** | PostgreSQL vía Prisma 7. **Opcional** |
 | **Almacenamiento** | Vercel Blob para binarios. La DB guarda URLs, nunca bytes ([ADR-0010](decisions/0010-vercel-blob-almacenamiento.md)) |
-| **Timeouts** | Por ruta en `vercel.json`. `video`, `avatar`, `model-create`, `bg-generate` → 300 s; `upscale`, `face-swap` → 120 s; `analyze-product`, `identity-check`, `product-features` → 60 s |
+| **Timeouts** | `unistudio/vercel.json`. El glob `src/app/api/**/*.ts` da **60 s a todas** las rutas API; 12 tienen override a 300 s (video, avatar, model-create, tryon, upscale, ad-create, batch, bg-remove, bg-generate, jewelry-tryon, social-kit, jewelry-scene) y 6 a 120 s (inpaint, face-swap, outpaint, analyze-image, photo-clean, jewelry-prompts). Detalle en [`reference/api-routes.md`](reference/api-routes.md) |
 | **Salud** | `GET /api/health` reporta qué proveedores responden |
 | **Feature flags** | `LINGERIE_FLATTEN=0`, `DEBUG_KOLORS=1` — revierten en producción sin redeploy |
 | **Límite de subida** | El `.vercelignore` de la raíz mantiene el paquete bajo el límite de 10 MB. Los deploys corren **desde la raíz** |
