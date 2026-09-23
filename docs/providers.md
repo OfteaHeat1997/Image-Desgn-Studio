@@ -184,6 +184,18 @@ No es un parámetro mal puesto, es estructural:
 >
 > **No toques ese camino.**
 
+### 3.6 Real-ESRGAN mancha los PNG con transparencia (Estáticos, 2026-09-23)
+
+**PROBADO.** Foto: ésika "Triple Acción Max FPS 100" (PNG 473×911 **RGBA**, fuente limpia). El blanco e-commerce salía con manchas oscuras rayadas a la izquierda de "SOLAR" y "acción antiedad". Se aisló paso por paso con la misma foto:
+
+| Entrada a Real-ESRGAN (×4) | Resultado |
+|---|---|
+| PNG RGBA tal cual (como hacía la ruta) | ❌ Manchas — ya salen del upscale, rembg solo las hereda |
+| Mismo PNG aplanado sobre blanco (RGB) | ✅ Limpio |
+| PNG RGBA a ×2 sin reducir | ✅ Limpio (no sirve de regla: el caso ×4 sí falla) |
+
+**Arreglo en `/api/upscale`:** si la entrada tiene alfa, el modelo recibe solo el RGB aplanado sobre blanco y el alfa original se reescala con Sharp y se vuelve a pegar. Verificado por la ruta real: 1440×2772, 4 canales, sin manchas, recorte intacto. Afecta a todo el que llame a Real-ESRGAN (Estáticos, Joyería, panel Upscale, Agente).
+
 ---
 
 ## 4. Precios verificados (2026-08-14)

@@ -42,21 +42,23 @@ const PROVIDER_COSTS: Record<string, number> = {
   supir: 0.10, // SUPIR-v0Q en L40S — restauración real de fotos degradadas
 };
 
+/** Reads a data URL or fetches an HTTP URL (with Replicate auth when needed). */
+async function loadImageBuffer(imageUrl: string): Promise<Buffer> {
+  if (imageUrl.startsWith('data:')) {
+    return Buffer.from(imageUrl.split(',')[1], 'base64');
+  }
+  const { replicateHeaders } = await import('@/lib/utils/image');
+  const res = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
+  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
 /**
  * Downscale `imageUrl` so that width * height <= maxPixels, returning a data URL.
  * Returns the original URL untouched when it already fits.
  */
 async function fitToPixelBudget(imageUrl: string, maxPixels: number): Promise<string> {
-  let buffer: Buffer;
-  if (imageUrl.startsWith('data:')) {
-    const base64 = imageUrl.split(',')[1];
-    buffer = Buffer.from(base64, 'base64');
-  } else {
-    const { replicateHeaders } = await import('@/lib/utils/image');
-    const res = await fetch(imageUrl, { headers: replicateHeaders(imageUrl) });
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
-    buffer = Buffer.from(await res.arrayBuffer());
-  }
+  const buffer = await loadImageBuffer(imageUrl);
 
   const metadata = await sharp(buffer).metadata();
   const w = metadata.width ?? 0;
@@ -81,6 +83,13 @@ async function fitToPixelBudget(imageUrl: string, maxPixels: number): Promise<st
  * Run Real-ESRGAN with a shrinking input budget. Each attempt halves the input
  * pixel budget, so a piece that OOMs at 1M px gets a second chance at 500k
  * instead of taking the whole pipeline down with it.
+ *
+ * Transparent inputs (RGBA PNG cutouts) are split: the model only ever sees the
+ * RGB flattened on white, and the original alpha is resized with Sharp and
+ * re-attached afterwards. Measured 2026-09-23 on the ésika "Triple Acción Max"
+ * PNG (473x911 RGBA, clean source): sending the RGBA straight to the model
+ * painted dark striped blotches beside "SOLAR" and "acción antiedad"; the same
+ * image flattened came out clean.
  */
 async function runRealEsrgan(
   imageUrl: string,
@@ -90,14 +99,21 @@ async function runRealEsrgan(
   let budget = Math.floor(MAX_OUTPUT_PIXELS / (scale * scale));
   let lastError: unknown;
 
+  const source = await loadImageBuffer(imageUrl);
+  const hasAlpha = (await sharp(source).metadata()).hasAlpha === true;
+  const modelSource = hasAlpha
+    ? `data:image/png;base64,${(await sharp(source).flatten({ background: '#ffffff' }).png().toBuffer()).toString('base64')}`
+    : imageUrl;
+
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const safeUrl = await fitToPixelBudget(imageUrl, budget);
+      const safeUrl = await fitToPixelBudget(modelSource, budget);
       const output = await runModel(
         'nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa',
         { image: safeUrl, scale, face_enhance: faceEnhance },
       );
-      return await extractOutputUrl(output);
+      const outputUrl = await extractOutputUrl(output);
+      return hasAlpha ? await reattachAlpha(source, outputUrl) : outputUrl;
     } catch (err) {
       lastError = err;
       if (!isCapacityError(err)) throw err;
@@ -108,6 +124,29 @@ async function runRealEsrgan(
     }
   }
   throw lastError;
+}
+
+/**
+ * Resizes the source alpha to the upscaled frame, joins it to the model's RGB
+ * and uploads the result (a data URL this size would blow the 4.5MB response).
+ */
+async function reattachAlpha(source: Buffer, upscaledUrl: string): Promise<string> {
+  const upscaled = await loadImageBuffer(upscaledUrl);
+  const { width, height } = await sharp(upscaled).metadata();
+  if (!width || !height) throw new Error('Real-ESRGAN devolvió una imagen sin dimensiones');
+
+  const alpha = await sharp(source)
+    .extractChannel(3)
+    .resize(width, height, { fit: 'fill', kernel: 'lanczos3' })
+    .png()
+    .toBuffer();
+  // Two passes on purpose: in a single Sharp pipeline removeAlpha runs AFTER
+  // joinChannel and strips the alpha we just added (verified: came out 3ch).
+  const rgb = await sharp(upscaled).removeAlpha().png().toBuffer();
+  const merged = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+
+  const { uploadToFalStorage } = await import('@/lib/api/fal');
+  return uploadToFalStorage(merged, 'image/png', 'upscale-rgba.png');
 }
 
 /** Clarity upscaler — used as the automatic fallback when Real-ESRGAN gives up. */
