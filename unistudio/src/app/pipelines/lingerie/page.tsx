@@ -2169,6 +2169,24 @@ function StepCard({ step, stepNumber, isActive, previousResultUrl, onAccept, onS
             </div>
           )}
 
+          {/* PASO SALTADO: tambien se puede reintentar.
+              Un paso saltado (detenido a mano, saltado, o sin prerequisito)
+              quedaba SIN un solo boton: la unica salida era reiniciar todo el
+              pipeline y volver a pagar los pasos buenos. */}
+          {step.status === "skipped" && (
+            <div className="mt-4 flex items-center justify-end border-t border-white/6 pt-4">
+              <button
+                onClick={onRerun}
+                className="flex items-center gap-2 rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--bg-primary)] shadow-md transition-colors hover:brightness-105"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {step.providerOverride && step.providerOverride !== "auto"
+                  ? lg.stepCard.retryWith(lg.tryonProviders[step.providerOverride]?.label ?? step.providerOverride)
+                  : lg.stepCard.retry}
+              </button>
+            </div>
+          )}
+
           {/* Error retry — Reintentar es primario (botón grande violeta), Saltar secundario (link gris) */}
           {step.status === "error" && (
             <div className="mt-4 space-y-3 border-t border-white/6 pt-4">
@@ -4028,6 +4046,10 @@ export default function LingeriePipelinePage() {
   // aprieta "Detener" en un step, buscamos el controller y lo abort()amos.
   // Usamos useRef porque no queremos re-renderear al agregar/quitar entries.
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // Pasos ("jobId:stepId") en los que el loop de processJob esta ESPERANDO una
+  // accion (Aceptar / Saltar / Rehacer). Si el paso no esta aca, nadie escucha
+  // el evento "pipeline-action" y el boton no hacia nada — ver dispatchAction.
+  const waitingStepsRef = useRef<Set<string>>(new Set());
 
   const stopStep = useCallback((jobId: string, stepId: StepId) => {
     const key = `${jobId}:${stepId}`;
@@ -4621,6 +4643,7 @@ export default function LingeriePipelinePage() {
             let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
             const cleanup = () => {
               window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+              waitingStepsRef.current.delete(`${jobId}:${stepDef.id}`);
               clearTimeout(timeoutId);
             };
             const handler = (event: CustomEvent<{ jobId: string; stepId: string; action: string }>) => {
@@ -4638,6 +4661,7 @@ export default function LingeriePipelinePage() {
               }
             };
             window.addEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+            waitingStepsRef.current.add(`${jobId}:${stepDef.id}`);
             timeoutId = setTimeout(() => {
               cleanup();
               updateStep(jobId, stepDef.id, { status: "skipped" });
@@ -4720,6 +4744,7 @@ export default function LingeriePipelinePage() {
             let timeoutId: ReturnType<typeof setTimeout> | undefined = undefined;
             const cleanup = () => {
               window.removeEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+              waitingStepsRef.current.delete(`${jobId}:${stepDef.id}`);
               clearTimeout(timeoutId);
             };
             const handler = (event: CustomEvent<{ jobId: string; stepId: string; action: string }>) => {
@@ -4734,6 +4759,7 @@ export default function LingeriePipelinePage() {
               }
             };
             window.addEventListener("pipeline-action" as keyof WindowEventMap, handler as EventListener);
+            waitingStepsRef.current.add(`${jobId}:${stepDef.id}`);
             timeoutId = setTimeout(() => {
               cleanup();
               updateStep(jobId, stepDef.id, { status: "skipped" });
@@ -4979,12 +5005,95 @@ export default function LingeriePipelinePage() {
   }, [jobs, steps, sharedModelUrl, sharedSeed, processJob]);
 
   /* ---- Manual mode action dispatcher ---- */
-  const dispatchAction = useCallback((jobId: string, stepId: StepId, action: "accept" | "skip" | "rerun") => {
-    if (action === "rerun") {
-      updateStep(jobId, stepId, { status: "idle", resultUrl: undefined, error: undefined });
+  /**
+   * Re-ejecuta UN paso por su cuenta, fuera del loop de processJob.
+   *
+   * "Rehacer" solo funcionaba mientras el loop estaba parado esperando ESE paso.
+   * Si el paso ya se habia saltado/aceptado, o el pipeline habia terminado,
+   * nadie escuchaba el evento y el boton no hacia nada: "ningun paso me deja
+   * reintentarlo". La entrada se reconstruye desde los resultados guardados en
+   * el job, con las mismas reglas que usa processStep.
+   */
+  const rerunStepStandalone = useCallback(async (jobId: string, stepId: StepId) => {
+    const jobsNow = await new Promise<ImageJob[]>((resolve) => {
+      setJobs((prev) => { resolve(prev); return prev; });
+    });
+    const job = jobsNow.find((j) => j.id === jobId);
+    const step = job?.steps.find((s) => s.id === stepId);
+    if (!job || !step) return;
+
+    const res = (id: StepId) => {
+      const s = job.steps.find((st) => st.id === id);
+      return s && (s.status === "done" || s.status === "accepted") ? s.resultUrl : undefined;
+    };
+    const isolated = res("isolate");
+    let input: string | undefined;
+    switch (stepId) {
+      case "isolate":
+        input = job.falUrl || job.uploadedUrl; break;
+      case "model":
+        input = job.falUrl || job.uploadedUrl || ""; break;
+      case "texturePreserve":
+        input = res("tryon"); break;
+      case "photoFullBody":
+        input = res("texturePreserve") || res("tryon"); break;
+      case "modelVideo":
+      case "heroVideo":
+        input = res("photoFullBody") || res("texturePreserve") || res("tryon") || sharedModelUrl; break;
+      case "photoBack":
+        input = res("texturePreserve") || res("tryon") || isolated; break;
+      case "tryon":
+        input = isolated || job.falUrl || job.uploadedUrl; break;
+      default: // photoSide, photoDetail, productVideo: necesitan la prenda aislada
+        input = isolated;
     }
-    window.dispatchEvent(new CustomEvent("pipeline-action", { detail: { jobId, stepId, action } }));
-  }, [updateStep]);
+    if (input === undefined) {
+      updateStep(jobId, stepId, {
+        status: "skipped",
+        error: "Falta el resultado de un paso anterior. Reintentá primero ese paso.",
+      });
+      return;
+    }
+
+    updateStep(jobId, stepId, { status: "processing", inputUrl: input, error: undefined, resultUrl: undefined });
+    try {
+      const result = await executeStep(job, step, input, sharedModelUrl, sharedSeed, isolated, jobsNow);
+      if (result.newModelUrl) setSharedModelUrl(result.newModelUrl);
+      if (result.newSeed !== undefined) setSharedSeed(result.newSeed);
+      updateStep(jobId, stepId, {
+        status: "done",
+        resultUrl: result.resultUrl,
+        cost_actual: result.cost,
+        candidates: result.candidates,
+        usedProvider: result.usedProvider,
+      });
+      setJobs((prev) => prev.map((j) => j.id !== jobId ? j : { ...j, totalCost: j.totalCost + result.cost }));
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        updateStep(jobId, stepId, { status: "skipped", error: lg.messages.stoppedByUser });
+        return;
+      }
+      const raw = err instanceof Error ? err.message : lg.messages.unknownError;
+      const isNetworkError = /failed to fetch|networkerror|load failed|network request failed/i.test(raw);
+      updateStep(jobId, stepId, { status: "error", error: isNetworkError ? lg.messages.networkError : raw });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [executeStep, sharedModelUrl, sharedSeed, updateStep]);
+
+  const dispatchAction = useCallback((jobId: string, stepId: StepId, action: "accept" | "skip" | "rerun") => {
+    // Si el loop del pipeline esta esperando este paso, el le responde.
+    if (waitingStepsRef.current.has(`${jobId}:${stepId}`)) {
+      if (action === "rerun") {
+        updateStep(jobId, stepId, { status: "idle", resultUrl: undefined, error: undefined });
+      }
+      window.dispatchEvent(new CustomEvent("pipeline-action", { detail: { jobId, stepId, action } }));
+      return;
+    }
+    // Nadie espera: el boton actua por su cuenta (antes no pasaba nada).
+    if (action === "rerun") void rerunStepStandalone(jobId, stepId);
+    else if (action === "accept") updateStep(jobId, stepId, { status: "accepted" });
+    else updateStep(jobId, stepId, { status: "skipped" });
+  }, [updateStep, rerunStepStandalone]);
 
   /* ---- Download all results ---- */
   const downloadAll = useCallback(async () => {
