@@ -4659,11 +4659,19 @@ export default function LingeriePipelinePage() {
         // fetch() tira DOMException con name "AbortError". Lo mostramos como
         // status "skipped" con mensaje claro, no como error rojo — fue una
         // acción deliberada de la usuaria, no un fallo.
-        const isAbort = err instanceof Error && (err.name === "AbortError" || /aborted|the user aborted/i.test(rawMsg));
+        // Solo el nombre del error identifica un abort real. Antes tambien se
+        // buscaba "aborted" en el mensaje, y un error del proveedor que contuviera
+        // esa palabra se disfrazaba de "Detenido por la usuaria".
+        const isAbort = err instanceof Error && err.name === "AbortError";
         if (isAbort) {
           updateStep(jobId, stepDef.id, { status: "skipped", error: lg.messages.stoppedByUser });
-          // Señal al caller: salir del loop, no procesar más steps.
-          return true;
+          // DETENER UN PASO NO ES DETENER EL PIPELINE.
+          // Antes cualquier abort devolvia `true` y el caller rompia el loop: la
+          // usuaria detenia la Foto Lateral (lenta) y los pasos 4+ quedaban en
+          // "Pendiente" para siempre — el pipeline "dejaba de funcionar despues
+          // del paso 3". Ahora solo corta si se apreto "Detener todo"
+          // (batchAbortRef); un Detener por paso salta ese paso y sigue.
+          return batchAbortRef.current;
         }
 
         // Smart fallback: si photoFullBody / photoBack fallan y la usuaria

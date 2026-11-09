@@ -1001,7 +1001,7 @@ export const LINGERIE_PIPELINE_ES: LingeriePipelineCopy = {
       'Foto Cuerpo Completo necesita el resultado del Try-On (Foto Frontal). Activá y corré la Foto Frontal primero.',
     productVideoSkip:
       "El Video 360° necesita la prenda aislada y el paso 'Aislar Producto' no dejó resultado. Reintentá ese paso, o desactivá este video.",
-    stoppedByUser: 'Detenido por la usuaria',
+    stoppedByUser: 'Detenido por la usuaria — seguimos con el paso siguiente',
     stepFellBack: (stepLabel, filename) =>
       `${stepLabel} falló — usamos tu foto real (${filename}) en su lugar para no perder el paso.`,
     networkError: 'Error de conexión. Revisá tu internet y reintentá.',
@@ -1684,7 +1684,7 @@ export const LINGERIE_PIPELINE_EN: LingeriePipelineCopy = {
       'Full Body Photo needs the Try-On result (Front Photo). Turn on and run the Front Photo first.',
     productVideoSkip:
       "The 360° Video needs the isolated garment and the 'Isolate Product' step left no result. Retry that step, or turn off this video.",
-    stoppedByUser: 'Stopped by the user',
+    stoppedByUser: 'Stopped by the user — moving on to the next step',
     stepFellBack: (stepLabel, filename) =>
       `${stepLabel} failed — we used your real photo (${filename}) instead so the step is not lost.`,
     networkError: 'Connection error. Check your internet and retry.',
