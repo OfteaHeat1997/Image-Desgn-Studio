@@ -1,5 +1,22 @@
 # UniStudio — Changelog
 
+## 2026-11-09 — Lencería: detener o saltar un paso ya no deja el pipeline sin salida
+
+**Detener un paso cortaba el producto entero.** El botón Detener abortaba el paso y
+`processStep` devolvía `true`, así que el loop se rompía y del Paso 4 en adelante todo
+quedaba en "Pendiente" para siempre. Ahora solo "Detener todo" corta; un Detener por paso
+salta ese paso y sigue. El abort se detecta por `err.name === "AbortError"`, no por la
+palabra "aborted" en el mensaje (un error real del proveedor se disfrazaba de "Detenido
+por la usuaria"). — `a57c09f`
+
+**Reintentar no hacía nada fuera del momento exacto.** El botón solo respondía si el loop
+estaba esperando ESE paso; con el paso saltado, aceptado o el pipeline terminado, el clic
+se perdía. Ahora, si nadie espera, el paso se re-ejecuta solo, reconstruyendo su entrada
+desde los resultados guardados del producto. Los pasos saltados muestran "Reintentar". — `80d4caf`
+
+**Sin verificar todavía:** por qué fallan los pasos 3+ en producción (los pasos 1 y 2
+funcionan, según la prueba de la usuaria del 2026-11-09). Falta el mensaje de error.
+
 ## 2026-08-23 — La documentación pasa a métodos reconocidos: ADR, arc42+C4, Diátaxis, Double Diamond y DOT
 
 **El README mentía en casi todos sus números.** Auditado contra el código: decía 37.114 líneas
