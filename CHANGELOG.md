@@ -1,5 +1,19 @@
 # UniStudio — Changelog
 
+## 2026-11-11 — Lencería: la Foto Espalda deja de mostrar la mancha blanca
+
+**La mancha blanca sobre el omoplato era el top del avatar asomando.** El aislado de la
+foto de espalda llegaba a FASHN chico y descentrado (~19% del cuadro en la ref 011473);
+el bra quedaba corto sobre la espalda del avatar de Uwear y por el hueco se veía su top
+blanco, más parches en la piel. `/api/tryon/async` ahora recorta la prenda a su bounding
+box (+6% de margen blanco) antes del warp. Medido en producción con el mismo avatar:
+mancha 3/3 antes → 0/4 después. — `6c50802`
+
+**Sigue abierto:** la forma de la prenda varía entre corridas (2/4 fieles; las otras
+inventan "mangas"). Mientras tanto, usar el modo multi-muestra del Paso 4. Próxima
+prueba: `segmentation_free:false` aislado (requiere `UWEAR_API_KEY` local). Ver
+`docs/providers.md` §3.7.
+
 ## 2026-11-09 — Lencería: detener o saltar un paso ya no deja el pipeline sin salida
 
 **Detener un paso cortaba el producto entero.** El botón Detener abortaba el paso y
