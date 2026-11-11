@@ -196,6 +196,19 @@ No es un parámetro mal puesto, es estructural:
 
 **Arreglo en `/api/upscale`:** si la entrada tiene alfa, el modelo recibe solo el RGB aplanado sobre blanco y el alfa original se reescala con Sharp y se vuelve a pegar. Verificado por la ruta real: 1440×2772, 4 canales, sin manchas, recorte intacto. Afecta a todo el que llame a Real-ESRGAN (Estáticos, Joyería, panel Upscale, Agente).
 
+### 3.7 Foto Espalda (Paso 4): la mancha blanca era el recorte demasiado chico (Lencería, 2026-11-11)
+
+**PROBADO.** Ref 011473 (bra negro de soporte, foto de espalda 3/4). Producción, mismo avatar de Uwear (`full_body_back`), FASHN v1.6 `segmentation_free:true`. El aislado de grounded-sam deja la prenda en su lugar original: 241×226 px dentro de un lienzo de 486×596 (~19% del cuadro).
+
+| Prenda que recibe FASHN | Mancha blanca (top del avatar asomando) | Prenda fiel (tirantes + malla) |
+|---|---|---|
+| Aislado tal cual (como hacía la ruta) | ❌ 3/3 | ❌ 0/3 — además manchas en la piel |
+| Aislado ajustado al bounding box + 6% de margen blanco | ✅ 0/4 | ⚠️ 2/4 — las otras 2 inventan "mangas" caídas |
+
+**Arreglo en `/api/tryon/async`** (solo `engine:'fashn'`): se recorta la prenda a su bounding box con Sharp antes del warp. Quita la mancha siempre; la forma sigue variando entre corridas (variabilidad propia de FASHN, no del recorte) — por eso conviene el modo multi-muestra del Paso 4 para elegir.
+
+**DESCARTADO en la misma sesión:** volver al camino de junio (foto de espalda como prenda → Uwear). Con el avatar fijo 21663 Uwear devuelve a la modelo **de frente** (1/1). El buen resultado de junio dependía de `avatar_id: null`.
+
 ---
 
 ## 4. Precios verificados (2026-08-14)

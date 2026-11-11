@@ -140,7 +140,50 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
   }
 
   const humanImageUrl = await ensureFalAccessibleUrl(modelImage);
-  const garmentImageUrl = await ensureFalAccessibleUrl(body.garmentImage!);
+  let garmentImageUrl = await ensureFalAccessibleUrl(body.garmentImage!);
+
+  // AJUSTAR EL RECORTE A LA PRENDA ANTES DEL WARP (Foto Espalda / FASHN).
+  //
+  // El aislado de grounded-sam devuelve la prenda en su lugar original dentro
+  // del lienzo entero de la foto: en la ref 011473 la prenda ocupaba 241x226 px
+  // de 486x596 (~19% del cuadro), descentrada. FASHN la escalaba mal, el bra
+  // quedaba corto sobre la espalda del avatar y por el hueco asomaba el top
+  // BLANCO del avatar (la "mancha blanca") y salian parches en la piel.
+  //
+  // Medido 2026-11-11 en produccion, mismo avatar, misma prenda: recorte tal
+  // cual → mancha blanca + piel manchada; recorte ajustado al bounding box con
+  // 6% de margen blanco → sin mancha, piel limpia, malla y banda en su lugar.
+  // Es el arreglo que quedo anotado en el revert b9c6a36.
+  //
+  // Solo para FASHN (hoy solo lo usa la Foto Espalda). Si algo falla seguimos
+  // con la prenda original: un resultado imperfecto es mejor que ninguno.
+  if (body.engine === 'fashn') {
+    try {
+      const gRes = await fetch(garmentImageUrl);
+      if (gRes.ok) {
+        const raw = Buffer.from(await gRes.arrayBuffer());
+        // Fondo blanco: el aislado viene sobre blanco opaco (o transparente,
+        // que flatten convierte a blanco) — trim corta todo lo uniforme.
+        const flat = await sharp(raw).flatten({ background: '#ffffff' }).png().toBuffer();
+        const before = await sharp(flat).metadata();
+        const t = await sharp(flat).trim({ threshold: 12 }).toBuffer({ resolveWithObject: true });
+        const shrunk = t.info.width < (before.width ?? 0) || t.info.height < (before.height ?? 0);
+        if (shrunk) {
+          const pad = Math.round(Math.max(t.info.width, t.info.height) * 0.06);
+          const fitted = await sharp(t.data)
+            .extend({ top: pad, bottom: pad, left: pad, right: pad, background: '#ffffff' })
+            .png()
+            .toBuffer();
+          garmentImageUrl = await uploadToFalStorage(fitted, 'image/png', 'garment-fitted.png');
+          console.log(
+            `[tryon-async] prenda ajustada al bounding box: ${before.width}x${before.height} → ${t.info.width + 2 * pad}x${t.info.height + 2 * pad}`,
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('[tryon-async] no se pudo ajustar la prenda, sigo con la original:', e instanceof Error ? e.message : e);
+    }
+  }
 
   // MOTOR: FASHN MASKLESS PARA LA ESPALDA.
   //
@@ -189,6 +232,8 @@ export const POST = withApiErrorHandler('tryon-async', async (request: NextReque
         // mancha NO es una alucinacion, es el top del avatar. El arreglo correcto
         // NO pasa por esta bandera, sino por que la silueta de entrada calce:
         // recortar el cutout al bounding box de la prenda antes del warp.
+        // HECHO 2026-11-11 (bloque "AJUSTAR EL RECORTE" mas arriba), medido:
+        // con la prenda ajustada la mancha desaparece sin tocar esta bandera.
         segmentation_free: true,
         moderation_level: 'permissive',
         garment_photo_type: 'flat-lay',

@@ -194,6 +194,7 @@ escena y luz, nunca el color del producto.
 | Timeout en paso 1 | grounded_sam + composite > 60s en Hobby | `vercel.json` ya tiene 300s para `/api/bg-remove` |
 | 413 al guardar resultado | Payload > 4.5MB en body | Usar `/api/upload` primero, guardar URL — no data URI |
 | Video duplica el producto | wan-2.2-fast sin `negative_prompt` | Pasar `negative_prompt: "duplicate, repeating, clone, multiple bodies"` + `guidance_scale: 3.0` |
+| Foto Espalda con una "mancha blanca" sobre el omoplato y parches en la piel | El aislado llegaba a FASHN chico y descentrado en un lienzo grande → el bra quedaba corto y asomaba el top blanco del avatar | Corregido 2026-11-11: `/api/tryon/async` ajusta la prenda a su bounding box antes del warp (ver `docs/providers.md` §3.7). Si la forma sale rara (mangas), usar multi-muestra y elegir |
 | Foto Espalda muestra un bra distinto al original | Kolors recibió la vista FRONTAL como garment ref y "inventó" la espalda | El step ahora se SALTA con warning si no hay foto etiquetada "espalda". Subí la foto trasera real y reintentá. |
 
 ---
